@@ -1,0 +1,40 @@
+PROJEKT ÖSSZEFOGLALÓ – AI HANGASSZISZTENS RENDSZER
+====================================================
+
+1. CÉLOK ÉS ELVÁRÁSOK
+---------------------
+- Egy olyan hangalapú AI asszisztens létrehozása, amely Slack-en keresztül vezérelhető, de később telefonos hívásokat is tud kezelni (kimenő, bejövő).
+- A rendszer képes legyen:
+  * Slack parancsra (pl. /call) hanghívást indítani egy felhasználóval.
+  * A hívás során az AI (STT → LLM → TTS) természetes nyelvű párbeszédet folytasson.
+  * Időpontokat foglaljon (naptárintegrációval, pl. Google Calendar).
+  * Több nyelvet támogasson (elsődlegesen magyar, később más nyelvek).
+- A teljes rendszer Docker-konténerekben fusson, és egyetlen .env fájl konfigurálásával telepíthető legyen bármely Linux rendszeren (elsősorban Raspberry Pi 4-en).
+- A megoldás nyílt forráskódú komponensekre épüljön, ne legyen függő fizetős felhőszolgáltatásoktól (kivéve a használt MI API-k, mint OpenAI, Deepgram).
+
+2. Tervek
+
+Készíts tervet arra, hogy hány docker konténer szükséges a rendszerhez, és milyen szerepet töltenek be.
+készíts terrvet arra, hogyan konfiguráljuk a Raspberry PI-t a docker konténer futtatása előtt.
+Készíts listát, milyen szoftverek telepítése szükséges a rendszerhez. Használd a scripts könyvtárat, ahol egy initial script mindezeket megcsinálja (scripts könyvtár)
+
+Követelmények:
+- Minden beállítás egy .env fájlban történik (API kulcsok, szerver URL, nyelvek).
+- A docker-compose.yml egyetlen paranccsal (docker compose up -d) elindítja a teljes stacket.
+- A LiveKit szerver konfigurációja (portok, kulcsok) a livekit.yaml-ben.
+- A Slack bot konfigurációja (token, signing secret) a .env fájlban.
+- A telefonos rendszer későbbi konfigurációja (csak leírás és placeholder kell)
+
+Telepítési lépések (magas szinten):
+1. Rendszer előkészítés (Docker, Git telepítése a Raspberry Pi-n).
+2. Repó klónozása.
+3. .env fájl létrehozása és kitöltése a szükséges API kulcsokkal.
+4. Slack App létrehozása a megfelelő jogosultságokkal és slash parancsokkal.
+5. docker compose build && docker compose up -d.
+
+4. TECHNOLÓGIAI KÖVETELMÉNYEK
+-----------------------------
+- Hardver: Raspberry Pi 4 (8GB+ RAM) vagy bármilyen Linux szerver (x86/ARM).
+- Szoftver: Docker, Docker Compose, Git.
+
+

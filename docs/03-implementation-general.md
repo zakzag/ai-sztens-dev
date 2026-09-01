@@ -170,7 +170,3 @@ Both are executed by the same **Action Executor** against the `Action` interface
 
 - Process diagram: [`02-flowchart.md`](02-flowchart.md)
 
-## 9. Stack Decision
-
-The concrete stack decision (incl. B2B / multi-tenant considerations) is tracked in
-[`Plans/05-b2b-merge.md`](Plans/05-b2b-merge.md).

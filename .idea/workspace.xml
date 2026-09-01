@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="0bf25cbd-a929-4a4c-a0fb-3f140a273081" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/docs/Plans/03-why-not-n8n.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/Plans/04-Laravel_vs_NestJS.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/callback-assistant.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/01-callback-assistant.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/class-diagram.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/entities.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/flowchart.drawio" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/flowchart.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/02-flowchart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/implementation-general.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/03-implementation-general.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/implementation-php.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/implementation-typescript.md" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
+  <component name="ProjectId" id="3IgXhWIQq2kBmzTh2WTIT3f1Bs1" />
+  <component name="ProjectViewState">
+    <option name="autoscrollFromSource" value="true" />
+    <option name="autoscrollToSource" value="true" />
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;E:/projects/AI/2026-08-31-call-assistant&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
+  }
+}</component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-a71380e98a7c-JavaScript-WS-252.28539.60" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="0bf25cbd-a929-4a4c-a0fb-3f140a273081" name="Changes" comment="" />
+      <created>1788187305105</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1788187305105</updated>
+      <workItem from="1788187306243" duration="18672000" />
+      <workItem from="1788259310535" duration="8885000" />
+      <workItem from="1788292792499" duration="7878000" />
+      <workItem from="1788303484848" duration="191000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

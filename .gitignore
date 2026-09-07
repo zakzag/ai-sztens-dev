@@ -1,7 +1,10 @@
 # compiled output
-/dist
-/node_modules
-/build
+dist/
+build/
+coverage/
+
+# dependencies
+node_modules/
 
 # Logs
 logs
@@ -16,24 +19,22 @@ lerna-debug.log*
 .DS_Store
 
 # Tests
-/coverage
-/.nyc_output
+coverage/
+.nyc_output/
 
 # IDEs and editors
-/.idea
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .project
 .classpath
 .c9/
 *.launch
 .settings/
 *.sublime-workspace
-
-# IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
 
 # dotenv environment variable files
 .env

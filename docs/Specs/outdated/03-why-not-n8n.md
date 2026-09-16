@@ -8,7 +8,7 @@
 ### 1. A saját elved sérülne
 
 A terv kulcselve: **a backend a döntéshozó, a külső szolgáltatások csak végrehajtók**
-(lásd: [`01-callback-assistant.md`](../01-callback-assistant.md)).
+(lásd: [`01-callback-assistant.md`](../../01-callback-assistant.md)).
 
 Ha az n8n lenne az orkesztrátor, akkor egy külső, fekete dobozos runtime válna a
 döntéshozóvá, a saját backend pedig csak adattárolóvá degradálódna — ez fordított irány.

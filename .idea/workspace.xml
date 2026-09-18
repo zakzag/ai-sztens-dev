@@ -5,14 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0bf25cbd-a929-4a4c-a0fb-3f140a273081" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/docs/Specs/01-Brainstorming.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/prompts/2026-09-18-droplet-setup.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/Plans/01-AI_telefonos_munkatars_uzleti_es_technikai_terv.pdf" beforeDir="false" afterPath="$PROJECT_DIR$/docs/Specs/outdated/01-AI_telefonos_munkatars_uzleti_es_technikai_terv.pdf" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/Plans/02-Magyar-nyelvu-AI-visszahivo-ugynok-technologiai-es-uzleti-terv.pdf" beforeDir="false" afterPath="$PROJECT_DIR$/docs/Specs/outdated/02-Magyar-nyelvu-AI-visszahivo-ugynok-technologiai-es-uzleti-terv.pdf" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/Plans/03-why-not-n8n.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/Specs/outdated/03-why-not-n8n.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/Plans/04-Laravel_vs_NestJS.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/Specs/outdated/04-Laravel_vs_NestJS.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/memories/2026-09-02-initialize-nestjs-plan.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/memories/2026-09-02-initialize-nestjs-plan.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-lock.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.roo/rules/general.coding-standards.md" beforeDir="false" afterPath="$PROJECT_DIR$/.roo/rules/general.coding-standards.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.roo/rules/instructions.md" beforeDir="false" afterPath="$PROJECT_DIR$/.roo/rules/instructions.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.roo/rules/project-context.md" beforeDir="false" afterPath="$PROJECT_DIR$/.roo/rules/project-context.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/api/Dockerfile" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/memories/2026-09-02-initialize-nestjs-plan.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/history/2026-09-02-initialize-nestjs-plan.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/memories/2026-09-02-monorepo-frontend-plan.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/history/2026-09-02-monorepo-frontend-plan.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

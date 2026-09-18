@@ -2,5 +2,8 @@
 
 # Documentation
 
-- Every plan needs to be written in a documentation file, in folder: docs/memories/*
-- Plan filename must be \<datetime in ISO format\>-\<short description\>.md
+- Every time a chat is opened and plan discussed, code implemented, 
+  the summary of the changes need to be written in a documentation file, 
+  in folder: docs/history/, 
+  filename must be: \<datetime in ISO format\>-\<short description\>.md
+

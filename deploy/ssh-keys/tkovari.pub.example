@@ -1,0 +1,2 @@
+# Replace with the real public key and rename to tkovari.pub
+# ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... tkovari@callback

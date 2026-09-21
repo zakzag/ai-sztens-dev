@@ -1,0 +1,41 @@
+# Callback Assistant — reverse proxy + TLS.
+# Caddy automatically obtains and renews Let's Encrypt certificates for the
+# configured hosts. DNS A records must point at the droplet before first start.
+
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+# Public API origin. Browser clients and inbound webhooks (e.g. VAPI) use this.
+api.{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:3000
+}
+
+# Public website + same-origin /api passthrough.
+# NOTE: static frontends are served via separate site blocks (see the admin
+# example below) because `handle` blocks cannot be mixed with `root`/`try_files`.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Any /api/* request is forwarded to the NestJS API.
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# Until a static site is mounted, redirect the apex to the API subdomain.
+	handle {
+		redir https://api.{$DOMAIN} 307
+	}
+}
+
+# Optional admin dashboard static site.
+# admin.{$DOMAIN} {
+# 	encode zstd gzip
+# 	root * /srv/admin
+# 	try_files {path} /index.html
+# 	handle /api/* {
+# 		reverse_proxy api:3000
+# 	}
+# }

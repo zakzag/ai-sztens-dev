@@ -1,0 +1,26 @@
+# Callback Assistant — local (WSL / Debian) override.
+# Merged on top of infra/docker-compose.yml, so it does NOT change the droplet setup.
+#
+# Usage (inside WSL, from the repo root):
+#   cp infra/.env.example infra/.env        # fill DOMAIN/POSTGRES_PASSWORD etc.
+#   docker compose --env-file infra/.env \
+#     -f infra/docker-compose.yml \
+#     -f infra/docker-compose.wsl.yml up -d --build
+#
+# Then reach the API from Windows/WSL at: http://localhost:3000/api
+
+services:
+  api:
+    # Expose the API on the host (WSL2 localhost is forwarded to Windows).
+    ports:
+      - "3000:3000"
+
+  postgres:
+    # Optional: allow local psql clients (Windows / WSL) to reach Postgres.
+    ports:
+      - "5432:5432"
+
+  caddy:
+    # No public DNS or Let's Encrypt on a local machine — keep Caddy off.
+    profiles:
+      - never

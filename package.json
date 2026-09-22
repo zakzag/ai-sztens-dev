@@ -10,7 +10,10 @@
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
     "test": "pnpm --filter @callback/api test",
-    "test:e2e": "pnpm --filter @callback/api test:e2e"
+    "test:e2e": "pnpm --filter @callback/api test:e2e",
+    "test:stack": "bash scripts/test/stack-smoke.sh",
+    "test:stack:up": "bash scripts/test/stack-up.sh",
+    "test:stack:down": "bash scripts/test/stack-down.sh"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

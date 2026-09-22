@@ -6,9 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="0bf25cbd-a929-4a4c-a0fb-3f140a273081" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/03-implementation-general.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/03-implementation-general.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/temp/KKV-AIsztens — MVP scope-dokumentum.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/temp/KKV-AIsztens — MVP scope-dokumentum.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -99,7 +96,7 @@
       <workItem from="1789473633339" duration="4794000" />
       <workItem from="1789559185048" duration="8348000" />
       <workItem from="1789979983067" duration="13984000" />
-      <workItem from="1790068933840" duration="7983000" />
+      <workItem from="1790068933840" duration="12700000" />
     </task>
     <servers />
   </component>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Callback Assistant — stack smoke test prelude.
+# AIsztens — stack smoke test prelude.
 #
 # Shared helpers and global state for the smoke test suite. Sourced by
 # scripts/test/stack-smoke.sh before any check runs. Defines:

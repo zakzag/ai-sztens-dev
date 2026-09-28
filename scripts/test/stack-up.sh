@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Callback Assistant — convenience wrapper: bring the stack up.
+# AIsztens — convenience wrapper: bring the stack up.
 #
 # Equivalent to running the canonical compose command directly, but with the
 # same defaults the rest of scripts/test/ uses. Wired to `pnpm test:stack:up`.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Callback Assistant — per-service liveness checks.
+# AIsztens — per-service liveness checks.
 #
 # Each check maps directly to one service in infra/docker-compose.yml and
 # mirrors the healthcheck defined for that service. The goal is to fail in

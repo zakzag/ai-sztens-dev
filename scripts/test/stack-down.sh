@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Callback Assistant — convenience wrapper: take the stack down.
+# AIsztens — convenience wrapper: take the stack down.
 #
 # Wired to `pnpm test:stack:down`. Does NOT remove volumes or images, only
 # stops and removes containers. Persistent data (postgres volume) is kept.

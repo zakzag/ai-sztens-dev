@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Callback Assistant — cross-service "do they see each other?" checks.
+# AIsztens — cross-service "do they see each other?" checks.
 #
 # These checks intentionally execute INSIDE the relevant containers and use
 # service names (not 127.0.0.1) as hostnames. That proves the docker compose

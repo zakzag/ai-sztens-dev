@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Callback Assistant — stack smoke test entrypoint.
+# AIsztens — stack smoke test entrypoint.
 #
 # Runs the full container-level integration suite against the docker compose
 # stack defined in infra/docker-compose.yml. Designed to be run locally on a

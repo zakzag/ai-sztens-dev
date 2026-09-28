@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Callback Assistant — optional teardown helper.
+# AIsztens — optional teardown helper.
 #
 # Sourced by stack-smoke.sh only when --down is passed. Currently the
 # teardown logic is small enough to live directly in stack-smoke.sh, but

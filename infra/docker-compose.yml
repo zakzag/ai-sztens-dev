@@ -87,6 +87,20 @@ services:
     # Caddy is small but TLS handshakes + large static SPA responses can
     # spike RSS. 64 MB is plenty and matches our actual usage (~30 MB).
     mem_limit: 64m
+    # IMPORTANT: This is the ONLY Caddy on the host. Binding 80/443 here
+    # means no other container (current or historical) may also bind these
+    # ports. `deploy/deploy.sh:up` actively prunes orphan containers from
+    # previous deployments to guarantee that.
+    #
+    # DigitalOcean Ubuntu droplets run `systemd-resolved` on 127.0.0.53:53
+    # as a stub resolver. The Docker bridge network cannot reach that
+    # address, so ACME DNS lookups fail with
+    # `lookup ... 127.0.0.53:53: read: connection refused` and Caddy
+    # never starts its HTTP listener. We pin an explicit public DNS so
+    # ACME registration and renewal work from inside the container.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       DOMAIN: ${DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL}

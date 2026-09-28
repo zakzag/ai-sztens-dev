@@ -1,8 +1,8 @@
 # Caddy — Reverse Proxy és TLS termináció
 
 **Státusz:** Élő (a `docs/Specs/outdated/`-ba kerül, ha a relevanciája megszűnik)
-**Utolsó frissítés:** 2026-09-28
-**Kapcsolódik:** [`docs/01-callback-assistant.md`](../01-callback-assistant.md), [`docs/02-flowchart.md`](../02-flowchart.md), [`docs/03-implementation-general.md`](../03-implementation-general.md), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`deploy/deploy.sh`](../../deploy/deploy.sh)
+**Utolsó frissítés:** 2026-09-28 (dual-stack port-ütközés + Cloud Firewall / ACME szekció hozzáadva)
+**Kapcsolódik:** [`docs/01-callback-assistant.md`](../01-callback-assistant.md), [`docs/02-flowchart.md`](../02-flowchart.md), [`docs/03-implementation-general.md`](../03-implementation-general.md), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md)
 
 ---
 
@@ -238,6 +238,66 @@ A Caddy-specifikus doksi mellett érdemes lenne a következő diagramokat is lé
 
 ---
 
-## 8. Karbantartási szabály
+## 8. Single-Caddy invariáns és a Cloud Firewall / ACME DNS kérdés
+
+Ez a szekció a 2026-09-28-i **dual-stack port-ütközés** és a **Cloud Firewall / Let's Encrypt** problémát írja le, és rögzíti az invariánst, ami megakadályozza a regressiont.
+
+### 8.1 A "single-Caddy" invariáns
+
+A Caddy konténer az egyetlen a hoston, ami bindelhet a 80-as és 443-as TCP portokra. Ha egy korábbi deploy-ból vagy egy másik compose projektből (`callback-assistant-*`) egy másik Caddy konténer is a hoston marad, az új Caddy indulásakor a Docker bind-szinten fatal errort ad:
+
+```
+Bind for 0.0.0.0:80 failed: port is already allocated
+```
+
+→ az új Caddy **exit 128-cal** meghal, és a 80/443-as port egyik Caddyhez sem tartozik → a teljes stack elérhetetlenné válik. Ez okozta a 2026-09-28-i 90%-os CPU-terhelést is: az `aisztens-api-1` konténer healthcheckje (`fetch('http://127.0.0.1:3000/api')`) az újraindulási ciklus miatt sosem futott le sikeresen, a konténer újra és újra indult, és minden indításkor a lockfile-verify 30-90 másodpercig pörgette a CPU-t.
+
+A garanciát két dolog adja:
+
+1. **`infra/docker-compose.yml` caddy service** — explicit `dns:` direktíva (`1.1.1.1`, `8.8.8.8`) és részletes komment arról, hogy ez az egyetlen Caddy a hoston, és hogy a systemd-resolved `127.0.0.53`-as stub-resolvere a bridge hálóról nem elérhető.
+2. **`deploy/deploy.sh:prune_legacy_stack()`** — minden `up` parancs előtt fut, és `xargs` + `docker rm -f` + `docker network rm` + `docker volume rm` segítségével eltávolítja a `callback-assistant-*`, `aisztens-legacy-*` és `old-stack-*` névképletű konténereket, hálózatokat és volume-okat. Ez egy "brute force" cleanup, ami minden korábbi compose projekt maradványát felszámolja.
+
+Ezen felül vészhelyzetre bevezettük a `down-all` parancsot:
+
+```bash
+./deploy.sh down-all
+```
+
+ami az **összes** Docker objektumot (konténer, hálózat, volume) törli a dropletről, és utána `./deploy.sh up`-pal tiszta lappal indul a stack. **Adatvesztés-veszélyes**, de a `pgdata` és `caddy_data` volume-ok is törlődnek — csak akkor használd, ha a stack teljesen wedged.
+
+### 8.2 A Cloud Firewall / ACME timeout probléma
+
+Ha a DigitalOcean Cloud Firewall (vagy más border firewall) blokkolja a bejövő 80/443-as TCP forgalmat a droplet IP-jére (`164.92.248.194`), a Let's Encrypt HTTP-01 és TLS-ALPN-01 challenge-ei **timeout-olnak**, és a Caddy nem tud tanúsítványt szerezni. A Caddy logja ezt így jelzi:
+
+```
+{"level":"error","logger":"http.acme_client","msg":"challenge failed",
+ "identifier":"api.aisztens.hu","challenge_type":"http-01",
+ "problem":{"detail":"164.92.248.194: Fetching http://api.aisztens.hu/.well-known/acme-challenge/...: Timeout during connect (likely firewall problem)"}}
+```
+
+Ebben az esetben a belső konténer-háló működik (a docker-proxy figyel a80/443-on), de a Caddy HTTPS listenere nem indul el, amíg a tanúsítvány meg nem érkezik.
+
+#### Megoldási lehetőségek
+
+1. **Cloud Firewall megnyitása a DO panelen** (leggyakoribb, ajánlott):
+   - DO panel → Networking → Firewalls → a dropletre vonatkozó firewall
+   - Inbound rules: `HTTP (80/TCP)` és `HTTPS (443/TCP)` → `0.0.0.0/0` (vagy a Let's Encrypt IP-tartománya)
+   - Ezután a Caddy 30-60 másodpercen belül megkapja a tanúsítványt
+2. **DNS-01 challenge használata** (ha a DNS a Cloudflare-nél van):
+   - Caddyfile-ban `acme_dns cloudflare {env.CF_API_TOKEN}` direktíva
+   - Nem igényel bejövő portot, a Cloudflare API-n keresztül validál
+   - A `dns:` direktíva a docker-compose-ban továbbra is szükséges, hogy a Caddy konténerből a Cloudflare API elérhető legyen
+3. **HTTP-only fallback** (végső megoldás tesztelésre):
+   - Caddyfile globális blokkjában `auto_https off`
+   - A Caddy HTTP-n szolgáltat, a HTTPS-t a böngésző figyelmen kívül hagyja
+   - **NE használd production-ben**, csak a routing tesztelésére
+
+#### Jelenlegi állapot
+
+A Caddy config és a konténer hálózat **100%-ban működik**, de a Let's Encrypt tanúsítványok beszerzése a Cloud Firewall-ön múlik. A droplet belsőleg minden tesztet teljesít (`docker stats`, `docker ps`, portok), a Caddy a `0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp` portokon figyel — csak a publikus ACME challenge-ek timeout-olnak.
+
+---
+
+## 9. Karbantartási szabály
 
 Ez a dokumentum **élő**: ha a `infra/caddy/Caddyfile`, a [`deploy/deploy.sh:render_caddyfile()`](../../deploy/deploy.sh), a [`infra/docker-compose.yml`](../../infra/docker-compose.yml) Caddy service blokkja, vagy a Caddy konténer hálózati topológiája megváltozik, a dokumentumot is frissíteni kell a változással együtt. A frissítési kötelezettséget a [`.roo/rules/instructions.md`](../../.roo/rules/instructions.md) „Specs doksik karbantartása" szekciója rögzíti.

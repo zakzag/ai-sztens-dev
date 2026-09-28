@@ -47,6 +47,13 @@ coverage/
 .env.production.local
 .env.local
 
+# Real public keys stay local; only placeholders are committed.
+*.pub
+# Real private keys never belong in the repo.
+*.private.key
+*.openssh.private
+*.openssh.private.key
+
 # temp directory
 .temp
 .tmp

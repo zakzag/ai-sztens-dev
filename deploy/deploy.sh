@@ -180,6 +180,42 @@ run_remote() {
   "${SSH[@]}" "cd $REMOTE_DIR && $1"
 }
 
+# ---------------------------------------------------------------------------
+# Prune orphaned containers, networks and volumes from previous deployments
+# that are no longer managed by the current `docker-compose.yml`. This is the
+# safety net that prevents the "two Caddy containers fight over 80/443"
+# regression: every historical compose project that ever bound port 80/443
+# MUST be removed before `up` runs, otherwise the new Caddy exits 128 with
+# `port is already allocated` and the site goes dark.
+#
+# Strategy:
+#   1. `docker compose down --remove-orphans` for the CURRENT project
+#      (`aisztens`) — clean stop.
+#   2. `docker ps -a --filter ...` for the few well-known historical project
+#      names that have lived on this droplet (added one-by-one as we find
+#      them, e.g. `callback-assistant`) and `docker rm -f` them.
+#   3. `docker network rm` for any orphan bridge networks that were created
+#      by those projects and are now empty.
+#
+# `|| true` everywhere so the script still succeeds if nothing is left to
+# clean up — this function is safe to call on a fresh droplet.
+prune_legacy_stack() {
+  log "Pruning legacy/orphan containers on the droplet ..."
+  "${SSH[@]}" "
+    cd $REMOTE_DIR && \
+    docker compose $COMPOSE_ARGS down --remove-orphans 2>/dev/null || true; \
+    docker ps -a --format '{{.Names}}' \
+      | grep -E '^(callback-assistant-|aisztens-legacy-|old-stack-)' \
+      | xargs -r docker rm -f 2>/dev/null || true; \
+    docker network ls --format '{{.Name}}' \
+      | grep -E '^(callback-assistant_|aisztens-legacy_)' \
+      | xargs -r docker network rm 2>/dev/null || true; \
+    docker volume ls --format '{{.Name}}' \
+      | grep -E '^(callback-assistant_|aisztens-legacy_)' \
+      | xargs -r docker volume rm 2>/dev/null || true
+  "
+}
+
 case "${1:-}" in
   upload)
     upload
@@ -189,7 +225,30 @@ case "${1:-}" in
     log "Running bootstrap.sh on the droplet ..."
     run_remote "sudo bash deploy/bootstrap.sh"
     ;;
+  down-all)
+    # VENT PANE: tear down every docker-compose project on the droplet,
+    # including historical ones, freeing 80/43 and removing all
+    # Caddy/API/postgres/monitor containers. Use only when the stack is
+    # wedged and `down` does not help.
+    log "Tearing down every Docker object on the droplet (DESTRUCTIVE) ..."
+    "${SSH[@]}" "
+      cd $REMOTE_DIR && \
+      docker compose $COMPOSE_ARGS down --remove-orphans 2>/dev/null || true; \
+      docker ps -a --format '{{.Names}}' \
+        | xargs -r docker rm -f 2>/dev/null || true; \
+      docker network ls --format '{{.Name}}' \
+        | grep -vE '^(bridge|host|none)$' \
+        | xargs -r docker network rm 2>/dev/null || true; \
+      docker volume ls --format '{{.Name}}' \
+        | xargs -r docker volume rm 2>/dev/null || true
+    "
+    log "Droplet Docker state cleared. Next: ./deploy.sh up"
+    ;;
   up)
+    # CRITICAL: prune before bring-up. If a previous Caddy from a different
+    # compose project still owns 80/443, the new one cannot bind them and
+    # exits 128 — the site goes dark until the orphan is removed.
+    prune_legacy_stack
     upload
     log "Building & starting the stack ..."
     run_remote "docker compose $COMPOSE_ARGS up -d --build"
@@ -207,7 +266,7 @@ case "${1:-}" in
     run_remote "docker compose $COMPOSE_ARGS logs -f --tail=200"
     ;;
   *)
-    echo "Usage: $0 {upload|bootstrap|up|down|restart|ps|logs}"
+    echo "Usage: $0 {upload|bootstrap|up|down|down-all|restart|ps|logs}"
     exit 1
     ;;
 esac

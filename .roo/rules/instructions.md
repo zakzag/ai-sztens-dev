@@ -5,7 +5,7 @@
 - Every time a chat is opened and plan discussed, code implemented, 
   the summary of the changes need to be written in a documentation file, 
   in folder: docs/history/, 
-  filename must be: \<datetime in ISO format\>-\<short description\>.md
+  filename must be: \<YYYY-MM-DD--HH-ii-ss\>-\<short description\>.md
 
 # Milestones
 
@@ -20,10 +20,10 @@
 
 - Milestone location: `docs/milestones/`.
 
-- Milestone filename: `<YYYY-MM-DD>-<short-kebab-description>.milestone.md`.
+- Milestone filename: `<YYYY-MM-DD--HH-ii-ss>-<short-kebab-description>.milestone.md`.
   Use English in the filename. Use lowercase, ASCII, kebab-case for the
   short description. Example:
-  `docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`.
+  `docs/milestones/2026-09-28--12-34-10-caddy-restart-loop-and-mem-limits.milestone.md`.
 
 - Milestone body language: ENGLISH only, regardless of the language used in
   the chat. The milestone is project documentation that must be readable

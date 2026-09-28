@@ -7,7 +7,11 @@
 
 set -u
 
-TARGET_URL="${TARGET_URL:-http://api:3000/api}"
+# Default target is the dedicated liveness endpoint exposed by
+# apps/api/src/health/health.controller.ts. It is intentionally excluded
+# from the NestJS `api` global prefix, so the path is stable even when
+# the business routing changes.
+TARGET_URL="${TARGET_URL:-http://api:3000/healthz}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-30}"
 FAIL_THRESHOLD="${FAIL_THRESHOLD:-2}"
 ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL:-}"

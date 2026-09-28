@@ -39,11 +39,20 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${API_PORT:-3000}/api').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      # Hit the dedicated liveness endpoint (see apps/api/src/health/health.controller.ts).
+      # `/healthz` is intentionally excluded from the NestJS `api` global prefix
+      # (see main.ts) so the path stays stable even if the business routing
+      # changes. The shell snippet uses an explicit `process.exit(r.ok ? 0 : 1)`
+      # on BOTH branches so a future change in Node's default exit code can
+      # never silently turn a healthy response into a `Restarting` container.
+      # The start_period is generous (60s) because cold start on the first run
+      # after a deploy combines pnpm workspace symlink resolution, NestJS
+      # module init and Fastify listener binding.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${API_PORT:-3000}/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
     networks:
       - internal
 
@@ -137,7 +146,12 @@ services:
     # Watchdog does almost nothing (curl + sleep). 32 MB is generous headroom.
     mem_limit: 32m
     environment:
-      TARGET_URL: ${MONITOR_TARGET_URL:-http://api:3000/api}
+      # Default targets the dedicated `/healthz` endpoint exposed by
+      # apps/api/src/health/health.controller.ts. It is intentionally
+      # excluded from the NestJS `api` global prefix, so the path is
+      # stable even when business routing changes. Falls back to `/api`
+      # only if the deploy-time .env does not override it (legacy).
+      TARGET_URL: ${MONITOR_TARGET_URL:-http://api:3000/healthz}
       INTERVAL_SECONDS: ${MONITOR_INTERVAL_SECONDS:-30}
       ALERT_WEBHOOK_URL: ${MONITOR_ALERT_WEBHOOK_URL:-}
       FAIL_THRESHOLD: ${MONITOR_FAIL_THRESHOLD:-2}

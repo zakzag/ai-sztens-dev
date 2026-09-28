@@ -13,7 +13,11 @@ async function bootstrap() {
   );
 
   // All HTTP endpoints live under /api (e.g. POST /api/callback-requests).
-  app.setGlobalPrefix('api');
+  // `healthz` is excluded so the Docker healthcheck and the monitor watchdog
+  // can hit a stable, unprefixed path that never drifts with the business
+  // routing. Keep this list in sync with the controllers that must stay
+  // outside the prefix (currently only HealthController).
+  app.setGlobalPrefix('api', { exclude: ['healthz'] });
 
   // CORS is driven by @fastify/cors (ships with @nestjs/platform-fastify).
   const allowedOrigins = (process.env.CORS_ORIGINS ?? '')

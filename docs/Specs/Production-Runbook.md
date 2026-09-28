@@ -1,8 +1,8 @@
 # Production Runbook — éles verifikáció deploy után
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-09-28
-**Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md)
+**Utolsó frissítés:** 2026-09-28 (api-healthcheck-fail impl: a healthcheck dedikált `/healthz` endpointra váltott, lásd 4.2 / 4.4 / 5. / 6. szakasz)
+**Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
 ---
 
@@ -79,6 +79,17 @@ A 4-es fejezet „Hibadiagnosztikai mátrix" szekció részletezi, mit jelentene
 
 Ez az a réteg, amit a látogató böngészője és a VAPI webhook hív — ha ez nem megy, a release bukott, még ha minden konténer `Up` is.
 
+A NestJS-nek **két root-szintű route-ja** van:
+
+* `GET /healthz` — dedikált liveness endpoint (a globális `api` prefix
+  alól kivéve; implementáció: [`apps/api/src/health/health.controller.ts`](../../apps/api/src/health/health.controller.ts)). Erre megy a Docker
+  healthcheck ÉS a monitor watchdog. A Caddy a `/healthz` útvonalat **nem**
+  proxyzza külön, de a Fastify automatikusan kiszolgálja a NestJS saját
+  listenerén, tehát a Caddy-n át közvetlenül is elérhető.
+* `GET /api` — az `AppController.getHello()` üzleti smoke-route (a
+  globális `api` prefix alatt). Ezt csak a frontend smoke tesztek és a
+  deploy sanity-check hívja; **nem** a healthcheck.
+
 ```bash
 # Apex domain (HTTP 307 → web subdomain, amíg nincs landing page)
 curl -fsSI https://<DOMAIN>/ | head -n1
@@ -89,8 +100,11 @@ curl -fsSI https://web.<DOMAIN>/ | head -n1
 # Admin SPA
 curl -fsSI https://admin.<DOMAIN>/ | head -n1
 
-# API health endpoint
-curl -fsS  https://api.<DOMAIN>/api/health && echo
+# API liveness endpoint (dedikált, prefix-mentes)
+curl -fsS  https://api.<DOMAIN>/healthz && echo
+
+# API üzleti smoke route (opcionális, deploy sanity check)
+curl -fsS  https://api.<DOMAIN>/api && echo
 ```
 
 | Végpont | Elvárt státuszkód | Megjegyzés |
@@ -98,7 +112,8 @@ curl -fsS  https://api.<DOMAIN>/api/health && echo
 | `https://<DOMAIN>/` | `HTTP/2 307` | Apex → web subdomain redirect |
 | `https://web.<DOMAIN>/` | `HTTP/2 200` | SPA `index.html` |
 | `https://admin.<DOMAIN>/` | `HTTP/2 200` | Admin SPA `index.html` |
-| `https://api.<DOMAIN>/api/health` | `HTTP/2 200` + JSON body | NestJS healthcheck |
+| `https://api.<DOMAIN>/healthz` | `HTTP/2 200` + JSON `{"status":"ok",...}` | Dedikált liveness endpoint (Docker healthcheck + monitor watchdog) |
+| `https://api.<DOMAIN>/api` | `HTTP/2 200` + `text/plain "Hello World!"` | Üzleti smoke route (opcionális) |
 
 Ha bármelyik `502` / `503` / `504`: a Caddy nem éri el a belső service-t. Lásd 4.7 „Hibadiagnosztikai mátrix".
 
@@ -129,14 +144,18 @@ docker compose exec caddy caddy list-certificates
 # Postgres readiness
 docker compose exec postgres pg_isready -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-callback}"
 
-# A monitor watchdog éri-e el az API-t?
-docker compose exec monitor sh -c 'wget -qO- http://api:3000/api || echo "MONITOR FAILED"'
+# A monitor watchdog éri-e el az API-t? (a watchdog /healthz-t hív)
+docker compose exec monitor sh -c 'wget -qO- http://api:3000/healthz || echo "MONITOR FAILED"'
+
+# A NestJS liveness endpoint közvetlenül a konténerből
+docker compose exec api wget -qO- http://127.0.0.1:3000/healthz
 ```
 
 **Elvárt:**
 
 - `pg_isready`: `accepting connections`
-- A monitor belső curl-je: a NestJS default `Hello World!` vagy az AppController válasza
+- A monitor belső wget-je: `{"status":"ok","uptime":N,"timestamp":"..."}`
+- A NestJS konténerből: ugyanaz a JSON body
 
 ---
 
@@ -210,7 +229,7 @@ echo '=== 2. External endpoints ==='
 echo -n 'apex:    '; curl -fsSI "https://${DOMAIN}/"            | head -n1 || echo FAIL
 echo -n 'web:     '; curl -fsSI "https://web.${DOMAIN}/"        | head -n1 || echo FAIL
 echo -n 'admin:   '; curl -fsSI "https://admin.${DOMAIN}/"      | head -n1 || echo FAIL
-echo -n 'api:     '; curl -fsS  "https://api.${DOMAIN}/api/health" && echo || echo FAIL
+echo -n 'api:     '; curl -fsS  "https://api.${DOMAIN}/healthz" && echo || echo FAIL
 echo
 echo '=== 3. Internal services ==='
 docker compose exec -T postgres pg_isready -U aisztens -d callback
@@ -232,14 +251,16 @@ Ha bármelyik lépés `FAIL` vagy `PLACEHOLDER LEAK!` kiírást ad, a `docker co
 | Tünet | Valószínű ok | Teendő |
 |---|---|---|
 | `ps -a` mutatja a konténert, de státusz `Created` | A `docker compose up -d --build` nem futott le, vagy a build hibázott | Futtasd: `docker compose ... up -d --build`, majd `logs --tail=100 <service>` |
-| `api` `Restarting` / `Exited (1)` | `DATABASE_URL` connect hiba — jellemzően `AISZTENS_DB_PASSWORD` üres az `infra/.env`-ben | `grep -E '^(POSTGRES_PASSWORD\|AISZTENS_DB_PASSWORD)=' infra/.env` — töltsd ki |
+| `api` `Restarting` / `Exited (1)` healthcheck `exitCode: 1` | A NestJS még nem áll kész (`start_period: 60s` sem volt elég), VAGY a `/healthz` route nem érhető el. Ellenőrizd: `docker compose exec api wget -qO- http://127.0.0.1:3000/healthz` | Ha a NestJS lassan indul, növeld a `start_period`-et; ha a route 404, a `main.ts` `exclude` listája elvesztette a `healthz`-t |
+| `api` `Restarting` / `Exited (1)` típusú egyéb hiba | `DATABASE_URL` connect hiba — jellemzően `AISZTENS_DB_PASSWORD` üres az `infra/.env`-ben (a jelenlegi kódban nincs DB driver, tehát ez a hiba csak a jövőben aktiválódik) | `grep -E '^(POSTGRES_PASSWORD\|AISZTENS_DB_PASSWORD)=' infra/.env` — töltsd ki |
 | `caddy` `Restarting` / `Exited (1)` | A renderelt Caddyfile placeholdert tartalmaz (`<DOMAIN>`) | Futtasd újra a deploy-t, vagy manuálisan: `sed -i 's\|<DOMAIN>\|$DOMAIN\|g' infra/caddy/Caddyfile` |
 | `caddy` `Exited (1)` `open /srv/web: no such file or directory` | A SPA dist mappa nincs a dropleten | Ellenőrizd az `apps/{web,admin}/dist` tartalmát; ha üres, a `deploy.sh:build_spas()` kimaradt |
 | `caddy` log: `http-01 challenge failed` | DNS A rekord nem a droplet IP-jére mutat, vagy a 80-as port zárva | `dig +short <DOMAIN>` + Cloud Firewall 80/443 szabályok |
-| `ps` OK, de `https://api.<DOMAIN>/api/health` → `502` | Caddy nem éri el a belső `api:3000`-et (rossz network vagy konténer leállt) | `docker compose exec caddy wget -qO- http://api:3000/api` |
-| `monitor` `Restarting` | Az api konténer még nem indult el (`start_period: 30s`) | Várj 30-60 másodpercet, vagy ellenőrizd az api logot |
+| `ps` OK, de `https://api.<DOMAIN>/healthz` → `502` | Caddy nem éri el a belső `api:3000`-et (rossz network vagy konténer leállt) | `docker compose exec caddy wget -qO- http://api:3000/healthz` |
+| `monitor` `Restarting` | Az api konténer még nem indult el (`start_period: 60s`) | Várj 60-90 másodpercet, vagy ellenőrizd az api logot; ha a `/healthz` route-ot a NestJS nem szolgáltatja, a watchdog is `down` alertet küld |
 | A konténer `killed` / `OOMKilled` | Memóriakorlát elérve | Lásd [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md) |
 | A `docker compose ps` önmagában csak a postgres-t mutatja | A többi service `Created` státuszban van, mert a stack indítása félbeszakadt | Lásd 4.1 — futtasd a `ps -a` flag-gel, majd ha kell, `up -d --build` |
+| `healthcheck exitCode: 1` a `fetch('/healthz')` Node scriptben | A `node -e` parancs `process.exit(r.ok?0:1)` exit kódot ad, de a Docker ezt 0-nak tekinti, ha a fetch sikeres volt. Ha a `r.ok` `false`, a Node 1-es kóddal lép ki — ez a NestJS nem-elérhetőség tünete (még nem indult el, vagy a route nem él) | Lásd fentebb, `api Restarting` sor |
 
 ---
 

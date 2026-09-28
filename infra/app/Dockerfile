@@ -73,4 +73,19 @@ RUN groupadd --system --gid 999 nodeapp \
  && chown -R nodeapp:nodeapp /workspace
 USER nodeapp
 
-CMD ["pnpm", "--filter", "@callback/api", "start:prod"]
+# Run Node directly, bypassing the pnpm CLI wrapper.
+#
+# Why not `pnpm --filter @callback/api start:prod`? Pnpm 9 spawns a
+# `pnpm-native` helper on every script invocation to verify the lockfile
+# and supply-chain policies. Empirically that helper reaches ~380 MB
+# `anon-rss` on cold start, which crosses the api container's
+# `mem_limit: 400m` (see infra/docker-compose.yml). The kernel
+# OOM-killer then SIGKILLs `pnpm-native`, the pnpm wrapper exits
+# non-zero, and `start:prod` never runs. Combined with the
+# `restart: unless-stopped` policy this produced an hourly restart-loop
+# death spiral (see docs/history/2026-09-29--00-50-12-pnpm-native-oom-
+# restart-loop-plan.md). Since the build stage has already produced the
+# full node_modules and the compiled `apps/api/dist/main.js`, the
+# runtime stage can launch Node directly and stay well under the
+# mem_limit.
+CMD ["node", "apps/api/dist/main.js"]

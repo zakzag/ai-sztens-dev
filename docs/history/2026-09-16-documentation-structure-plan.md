@@ -36,7 +36,7 @@ Implementation plan            (docs/history/<date>-...-plan.md)
 - [`02-Functional-Specification.md`](../Specs/02-Functional-Specification.md) — **single source of
   truth for functions**: user-visible functions (F1, F2, …), operator-visible functions
   (O1, O2, …), each tagged with `MVP?` and priority. MVP scope = all rows where `MVP? = Igen`.
-- Technical docs — [`01-callback-assistant.md`](../01-callback-assistant.md),
+- Technical docs — [`01-aisztens.md`](../01-aisztens.md),
   [`02-flowchart.md`](../02-flowchart.md),
   [`03-implementation-general.md`](../03-implementation-general.md) describe the HOW.
 

@@ -8,7 +8,7 @@
 
 Integrate the email-module MVP described in
 `docs/temp/KKV-AIsztens — MVP scope-dokumentum.md` into the current
-`callback-assistant` pnpm monorepo, reusing the platform concerns that the
+`aisztens` pnpm monorepo, reusing the platform concerns that the
 voice call-back product also needs.
 
 ## 2. Context

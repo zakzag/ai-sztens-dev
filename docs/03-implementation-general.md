@@ -131,7 +131,7 @@ sequenceDiagram
 
 ## 4. Status Model
 
-Request status follows a fixed state machine (see [`01-callback-assistant.md`](01-callback-assistant.md),
+Request status follows a fixed state machine (see [`01-aisztens.md`](01-aisztens.md),
 section "Call Lifecycle State Machine"):
 
 `queued → dialing → ringing → in-progress → completed | failed | no_answer | busy`,

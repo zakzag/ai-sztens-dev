@@ -1,4 +1,4 @@
-# Callback Assistant — single-droplet runtime stack.
+# AIsztens — single-droplet runtime stack.
 # Everything runs in Docker so the config is easy to change and the machine
 # can be recreated quickly (see deploy/bootstrap.sh + deploy/deploy.sh).
 #
@@ -12,15 +12,20 @@
 #   cp infra/.env.example infra/.env   # then fill in real values
 #   docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
 
-name: callback-assistant
+name: aisztens
 
 services:
   api:
     build:
       context: ..            # repo root: pnpm workspace needs apps/* and packages/*
       dockerfile: infra/app/Dockerfile
-    image: callback-assistant/api:latest
+    image: aisztens/api:latest
     restart: unless-stopped
+    # Hard cap so a runaway heap cannot starve the host (the V8 heap is also
+    # bounded by NODE_OPTIONS=--max-old-space-size=384 in the Dockerfile, so
+    # the limit is honoured at the application level instead of the kernel
+    # OOM-killer firing inside a restart loop).
+    mem_limit: 400m
     environment:
       NODE_ENV: production
       PORT: ${API_PORT:-3000}
@@ -45,6 +50,11 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Cap Postgres so its default 25%-of-host shared_buffers cannot blow the
+    # 2 GB droplet. The three POSTGRES_* envs below are consumed by the
+    # official image's docker-entrypoint.sh and translated into
+    # postgresql.conf settings (shared_buffers, effective_cache_size, work_mem).
+    mem_limit: 400m
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-callback}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -54,6 +64,10 @@ services:
       KRAK_DB_PASSWORD: ${KRAK_DB_PASSWORD}
       AISZTENS_DB_USER: ${AISZTENS_DB_USER:-aisztens}
       AISZTENS_DB_PASSWORD: ${AISZTENS_DB_PASSWORD}
+      # Tuned for a 2 GB host + 400 MB container limit.
+      POSTGRES_SHARED_BUFFERS: 128MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 512MB
+      POSTGRES_WORK_MEM: 4MB
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -70,6 +84,9 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    # Caddy is small but TLS handshakes + large static SPA responses can
+    # spike RSS. 64 MB is plenty and matches our actual usage (~30 MB).
+    mem_limit: 64m
     environment:
       DOMAIN: ${DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL}
@@ -77,12 +94,20 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The Caddy container mounts the *rendered* Caddyfile (where the
+      # `__DOMAIN__` / `__ACME_EMAIL__` placeholders in the template have
+      # already been replaced with the real values), NOT the template in
+      # `infra/caddy/Caddyfile`. `deploy/deploy.sh:render_caddyfile()` writes
+      # the rendered file on the droplet under infra/caddy/Caddyfile.rendered
+      # on every deploy.
+      - ./caddy/Caddyfile.rendered:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-      # Optional static frontends. Enable only after building apps/web + apps/admin.
-      # - ${WEB_DIST_PATH:-../apps/web/dist}:/srv/web:ro
-      # - ${ADMIN_DIST_PATH:-../apps/admin/dist}:/srv/admin:ro
+      # Static SPA bundles, produced by `pnpm --filter @callback/web build`
+      # and `pnpm --filter @callback/admin build` in deploy/deploy.sh and
+      # rsynced to the droplet under apps/{web,admin}/dist/.
+      - ${WEB_DIST_PATH:-../apps/web/dist}:/srv/web:ro
+      - ${ADMIN_DIST_PATH:-../apps/admin/dist}:/srv/admin:ro
     depends_on:
       api:
         condition: service_started
@@ -93,8 +118,10 @@ services:
     build:
       context: ./monitor
       dockerfile: Dockerfile
-    image: callback-assistant/monitor:latest
+    image: aisztens/monitor:latest
     restart: unless-stopped
+    # Watchdog does almost nothing (curl + sleep). 32 MB is generous headroom.
+    mem_limit: 32m
     environment:
       TARGET_URL: ${MONITOR_TARGET_URL:-http://api:3000/api}
       INTERVAL_SECONDS: ${MONITOR_INTERVAL_SECONDS:-30}

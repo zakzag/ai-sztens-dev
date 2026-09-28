@@ -1,41 +1,71 @@
-# Callback Assistant — reverse proxy + TLS.
-# Caddy automatically obtains and renews Let's Encrypt certificates for the
-# configured hosts. DNS A records must point at the droplet before first start.
+# AIsztens — reverse proxy + TLS.
+#
+# This file is a TEMPLATE — the real config used by the running Caddy container
+# is `infra/caddy/Caddyfile.rendered`, which `deploy/deploy.sh` regenerates on
+# every deploy by substituting the `<DOMAIN>` and `<ACME_EMAIL>` tokens below
+# with the values from `infra/.env` (or `deploy/.env`).
+#
+# Why render server-side instead of relying on Caddy's own placeholders:
+#   * `{$DOMAIN}` is the placeholder syntax for blocks defined INSIDE a `{}`
+#     block. It is NOT a way to read the process environment.
+#   * `{env.DOMAIN}` is supported by some Caddy modules, but NOT in site
+#     addresses (the line right after the global options block). The Caddy
+#     process literally matches `admin.{env.DOMAIN}` as the host name, then
+#     the ACME / Let's Encrypt module rejects it with
+#     `subject does not qualify for certificate: 'admin.{env.DOMAIN}'`,
+#     causing a restart loop every ~8 s. The `docker logs caddy` output on
+#     the droplet makes this very obvious:
+#       Error: adapting config using caddyfile: subject does not qualify for
+#       certificate: 'admin.{env.DOMAIN}'
+#   * Rendering the domain into a plain string at deploy time removes the
+#     ambiguity entirely: the rendered Caddyfile contains the literal hostname
+#     `admin.aisztens.hu` and Caddy is happy.
+#
+# Keep the `<DOMAIN>` / `<ACME_EMAIL>` tokens in sync with the `sed` invocation
+# in `deploy/deploy.sh:render_caddyfile()`. Anything else in this file
+# (e.g. Caddy's own `{path}`, `{uri}` placeholders inside directives) is left
+# untouched by the renderer.
 
 {
-	email {$ACME_EMAIL}
+	email <ACME_EMAIL>
 	admin off
 }
 
 # Public API origin. Browser clients and inbound webhooks (e.g. VAPI) use this.
-api.{$DOMAIN} {
+api.<DOMAIN> {
 	encode zstd gzip
 	reverse_proxy api:3000
 }
 
-# Public website + same-origin /api passthrough.
-# NOTE: static frontends are served via separate site blocks (see the admin
-# example below) because `handle` blocks cannot be mixed with `root`/`try_files`.
-{$DOMAIN} {
+# Public website (visitor call-back form). Served as a static SPA from
+# /srv/web, mounted from apps/web/dist by docker-compose. The `try_files`
+# makes deep-link refreshes (e.g. /legal) fall back to /index.html so the
+# React Router takes over. Same-origin /api/* is proxied through to the
+# NestJS API as a safety net for anyone pasting the API URL under this host.
+web.<DOMAIN> {
 	encode zstd gzip
-
-	# Any /api/* request is forwarded to the NestJS API.
+	root * /srv/web
+	try_files {path} /index.html
 	handle /api/* {
 		reverse_proxy api:3000
 	}
+}
 
-	# Until a static site is mounted, redirect the apex to the API subdomain.
-	handle {
-		redir https://api.{$DOMAIN} 307
+# Admin dashboard SPA. Same shape as the web site but mounted from
+# /srv/admin (apps/admin/dist). In production the SPA calls
+# https://api.aisztens.hu/api/... cross-origin; the /api/* handle below
+# is only a safety net for same-origin probing.
+admin.<DOMAIN> {
+	encode zstd gzip
+	root * /srv/admin
+	try_files {path} /index.html
+	handle /api/* {
+		reverse_proxy api:3000
 	}
 }
 
-# Optional admin dashboard static site.
-# admin.{$DOMAIN} {
-# 	encode zstd gzip
-# 	root * /srv/admin
-# 	try_files {path} /index.html
-# 	handle /api/* {
-# 		reverse_proxy api:3000
-# 	}
-# }
+# Apex: redirect to the public website. Until a real landing page is
+# mounted at the apex, this is the cleanest behaviour.
+<DOMAIN> {
+	redir https://web.<DOMAIN>{uri} 307
+}

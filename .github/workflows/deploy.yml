@@ -1,0 +1,276 @@
+# Callback Assistant — production deploy to the DigitalOcean droplet.
+#
+# Mirrors deploy/deploy.sh + deploy/bootstrap.sh but driven by GitHub Actions:
+#   1. Render infra/.env from the INFRA_ENV secret
+#   2. SCP the repo to /opt/aisztens on the droplet (with --delete, like rsync)
+#   3. SCP infra/.env (the secret-rendered file) on top of what was uploaded
+#   4. Install pnpm + Node 22, build the web + admin SPAs against the
+#      production API base URL (derived from the rendered infra/.env),
+#      then SCP the two apps/{web,admin}/dist/ folders to the droplet so
+#      the Caddy volume mounts have content to serve
+#   5. SSH in as `deployer` and run `docker compose up -d --build`
+#   6. Wait for the `api` container to become `healthy` (uses the compose
+#      healthcheck declared in infra/docker-compose.yml)
+#   7. Run scripts/test/stack-smoke.sh against the live stack — fail the
+#      workflow if any of the 4 liveness + 6 cross-service checks fail
+#   8. On failure, dump the last 500 log lines of every container for triage
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   DROPLET_HOST     — droplet public IPv4 or hostname
+#   DROPLET_SSH_KEY  — private key matching deploy/ssh-keys/deployer.pub
+#                      (installed into authorized_keys by deploy/bootstrap.sh)
+#   INFRA_ENV        — full contents of infra/.env (multi-line; verbatim copy)
+#
+# The `deployer` user is created by deploy/bootstrap.sh with sudo + docker
+# group, so docker compose can run non-interactively without root SSH.
+
+name: Deploy to droplet
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+# Never run two deploys against the same droplet at once.
+concurrency:
+  group: deploy-droplet
+  cancel-in-progress: false
+
+# Fail the workflow if anything runs longer than 30 minutes (covers a slow
+# `pnpm install` rebuild on a small droplet).
+env:
+  REMOTE_DIR: /opt/aisztens
+
+jobs:
+  deploy:
+    name: Deploy + smoke-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. Get the source
+      # ------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # 2. Render infra/.env from the INFRA_ENV secret. The secret holds
+      #    the full multi-line file; we copy it verbatim into infra/.env.
+      #    `chmod 600` matches the convention from deploy/README.md where
+      #    the .env files are world-unreadable.
+      # ------------------------------------------------------------------
+      - name: Render infra/.env from secret
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          mkdir -p infra
+          printf '%s\n' "$INFRA_ENV" > infra/.env
+          chmod 600 infra/.env
+          echo "Rendered infra/.env ($(wc -l < infra/.env) lines)."
+        env:
+          INFRA_ENV: ${{ secrets.INFRA_ENV }}
+
+      # ------------------------------------------------------------------
+      # 3. Upload the repo (minus secrets, build artifacts, git history).
+      #    `rm: true` mirrors the rsync --delete behaviour used by
+      #    deploy/deploy.sh so removed files actually disappear on the
+      #    droplet.
+      # ------------------------------------------------------------------
+      - name: Upload repository to droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          source: "."
+          target: ${{ env.REMOTE_DIR }}
+          rm: true
+          strip_components: 0
+          exclude: |
+            .git
+            .github/workflows/**
+            node_modules
+            dist
+            coverage
+            .env
+            infra/.env
+            deploy/.env
+            deploy/ssh-keys/
+
+      # ------------------------------------------------------------------
+      # 4. Push the secret-rendered infra/.env to the exact path the
+      #    compose stack expects. We SCP it separately so the secret
+      #    never travels inside the bulk upload (which uses `rm: true`).
+      # ------------------------------------------------------------------
+      - name: Upload infra/.env to droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          source: "infra/.env"
+          target: ${{ env.REMOTE_DIR }}/infra/.env
+          overwrite: true
+
+      # ------------------------------------------------------------------
+      # 4b. Install pnpm + Node so we can build the SPAs in CI. Pin to the
+      #     same versions ci.yml uses so we don't end up with two slightly
+      #     different build toolchains in the same repo.
+      # ------------------------------------------------------------------
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # ------------------------------------------------------------------
+      # 4c. Build the web + admin SPAs. Vite embeds `import.meta.env.VITE_*`
+      #     at build time, so we pass the production API base URL inline.
+      #     The DOMAIN is read from the rendered infra/.env so the bundle
+      #     and the Caddyfile on the droplet stay in sync. Matches
+      #     deploy/deploy.sh::build_spas().
+      # ------------------------------------------------------------------
+      - name: Build web and admin SPAs
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          domain="$(grep -E '^DOMAIN=' infra/.env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+          if [ -z "$domain" ]; then
+            echo "ERROR: DOMAIN not found in rendered infra/.env"
+            exit 1
+          fi
+          api_base="https://api.${domain}/api"
+          echo "Building SPAs against VITE_API_BASE_URL=$api_base"
+          VITE_API_BASE_URL="$api_base" pnpm --filter @callback/web build
+          VITE_API_BASE_URL="$api_base" pnpm --filter @callback/admin build
+
+      # ------------------------------------------------------------------
+      # 4d. Push the freshly built apps/{web,admin}/dist/ folders to the
+      #     droplet. The bulk SCP upload (step 3) excludes `dist`, so the
+      #     Caddy container would otherwise mount empty directories. We
+      #     SCP each dist/ separately and use --rm so the previous build
+      #     artefacts (asset hashes that no longer exist) are cleaned up.
+      # ------------------------------------------------------------------
+      - name: Upload SPA dist folders to droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          source: "apps/web/dist/,apps/admin/dist/"
+          target: ${{ env.REMOTE_DIR }}/apps
+          rm: true
+          overwrite: true
+          strip_components: 1
+
+      # ------------------------------------------------------------------
+      # 5. Build the images and (re)start the stack. --remove-orphans
+      #    cleans up any containers left behind by previous experiments.
+      # ------------------------------------------------------------------
+      - name: Build and start the stack
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          REMOTE_DIR: ${{ env.REMOTE_DIR }}
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          command: |
+            set -euo pipefail
+            cd "$REMOTE_DIR"
+            docker compose \
+              --env-file infra/.env \
+              -f infra/docker-compose.yml \
+              up -d --build --remove-orphans
+
+      # ------------------------------------------------------------------
+      # 6. Wait for the `api` container healthcheck to become `healthy`.
+      #    infra/docker-compose.yml declares interval=15s / retries=5 /
+      #    start_period=30s, so 30 × 5s = 150s is more than enough for
+      #    first-run image pulls. If the healthcheck never reports
+      #    healthy we still proceed so the smoke step can produce a
+      #    more diagnostic failure.
+      # ------------------------------------------------------------------
+      - name: Wait for api healthcheck
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          REMOTE_DIR: ${{ env.REMOTE_DIR }}
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          command: |
+            set -euo pipefail
+            cd "$REMOTE_DIR"
+            api_id="$(docker compose --env-file infra/.env -f infra/docker-compose.yml ps -q api)"
+            if [ -z "$api_id" ]; then
+              echo "ERROR: api container id is empty — compose did not start it."
+              exit 1
+            fi
+            for i in $(seq 1 30); do
+              state="$(docker inspect -f '{{.State.Health.Status}}' "$api_id" 2>/dev/null || echo unknown)"
+              echo "probe $i/30: api health = $state"
+              if [ "$state" = "healthy" ]; then
+                echo "api is healthy after $i probes"
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "WARN: api did not become healthy within 150s; smoke test will report a precise failure."
+            exit 0
+
+      # ------------------------------------------------------------------
+      # 7. Run the smoke suite against the live deployment.
+      #    scripts/test/stack-smoke.sh exits 0 on full pass, 1 on
+      #    failure, 2 if the stack isn't running. Any non-zero value
+      #    fails this step, which fails the workflow.
+      # ------------------------------------------------------------------
+      - name: Run stack smoke tests against live deployment
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          REMOTE_DIR: ${{ env.REMOTE_DIR }}
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          command: |
+            set -euo pipefail
+            cd "$REMOTE_DIR"
+            bash scripts/test/stack-smoke.sh
+
+      # ------------------------------------------------------------------
+      # 8. On failure, dump the last 500 log lines of every container into
+      #    the workflow run so triage does not require manual SSH.
+      # ------------------------------------------------------------------
+      - name: Dump container logs on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          REMOTE_DIR: ${{ env.REMOTE_DIR }}
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          command: |
+            set +e  # best-effort: always show whatever logs exist
+            cd "$REMOTE_DIR"
+            echo "===== docker compose ps ====="
+            docker compose --env-file infra/.env -f infra/docker-compose.yml ps
+            echo
+            echo "===== last 500 log lines per service ====="
+            docker compose --env-file infra/.env -f infra/docker-compose.yml \
+              logs --no-color --tail=500
+            echo
+            echo "===== scripts/test/stack-smoke.sh last run (if present) ====="
+            # If the smoke script wrote its own output, surface it too.
+            docker compose --env-file infra/.env -f infra/docker-compose.yml \
+              logs --no-color monitor --tail=200 || true

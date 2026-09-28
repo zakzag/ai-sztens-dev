@@ -1,5 +1,5 @@
 #!/bin/sh
-# Callback Assistant — API watchdog.
+# AIsztens — API watchdog.
 #
 # Polls TARGET_URL. After FAIL_THRESHOLD consecutive failures it posts a
 # "down" event to ALERT_WEBHOOK_URL; after recovery it posts an "up" event.

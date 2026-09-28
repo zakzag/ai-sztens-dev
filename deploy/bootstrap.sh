@@ -16,9 +16,13 @@ set -euo pipefail
 
 SUDO_USERS="${SUDO_USERS:-tkovari,krak,deployer}"
 APP_USER="${APP_USER:-aisztens}"
-KEYS_DIR="${KEYS_DIR:-/opt/callback/deploy/ssh-keys}"
+KEYS_DIR="${KEYS_DIR:-/opt/aisztens/deploy/ssh-keys}"
 UFW_ENABLE="${UFW_ENABLE:-0}"
 TZ="${TZ:-Europe/Budapest}"
+# Size of the swap file provisioned by configure_swap(). Set to 0 to skip.
+# Default 2 GB is enough to absorb a DigitalOcean do-agent memory leak spike
+# on a 1-2 GB droplet without forcing the kernel into swap-thrash.
+SWAP_SIZE_MB="${SWAP_SIZE_MB:-2048}"
 
 log() { echo "[bootstrap] $*"; }
 
@@ -31,7 +35,7 @@ install_docker() {
 
   log "Installing Docker Engine + Compose plugin ..."
   apt-get update -y
-  apt-get install -y ca-certificates curl gnupg
+  apt-get install -y ca-certificates curl gnupg net-tools lsb-release
 
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
@@ -79,6 +83,48 @@ create_user() {
 }
 
 # ---------------------------------------------------------------------------
+# Idempotent swap file. Creates /swapfile of SWAP_SIZE_MB if missing. Safe to
+# re-run: existing swap entries are detected and the script no-ops.
+configure_swap() {
+  if [ "$SWAP_SIZE_MB" = "0" ]; then
+    log "Swap skipped (SWAP_SIZE_MB=0)."
+    return 0
+  fi
+
+  # If /swapfile is already in fstab and active, nothing to do.
+  if grep -E '^/swapfile\b' /etc/fstab >/dev/null 2>&1; then
+    if swapon --show=NAME --noheadings | grep -qx '/swapfile'; then
+      log "Swap already active at /swapfile."
+      return 0
+    fi
+    log "Re-enabling existing /swapfile from /etc/fstab ..."
+    swapon /swapfile || log "WARN: swapon /swapfile failed"
+    return 0
+  fi
+
+  # A leftover /swapfile with no fstab entry is suspicious — do not silently
+  # overwrite it (it might contain unrelated data on a non-fresh host).
+  if [ -f /swapfile ]; then
+    log "WARNING: /swapfile exists but is not in /etc/fstab — leaving untouched."
+    return 0
+  fi
+
+  log "Creating ${SWAP_SIZE_MB} MB swap file at /swapfile ..."
+  fallocate -l "${SWAP_SIZE_MB}M" /swapfile || dd if=/dev/zero of=/swapfile bs=1M count="$SWAP_SIZE_MB" status=none
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+  swapon /swapfile
+  # Persist across reboots. Use `none swap sw` so mount picks it up by name.
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  # Reduce swappiness so the kernel prefers dropping in-memory caches over
+  # pushing application pages to disk on a 2 GB droplet.
+  sysctl -w vm.swappiness=10 >/dev/null
+  grep -q '^vm.swappiness' /etc/sysctl.conf 2>/dev/null \
+    || echo 'vm.swappiness=10' >> /etc/sysctl.conf
+  log "Swap configured: $(swapon --show=SIZE --noheadings --bytes /swapfile | numfmt --to=iec) (swappiness=10)."
+}
+
+# ---------------------------------------------------------------------------
 configure_ufw() {
   if [ "$UFW_ENABLE" != "1" ]; then
     log "UFW skipped (set UFW_ENABLE=1 to enable). DigitalOcean's cloud firewall is recommended instead."
@@ -106,6 +152,7 @@ main() {
   [ "$(id -u)" -eq 0 ] || { log "ERROR: run as root"; exit 1; }
 
   set_timezone
+  configure_swap
   install_docker
 
   local user

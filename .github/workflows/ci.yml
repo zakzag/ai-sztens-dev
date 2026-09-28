@@ -1,0 +1,70 @@
+# Callback Assistant — PR-time checks: install, build, lint, unit tests.
+#
+# Runs on every PR (into `main` or `dev`) and on every push to `dev`. It is
+# intentionally a separate workflow from `deploy.yml` so PR authors get a
+# fast "is this mergeable?" signal without waiting on the droplet deploy,
+# and so `deploy.yml` stays focused on droplet delivery.
+#
+# What it checks:
+#   * pnpm install (frozen lockfile) succeeds against the repo lockfile
+#   * `pnpm -r build` succeeds — exercises shared, api, web, admin builds
+#   * `pnpm -r lint` succeeds (api enforces ESLint, root runs prettier)
+#   * `pnpm --filter @callback/api test` succeeds (Jest unit tests)
+
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+# Allow PRs from feature branches to skip the optional lint step if needed
+# in the future. Concurrency cancels stale runs for the same ref so PR
+# authors get quick feedback on their latest push.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Install, build, lint, unit test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # pnpm/action-setup installs pnpm using corepack by default. Pin the
+      # version so a future pnpm release cannot break CI silently.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `predev` only runs in dev; for CI we always build shared first so
+      # that the api package sees the workspace dependency as compiled JS.
+      - name: Build shared
+        run: pnpm --filter @callback/shared build
+
+      - name: Build all packages
+        run: pnpm -r build
+
+      - name: Lint
+        run: pnpm -r lint
+
+      - name: Unit tests (api)
+        run: pnpm --filter @callback/api test -- --colors=false

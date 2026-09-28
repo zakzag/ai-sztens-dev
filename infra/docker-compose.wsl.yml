@@ -1,4 +1,4 @@
-# Callback Assistant — local (WSL / Debian) override.
+# AIsztens — local (WSL / Debian) override.
 # Merged on top of infra/docker-compose.yml, so it does NOT change the droplet setup.
 #
 # Usage (inside WSL, from the repo root):

@@ -1,4 +1,4 @@
-# Callback Assistant — API watchdog image.
+# AIsztens — API watchdog image.
 # Minimal Alpine with curl so the script can poll the API and post alerts.
 
 FROM alpine:3.20

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Callback Assistant — idempotent database bootstrap.
+# AIsztens — idempotent database bootstrap.
 # Executed by the official postgres image on first initialization only.
 #
 # Environment variables are provided by docker-compose.yml (POSTGRES_* plus

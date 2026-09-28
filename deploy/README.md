@@ -16,9 +16,15 @@ live in [`infra/`](../infra) and this directory.
 ## 1. Local preparation
 
 ```bash
-cp deploy/.env.example deploy/.env        # set HOST, SSH_USER, users
+cp deploy/.env.example deploy/.env        # set HOST, SSH_USER, (optionally) SSH_KEY, users
 cp infra/.env.example infra/.env          # set DOMAIN, DB passwords, secrets
 ```
+
+If your private key is not loaded into `ssh-agent` (or you want to pin a specific
+key per-droplet to avoid `too many authentication failures` from `IdentitiesOnly`),
+set `SSH_KEY=/absolute/path/to/private_key` in `deploy/.env`. The deploy script
+uses `ssh -o IdentitiesOnly=yes`, so only that key is offered — leaving it empty
+falls back to the agent + `~/.ssh` defaults.
 
 Copy the four public keys next to [`deploy/ssh-keys/README.md`](ssh-keys/README.md):
 
@@ -40,7 +46,7 @@ From your machine (needs `ssh` + `rsync`; on Windows use Git Bash or WSL):
 ./deploy/deploy.sh bootstrap
 ```
 
-This uploads the repository to `/opt/callback` and, as root, installs Docker and the
+This uploads the repository to `/opt/aisztens` and, as root, installs Docker and the
 Compose plugin, creates the users (`tkovari`, `krak`, `deployer` with sudo;
 `aisztens` as app user), installs their SSH keys, and leaves UFW off by default.
 
@@ -93,7 +99,64 @@ Because the bootstrap script and the Compose stack are declarative and idempoten
 droplet is brought up by repeating steps 1–3 with the same `deploy/.env` +
 `infra/.env` values. No snapshot or manual steps are required.
 
-## 8. Local development in WSL (Debian)
+## 8. GitHub Actions deploy
+
+After the droplet has been bootstrapped once (steps 1–4 above) and
+`deploy/.env` is set to `SSH_USER=deployer`, every merge into the `dev`
+branch is deployed to the droplet by
+[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml). A
+PR-only workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+runs install + build + lint + unit tests before the merge is allowed in.
+
+### 8.1 Repository secrets
+
+Configure under **Settings → Secrets and variables → Actions**:
+
+| Secret | Value | Notes |
+|---|---|---|
+| `DROPLET_HOST` | Droplet public IPv4 or hostname | e.g. `164.92.248.194` |
+| `DROPLET_SSH_KEY` | Private key matching [`deploy/ssh-keys/deployer.pub`](ssh-keys/deployer.pub) | Installed into `authorized_keys` by [`bootstrap.sh`](bootstrap.sh) |
+| `INFRA_ENV` | Full contents of [`infra/.env`](../infra/.env.example) | Multi-line; written verbatim to `/opt/aisztens/infra/.env` on every deploy. Rotate by updating the secret. |
+
+### 8.2 What the workflow does
+
+1. Renders `infra/.env` from the `INFRA_ENV` secret.
+2. SCPs the repo (minus `.git`, `node_modules`, build artifacts, secrets,
+   and `deploy/ssh-keys/`) to `/opt/aisztens` on the droplet, mirroring
+   `deploy/deploy.sh`'s `--delete` semantics.
+3. SCPs the secret-rendered `infra/.env` on top.
+4. SSHes in as `deployer` and runs
+   `docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build --remove-orphans`.
+5. Waits for the `api` container healthcheck (defined in
+   [`infra/docker-compose.yml`](../infra/docker-compose.yml)) to become
+   `healthy`.
+6. Runs [`scripts/test/stack-smoke.sh`](../scripts/test/stack-smoke.sh)
+   against the live deployment. The same 4 liveness + 6 cross-service
+   checks documented in [`scripts/test/README.md`](../scripts/test/README.md).
+7. On failure, dumps the last 500 log lines of every container into the
+   workflow run so triage doesn't require manual SSH.
+
+### 8.3 Triggering a manual deploy / rollback
+
+The workflow also listens on `workflow_dispatch`, so a maintainer can
+re-run a deploy (or roll back by re-pushing the previous commit to `dev`)
+from **Actions → Deploy to droplet → Run workflow** without waiting for a
+merge. Concurrency is keyed `deploy-droplet` so two deploys cannot race.
+
+### 8.4 Limitations
+
+- There is **no automatic rollback**. If a bad image makes the smoke
+  step fail, the previous (still-healthy) containers are replaced by
+  compose only for services that were actually recreated — services that
+  were not touched by the change keep running. To roll back definitively,
+  push the previous commit to `dev` (or rerun the workflow with that
+  commit checked out).
+- `DROPLET_SSH_KEY` is the deployer key (sudo + docker group, matching
+  the policy in [`bootstrap.sh`](bootstrap.sh:67)). For stricter
+  isolation, restrict `deployer`'s `sudoers` to `docker compose` and
+  `docker` only.
+
+## 9. Local development in WSL (Debian)
 
 The droplet setup assumes a public domain and Let's Encrypt; on a local WSL Debian
 (NAT network, no public DNS) use the local override instead:

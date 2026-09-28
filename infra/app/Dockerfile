@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Callback Assistant API image (NestJS + Fastify, pnpm monorepo).
+# AIsztens API image (NestJS + Fastify, pnpm monorepo).
 #
 # Build context MUST be the repository root:
 #   docker build -f infra/app/Dockerfile .
@@ -48,6 +48,13 @@ RUN corepack enable \
  && corepack prepare pnpm@9.15.4 --activate
 
 ENV NODE_ENV=production
+# Cap the V8 heap so it gives up BEFORE the container's mem_limit (400m) fires.
+# Without this, the Node process would happily allocate up to ~1.5 GB on a
+# 2 GB host, then the kernel OOM-kills it, and the `restart: unless-stopped`
+# loop turns into a death-spiral that also kicks the postgres container out.
+# Leave ~16 MB headroom under the 400 MB container limit for the libuv
+# thread-pool, native buffers and V8 overhead.
+ENV NODE_OPTIONS=--max-old-space-size=384
 WORKDIR /workspace
 
 # Copy the built workspace: node_modules (with workspace symlinks resolved),
@@ -61,8 +68,8 @@ COPY --from=build /workspace/apps/api ./apps/api
 EXPOSE 3000
 
 # Non-root runtime user where possible; create a dedicated one.
-RUN groupadd --system --gid 1001 nodeapp \
- && useradd --system --uid 1001 --gid nodeapp --home-dir /workspace nodeapp \
+RUN groupadd --system --gid 999 nodeapp \
+ && useradd --system --uid 999 --gid nodeapp --home-dir /workspace nodeapp \
  && chown -R nodeapp:nodeapp /workspace
 USER nodeapp
 

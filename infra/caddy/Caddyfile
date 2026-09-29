@@ -46,6 +46,7 @@ web.<DOMAIN> {
 	encode zstd gzip
 	root * /srv/web
 	try_files {path} /index.html
+	file_server
 	handle /api/* {
 		reverse_proxy api:3000
 	}
@@ -59,6 +60,7 @@ admin.<DOMAIN> {
 	encode zstd gzip
 	root * /srv/admin
 	try_files {path} /index.html
+	file_server
 	handle /api/* {
 		reverse_proxy api:3000
 	}

@@ -37,6 +37,15 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(process.env.PORT ?? 3000);
+  // Bind explicitly to 0.0.0.0 so the Fastify listener is reachable from
+  // OTHER containers (e.g. the Caddy reverse proxy on the `internal`
+  // Docker network). Without the explicit host, Fastify's `listen(port)`
+  // falls back to a loopback-only bind (`127.0.0.1` / `[::1]`), the
+  // container's healthcheck still passes (it hits 127.0.0.1 inside the
+  // container), but Caddy's `reverse_proxy api:3000` from a sibling
+  // container gets `connection refused` and the public API returns 502.
+  // Verified via /proc/net/tcp inside the api container: 127.0.0.1:3000
+  // and [::1]:3000 were the only listeners before this fix.
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 void bootstrap();

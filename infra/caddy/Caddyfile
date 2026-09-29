@@ -25,6 +25,14 @@
 # in `deploy/deploy.sh:render_caddyfile()`. Anything else in this file
 # (e.g. Caddy's own `{path}`, `{uri}` placeholders inside directives) is left
 # untouched by the renderer.
+#
+# M2 (PR #1 of the deploy hardening plan): the token convention used here is
+# the single source of truth. Comments in this file MUST keep referring to the
+# angle-bracket form (`<DOMAIN>`, `<ACME_EMAIL>`); do NOT switch to the
+# `__DOMAIN__` / `__ACME_EMAIL__` style — the renderer only knows the
+# angle-bracket form, and a copy-paste mistake would ship a placeholder to
+# the Caddy container and trigger the `subject does not qualify` restart loop
+# documented in the runbook.
 
 {
 	email <ACME_EMAIL>

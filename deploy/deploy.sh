@@ -20,6 +20,37 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# ---------------------------------------------------------------------------
+# M1 (PR #1 of the deploy hardening plan): stage breadcrumbs.
+#
+# Every abort should tell the operator *which phase* failed and dump a few
+# lines of remote context so they do not have to read the script. Stages
+# are coarse-grained labels set by set_stage() before each major step.
+# The ERR trap fires once on the first non-zero exit (set -e), prints the
+# banner, and re-exits with the original failure code.
+# ---------------------------------------------------------------------------
+CURRENT_STAGE="init"
+DEPLOY_START_TS="$(date +%s)"
+
+log_stage()  { CURRENT_STAGE="$1"; log "→ stage=$1"; }
+on_err() {
+  local exit_code=$?
+  local line=${1:-?}
+  log "FAILED at stage=$CURRENT_STAGE line=$line exit=$exit_code after $(( $(date +%s) - DEPLOY_START_TS ))s"
+  # Best-effort remote context: only attempt if the ssh array + compose args
+  # were already initialised. If we died during init (e.g. set -u on HOST=)
+  # those are still unset and expanding them here would mask the real error.
+  if [ -n "${SSH_USER:-}" ] && [ -n "${HOST:-}" ] && [ -n "${SSH_CMD[*]:-}" ]; then
+    "${SSH_CMD[@]}" "$SSH_USER@$HOST" \
+      "cd ${REMOTE_DIR:-/opt/aisztens} 2>/dev/null && \
+       docker compose ${COMPOSE_ARGS:-} ps -a 2>/dev/null; \
+       docker compose ${COMPOSE_ARGS:-} logs --tail=20 2>/dev/null" \
+      >/dev/null 2>&1 || true
+  fi
+  exit "$exit_code"
+}
+trap 'on_err $LINENO' ERR
+
 if [ -f "$SCRIPT_DIR/.env" ]; then
   # shellcheck disable=SC1091
   set -a; . "$SCRIPT_DIR/.env"; set +a
@@ -100,12 +131,12 @@ upload_dists() {
 
 # ---------------------------------------------------------------------------
 # Render infra/caddy/Caddyfile (template) → infra/caddy/Caddyfile.rendered
-# (real config consumed by the Caddy container). Substitutes __DOMAIN__ and
-# __ACME_EMAIL__ placeholders with the values resolved above. Must be called
+# (real config consumed by the Caddy container). Substitutes <DOMAIN> and
+# <ACME_EMAIL> placeholders with the values resolved above. Must be called
 # *after* upload() puts the template on the droplet, otherwise sed has no
 # input to operate on. Idempotent.
 #
-# IMPORTANT: keep the placeholder tokens (`__DOMAIN__`, `__ACME_EMAIL__`) in
+# IMPORTANT: keep the placeholder tokens (`<DOMAIN>`, `<ACME_EMAIL>`) in
 # sync with infra/caddy/Caddyfile. If a future change introduces a new
 # env-driven value in the Caddyfile, add a corresponding `sed -i` line here.
 render_caddyfile() {
@@ -139,6 +170,7 @@ render_caddyfile() {
 
 # ---------------------------------------------------------------------------
 upload() {
+  log_stage "upload_rsync"
   log "Uploading $REPO_DIR -> $SSH_USER@$HOST:$REMOTE_DIR ..."
   "${SSH[@]}" "mkdir -p $REMOTE_DIR"
   rsync -az --delete -e "${SSH_CMD[*]}" \
@@ -150,6 +182,7 @@ upload() {
     --exclude 'deploy/.env' \
     --exclude 'infra/.env' \
     --exclude 'infra/caddy/Caddyfile.rendered' \
+    --exclude 'deploy/ssh-keys/' \
     "$REPO_DIR/" "$SSH_USER@$HOST:$REMOTE_DIR/"
   # Render runtime env files from the deploy/.env + infra/.env values (or the
   # INFRA_ENV GitHub secret in CI) and ship them on top. We don't rely on the
@@ -158,19 +191,31 @@ upload() {
     log "Rendering deploy/.env on the droplet ..."
     "${SCP[@]}" "$SCRIPT_DIR/.env" "$SSH_USER@$HOST:$REMOTE_DIR/deploy/.env"
   fi
-  if [ -f "$REPO_DIR/../infra/.env" ] || [ -f "$REPO_DIR/infra/.env" ]; then
-    local_infra_env=""
-    [ -f "$REPO_DIR/infra/.env" ] && local_infra_env="$REPO_DIR/infra/.env"
-    log "Rendering infra/.env on the droplet ..."
-    "${SCP[@]}" "$local_infra_env" "$SSH_USER@$HOST:$REMOTE_DIR/infra/.env"
+  # Pick exactly one local copy of infra/.env and refuse to proceed if none
+  # exists. The previous implementation accepted `$REPO_DIR/../infra/.env`
+  # as sufficient but only ever assigned `local_infra_env` from
+  # `$REPO_DIR/infra/.env`; if only the parent-dir file existed the
+  # standalone `[ -f ... ] && ...` list returned 1 and `set -e` aborted the
+  # deploy (otherwise it would have tried to `scp ""`). Pin the choice
+  # here so the failure mode is "clear error" instead of either.
+  local local_infra_env=""
+  if [ -f "$REPO_DIR/infra/.env" ]; then
+    local_infra_env="$REPO_DIR/infra/.env"
+  elif [ -f "$REPO_DIR/../infra/.env" ]; then
+    local_infra_env="$REPO_DIR/../infra/.env"
+  else
+    log "ERROR: no infra/.env found (looked in $REPO_DIR and $REPO_DIR/..). Copy infra/.env.example to infra/.env and fill it in before deploying."
+    return 1
   fi
+  log "Rendering infra/.env on the droplet (source: $local_infra_env) ..."
+  "${SCP[@]}" "$local_infra_env" "$SSH_USER@$HOST:$REMOTE_DIR/infra/.env"
   # Build the SPAs locally and ship only the two dist/ folders. The main
   # rsync above excludes dist/ on purpose; this is the single source of
   # truth for what the Caddy container ends up serving.
   build_spas
   upload_dists
   # Render + ship the Caddyfile so the running container sees the real
-  # domain (not the template's __DOMAIN__ placeholder).
+  # domain (not the template's <DOMAIN> placeholder).
   render_caddyfile
   log "Upload complete."
 }
@@ -200,6 +245,7 @@ run_remote() {
 # `|| true` everywhere so the script still succeeds if nothing is left to
 # clean up — this function is safe to call on a fresh droplet.
 prune_legacy_stack() {
+  log_stage "prune_legacy_stack"
   log "Pruning legacy/orphan containers on the droplet ..."
   "${SSH[@]}" "
     cd $REMOTE_DIR && \
@@ -248,10 +294,15 @@ case "${1:-}" in
     # CRITICAL: prune before bring-up. If a previous Caddy from a different
     # compose project still owns 80/443, the new one cannot bind them and
     # exits 128 — the site goes dark until the orphan is removed.
+    # NOTE: this module still tears down the current project first;
+    # splitting foreign-only-first is module M7 (PR #6 of the plan).
+    log_stage "up_start"
     prune_legacy_stack
     upload
+    log_stage "compose_up"
     log "Building & starting the stack ..."
     run_remote "docker compose $COMPOSE_ARGS up -d --build"
+    log_stage "done"
     ;;
   down)
     run_remote "docker compose $COMPOSE_ARGS down"

@@ -4,14 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0bf25cbd-a929-4a4c-a0fb-3f140a273081" name="Changes" comment="fixing server errors">
+    <list default="true" id="0bf25cbd-a929-4a4c-a0fb-3f140a273081" name="Changes" comment="refactor(scripts): reorganize SSH key management scripts into a dedicated directory">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/_convert-ppk.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_convert-ppk.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/_fix-ssh-key.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_fix-ssh-key.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/_inspect-key.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_inspect-key.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/_install-puttygen.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_install-puttygen.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/_remove-ssh-passphrase.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_remove-ssh-passphrase.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/convert-ppk-to-openssh.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/convert-ppk-to-openssh.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/deploy/deploy.sh" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/deploy.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/infra/caddy/Caddyfile" beforeDir="false" afterPath="$PROJECT_DIR$/infra/caddy/Caddyfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/infra/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/infra/docker-compose.yml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -118,7 +115,7 @@
       <workItem from="1790630947299" duration="7109000" />
       <workItem from="1790673534778" duration="3913000" />
       <workItem from="1790682394556" duration="2353000" />
-      <workItem from="1790686379965" duration="6663000" />
+      <workItem from="1790686379965" duration="7699000" />
     </task>
     <task id="LOCAL-00001" summary="fixing server errors">
       <option name="closed" value="true" />
@@ -128,7 +125,15 @@
       <option name="project" value="LOCAL" />
       <updated>1790634375828</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="refactor(scripts): reorganize SSH key management scripts into a dedicated directory">
+      <option name="closed" value="true" />
+      <created>1790694147569</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1790694147569</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -147,6 +152,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="fixing server errors" />
-    <option name="LAST_COMMIT_MESSAGE" value="fixing server errors" />
+    <MESSAGE value="refactor(scripts): reorganize SSH key management scripts into a dedicated directory" />
+    <option name="LAST_COMMIT_MESSAGE" value="refactor(scripts): reorganize SSH key management scripts into a dedicated directory" />
   </component>
 </project>

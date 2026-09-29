@@ -118,7 +118,7 @@ services:
       - "443:443"
     volumes:
       # The Caddy container mounts the *rendered* Caddyfile (where the
-      # `__DOMAIN__` / `__ACME_EMAIL__` placeholders in the template have
+      # `<DOMAIN>` / `<ACME_EMAIL>` placeholders in the template have
       # already been replaced with the real values), NOT the template in
       # `infra/caddy/Caddyfile`. `deploy/deploy.sh:render_caddyfile()` writes
       # the rendered file on the droplet under infra/caddy/Caddyfile.rendered

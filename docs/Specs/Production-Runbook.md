@@ -1,7 +1,7 @@
 # Production Runbook — éles verifikáció deploy után
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-09-28 (pnpm-native-oom-restart-loop impl: a runtime image a Node-ot közvetlenül indítja, kikerülve a pnpm wrappert; lásd 4.2 / 4.4 / 5. / 6. szakasz + a `docs/milestones/2026-09-29--01-30-00-pnpm-native-oom-restart-loop.milestone.md` összefoglaló)
+**Utolsó frissítés:** 2026-09-29 (deploy.sh PR #1: hibabanner + stage-szintek a `deploy.sh` trap-ből, `infra/.env` scp-bugfix, rsync kihagyja a `deploy/ssh-keys/` mappát; lásd 6.1 szakasz + `docs/history/2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.md`)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
 ---
@@ -262,6 +262,32 @@ Ha bármelyik lépés `FAIL` vagy `PLACEHOLDER LEAK!` kiírást ad, a `docker co
 | `api` `Restarting` rövid ciklusokban (5-60 mp), `top`-ban `pnpm-native` 60+ % CPU, `dmesg`-ben `Memory cgroup out of memory: Killed process ... (pnpm-native)` | A runtime image a `pnpm --filter … start:prod` wrappert használja, aminek a `pnpm-native` lockfile-verify helperje ~380 MB RSS-sel jár, és átlépi a 400 MB `mem_limit`-et. A kernel OOM-killere megöli, mielőtt a Node elindulna. | Ellenőrizd, hogy az image a `node apps/api/dist/main.js` CMD-t használja-e (lásd [`infra/app/Dockerfile`](../../infra/app/Dockerfile)). Ha a régi `pnpm …` CMD fut, frissítsd a CMD-et és rebuildelj: `docker compose ... up -d --build`. Teljes diagnózis: [`docs/history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md`](../history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md) |
 | A `docker compose ps` önmagában csak a postgres-t mutatja | A többi service `Created` státuszban van, mert a stack indítása félbeszakadt | Lásd 4.1 — futtasd a `ps -a` flag-gel, majd ha kell, `up -d --build` |
 | `healthcheck exitCode: 1` a `fetch('/healthz')` Node scriptben | A `node -e` parancs `process.exit(r.ok?0:1)` exit kódot ad, de a Docker ezt 0-nak tekinti, ha a fetch sikeres volt. Ha a `r.ok` `false`, a Node 1-es kóddal lép ki — ez a NestJS nem-elérhetőség tünete (még nem indult el, vagy a route nem él) | Lásd fentebb, `api Restarting` sor |
+
+### 6.1 A deploy hiba bannerének olvasása (PR #1, 2026-09-29)
+
+A `deploy.sh` mostantól `set -euo pipefail` felett egy `ERR` trap-et is tartalmaz, amely minden nem nulla kilépéskor kiírja, hogy **melyik fázisban** halt el a script, és a `docker compose ps -a` + `docker compose logs --tail=20` utolsó sorait. A banner formátuma:
+
+```
+[deploy] → stage=upload_rsync
+[deploy] Uploading /home/me/repo -> root@164.92.248.194:/opt/aisztens ...
+[deploy] FAILED at stage=upload_rsync line=215 exit=12 after 47s
+NAME                    SERVICE    STATUS
+aisztens-postgres-1     postgres   Up 12 minutes (healthy)
+aisztens-api-1          api        Up 12 minutes
+aisztens-caddy-1        caddy      Restarting
+aisztens-monitor-1      monitor    Restarting
+...
+```
+
+A stage-értékek lehetséges készlete: `init`, `prune_legacy_stack`, `upload_rsync`, `upload_build_spas`, `compose_up`, `done`. A `line=` a deploy.sh belső sorszám, nem a távoli parancsé — a valódi okot a távoli `ps -a` + `logs` részben kell keresni.
+
+Ha a banner `stage=init` és a kilépés a `.env` betöltése előtt történt (pl. hiányzó `HOST=`), akkor a távoli `ps -a` rész szándékosan kimarad: a trap csak akkor hívja a drólet, ha az ssh-tömb már inicializálva van. Ez nem hiba, csak annyit jelent, hogy a deploy a konfiguráció betöltése előtt halt el — a lokális `.env` tartalmát kell ellenőrizni.
+
+További, a PR #1 során bevezetett kisebb védelmek:
+
+* A `render_caddyfile()` mostantól `<DOMAIN>` / `<ACME_EMAIL>` tokenekkel dolgozik (korábban a komment és a kód mást használt — lásd `docs/history/2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.md` M2). Ha a `grep '<DOMAIN>'` bármit talál a `/opt/aisztens/infra/caddy/Caddyfile.rendered` fájlban, a deploy nem indult el.
+* A `deploy/.env` és `infra/.env` scp útvonala mostantól explicit: ha egyik sem található meg a `repo/infra/.env` és a `repo/../infra/.env` útvonalak egyikén sem, a deploy a `no infra/.env found ...` üzenettel leáll, mielőtt bármit írna a dropletre.
+* Az rsync mirror `--exclude 'deploy/ssh-keys/'` szabállyal bővült (korábban csak a CI workflow zárta ki ezt a mappát — lásd `.github/workflows/deploy.yml`). A helyi deploy most már semmiképpen nem másol privát SSH-kulcsokat a dropletre, függetlenül attól, hogy a `.gitignore` mit ignorál.
 
 ---
 

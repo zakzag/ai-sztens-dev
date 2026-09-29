@@ -1,7 +1,7 @@
 # Production Runbook — éles verifikáció deploy után
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-09-28 (api-healthcheck-fail impl: a healthcheck dedikált `/healthz` endpointra váltott, lásd 4.2 / 4.4 / 5. / 6. szakasz)
+**Utolsó frissítés:** 2026-09-28 (pnpm-native-oom-restart-loop impl: a runtime image a Node-ot közvetlenül indítja, kikerülve a pnpm wrappert; lásd 4.2 / 4.4 / 5. / 6. szakasz + a `docs/milestones/2026-09-29--01-30-00-pnpm-native-oom-restart-loop.milestone.md` összefoglaló)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
 ---
@@ -259,6 +259,7 @@ Ha bármelyik lépés `FAIL` vagy `PLACEHOLDER LEAK!` kiírást ad, a `docker co
 | `ps` OK, de `https://api.<DOMAIN>/healthz` → `502` | Caddy nem éri el a belső `api:3000`-et (rossz network vagy konténer leállt) | `docker compose exec caddy wget -qO- http://api:3000/healthz` |
 | `monitor` `Restarting` | Az api konténer még nem indult el (`start_period: 60s`) | Várj 60-90 másodpercet, vagy ellenőrizd az api logot; ha a `/healthz` route-ot a NestJS nem szolgáltatja, a watchdog is `down` alertet küld |
 | A konténer `killed` / `OOMKilled` | Memóriakorlát elérve | Lásd [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md) |
+| `api` `Restarting` rövid ciklusokban (5-60 mp), `top`-ban `pnpm-native` 60+ % CPU, `dmesg`-ben `Memory cgroup out of memory: Killed process ... (pnpm-native)` | A runtime image a `pnpm --filter … start:prod` wrappert használja, aminek a `pnpm-native` lockfile-verify helperje ~380 MB RSS-sel jár, és átlépi a 400 MB `mem_limit`-et. A kernel OOM-killere megöli, mielőtt a Node elindulna. | Ellenőrizd, hogy az image a `node apps/api/dist/main.js` CMD-t használja-e (lásd [`infra/app/Dockerfile`](../../infra/app/Dockerfile)). Ha a régi `pnpm …` CMD fut, frissítsd a CMD-et és rebuildelj: `docker compose ... up -d --build`. Teljes diagnózis: [`docs/history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md`](../history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md) |
 | A `docker compose ps` önmagában csak a postgres-t mutatja | A többi service `Created` státuszban van, mert a stack indítása félbeszakadt | Lásd 4.1 — futtasd a `ps -a` flag-gel, majd ha kell, `up -d --build` |
 | `healthcheck exitCode: 1` a `fetch('/healthz')` Node scriptben | A `node -e` parancs `process.exit(r.ok?0:1)` exit kódot ad, de a Docker ezt 0-nak tekinti, ha a fetch sikeres volt. Ha a `r.ok` `false`, a Node 1-es kóddal lép ki — ez a NestJS nem-elérhetőség tünete (még nem indult el, vagy a route nem él) | Lásd fentebb, `api Restarting` sor |
 

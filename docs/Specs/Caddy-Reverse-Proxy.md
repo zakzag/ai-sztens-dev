@@ -1,7 +1,7 @@
 # Caddy — Reverse Proxy és TLS termináció
 
 **Státusz:** Élő (a `docs/Specs/outdated/`-ba kerül, ha a relevanciája megszűnik)
-**Utolsó frissítés:** 2026-09-28 (dual-stack port-ütközés + Cloud Firewall / ACME szekció hozzáadva)
+**Utolsó frissítés:** 2026-09-29 (explicit `file_server` a web/admin blokkokban — a `handle /api/*` blokkok jelenléte letiltja az implicit `file_server`-t; valamint a `try_files` önmagában nem szolgál ki fájlt, csak URI-t ír át)
 **Kapcsolódik:** [`docs/01-callback-assistant.md`](../01-callback-assistant.md), [`docs/02-flowchart.md`](../02-flowchart.md), [`docs/03-implementation-general.md`](../03-implementation-general.md), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md)
 
 ---
@@ -119,8 +119,8 @@ A renderelés a [`deploy/deploy.sh:render_caddyfile()`](../../deploy/deploy.sh)-
 | 1 | `email <ACME_EMAIL>` | A Let's Encrypt felé a kapcsolattartó email cím | A LE tanúsítvány lejáratáról szóló értesítések ide érkeznek; az ACME regisztrációhoz kell |
 | 2 | `admin off` | Letiltja a Caddy admin API-t (REST endpoint a konténeren belül) | Biztonsági keményítés: a Caddy nem futtat belső HTTP admin felületet |
 | 3 | `api.<DOMAIN> { encode zstd gzip reverse_proxy api:3000 }` | A `api.aisztens.hu` hosztnevet a NestJS API-hoz proxy-zza, zstd + gzip tömörítéssel | A böngésző CORS preflight-ok és a VAPI bejövő webhookok ezen a végponton érkeznek |
-| 4 | `web.<DOMAIN> { root * /srv/web, try_files {path} /index.html, handle /api/* }` | A SPA statikus fájljait szolgálja ki `/srv/web` mount-ból; a nem létező útvonalakat `/index.html`-re redirecteli (SPA fallback); a `/api/*` útvonalakat átproxy-zza az API-hoz | A React Router deep-linkjei (`/legal`, `/thank-you`) működnek böngésző-frissítéskor; ugyanarról az eredetről (same-origin) is elérhető az API |
-| 5 | `admin.<DOMAIN> { root * /srv/admin, ... }` | Ugyanaz, mint a `web`, de `/srv/admin` mount-ból, az admin SPA-t szolgálja ki | Az admin dashboard a `https://admin.aisztens.hu/`-n érhető el |
+| 4 | `web.<DOMAIN> { root * /srv/web, try_files {path} /index.html, file_server, handle /api/* }` | A SPA statikus fájljait szolgálja ki `/srv/web` mount-ból; a nem létező útvonalakat `/index.html`-re redirecteli (SPA fallback); a `/api/*` útvonalakat átproxy-zza az API-hoz | A React Router deep-linkjei (`/legal`, `/thank-you`) működnek böngésző-frissítéskor; ugyanarról az eredetről (same-origin) is elérhető az API. **`file_server` kötelező**: amint bármely `handle` blokk megjelenik a site-on belül, a Caddy kiveszi az implicit `file_server`-t; nélküle a `try_files` csak URI-t ír át, nem szolgál ki fájlt, és a böngésző üres 200-as választ kap (`content-length: 0`). |
+| 5 | `admin.<DOMAIN> { root * /srv/admin, file_server, ... }` | Ugyanaz, mint a `web`, de `/srv/admin` mount-ból, az admin SPA-t szolgálja ki | Az admin dashboard a `https://admin.aisztens.hu/`-n érhető el |
 | 6 | `<DOMAIN> { redir https://web.<DOMAIN>{uri} 307 }` | Az apex domain (`aisztens.hu/*`) összes kérését 307-es átirányítással a `web.aisztens.hu/*`-ra küldi | Amíg nincs külön landing page, a felhasználó azonnal a web app-ba jut |
 
 ### 4.2 A template-render mechanizmus

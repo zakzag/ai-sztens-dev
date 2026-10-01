@@ -2,7 +2,7 @@
 
 **Dátum:** 2026-09-28
 **Szerző:** Zoo (code mode)
-**Kapcsolódik:** [`docs/history/2026-09-28-api-healthcheck-fail-plan.md`](../history/2026-09-28-api-healthcheck-fail-plan.md), [`docs/history/2026-09-28-api-healthcheck-fail-impl.md`](../history/2026-09-28-api-healthcheck-fail-impl.md), [`docs/milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md`](2026-09-28-dual-stack-port-collision-fix.milestone.md)
+**Kapcsolódik:** [`2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](../history/2026-09-29--00-30-10-api-healthcheck-fail-plan.md), [`2026-09-29--00-34-28-api-healthcheck-fail-impl.md`](../history/2026-09-29--00-34-28-api-healthcheck-fail-impl.md), [`2026-09-29--00-18-00-dual-stack-port-collision-fix.milestone.md`](./2026-09-29--00-18-00-dual-stack-port-collision-fix.milestone.md)
 
 ## 1. Problem
 

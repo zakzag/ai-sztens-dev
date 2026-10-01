@@ -1,4 +1,10 @@
-import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 /** Validated body of POST /api/callback-requests. */
 export class CreateCallbackRequestDto {
@@ -12,7 +18,9 @@ export class CreateCallbackRequestDto {
   email!: string;
 
   @IsString()
-  @Matches(/^[+]?[0-9\s\-()]{6,20}$/, { message: 'Érvényes telefonszámot adj meg' })
+  @Matches(/^[+]?[0-9\s\-()]{6,20}$/, {
+    message: 'Érvényes telefonszámot adj meg',
+  })
   phone!: string;
 
   @IsString()

@@ -16,6 +16,33 @@ import { AppModule } from './../src/app.module.js';
  * Keeping this in sync with main.ts is intentional; the contract tested
  * here is "GET /healthz returns 200 + status:'ok'".
  */
+
+/**
+ * Mirrors the return type of `HealthController.check()`.
+ *
+ * `FastifyInjectResponse.json()` is typed as `any`, so we narrow it through
+ * `unknown` plus a type guard rather than a `as unknown as HealthBody`
+ * assertion: the latter is treated by `@typescript-eslint/no-unsafe-*` as
+ * still-unsafe under `recommendedTypeChecked` (and trips
+ * `no-unused-vars` because the cast happens to erase the symbol from the
+ * program's type graph).
+ */
+interface HealthBody {
+  status: 'ok';
+  uptime: number;
+  timestamp: string;
+}
+
+function isHealthBody(value: unknown): value is HealthBody {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    v['status'] === 'ok' &&
+    typeof v['uptime'] === 'number' &&
+    typeof v['timestamp'] === 'string'
+  );
+}
+
 describe('HealthController (e2e)', () => {
   let app: NestFastifyApplication;
 
@@ -39,7 +66,9 @@ describe('HealthController (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json();
+    const body: unknown = response.json();
+    // Type-guard narrows `unknown` -> `HealthBody`; `expect()` would not.
+    if (!isHealthBody(body)) throw new Error('health body shape mismatch');
     expect(body.status).toBe('ok');
     expect(typeof body.uptime).toBe('number');
     expect(body.uptime).toBeGreaterThanOrEqual(0);

@@ -1,11 +1,21 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+} from '@nestjs/common';
 import type { CallbackRequest } from '@callback/shared';
 import { CallbackRequestsService } from './callback-requests.service.js';
 import { CreateCallbackRequestDto } from './dto/create-callback-request.dto.js';
 
 @Controller('callback-requests')
 export class CallbackRequestsController {
-  constructor(private readonly callbackRequestsService: CallbackRequestsService) {}
+  constructor(
+    private readonly callbackRequestsService: CallbackRequestsService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)

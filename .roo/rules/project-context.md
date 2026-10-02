@@ -2,7 +2,7 @@
 
 ## What this project is
 
-**Callback Assistant** — an automated call-back system. A website visitor submits a call-back
+**AIsztens** — an automated call-back system. A website visitor submits a call-back
 request through a form; the backend validates and stores it, then a worker initiates an
 AI-driven phone call (speech-to-text / text-to-speech / LLM conversation), processes the
 result and runs configurable follow-up actions (owner notification, calendar booking

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Callback Assistant — deploy helper (run from YOUR local machine).
+# AIsztens — deploy helper (run from YOUR local machine).
 #
 # Requires: ssh, rsync (use Git Bash / WSL on Windows).
 #

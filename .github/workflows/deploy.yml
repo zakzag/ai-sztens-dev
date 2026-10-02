@@ -1,4 +1,4 @@
-# Callback Assistant — production deploy to the DigitalOcean droplet.
+# AIsztens — production deploy to the DigitalOcean droplet.
 #
 # Mirrors deploy/deploy.sh + deploy/bootstrap.sh but driven by GitHub Actions:
 #   1. Render infra/.env from the INFRA_ENV secret

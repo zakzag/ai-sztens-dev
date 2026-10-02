@@ -1,4 +1,4 @@
-# Callback Assistant – Egyszerűsített folyamatábra
+# AIsztens – Egyszerűsített folyamatábra
 
 A rendszer egyszerűsített, magas szintű folyamata — a részletes, keretrendszer-független
 specifikáció a [`03-implementation-general.md`](03-implementation-general.md) fájlban van.

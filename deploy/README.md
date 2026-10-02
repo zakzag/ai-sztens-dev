@@ -1,4 +1,4 @@
-# Deployment — Callback Assistant droplet
+# Deployment — AIsztens droplet
 
 Runbook to take a fresh DigitalOcean droplet (Ubuntu, only `root`, no Docker) to a
 running, monitored application. Everything is Docker Compose-based; the mandatory files

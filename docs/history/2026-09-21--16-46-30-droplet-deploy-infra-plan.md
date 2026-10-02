@@ -2,7 +2,7 @@
 
 - Date: 2026-09-18
 - Status: Done
-- Scope: Create the mandatory `deploy/` and `infra/` files for the Callback Assistant droplet
+- Scope: Create the mandatory `deploy/` and `infra/` files for the AIsztens droplet
   described in [`docs/prompts/2026-09-18-droplet-setup.txt`](../prompts/2026-09-18-droplet-setup.txt).
   No setup automation is required yet — just the reusable files so an identical machine can be
   brought up quickly and reproducibly.

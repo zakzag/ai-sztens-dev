@@ -1,4 +1,4 @@
-# Callback Assistant — PR-time checks: install, build, lint, unit tests.
+# AIsztens — PR-time checks: install, build, lint, unit tests.
 #
 # Runs on every PR (into `main` or `dev`) and on every push to `dev`. It is
 # intentionally a separate workflow from `deploy.yml` so PR authors get a

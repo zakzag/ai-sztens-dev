@@ -3,7 +3,7 @@
 ## Goal
 
 Identify files and folders inside `E:\projects\AI\2026-08-31-ai-sztens-dev`
-that are not functional parts of the **Callback Assistant** codebase and
+that are not functional parts of the **AIsztens** codebase and
 should be removed. The investigation started from the user's observation
 that the **MCP server** (`E:\projects\AI\2026-08-28-MCPs\`) tends to drop
 files into whatever directory it is launched from, and from the suspicious

@@ -1,4 +1,4 @@
-# Callback Assistant – General Implementation (Framework-Agnostic)
+# AIsztens – General Implementation (Framework-Agnostic)
 
 This document defines the implementation **by function only** — no specific language,
 framework or vendor. The concrete stack decision (incl. B2B / multi-tenant considerations)

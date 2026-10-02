@@ -2,7 +2,7 @@
 
 - Date: 2026-09-18
 - Status: Done
-- Scope: Make it possible to bring up the Callback Assistant stack on the developer's
+- Scope: Make it possible to bring up the AIsztens stack on the developer's
   Windows machine inside WSL (Debian) instead of the DigitalOcean droplet.
 
 ## 1. Context

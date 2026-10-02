@@ -8,12 +8,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0bf25cbd-a929-4a4c-a0fb-3f140a273081" name="Changes" comment="refactor(scripts): reorganize SSH key management scripts into a dedicated directory">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/api/src/callback-requests/callback-requests.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/src/callback-requests/callback-requests.controller.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/api/src/callback-requests/dto/create-callback-request.dto.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/src/callback-requests/dto/create-callback-request.dto.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/api/test/health.e2e-spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/test/health.e2e-spec.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/milestones/2026-09-29--00-34-49-api-healthcheck-fail.milestone.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/milestones/2026-09-29--00-34-49-api-healthcheck-fail.milestone.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -23,6 +19,7 @@
   <component name="CopilotPersistence">
     <persistenceIdMap>
       <entry key="_E:/projects/AI/2026-08-31-ai-sztens-dev" value="3K3prg4v6Ra64VFCLIAiP1uuJ1V" />
+      <entry key="_E:/projects/AI/2026-08-31-ai-sztens-dev-2" value="3K9J2cCkDLdvKWjyZRtmJVkVSmU" />
     </persistenceIdMap>
   </component>
   <component name="Git.Settings">
@@ -41,7 +38,9 @@
   }
 }</component>
   <component name="PackageJsonUpdateNotifier">
+    <dismissed value="$PROJECT_DIR$/apps/admin/package.json" />
     <dismissed value="$PROJECT_DIR$/package.json" />
+    <dismissed value="$PROJECT_DIR$/packages/shared/package.json" />
   </component>
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="CurrentFile" />
@@ -148,6 +147,8 @@
       <workItem from="1790686379965" duration="7699000" />
       <workItem from="1790760460131" duration="3567000" />
       <workItem from="1790802191240" duration="8511000" />
+      <workItem from="1790963349706" duration="378000" />
+      <workItem from="1790963755897" duration="420000" />
     </task>
     <task id="LOCAL-00001" summary="fixing server errors">
       <option name="closed" value="true" />

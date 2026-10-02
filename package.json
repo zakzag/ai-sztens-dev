@@ -1,8 +1,8 @@
 {
-  "name": "callback-assistant",
+  "name": "aisztens",
   "version": "0.0.1",
   "private": true,
-  "description": "Callback Assistant monorepo: NestJS+Fastify API, React public site, React admin SPA",
+  "description": "AIsztens monorepo: NestJS+Fastify API, React public site, React admin SPA",
   "scripts": {
     "predev": "pnpm --filter @callback/shared build",
     "dev": "concurrently -k -n shared,api,web,admin -c yellow,blue,green,magenta \"pnpm --filter @callback/shared dev\" \"pnpm --filter @callback/api start:dev\" \"pnpm --filter @callback/web dev\" \"pnpm --filter @callback/admin dev\"",
@@ -10,7 +10,10 @@
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
     "test": "pnpm --filter @callback/api test",
-    "test:e2e": "pnpm --filter @callback/api test:e2e"
+    "test:e2e": "pnpm --filter @callback/api test:e2e",
+    "test:stack": "bash scripts/test/stack-smoke.sh",
+    "test:stack:up": "bash scripts/test/stack-up.sh",
+    "test:stack:down": "bash scripts/test/stack-down.sh"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

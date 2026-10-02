@@ -12,7 +12,7 @@ any of its functional units yet.
 
 ## 2. Context (from `docs/`)
 
-- [`README.md`](../../README.md) and [`docs/01-callback-assistant.md`](../../docs/01-callback-assistant.md)
+- [`README.md`](../../README.md) and [`docs/01-aisztens.md`](../../docs/01-aisztens.md)
   define a call-back system: form submission, validation, persistence, two queues
   (call + action), a call dispatcher, a webhook receiver, and an extensible action engine.
 - [`docs/Plans/04-Laravel_vs_NestJS.md`](../Specs/outdated/04-Laravel_vs_NestJS.md) concludes that

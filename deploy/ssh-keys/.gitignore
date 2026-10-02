@@ -1,0 +1,2 @@
+# Real public keys stay local; only placeholders are committed.
+*.pub

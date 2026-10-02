@@ -1,0 +1,25 @@
+# Never send local environment files or build artifacts into the image context.
+**/.env
+**/.env.*
+!**/.env.example
+
+node_modules
+**/node_modules
+
+dist
+**/dist
+build
+coverage
+.temp
+.tmp
+*.log
+
+.git
+.gitignore
+.vscode
+.idea
+
+docs
+deploy
+infra
+README.md

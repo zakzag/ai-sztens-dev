@@ -3,9 +3,14 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { CallbackRequestsModule } from './callback-requests/callback-requests.module.js';
+import { HealthModule } from './health/health.module.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), CallbackRequestsModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    CallbackRequestsModule,
+    HealthModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

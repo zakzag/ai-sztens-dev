@@ -117,14 +117,61 @@ if ($IsWindows -or $PSVersionTable.PSVersion.Major -le 5 -or ($env:OS -eq 'Windo
         exit 1
     }
     # Convert the Windows-side repo path to the WSL-side path.
-    $wslPath = (& wsl.exe wslpath -u $RepoDir 2>$null)
+    #
+    # We use Start-Process with -ArgumentList (an array) instead of the
+    # & native-command form because PowerShell's native-command argument
+    # parser strips the backslashes from a Windows path before forwarding
+    # it to wslpath, which then receives "E:projectsAI..." and rejects
+    # the input. -ArgumentList bypasses that parser.
+    #
+    # The original code used `& wsl.exe wslpath -u $RepoDir 2>$null`
+    # which silently swallowed wslpath's own error message. We capture
+    # stdout AND stderr to separate temp files so the operator gets a
+    # useful diagnostic instead of "Could not translate repo path to
+    # WSL: <path>" with no explanation. The most common failure on a
+    # fresh Windows install is "no WSL distro installed" -- wslpath
+    # exits with code 1 and prints "E:... is not accessible".
+    $wslPathOutFile = [System.IO.Path]::GetTempFileName()
+    $wslPathErrFile = [System.IO.Path]::GetTempFileName()
+    try {
+        $proc = Start-Process -FilePath 'wsl.exe' `
+            -ArgumentList @('wslpath', '-u', $RepoDir) `
+            -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $wslPathOutFile `
+            -RedirectStandardError $wslPathErrFile
+        if ($proc.ExitCode -ne 0) {
+            $errOut = if (Test-Path -LiteralPath $wslPathErrFile) { (Get-Content -LiteralPath $wslPathErrFile -Raw).Trim() } else { '' }
+            Write-Err "Could not translate repo path to WSL: $RepoDir (wslpath exit $($proc.ExitCode))"
+            if ($errOut) { Write-Err "  wslpath stderr: $errOut" }
+            Write-Err "  Most common cause: no WSL distro is installed, OR the path"
+            Write-Err "  is not accessible from inside WSL. Install a distro with"
+            Write-Err "  'wsl --install -d Ubuntu' from an elevated PowerShell."
+            exit 1
+        }
+        $wslPath = (Get-Content -LiteralPath $wslPathOutFile -Raw).Trim()
+    } finally {
+        Remove-Item -LiteralPath $wslPathOutFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $wslPathErrFile -Force -ErrorAction SilentlyContinue
+    }
     if (-not $wslPath) {
-        Write-Err "Could not translate repo path to WSL: $RepoDir"
+        Write-Err "Could not translate repo path to WSL: $RepoDir (wslpath returned empty)"
         exit 1
     }
     # We invoke the bash script via wsl.exe so the caller's Windows terminal
     # stays the source of truth (PATH, exit code, output streams).
-    $bashCmd = { & wsl.exe --cd $wslPath bash 'scripts/dev-stack.sh' $Subcommand @RemainingArgs }
+    $bashCmd = {
+        # Build the wsl.exe argument list fresh each time so $Subcommand
+        # and $RemainingArgs are captured at invocation, not at scriptblock
+        # definition time. The @-splat operator can't appear inside an
+        # expression, so we build the array in two steps.
+        $argsLocal = [System.Collections.Generic.List[string]]::new()
+        [void]$argsLocal.AddRange(@('--cd', $wslPath, 'bash', 'scripts/dev-stack.sh', $Subcommand))
+        foreach ($a in $RemainingArgs) { [void]$argsLocal.Add($a) }
+        $proc = Start-Process -FilePath 'wsl.exe' `
+            -ArgumentList $argsLocal `
+            -NoNewWindow -Wait -PassThru
+        exit $proc.ExitCode
+    }
 } else {
     # Native Linux/macOS bash; just call the script directly.
     $bashScript = Join-Path $RepoDir 'scripts/dev-stack.sh'

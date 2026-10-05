@@ -368,6 +368,7 @@ A `pgdata` és `caddy_data` named volume-ok ilyenkor is megmaradnak — nem vesz
 - [`infra/.env.example`](../../infra/.env.example) — a per-env séma dokumentációja (local / dev / prod blokkok). A tényleges fájlok: `infra/.env.local`, `infra/.env.dev`, `infra/.env.prod` (mind gitignored).
 - [`scripts/test/stack-smoke.sh`](../../scripts/test/stack-smoke.sh) — teljes lifecycle smoke
 - [`docs/Specs/Local-Development.md`](Local-Development.md) — a fejlesztői oldali workflow dokumentációja (`scripts/dev-stack.sh`, per-env fájlok, APP_ENV terjedés)
+- [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md) — **az end-to-end manuális tesztelési útmutató**: parancsok + várt kimenet a local / dev / prod környezetek mindegyikére. Minden deploy vagy friss pull után fussa le a §1 (repo checks) és a saját env-ének megfelelő szakaszt (§2 local, §3 dev, §4 prod).
 - [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../history/2026-10-05--10-30-00-three-env-separation-plan.md) — a teljes három-env terv, ami ezt a struktúrát létrehozta
 
 ### 9.2 Specifikus deep-dive-ok

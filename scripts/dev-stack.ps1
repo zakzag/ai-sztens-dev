@@ -57,14 +57,40 @@ function Write-Err  { param([string]$Msg) [Console]::Error.WriteLine("[dev-stack
 
 # ---------------------------------------------------------------------------
 # Resolve the repo root (this script's parent directory).
+#
+# `Split-Path -LiteralPath $null` is the root cause of the
+# "Parameter set cannot be resolved" error that started appearing on
+# `pwsh scripts/dev-stack.ps1 up`: when [CmdletBinding()] is in play and
+# the script is invoked in certain contexts (notably under `pwsh -File`
+# with PowerShell 5.x), `$MyInvocation.MyCommand.Path` AND
+# `$PSCommandPath` can both be $null. Feeding $null into the
+# `-LiteralPath` parameter of `Split-Path` (or `Resolve-Path`,
+# `Get-Item` etc.) raises a ParameterBindingException with that exact
+# message.
+#
+# Fix: use the positional form (which goes through the default
+# `-Path` parameter set, where $null is accepted and produces a clean
+# "path is null" failure later), and add an explicit null-guard that
+# exits with a useful diagnostic rather than continuing with a bad path.
 # ---------------------------------------------------------------------------
 $ScriptPath = $MyInvocation.MyCommand.Path
 if (-not $ScriptPath) {
     # MyCommand.Path is null when the script is piped; fall back to PSScriptRoot.
     $ScriptPath = $PSCommandPath
 }
-$ScriptDir  = Split-Path -LiteralPath $ScriptPath -Parent
-$RepoDir    = (Resolve-Path -LiteralPath (Join-Path $ScriptDir '..')).ProviderPath
+if ([string]::IsNullOrEmpty($ScriptPath)) {
+    # Neither $MyInvocation.MyCommand.Path nor $PSCommandPath was populated.
+    # Common cause: the script is run from a context that does not expose
+    # its own path (e.g. certain `Invoke-Command` invocations). Refuse
+    # to start with an unambiguous error instead of failing at the next
+    # Split-Path call with a confusing ParameterBindingException.
+    Write-Err 'FATAL: cannot determine the script path ($MyInvocation.MyCommand.Path and $PSCommandPath are both empty).'
+    Write-Err '       Invoke this script directly with `pwsh scripts/dev-stack.ps1 up`, or'
+    Write-Err '       call & { . scripts/dev-stack.ps1 } from a context where the script path is resolvable.'
+    exit 1
+}
+$ScriptDir  = Split-Path $ScriptPath -Parent
+$RepoDir    = (Resolve-Path (Join-Path $ScriptDir '..')).ProviderPath
 
 # ---------------------------------------------------------------------------
 # Find bash + WSL. On Linux/macOS PowerShell, bash is the natural interpreter

@@ -92,22 +92,63 @@ SCP=(scp -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes ${SSH_KEY:+-i
 log() { echo "[deploy] $*"; }
 
 # ---------------------------------------------------------------------------
-# Build the two SPAs (apps/web, apps/admin) into apps/*/dist/. The SPAs
-# read `import.meta.env.VITE_API_BASE_URL` at build time, so we pass the
-# production URL inline. The same `DOMAIN` value is used by infra/caddy
-# on the droplet, so they stay in sync.
+# Ensure the per-env SPA file exists for the current build mode, seeding it
+# from the resolved `DOMAIN` when missing. Without this guard, a fresh
+# droplet (which only has `.env.example` rsynced) would fail
+# `pnpm ... build:dev` because `apps/<app>/.env.dev` is not tracked in
+# the repo (it is gitignored, by design — see `.gitignore:58`).
+#
+# After the first run, the per-env file lives on the build host and the
+# operator can hand-edit it for any future override. Subsequent deploys
+# do NOT overwrite an existing file — they only seed the first time.
+ensure_spa_env() {
+  local app="$1" mode="$2" env_file="$REPO_DIR/apps/$app/.env.$mode"
+  if [ -f "$env_file" ]; then
+    return 0
+  fi
+  log "Seeding apps/$app/.env.$mode (DOMAIN=$DOMAIN) ..."
+  case "$app" in
+    web|admin)
+      printf 'VITE_API_BASE_URL=https://api.%s/api\n' "$DOMAIN" > "$env_file"
+      ;;
+    *)
+      log "ERROR: ensure_spa_env called with unknown app '$app'"
+      return 1
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Build the two SPAs (apps/web, apps/admin) into apps/*/dist/.
+#
+# Vite resolves `import.meta.env.VITE_API_BASE_URL` at build time. The
+# value comes from per-env files (apps/<app>/.env.local / .env.dev /
+# .env.prod) selected by the `--mode` flag passed to `vite build`. Today
+# we always build for the dev droplet, so we pass `--mode dev`, which
+# makes Vite pick up `apps/<app>/.env.dev` (see the three-env separation
+# plan in docs/history/2026-10-05--10-30-00-three-env-separation-plan.md).
+# Future prod deploys will pass `--mode prod`.
+#
+# Previously this function injected the API URL inline via `VITE_API_BASE_URL=`
+# in front of the pnpm call. That bypassed the per-env file layout, made
+# the deploy script the source of truth for the production URL, and silently
+# overrode anything developers had set locally. The new `--mode dev` flow
+# keeps the deploy script honest and makes the SPA env files the single
+# source of truth for the built-in API URL.
 build_spas() {
   if ! command -v pnpm >/dev/null 2>&1; then
     log "pnpm not found on PATH; skipping SPA build. Install pnpm or run the build manually."
     return 0
   fi
-  local api_base="https://api.${DOMAIN}/api"
+  local build_mode="${SPA_BUILD_MODE:-dev}"
+  ensure_spa_env web  "$build_mode"
+  ensure_spa_env admin "$build_mode"
   log "Installing workspace dependencies ..."
   (cd "$REPO_DIR" && pnpm install --frozen-lockfile)
-  log "Building @callback/web against VITE_API_BASE_URL=$api_base ..."
-  (cd "$REPO_DIR" && VITE_API_BASE_URL="$api_base" pnpm --filter @callback/web build)
-  log "Building @callback/admin against VITE_API_BASE_URL=$api_base ..."
-  (cd "$REPO_DIR" && VITE_API_BASE_URL="$api_base" pnpm --filter @callback/admin build)
+  log "Building @callback/web (mode=$build_mode) ..."
+  (cd "$REPO_DIR" && pnpm --filter @callback/web "build:${build_mode}")
+  log "Building @callback/admin (mode=$build_mode) ..."
+  (cd "$REPO_DIR" && pnpm --filter @callback/admin "build:${build_mode}")
 }
 
 # ---------------------------------------------------------------------------

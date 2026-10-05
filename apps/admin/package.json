@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:dev": "vite --mode dev",
+    "dev:prod": "vite --mode prod",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "build:dev": "tsc --noEmit -p tsconfig.json && vite build --mode dev",
+    "build:prod": "tsc --noEmit -p tsconfig.json && vite build --mode prod",
     "preview": "vite preview",
     "test": "echo \"@callback/admin: no unit tests yet\" && exit 0",
     "lint": "echo \"@callback/admin: no eslint config yet\" && exit 0"

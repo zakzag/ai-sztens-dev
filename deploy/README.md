@@ -159,18 +159,15 @@ merge. Concurrency is keyed `deploy-droplet` so two deploys cannot race.
 ## 9. Local development in WSL (Debian)
 
 The droplet setup assumes a public domain and Let's Encrypt; on a local WSL Debian
-(NAT network, no public DNS) use the local override instead:
+(NAT network, no public DNS) use the local helper instead:
 
 ```bash
-# 1. Install Docker: either Docker Desktop for Windows with WSL integration,
-#    or native Docker inside WSL (enable systemd first, then get.docker.com).
-# 2. Prepare the env file.
-cp infra/.env.example infra/.env
-
-# 3. Start without Caddy/TLS; the API is reachable at http://localhost:3000/api.
-docker compose --env-file infra/.env \
-  -f infra/docker-compose.yml \
-  -f infra/docker-compose.wsl.yml up -d --build
+# From the repo root.
+scripts/dev-stack.sh up
+# Equivalent long form:
+#   docker compose --env-file infra/.env.local \
+#     -f infra/docker-compose.yml \
+#     -f infra/docker-compose.local.yml up -d --build
 ```
 
 Verify:
@@ -180,6 +177,7 @@ curl http://localhost:3000/api
 curl http://localhost:3000/api/callback-requests
 ```
 
-The `docker-compose.wsl.yml` override publishes `api` on `localhost:3000` and Postgres on
+The `docker-compose.local.yml` override publishes `api` on `localhost:3000` and Postgres on
 `localhost:5432`, and disables Caddy via a `never` profile. It is merged explicitly, so the
-droplet deployment is unaffected.
+droplet deployment is unaffected. From Windows PowerShell, `pwsh scripts/dev-stack.ps1 up`
+delegates to the same bash script via WSL.

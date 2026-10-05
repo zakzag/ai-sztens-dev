@@ -116,47 +116,33 @@ if ($IsWindows -or $PSVersionTable.PSVersion.Major -le 5 -or ($env:OS -eq 'Windo
         Write-Err 'WSL is not on PATH. Install WSL or run this from inside a WSL terminal.'
         exit 1
     }
-    # Convert the Windows-side repo path to the WSL-side path.
+    # Convert the Windows-side repo path to a WSL-side path.
     #
-    # We use Start-Process with -ArgumentList (an array) instead of the
-    # & native-command form because PowerShell's native-command argument
-    # parser strips the backslashes from a Windows path before forwarding
-    # it to wslpath, which then receives "E:projectsAI..." and rejects
-    # the input. -ArgumentList bypasses that parser.
+    # We do this conversion ourselves in PowerShell (no wslpath
+    # involved) because the Microsoft Store wsl.exe binary eats
+    # backslashes when forwarding argv entries: `& wsl.exe wslpath
+    # -u "E:\projects\AI\..."` receives `E:projectsAI...` regardless
+    # of how the Windows-side argument is quoted, escaped, or
+    # passed (verified with `& wsl.exe ...`, `Start-Process
+    # -ArgumentList`, and `--%` stop-parsing -- all three exhibit
+    # the same mangling). So we skip the cross-process conversion
+    # entirely and compute the WSL mount-path manually.
     #
-    # The original code used `& wsl.exe wslpath -u $RepoDir 2>$null`
-    # which silently swallowed wslpath's own error message. We capture
-    # stdout AND stderr to separate temp files so the operator gets a
-    # useful diagnostic instead of "Could not translate repo path to
-    # WSL: <path>" with no explanation. The most common failure on a
-    # fresh Windows install is "no WSL distro installed" -- wslpath
-    # exits with code 1 and prints "E:... is not accessible".
-    $wslPathOutFile = [System.IO.Path]::GetTempFileName()
-    $wslPathErrFile = [System.IO.Path]::GetTempFileName()
-    try {
-        $proc = Start-Process -FilePath 'wsl.exe' `
-            -ArgumentList @('wslpath', '-u', $RepoDir) `
-            -NoNewWindow -Wait -PassThru `
-            -RedirectStandardOutput $wslPathOutFile `
-            -RedirectStandardError $wslPathErrFile
-        if ($proc.ExitCode -ne 0) {
-            $errOut = if (Test-Path -LiteralPath $wslPathErrFile) { (Get-Content -LiteralPath $wslPathErrFile -Raw).Trim() } else { '' }
-            Write-Err "Could not translate repo path to WSL: $RepoDir (wslpath exit $($proc.ExitCode))"
-            if ($errOut) { Write-Err "  wslpath stderr: $errOut" }
-            Write-Err "  Most common cause: no WSL distro is installed, OR the path"
-            Write-Err "  is not accessible from inside WSL. Install a distro with"
-            Write-Err "  'wsl --install -d Ubuntu' from an elevated PowerShell."
-            exit 1
-        }
-        $wslPath = (Get-Content -LiteralPath $wslPathOutFile -Raw).Trim()
-    } finally {
-        Remove-Item -LiteralPath $wslPathOutFile -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $wslPathErrFile -Force -ErrorAction SilentlyContinue
-    }
-    if (-not $wslPath) {
-        Write-Err "Could not translate repo path to WSL: $RepoDir (wslpath returned empty)"
+    # WSL's standard auto-mount layout is /mnt/<drive-letter>/...
+    # for Windows drives, with the drive letter lower-cased and the
+    # backslashes turned into forward slashes. UNC paths
+    # (\\server\share\...) would need a different layout but this
+    # script targets a local repo, so /mnt/<x>/ is sufficient.
+    if ($RepoDir -notmatch '^[A-Za-z]:[\\/]') {
+        Write-Err "Repo path '$RepoDir' is not a Windows drive-letter path; cannot convert to WSL form."
+        Write-Err "Use the bash entry point ('scripts/dev-stack.sh up') directly inside WSL instead."
         exit 1
     }
+    $drive = $RepoDir.Substring(0, 1).ToLowerInvariant()
+    $tail  = $RepoDir.Substring(2) -replace '\\', '/'
+    $wslPath = "/mnt/$drive$tail"
+    # wsl.exe --cd is confused by trailing slashes on some builds.
+    if ($wslPath.EndsWith('/')) { $wslPath = $wslPath.TrimEnd('/') }
     # We invoke the bash script via wsl.exe so the caller's Windows terminal
     # stays the source of truth (PATH, exit code, output streams).
     $bashCmd = {
@@ -165,7 +151,7 @@ if ($IsWindows -or $PSVersionTable.PSVersion.Major -le 5 -or ($env:OS -eq 'Windo
         # definition time. The @-splat operator can't appear inside an
         # expression, so we build the array in two steps.
         $argsLocal = [System.Collections.Generic.List[string]]::new()
-        [void]$argsLocal.AddRange(@('--cd', $wslPath, 'bash', 'scripts/dev-stack.sh', $Subcommand))
+        [void]$argsLocal.AddRange([string[]]@('--cd', $wslPath, 'bash', 'scripts/dev-stack.sh', $Subcommand))
         foreach ($a in $RemainingArgs) { [void]$argsLocal.Add($a) }
         $proc = Start-Process -FilePath 'wsl.exe' `
             -ArgumentList $argsLocal `

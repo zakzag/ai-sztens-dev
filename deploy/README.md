@@ -114,23 +114,41 @@ Configure under **Settings → Secrets and variables → Actions**:
 
 | Secret | Value | Notes |
 |---|---|---|
-| `DROPLET_HOST` | Droplet public IPv4 or hostname | e.g. `164.92.248.194` |
+| `DROPLET_HOST` | Droplet public IPv4 or hostname | e.g. `164.92.248.194`. Currently a single value; when the prod droplet comes online, a second `DROPLET_HOST_PROD` secret and a per-env matrix step are needed. |
 | `DROPLET_SSH_KEY` | Private key matching [`deploy/ssh-keys/deployer.pub`](ssh-keys/deployer.pub) | Installed into `authorized_keys` by [`bootstrap.sh`](bootstrap.sh) |
-| `INFRA_ENV` | Full contents of [`infra/.env`](../infra/.env.example) | Multi-line; written verbatim to `/opt/aisztens/infra/.env` on every deploy. Rotate by updating the secret. |
+| `INFRA_ENV_DEV` | Full contents of [`infra/.env.dev`](../infra/.env.example) (multi-line, verbatim) | Renders `infra/.env.dev` on every deploy. The `workflow_dispatch` matrix default picks this for push to `dev`. |
+| `INFRA_ENV_PROD` | Full contents of `infra/.env.prod` (multi-line, verbatim) | Renders `infra/.env.prod` on every deploy. Only consumed when an operator dispatches the workflow with `app_env=prod` against a future prod droplet. |
+
+The `APP_ENV` selector (`dev` / `prod`) is set automatically:
+
+- **`push` to `dev` branch** → no `inputs.app_env` → `APP_ENV=dev` → renders from `INFRA_ENV_DEV` → deploys to the dev droplet.
+- **`workflow_dispatch`** → the operator picks `dev` or `prod` from a choice input → `APP_ENV` is set from that pick → the matching secret is rendered.
+
+The push trigger cannot accidentally target prod (the input does not exist for `push`). Prod deploys are gated by the GitHub `production` environment protection rule (recommended: require a manual reviewer on the `prod` deployer before it can run).
 
 ### 8.2 What the workflow does
 
-1. Renders `infra/.env` from the `INFRA_ENV` secret.
-2. SCPs the repo (minus `.git`, `node_modules`, build artifacts, secrets,
-   and `deploy/ssh-keys/`) to `/opt/aisztens` on the droplet, mirroring
-   `deploy/deploy.sh`'s `--delete` semantics.
-3. SCPs the secret-rendered `infra/.env` on top.
-4. SSHes in as `deployer` and runs
-   `docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build --remove-orphans`.
-5. Waits for the `api` container healthcheck (defined in
+1. Renders `infra/.env.${APP_ENV}` from the matching GitHub Secret
+   (`INFRA_ENV_DEV` for `APP_ENV=dev`, `INFRA_ENV_PROD` for `APP_ENV=prod`).
+   The choice depends on the trigger:
+   - `push` to `dev` → `APP_ENV=dev` → renders `infra/.env.dev`.
+   - `workflow_dispatch` with `app_env=prod` → renders `infra/.env.prod`.
+   The render step exports `APP_ENV` for all downstream steps via
+   `$GITHUB_ENV`.
+2. SCPs the repo (minus `.git`, `node_modules`, build artifacts, the
+   `apps/**/.env.{local,dev,prod}` and `infra/.env.{local,dev,prod}` per-env
+   files, and `deploy/ssh-keys/`) to `/opt/aisztens` on the droplet.
+3. SCPs the secret-rendered `infra/.env.${APP_ENV}` on top (destination on
+   the droplet stays `/opt/aisztens/infra/.env` — the rename applies only
+   to the local repo working copy).
+4. Builds the SPAs against the matching `apps/<app>/.env.${APP_ENV}` via
+   the `--mode ${APP_ENV}` flag passed to `pnpm --filter ... build:${APP_ENV}`.
+6. SSHes in as `deployer` and runs
+   `APP_ENV=${APP_ENV} docker compose --env-file "infra/.env.${APP_ENV}" -f infra/docker-compose.yml up -d --build --remove-orphans`.
+7. Waits for the `api` container healthcheck (defined in
    [`infra/docker-compose.yml`](../infra/docker-compose.yml)) to become
    `healthy`.
-6. Runs [`scripts/test/stack-smoke.sh`](../scripts/test/stack-smoke.sh)
+8. Runs [`scripts/test/stack-smoke.sh`](../scripts/test/stack-smoke.sh)
    against the live deployment. The same 4 liveness + 6 cross-service
    checks documented in [`scripts/test/README.md`](../scripts/test/README.md).
 7. On failure, dumps the last 500 log lines of every container into the

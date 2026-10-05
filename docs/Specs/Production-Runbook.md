@@ -1,7 +1,7 @@
 # Production Runbook — éles verifikáció deploy után
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-09-29 (deploy.sh PR #1: hibabanner + stage-szintek a `deploy.sh` trap-ből, `infra/.env` scp-bugfix, rsync kihagyja a `deploy/ssh-keys/` mappát; lásd 6.1 szakasz + `docs/history/2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.md`)
+**Utolsó frissítés:** 2026-10-02 (`/api/vapi/*` HMAC ellenőrzés + Caddy pre-filter; `CORS_ORIGINS` tisztítás; curl példa helyes signature küldéséhez — lásd 4.4 + `docs/history/2026-10-02--19-09-30-vapi-webhook-security.md`)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
 ---
@@ -149,6 +149,35 @@ docker compose exec monitor sh -c 'wget -qO- http://api:3000/healthz || echo "MO
 
 # A NestJS liveness endpoint közvetlenül a konténerből
 docker compose exec api wget -qO- http://127.0.0.1:3000/healthz
+
+# A VAPI webhook védelmi vonalak ellenőrzése (Caddy 405 + NestJS HMAC).
+# A Caddy pre-filter: POST X-Vapi-Signature nélkül → 405 az edge-ről.
+curl -i -X POST "https://api.aisztens.hu/api/vapi/webhooks/end-of-call-report" \
+  -H "Content-Type: application/json" \
+  -d '{"message":{"id":"evt-test","type":"end-of-call-report"}}'
+# Elvárt: HTTP/2 405 (a Caddy @vapi_match nem egyezik → respond "Method Not Allowed" 405)
+
+# A NestJS HMAC guard: helyes signature-rel POST → 200, helytelen → 401.
+# A secret az infra/.env VAPI_WEBHOOK_SECRET sorából jön, SOHA ne dump-old log-ba.
+SECRET="$(grep VAPI_WEBHOOK_SECRET /opt/aisztens/infra/.env | cut -d= -f2)"
+BODY='{"message":{"id":"evt-test-001","type":"end-of-call-report","call":{"id":"call-test-001"}}}'
+TS="$(date +%s)"
+SIG="$(printf '%s' "${TS}.${BODY}" | openssl dgst -sha256 -hmac "${SECRET}" | sed 's/^.*= //')"
+
+curl -i -X POST "https://api.aisztens.hu/api/vapi/webhooks/end-of-call-report" \
+  -H "Content-Type: application/json" \
+  -H "X-Vapi-Timestamp: ${TS}" \
+  -H "X-Vapi-Signature: sha256=${SIG}" \
+  -d "${BODY}"
+# Elvárt: HTTP/2 200 + JSON {"received":true,"id":"<uuid>"}
+
+# Helytelen signature-rel ugyanaz a payload → 401 (NestJS guard).
+curl -i -X POST "https://api.aisztens.hu/api/vapi/webhooks/end-of-call-report" \
+  -H "Content-Type: application/json" \
+  -H "X-Vapi-Timestamp: ${TS}" \
+  -H "X-Vapi-Signature: sha256=deadbeef" \
+  -d "${BODY}"
+# Elvárt: HTTP/2 401 (VapiSignatureGuard HMAC mismatch)
 ```
 
 **Elvárt:**
@@ -156,6 +185,8 @@ docker compose exec api wget -qO- http://127.0.0.1:3000/healthz
 - `pg_isready`: `accepting connections`
 - A monitor belső wget-je: `{"status":"ok","uptime":N,"timestamp":"..."}`
 - A NestJS konténerből: ugyanaz a JSON body
+- A Caddy pre-filter: 405 az edge-ről, mielőtt a kérés elérné a NestJS-t
+- A HMAC guard: 200 helyes, 401 helytelen signature esetén
 
 ---
 
@@ -328,12 +359,16 @@ A `pgdata` és `caddy_data` named volume-ok ilyenkor is megmaradnak — nem vesz
 
 ### 9.1 Közvetlenül kapcsolódó fájlok
 
-- [`deploy/deploy.sh`](../../deploy/deploy.sh) — a deploy szkript (upload + build + render + up)
-- [`infra/docker-compose.yml`](../../infra/docker-compose.yml) — a stack definíciója
+- [`deploy/deploy.sh`](../../deploy/deploy.sh) — a deploy szkript (upload + build + render + up). Az `APP_ENV` szelektor (dev/prod) a `local_infra_env` feloldáson és a `COMPOSE_ARGS` összeállításán keresztül terjed.
+- [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) — a CI deploy. Az `INFRA_ENV_DEV` / `INFRA_ENV_PROD` titkokból renderel; a `workflow_dispatch.app_env` input dönti el, melyiket.
+- [`infra/docker-compose.yml`](../../infra/docker-compose.yml) — a stack definíciója; tartalmazza az `APP_ENV: ${APP_ENV:-dev}` sort az `api.environment:` blokkban.
+- [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) — a fejlesztői override (Caddy kikapcsolva, host portok publikusak); a `scripts/dev-stack.sh` ezt merge-öli.
 - [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile) — a Caddy template
 - [`infra/caddy/Caddyfile.rendered`](../../infra/caddy/Caddyfile.rendered) — a renderelt Caddyfile (gitignored)
-- [`infra/.env.example`](../../infra/.env.example) — az `infra/.env` környezeti változói
+- [`infra/.env.example`](../../infra/.env.example) — a per-env séma dokumentációja (local / dev / prod blokkok). A tényleges fájlok: `infra/.env.local`, `infra/.env.dev`, `infra/.env.prod` (mind gitignored).
 - [`scripts/test/stack-smoke.sh`](../../scripts/test/stack-smoke.sh) — teljes lifecycle smoke
+- [`docs/Specs/Local-Development.md`](Local-Development.md) — a fejlesztői oldali workflow dokumentációja (`scripts/dev-stack.sh`, per-env fájlok, APP_ENV terjedés)
+- [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../history/2026-10-05--10-30-00-three-env-separation-plan.md) — a teljes három-env terv, ami ezt a struktúrát létrehozta
 
 ### 9.2 Specifikus deep-dive-ok
 

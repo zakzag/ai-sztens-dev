@@ -59,12 +59,34 @@ fi
 HOST="${HOST:?Set HOST= in deploy/.env}"
 SSH_USER="${SSH_USER:-root}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/aisztens}"
+
+# APP_ENV selects which per-env file NestJS / Vite / the docker compose
+# `api` service load. The values are normalised in
+# `apps/api/src/config/app-env.ts`; deploy.sh only needs to make sure
+# the matching `infra/.env.${APP_ENV}` exists locally (and that the
+# droplet's compose `environment:` block receives `APP_ENV=${APP_ENV}`,
+# which is already declared in `infra/docker-compose.yml`).
+#
+#   local → developer machine (used by scripts/dev-stack.sh; deploy.sh
+#           never targets a local droplet — this is here only to support
+#           dry-runs and CI matrix sanity).
+#   dev   → the existing dev droplet.
+#   prod  → a future prod droplet (default off; the deploy.yml workflow
+#              matrix uses `INFRA_ENV_PROD` for that).
+APP_ENV="${APP_ENV:-dev}"
+# SPA build mode follows APP_ENV by default; operators can override
+# with `SPA_BUILD_MODE=prod` for a one-off dev build of the prod bundle.
+SPA_BUILD_MODE="${SPA_BUILD_MODE:-${APP_ENV}}"
+
 # Used by build_spas() to compute the production API base URL the SPAs are
 # built against. Falls back to localhost for dry runs / local builds. The
-# source of truth for the apex domain is infra/.env (read on the droplet);
-# we read it locally if available so the SPA bundle picks up the right URL
-# at build time without round-tripping through SSH.
+# source of truth for the apex domain is infra/.env.${APP_ENV} (the new
+# per-env layout); we fall back to legacy infra/.env for the dev droplet
+# that pre-dates the three-env separation plan.
 DOMAIN="${DOMAIN:-}"
+if [ -z "$DOMAIN" ] && [ -f "$REPO_DIR/infra/.env.${APP_ENV}" ]; then
+  DOMAIN="$(grep -E '^DOMAIN=' "$REPO_DIR/infra/.env.${APP_ENV}" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+fi
 if [ -z "$DOMAIN" ] && [ -f "$REPO_DIR/infra/.env" ]; then
   DOMAIN="$(grep -E '^DOMAIN=' "$REPO_DIR/infra/.env" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
 fi
@@ -73,12 +95,26 @@ DOMAIN="${DOMAIN:-localhost}"
 # ACME_EMAIL is read the same way (defaults to nothing, which would make
 # Caddy fall back to its own placeholder — let's be explicit instead).
 ACME_EMAIL="${ACME_EMAIL:-}"
+if [ -z "$ACME_EMAIL" ] && [ -f "$REPO_DIR/infra/.env.${APP_ENV}" ]; then
+  ACME_EMAIL="$(grep -E '^ACME_EMAIL=' "$REPO_DIR/infra/.env.${APP_ENV}" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+fi
 if [ -z "$ACME_EMAIL" ] && [ -f "$REPO_DIR/infra/.env" ]; then
   ACME_EMAIL="$(grep -E '^ACME_EMAIL=' "$REPO_DIR/infra/.env" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
 fi
 ACME_EMAIL="${ACME_EMAIL:-admin@${DOMAIN}}"
 
-COMPOSE_ARGS="--env-file infra/.env -f infra/docker-compose.yml"
+# COMPOSE_ARGS uses the per-env file as the source of truth; falls back to
+# the legacy `infra/.env` path so a droplet that pre-dates the per-env
+# rename (i.e. the current dev droplet, which has only `/opt/aisztens/
+# infra/.env` on disk) keeps receiving the correct file. Note the
+# destination on the droplet is always `infra/.env` — the rename applies
+# locally to the repo working copy only (see docs/history/2026-10-05--
+# 10-30-00-three-env-separation-step0.md).
+COMPOSE_ENV_FILE_LOCAL="infra/.env.${APP_ENV}"
+if [ ! -f "$REPO_DIR/$COMPOSE_ENV_FILE_LOCAL" ]; then
+  COMPOSE_ENV_FILE_LOCAL="infra/.env"
+fi
+COMPOSE_ARGS="--env-file ${COMPOSE_ENV_FILE_LOCAL} -f infra/docker-compose.yml"
 
 # rsync's `-e` only accepts the remote shell command + its options (NOT the
 # destination host), so keep the ssh command separate from the `user@host`
@@ -232,20 +268,20 @@ upload() {
     log "Rendering deploy/.env on the droplet ..."
     "${SCP[@]}" "$SCRIPT_DIR/.env" "$SSH_USER@$HOST:$REMOTE_DIR/deploy/.env"
   fi
-  # Pick exactly one local copy of infra/.env and refuse to proceed if none
-  # exists. The previous implementation accepted `$REPO_DIR/../infra/.env`
-  # as sufficient but only ever assigned `local_infra_env` from
-  # `$REPO_DIR/infra/.env`; if only the parent-dir file existed the
-  # standalone `[ -f ... ] && ...` list returned 1 and `set -e` aborted the
-  # deploy (otherwise it would have tried to `scp ""`). Pin the choice
-  # here so the failure mode is "clear error" instead of either.
+  # Pick exactly one local copy of infra/.env.${APP_ENV} (preferred; new
+  # per-env layout from the three-env separation plan) and fall back to the
+  # legacy `infra/.env` path so a droplet that pre-dates the rename still
+  # gets the correct file. Refuse to proceed if neither exists.
   local local_infra_env=""
-  if [ -f "$REPO_DIR/infra/.env" ]; then
+  if [ -f "$REPO_DIR/infra/.env.${APP_ENV}" ]; then
+    local_infra_env="$REPO_DIR/infra/.env.${APP_ENV}"
+  elif [ -f "$REPO_DIR/infra/.env" ]; then
+    log "Note: using legacy infra/.env (no infra/.env.${APP_ENV} found); switch to the per-env name to silence it."
     local_infra_env="$REPO_DIR/infra/.env"
   elif [ -f "$REPO_DIR/../infra/.env" ]; then
     local_infra_env="$REPO_DIR/../infra/.env"
   else
-    log "ERROR: no infra/.env found (looked in $REPO_DIR and $REPO_DIR/..). Copy infra/.env.example to infra/.env and fill it in before deploying."
+    log "ERROR: no infra/.env.${APP_ENV} or infra/.env found (APP_ENV=${APP_ENV}). Copy infra/.env.example to infra/.env.${APP_ENV} and fill it in before deploying."
     return 1
   fi
   log "Rendering infra/.env on the droplet (source: $local_infra_env) ..."
@@ -341,8 +377,12 @@ case "${1:-}" in
     prune_legacy_stack
     upload
     log_stage "compose_up"
-    log "Building & starting the stack ..."
-    run_remote "docker compose $COMPOSE_ARGS up -d --build"
+    log "Building & starting the stack (APP_ENV=${APP_ENV}) ..."
+    # APP_ENV is also declared in infra/docker-compose.yml's `api` service
+    # `environment:` block; we re-export it as shell env here as belt-and-
+    # braces so a future change that forgets the compose line cannot silently
+    # run the api container as APP_ENV=dev on a prod droplet.
+    run_remote "APP_ENV=${APP_ENV} docker compose $COMPOSE_ARGS up -d --build"
     log_stage "done"
     ;;
   down)

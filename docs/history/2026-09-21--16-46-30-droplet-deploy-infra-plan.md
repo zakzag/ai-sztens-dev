@@ -3,7 +3,8 @@
 - Date: 2026-09-18
 - Status: Done
 - Scope: Create the mandatory `deploy/` and `infra/` files for the AIsztens droplet
-  described in [`docs/prompts/2026-09-18-droplet-setup.txt`](../prompts/2026-09-18-droplet-setup.txt).
+  described in [`docs/prompts/2026-09-18-droplet-setup.md`](../prompts/2026-09-18-droplet-setup.md)
+  (renamed from `.txt` on 2026-10-05).
   No setup automation is required yet — just the reusable files so an identical machine can be
   brought up quickly and reproducibly.
 

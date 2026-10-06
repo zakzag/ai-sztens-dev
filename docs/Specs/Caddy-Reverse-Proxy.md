@@ -1,7 +1,7 @@
 # Caddy — Reverse Proxy és TLS termináció
 
 **Státusz:** Élő (a `docs/Specs/outdated/`-ba kerül, ha a relevanciája megszűnik)
-**Utolsó frissítés:** 2026-10-06 (háromkörnyezetes szétválasztás: a Caddy a `dev`/`prod` dropleteken fut, `local`-ban a [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override `profiles: [never]`-re teszi, így a fejlesztői stackben nincs Caddy — a Caddy csak a nyilvános TLS terminációért felelős; a per-env renderelést és a `APP_ENV`-alapú compose szekciót lásd lentebb a §3.3 / §4.2 szakaszokban).
+**Utolsó frissítés:** 2026-10-06 (háromkörnyezetes szétválasztás: a Caddy a `dev`/`prod` dropleteken fut, `local`-ban a [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override `profiles: [never]`-re teszi, így a fejlesztői stackben nincs Caddy — a Caddy csak a nyilvános TLS terminációért felelős; a per-env renderelést és a `APP_ENV`-alapú compose szekciót lásd lentebb a §3.3 / §4.2 szakaszokban. **§4.4 frissítve:** a VAPI guard konfigurációja `VAPI_WEBHOOK_CONFIG` tokennel érkezik, a `rawBody` pedig Nest *alkalmazás* opció — lásd [`docs/milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md`](../milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md)).
 **Kapcsolódik:** [`docs/01-callback-assistant.md`](../01-callback-assistant.md), [`docs/02-flowchart.md`](../02-flowchart.md), [`docs/03-implementation-general.md`](../03-implementation-general.md), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md)
 
 ---
@@ -176,7 +176,29 @@ handle /api/vapi/* {
 
 Egy `GET /api/vapi/webhooks/tool-calls` (vagy `POST` `X-Vapi-Signature` header nélkül) sosem éri el a NestJS-t — a Caddy 405-tel konvertálja, mielőtt a Fastify egy request slotot foglalna.
 
-**A második vonal (NestJS, HMAC):** az `apps/api/src/vapi-webhooks/vapi-signature.guard.ts` újraszámolja a HMAC-SHA256-ot a `${X-Vapi-Timestamp}.${rawBody}` payload felett a `VAPI_WEBHOOK_SECRET` kulccsal, és `crypto.timingSafeEqual`-lel hasonlítja a `X-Vapi-Signature` headerhez. A `rawBody`-t a Fastify `rawBody: true` flag-gel szolgáltatja a `main.ts`-ben; a JSON parser különben megváltoztatná a body-t (kulcs-sorrend, unicode escape-ek, whitespace), és érvénytelenítené a signature-et. A guard:
+**A második vonal (NestJS, HMAC):** az `apps/api/src/vapi-webhooks/vapi-signature.guard.ts` újraszámolja a HMAC-SHA256-ot a `${X-Vapi-Timestamp}.${rawBody}` payload felett a `VAPI_WEBHOOK_SECRET` kulccsal, és `crypto.timingSafeEqual`-lel hasonlítja a `X-Vapi-Signature` headerhez.
+
+A `rawBody`-t a **Nest alkalmazás** `{ rawBody: true }` opciója szolgáltatja a
+`main.ts`-ben (`NestFactory.create(AppModule, new FastifyAdapter(), { rawBody: true })`) — *nem* a
+`FastifyAdapter` konstruktorának opciója, ott a kulcs nem is létezik, és a `request.rawBody`
+kitöltetlen maradna. A Nest ezt az opciót adja tovább az adapter
+`registerParserMiddleware()` metódusának (`@nestjs/core/nest-application.js`). A JSON parser
+különben megváltoztatná a body-t (kulcs-sorrend, unicode escape-ek, whitespace), és
+érvénytelenítené a signature-et. Az adapter `parseAs: 'buffer'`-rel dolgozik, ezért a guard
+`Buffer`-ként kapja a raw body-t (stringet is elfogad, mást nem).
+
+A guard konfigurációja a `VAPI_WEBHOOK_CONFIG` symbol tokenen keresztül érkezik
+(`vapi-webhook-config.ts` + `vapiWebhookConfigProvider` a `vapi-webhooks.module.ts`-ben), nem
+`ConfigService`-en: ez tartja a VAPI bounded contextet függetlenül a `@nestjs/config` csomagtól
+(CommonJS-only, ezért a Jest ESM-runnerében nem tölthető be Node < 24.9 alatt), és megszünteti a
+kérésenkénti `config.get()` hívást. A guard:
+
+- hiányzó secret → `500` (fail closed: a konfiguráció elromlott, nem kliens hiba)
+- bármely kliens oldali hiba (rossz signature, lejárt timestamp, hiányzó header, rossz formátum, hiányzó raw body) → `401` egységesen (nem szivárogtat információt)
+
+> **Telepítési státusz (2026-10-06):** a fenti védelem a kódban és a tesztekben él, de a dev
+> droplet még a VAPI előtti image-et futtatja (`POST /api/vapi/webhooks/*` → 404 a NestJS-től),
+> ezért élesben még nem működik. A smoke suite 5–6. checkje ezt ki is mutatja deploy után.
 
 - hiányzó secret → `500` (fail closed: a konfiguráció elromlott, nem kliens hiba)
 - bármely kliens oldali hiba (rossz signature, lejárt timestamp, hiányzó header, rossz formátum) → `401` egységesen (nem szivárogtat információt)

@@ -22,10 +22,13 @@ import { APP_ENV } from './config/app-env.js';
  * here is the explicit "we mean it" version of that, removing any reliance
  * on the absence of the file on disk.
  */
-const envFilePaths: string[] = APP_ENV === 'prod' ? [] : [
-  join(process.cwd(), `.env.${APP_ENV}`),
-  join(process.cwd(), '.env.local'),
-];
+const envFilePaths: string[] =
+  APP_ENV === 'prod'
+    ? []
+    : [
+        join(process.cwd(), `.env.${APP_ENV}`),
+        join(process.cwd(), '.env.local'),
+      ];
 
 @Module({
   imports: [

@@ -8,16 +8,63 @@
 #
 # Sourced by stack-smoke.sh after 00-prelude.sh. Depends on:
 #   * assert_service, assert_service_out, assert_log_contains
+#   * log_info / log_section (from 00-prelude.sh)
 #   * dc_exec, dc_logs
 #   * PASS_COUNT / FAIL_COUNT counters
 
+# resolve_webhook_check_env
+#
+# Fills in WEBHOOK_TARGET / VAPI_WEBHOOK_SECRET for checks 5+6 when the caller
+# did not export them:
+#   * VAPI_WEBHOOK_SECRET is read from $ENV_FILE (infra/.env) — the same value
+#     the api container receives through the compose `environment:` block.
+#   * WEBHOOK_TARGET is derived as `https://api.$DOMAIN` (DOMAIN also from
+#     $ENV_FILE) but ONLY when a `caddy` container is part of the running
+#     compose project: the local dev override disables Caddy
+#     (`infra/docker-compose.local.yml`, `profiles: [never]`), so deriving a
+#     target there would produce a guaranteed false failure.
+#
+# Exported so the curl sub-shells see them. No-op when the values already
+# exist in the environment.
+resolve_webhook_check_env() {
+  if [ -z "${VAPI_WEBHOOK_SECRET:-}" ] && [ -f "${ENV_FILE:-}" ]; then
+    VAPI_WEBHOOK_SECRET="$(grep -E '^VAPI_WEBHOOK_SECRET=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+    export VAPI_WEBHOOK_SECRET
+  fi
+
+  if [ -z "${WEBHOOK_TARGET:-}" ]; then
+    if dc ps --format json 2>/dev/null | grep -q '"Service":"caddy"'; then
+      local domain="${DOMAIN:-}"
+      if [ -z "$domain" ] && [ -f "${ENV_FILE:-}" ]; then
+        domain="$(grep -E '^DOMAIN=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+      fi
+      if [ -n "$domain" ]; then
+        WEBHOOK_TARGET="https://api.${domain}"
+        export WEBHOOK_TARGET
+      fi
+    fi
+  fi
+}
+
 # run_service_checks
 #
-# Runs the four liveness checks in order:
-#   1. api      — GET /api returns 200 from inside the container
-#   2. postgres — pg_isready succeeds
-#   3. caddy    — admin API at :2019 responds
-#   4. monitor  — at least one "API check" line in the logs
+# Runs the six liveness checks in order:
+#   1. api            — GET /api returns 200 from inside the container
+#   2. postgres       — pg_isready succeeds
+#   3. caddy          — admin API at :2019 responds
+#   4. monitor        — at least one "API check" line in the logs
+#   5. caddy vapi 405 — POST /api/vapi/webhooks/* without X-Vapi-Signature → 405
+#   6. caddy vapi 200 — POST /api/vapi/webhooks/* with valid signature → 200
+#
+# Checks 5+6 exercise the dual-line VAPI defence documented in
+# `docs/Specs/Caddy-Reverse-Proxy.md` §4.4:
+#   - 405 is the Caddy @vapi_match pre-filter (header-only, edge-level)
+#   - 200 is the NestJS VapiSignatureGuard (HMAC, second line)
+# They need a reachable Caddy (WEBHOOK_TARGET) and the HMAC secret
+# (VAPI_WEBHOOK_SECRET); `resolve_webhook_check_env` derives both from
+# $ENV_FILE / the running compose project, and the checks are announced as
+# skipped when the stack (or the operator) does not provide them. The runner
+# needs `curl` and `openssl` on PATH.
 #
 # No return value: counters are mutated in the parent scope.
 run_service_checks() {
@@ -64,4 +111,43 @@ run_service_checks() {
     "monitor" \
     "API check|API is reachable" \
     60
+
+  # -----------------------------------------------------------------------
+  # 5. caddy vapi 405 — header-only pre-filter at the edge.
+  # -----------------------------------------------------------------------
+  # A POST /api/vapi/webhooks/* without X-Vapi-Signature must be dropped
+  # by the Caddy @vapi_match named matcher with HTTP 405, BEFORE the
+  # NestJS process is ever touched. This is the cheapest line of defence
+  # and protects against obviously malformed traffic.
+  resolve_webhook_check_env
+
+  if [ -z "${WEBHOOK_TARGET:-}" ]; then
+    log_info "Skipping VAPI webhook checks 5+6 (no WEBHOOK_TARGET: export it, e.g. https://api.<domain>)"
+  else
+    assert_service_out "caddy" \
+      "POST /api/vapi/webhooks/* without signature → 405 (Caddy pre-filter)" \
+      "405" \
+      sh -c "curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -X POST '${WEBHOOK_TARGET}/api/vapi/webhooks/end-of-call-report' -H 'Content-Type: application/json' -d '{}'"
+
+    # ---------------------------------------------------------------------
+    # 6. caddy vapi 200 — happy path with a valid HMAC signature.
+    # ---------------------------------------------------------------------
+    # Full POST with a freshly-computed signature reaches the NestJS guard
+    # and is accepted. The HMAC is recomputed exactly as the guard does
+    # (HMAC-SHA256 over "${ts}.${rawBody}"). If this check fails after
+    # the 405 check passes, the suspect is the NestJS side (the `rawBody`
+    # application option or signature parsing in vapi-signature.guard.ts),
+    # not Caddy.
+    if [ -n "${VAPI_WEBHOOK_SECRET:-}" ]; then
+      local_body='{"message":{"id":"evt-smoke","type":"end-of-call-report"}}'
+      local_ts="$(date +%s)"
+      local_sig="$(printf '%s' "${local_ts}.${local_body}" | openssl dgst -sha256 -hmac "${VAPI_WEBHOOK_SECRET}" | sed 's/^.*= //')"
+      assert_service_out "caddy" \
+        "POST /api/vapi/webhooks/* with valid signature → 200 (NestJS guard accept)" \
+        "200" \
+        sh -c "curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -X POST '${WEBHOOK_TARGET}/api/vapi/webhooks/end-of-call-report' -H 'Content-Type: application/json' -H 'X-Vapi-Timestamp: ${local_ts}' -H 'X-Vapi-Signature: sha256=${local_sig}' -d '${local_body}'"
+    else
+      log_info "Skipping check 6 (VAPI_WEBHOOK_SECRET not set and not found in ${ENV_FILE:-infra/.env})"
+    fi
+  fi
 }

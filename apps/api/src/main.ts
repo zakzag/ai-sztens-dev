@@ -8,16 +8,26 @@ import { AppModule } from './app.module.js';
 import { APP_ENV, APP_ENV_RAW, isProd } from './config/app-env.js';
 
 async function bootstrap() {
-  // `rawBody: true` makes Fastify expose the byte-exact request body as
-  // `request.rawBody`. The VAPI webhook receiver needs this because the
-  // HMAC-SHA256 over the payload is computed against the raw bytes the
+  // `rawBody: true` makes the Fastify adapter expose the byte-exact request
+  // body as `request.rawBody`. The VAPI webhook receiver needs this because
+  // the HMAC-SHA256 over the payload is computed against the raw bytes the
   // VAPI server sent — the JSON parser would otherwise re-serialise the
   // body (key order, unicode escapes, whitespace) and break the signature.
   // See `apps/api/src/vapi-webhooks/vapi-signature.guard.ts` for the
   // consumer of `rawBody`.
+  //
+  // IMPORTANT: `rawBody` is a **Nest application** option (3rd argument of
+  // `NestFactory.create`), NOT a Fastify adapter option. `NestApplication`
+  // reads it and passes it to the adapter's `registerParserMiddleware()`
+  // (`@nestjs/core/nest-application.js`), which is what makes the adapter
+  // register the JSON parser with raw-body capture. Passing it to
+  // `new FastifyAdapter({ rawBody: true })` compiles to nothing but a
+  // TypeScript error (the option does not exist there) and silently leaves
+  // `request.rawBody` undefined — every webhook would then fail with 401.
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ rawBody: true }),
+    new FastifyAdapter(),
+    { rawBody: true },
   );
 
   // All HTTP endpoints live under /api (e.g. POST /api/callback-requests).

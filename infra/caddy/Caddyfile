@@ -40,9 +40,36 @@
 }
 
 # Public API origin. Browser clients and inbound webhooks (e.g. VAPI) use this.
+#
+# The /api/vapi/* handlers are the FIRST line of defence for inbound
+# VAPI webhooks: requests are only forwarded to the NestJS API if they
+# hit /api/vapi/* AND carry an X-Vapi-Signature header AND use POST.
+# Anything else (wrong method, missing header, GET, OPTIONS) is dropped
+# with a cheap 405 at the edge — the body is never read here. The actual
+# HMAC verification against VAPI_WEBHOOK_SECRET happens in
+# `apps/api/src/vapi-webhooks/vapi-signature.guard.ts`, which is the
+# SECOND and only cryptographically meaningful line of defence. This
+# pre-filter exists so that obvious garbage (GET /api/vapi/...) never
+# costs a Fastify request slot.
 api.<DOMAIN> {
 	encode zstd gzip
-	reverse_proxy api:3000
+	@vapi_match {
+		path /api/vapi/*
+		header X-Vapi-Signature *
+		method POST
+	}
+	handle @vapi_match {
+		reverse_proxy api:3000
+	}
+	handle /api/vapi/* {
+		respond "Method Not Allowed" 405
+	}
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /healthz {
+		reverse_proxy api:3000
+	}
 }
 
 # Public website (visitor call-back form). Served as a static SPA from

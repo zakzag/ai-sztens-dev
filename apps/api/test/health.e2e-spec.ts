@@ -1,9 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { AppModule } from './../src/app.module.js';
+import { Test } from '@nestjs/testing';
+import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
 
 /**
  * E2E for the dedicated liveness endpoint.
@@ -15,6 +15,11 @@ import { AppModule } from './../src/app.module.js';
  *
  * Keeping this in sync with main.ts is intentional; the contract tested
  * here is "GET /healthz returns 200 + status:'ok'".
+ *
+ * `AppModule` is imported dynamically (see `test/lib/app-module-gate.ts`):
+ * Jest's ESM runner cannot load the CommonJS-only `@nestjs/config` on
+ * Node < 24.9, so these tests self-skip with a warning there instead of
+ * failing to load.
  */
 
 /**
@@ -43,50 +48,64 @@ function isHealthBody(value: unknown): value is HealthBody {
   );
 }
 
+/**
+ * Boots the application the way `main.ts` does, or returns `null` when the
+ * runtime cannot load `AppModule` under Jest.
+ */
+async function bootApp(): Promise<NestFastifyApplication | null> {
+  const AppModule = await loadAppModuleOrSkip();
+  if (AppModule === null) return null;
+
+  const moduleFixture = await Test.createTestingModule({
+    imports: [AppModule],
+  }).compile();
+
+  const app = moduleFixture.createNestApplication<NestFastifyApplication>(
+    new FastifyAdapter(),
+  );
+  // Same prefix config as production (see src/main.ts).
+  app.setGlobalPrefix('api', { exclude: ['healthz'] });
+  await app.init();
+  return app;
+}
+
 describe('HealthController (e2e)', () => {
-  let app: NestFastifyApplication;
-
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication<NestFastifyApplication>(
-      new FastifyAdapter(),
-    );
-    // Same prefix config as production (see src/main.ts).
-    app.setGlobalPrefix('api', { exclude: ['healthz'] });
-    await app.init();
-  });
-
   it('/healthz (GET) returns 200 and a JSON status', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: '/healthz',
-    });
+    const app = await bootApp();
+    if (app === null) return;
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/healthz',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body: unknown = response.json();
-    // Type-guard narrows `unknown` -> `HealthBody`; `expect()` would not.
-    if (!isHealthBody(body)) throw new Error('health body shape mismatch');
-    expect(body.status).toBe('ok');
-    expect(typeof body.uptime).toBe('number');
-    expect(body.uptime).toBeGreaterThanOrEqual(0);
-    expect(typeof body.timestamp).toBe('string');
-    expect(Number.isNaN(Date.parse(body.timestamp))).toBe(false);
+      expect(response.statusCode).toBe(200);
+      const body: unknown = response.json();
+      // Type-guard narrows `unknown` -> `HealthBody`; `expect()` would not.
+      if (!isHealthBody(body)) throw new Error('health body shape mismatch');
+      expect(body.status).toBe('ok');
+      expect(typeof body.uptime).toBe('number');
+      expect(body.uptime).toBeGreaterThanOrEqual(0);
+      expect(typeof body.timestamp).toBe('string');
+      expect(Number.isNaN(Date.parse(body.timestamp))).toBe(false);
+    } finally {
+      await app.close();
+    }
   });
 
   it('/healthz is NOT served under the /api prefix', async () => {
-    // Sanity check: the exclude list must keep /healthz at the root, not under /api.
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/healthz',
-    });
+    const app = await bootApp();
+    if (app === null) return;
+    try {
+      // Sanity check: the exclude list must keep /healthz at the root, not under /api.
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/healthz',
+      });
 
-    expect(response.statusCode).toBe(404);
-  });
-
-  afterEach(async () => {
-    await app.close();
+      expect(response.statusCode).toBe(404);
+    } finally {
+      await app.close();
+    }
   });
 });

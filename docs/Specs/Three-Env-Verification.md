@@ -339,7 +339,12 @@ curl -fsS https://web.aisztens.hu/ | grep -oE 'aisztens.hu|localhost' | sort -u
 ```bash
 # 3.7.1 Run the full smoke suite against the live stack
 ssh deployer@aisztens.hu "cd /opt/aisztens && bash scripts/test/stack-smoke.sh"
-# Expect: 4 liveness + 6 cross-service checks all PASS.
+# Expect: 6 liveness + 6 cross-service checks all PASS.
+#   The liveness module gained two VAPI webhook checks (5: Caddy 405
+#   pre-filter, 6: NestJS HMAC accept). They need a running `caddy`
+#   container and are derived from infra/.env (WEBHOOK_TARGET,
+#   VAPI_WEBHOOK_SECRET) — see scripts/test/lib/10-services.sh and
+#   docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md.
 #   (If stack-smoke.sh is missing on the droplet, that itself is a
 #   problem — deploy.sh is supposed to ship scripts/test/ along with the
 #   rest of the repo. Re-run deploy.sh.)

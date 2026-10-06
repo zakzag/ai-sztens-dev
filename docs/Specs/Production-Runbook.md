@@ -1,7 +1,7 @@
 # Production Runbook — éles verifikáció deploy után
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-10-02 (`/api/vapi/*` HMAC ellenőrzés + Caddy pre-filter; `CORS_ORIGINS` tisztítás; curl példa helyes signature küldéséhez — lásd 4.4 + `docs/history/2026-10-02--19-09-30-vapi-webhook-security.md`)
+**Utolsó frissítés:** 2026-10-06 (`/api/vapi/*` HMAC ellenőrzés + Caddy pre-filter automatizálva a smoke suite-ban; a guard config tokenen + Buffer raw body-n alapul — lásd 4.4 + `docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
 ---
@@ -178,6 +178,18 @@ curl -i -X POST "https://api.aisztens.hu/api/vapi/webhooks/end-of-call-report" \
   -H "X-Vapi-Signature: sha256=deadbeef" \
   -d "${BODY}"
 # Elvárt: HTTP/2 401 (VapiSignatureGuard HMAC mismatch)
+```
+
+> **Automatizált változat:** ugyanez a három ellenőrzés fut a smoke suite
+> `scripts/test/lib/10-services.sh` 5. és 6. checkjeként (`pnpm test:stack`). A `WEBHOOK_TARGET`
+> (`https://api.$DOMAIN`) és a `VAPI_WEBHOOK_SECRET` értékét a szkript automatikusan az
+> `infra/.env`-ből olvassa — de csak akkor futtatja a checkeket, ha a compose projektben fut
+> `caddy` konténer (a `local` override letiltja a Caddy-t, ott nincs mit tesztelni).
+>
+> **Fontos (2026-10-06):** a dev droplet még a VAPI előtti image-et futtatja, ezért a fenti
+> curl-ek `404`-et adnak, amíg a módosított API image és a renderelt Caddyfile ki nincs
+> telepítve. Ez nem regresszió, hanem a deploy hiánya — részletek:
+> [`docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`](../history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md).
 ```
 
 **Elvárt:**

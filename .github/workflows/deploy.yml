@@ -1,14 +1,22 @@
 # AIsztens — production deploy to the DigitalOcean droplet.
 #
 # Mirrors deploy/deploy.sh + deploy/bootstrap.sh but driven by GitHub Actions:
-#   1. Render infra/.env from the INFRA_ENV secret
+#   1. Render infra/.env.${APP_ENV} from the matching INFRA_ENV_${APP_ENV}
+#      secret (INFRA_ENV_DEV for APP_ENV=dev, INFRA_ENV_PROD for APP_ENV=prod).
+#      APP_ENV comes from `inputs.app_env` (workflow_dispatch) or defaults to
+#      `dev` for push events.
 #   2. SCP the repo to /opt/aisztens on the droplet (with --delete, like rsync)
-#   3. SCP infra/.env (the secret-rendered file) on top of what was uploaded
-#   4. Install pnpm + Node 22, build the web + admin SPAs against the
-#      production API base URL (derived from the rendered infra/.env),
-#      then SCP the two apps/{web,admin}/dist/ folders to the droplet so
-#      the Caddy volume mounts have content to serve
-#   5. SSH in as `deployer` and run `docker compose up -d --build`
+#   3. SCP infra/.env.${APP_ENV} (the secret-rendered file) on top of what was
+#      uploaded; on the droplet the destination stays infra/.env for compose
+#      compatibility (see apps/api/src/app.module.ts and infra/docker-compose.yml).
+#   4. Install pnpm + Node 22, build the web + admin SPAs against the matching
+#      per-env API base URL via `pnpm ... build:${APP_ENV}` (Vite mode), then
+#      SCP the two apps/{web,admin}/dist/ folders to the droplet so the Caddy
+#      volume mounts have content to serve.
+#   5. SSH in as `deployer` and run `APP_ENV=${APP_ENV} docker compose up -d --build`
+#      with `--env-file "infra/.env.${APP_ENV}"`. APP_ENV is exported both as
+#      shell env (belt-and-braces) and via the compose `api.environment.APP_ENV`
+#      entry — see infra/docker-compose.yml:30.
 #   6. Wait for the `api` container to become `healthy` (uses the compose
 #      healthcheck declared in infra/docker-compose.yml)
 #   7. Run scripts/test/stack-smoke.sh against the live stack — fail the
@@ -96,7 +104,16 @@ jobs:
           # Also expose APP_ENV to subsequent steps via $GITHUB_ENV.
           echo "APP_ENV=${app_env}" >> "$GITHUB_ENV"
         env:
-          INFRA_ENV: ${{ secrets.INFRA_ENV_DEV }}
+          # Pick the matching secret based on APP_ENV (defaults to DEV for
+          # the push trigger). An operator dispatching app_env=prod will
+          # render infra/.env.prod from INFRA_ENV_PROD; the push trigger
+          # never produces APP_ENV=prod, so INFRA_ENV_PROD cannot leak
+          # into a dev build. The push-to-prod branch protection + the
+          # GitHub `production` environment (see env: line in the deploy
+          # job) gate the prod secret independently. `upper()` is required
+          # because GitHub secret names are uppercase but `inputs.app_env`
+          # is lowercase ('dev' / 'prod').
+          INFRA_ENV: ${{ secrets[format('INFRA_ENV_{0}', upper(inputs.app_env || 'dev'))] }}
 
       # ------------------------------------------------------------------
       # 3. Upload the repo (minus secrets, build artifacts, git history).

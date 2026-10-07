@@ -17,8 +17,8 @@ It complements the droplet-side runbook
 | Env | Where it runs | Config files it reads | How it boots |
 |---|---|---|---|
 | **local** | The developer's own machine (Windows / WSL / Linux / macOS) | [`infra/.env.local`](../../infra/.env.example) + [`apps/api/.env.local`](../../apps/api/.env.example) + `apps/web/.env.local` + `apps/admin/.env.local` | [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) `up` |
-| **dev** | The currently running droplet (`aisztens.hu`) | [`infra/.env.dev`](../../infra/.env.example) (rendered into `infra/.env` on the droplet by deploy.sh) + compose `environment:` block | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up` or the `.github/workflows/deploy.yml` push trigger |
-| **prod** | A **future** dedicated production droplet (does not exist yet) | [`infra/.env.prod`](../../infra/.env.example) (dormant template; replace `<prod-domain>` with the real apex when provisioning) | The same deploy pipeline, dispatched manually with `app_env=prod` |
+| **dev** | The currently running droplet (`aisztens.hu`) | [`infra/.env.dev`](../../infra/.env.example) (rendered into `infra/.env` on the droplet by deploy.sh) + [`deploy/.env.dev`](../../deploy/.env.example) (operator/SSH config for the dev droplet) + compose `environment:` block | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up dev` (or plain `up` — `dev` is the default target) or the `.github/workflows/deploy.yml` push trigger |
+| **prod** | A **future** dedicated production droplet (does not exist yet) | [`infra/.env.prod`](../../infra/.env.example) (dormant template; replace `<prod-domain>` with the real apex when provisioning) + `deploy/.env.prod` (operator/SSH config for the prod droplet) | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up prod`, or the same deploy pipeline dispatched manually with `app_env=prod` |
 
 All real env files are **gitignored** — only `*.env.example` templates are
 tracked. The plan added the patterns in
@@ -27,7 +27,11 @@ and `infra/.env.{local,dev,prod}` paths in addition to the existing `.env`.
 
 ---
 
-## 2. Single command: `scripts/dev-stack.sh`
+## 2. Starting the local stack
+
+The local stack is started with one command. Its subcommands, pre-flight checks
+and exact compose invocation are documented in
+[`scripts/README.md`](../../scripts/README.md).
 
 ```bash
 scripts/dev-stack.sh up        # bash entry point (Linux / WSL / macOS)
@@ -35,53 +39,17 @@ scripts/dev-stack.sh up        # bash entry point (Linux / WSL / macOS)
 pwsh scripts/dev-stack.ps1 up   # Windows PowerShell wrapper (delegates to bash via WSL)
 ```
 
-Subcommands:
-
-| Subcommand | What it does |
-|---|---|
-| `up` | Build + start the local stack. Seeds `infra/.env.local` on first run. Sets `APP_ENV=local`. |
-| `down` | Stop the stack (keeps the Postgres volume). |
-| `ps` | `docker compose ps`. |
-| `logs [service]` | Tail logs (pass a service name to scope, e.g. `scripts/dev-stack.sh logs api`). |
-| `restart` | Restart all services. |
-| `--help` / `help` / `-h` | Print the script's header (the first ~40 lines). |
-
-Pre-flight checks the script performs:
-
-- `docker` and `docker compose` v2 are on `PATH`.
-- `infra/docker-compose.yml` and `infra/docker-compose.local.yml` exist.
-- `infra/.env.local` exists, or is copied from `infra/.env.example` with a
-  warning to replace the placeholders.
-
-What it runs:
-
-```bash
-docker compose \
-  --env-file infra/.env.local \
-  -f infra/docker-compose.yml \
-  -f infra/docker-compose.local.yml \
-  up -d --build
-```
-
-The [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml)
+It merges [`infra/docker-compose.yml`](../../infra/docker-compose.yml) with the
+[`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml)
 override (formerly `infra/docker-compose.wsl.yml`, renamed in Step 3 of the
-plan) does three things:
+plan), which:
 
-- `api` service: `"3000:3000"` host port — the API is reachable from the
-  developer machine at `http://localhost:3000`.
-- `postgres` service: `"5432:5432"` host port — `psql` on the developer
-  machine can talk to the local stack.
-- `caddy` service: `profiles: [never]` — Caddy is **disabled** in local.
-  No public DNS, no Let's Encrypt, no TLS. The developer hits the API
-  directly over `http://localhost:3000`.
-
-After `up`, the script prints the URLs to open:
-
-```
-http://localhost:3000/healthz          # NestJS healthcheck
-http://localhost:3000/api              # NestJS API root
-psql -h localhost -U aisztens -d callback  # Postgres on :5432
-```
+- publishes the `api` service on host port `3000` — reachable at
+  `http://localhost:3000`;
+- publishes the `postgres` service on host port `5432` — `psql` from the
+  developer machine;
+- disables `caddy` via `profiles: [never]` — no public DNS, no Let's Encrypt,
+  no TLS.
 
 ---
 
@@ -178,4 +146,5 @@ one place, the others propagate.
 - [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../history/2026-10-05--10-30-00-three-env-separation-plan.md) — the full plan that produced this layout.
 - [`deploy/README.md`](../../deploy/README.md) — the droplet-side deploy runbook (steps 8.1 / 8.2 / 9 cover the per-environment secrets and the local override).
 - [`docs/Specs/Production-Runbook.md`](Production-Runbook.md) — what to do once the stack is on the droplet.
-- [`README.md`](../../README.md) — the top-level quick-start; the "Useful scripts" table lists `scripts/dev-stack.sh`.
+- [`scripts/README.md`](../../scripts/README.md) — the script index (this spec's commands, subcommands and flags).
+- [`README.md`](../../README.md) — the top-level quick-start; its "Scripts" section points at [`scripts/README.md`](../../scripts/README.md).

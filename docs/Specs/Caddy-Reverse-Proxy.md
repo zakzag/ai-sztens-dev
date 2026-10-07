@@ -135,7 +135,7 @@ flowchart LR
 
 A renderelés lépései ([`deploy/deploy.sh`](../../deploy/deploy.sh) `render_caddyfile()` függvény):
 
-1. **`DOMAIN`** és **`ACME_EMAIL`** kiolvasása a `deploy/.env` vagy `infra/.env` fájlból (alapértelmezett: `localhost` ill. `admin@${DOMAIN}`).
+1. **`DOMAIN`** és **`ACME_EMAIL`** kiolvasása az `infra/.env.<target>` (visszaesésként a legacy `infra/.env`) fájlból (alapértelmezett: `localhost` ill. `admin@${DOMAIN}`). A `<target>` a `deploy.sh` második argumentuma (`dev` vagy `prod`, alapértelmezés `dev`), amely a betöltendő `deploy/.env.<target>` operator-konfigurációt is kiválasztja.
 2. **`sed -e 's\|<DOMAIN>\|$DOMAIN\|g' -e 's\|<ACME_EMAIL>\|$ACME_EMAIL\|g'`** a template-en → `Caddyfile.rendered`.
 3. **Sanity check**: `grep -q '<DOMAIN>\|<ACME_EMAIL>'` — ha bármelyik token maradt, a deploy hibával leáll.
 4. **SCP** a renderelt fájlt a dropletre, a `./caddy/Caddyfile.rendered` útvonalra.
@@ -224,13 +224,13 @@ A háromkörnyezetes szétválasztás ([`docs/history/2026-10-05--10-30-00-three
 
 | Env | `DOMAIN` forrása | `infra/.env.${APP_ENV}` | Caddy a stackben? |
 |---|---|---|---|
-| **local** (fejlesztői gép) | — (nincs Caddy) | `infra/.env.local` (a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) seedeli az `infra/.env.example`-ből) | **Nem.** Az [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override a Caddy service-t `profiles: [never]`-re teszi, így `docker compose --profile never up` nem indítja. A fejlesztő a `http://localhost:3000/api`-n éri el a NestJS-t közvetlenül, nincs publikus DNS, nincs Let's Encrypt. |
+| **local** (fejlesztői gép) | — (nincs Caddy) | `infra/.env.local` (a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) seedeli az `infra/.env.example`-ből — lásd [`scripts/README.md`](../../scripts/README.md)) | **Nem.** Az [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override a Caddy service-t `profiles: [never]`-re teszi, így `docker compose --profile never up` nem indítja. A fejlesztő a `http://localhost:3000/api`-n éri el a NestJS-t közvetlenül, nincs publikus DNS, nincs Let's Encrypt. |
 | **dev** droplet (`aisztens.hu`) | `infra/.env.dev` `DOMAIN=aisztens.hu` | `infra/.env.dev` (a [`deploy/deploy.sh:render_caddyfile()`](../../deploy/deploy.sh) rendereli, a CI a [`INFRA_ENV_DEV`](../../.github/workflows/deploy.yml:111) secretből seedeli) | Igen — a [`Caddyfile.rendered`](../../infra/caddy/Caddyfile.rendered) a `web.aisztens.hu`, `api.aisztens.hu`, `admin.aisztens.hu`, `aisztens.hu` hosztnevekre szól. |
 | **prod** droplet (jövő) | `infra/.env.prod` `DOMAIN=<prod-domain>` | `infra/.env.prod` (a CI a [`INFRA_ENV_PROD`](../../.github/workflows/deploy.yml:120) secretből seedeli, csak `workflow_dispatch` `app_env=prod` indítja; a GitHub `production` environment protection rule adja a manuális review-t) | Igen, a domotic-IP-n kiadott Let's Encrypt tanúsítványokkal. |
 
 A `DOMAIN` értéke az [`infra/.env.${APP_ENV}`](../../infra/.env.example) `DOMAIN=` sorából jön; a [`deploy/deploy.sh`](../../deploy/deploy.sh) `render_caddyfile()` függvénye `sed`-del cseréli ki a `<DOMAIN>` és `<ACME_EMAIL>` tokeneket a template-ben, és a sanity check (`grep` a maradék tokenekre) megakadályozza, hogy a renderelés érvénytelen Caddyfile-lal fusson.
 
-A `local` env-ben a Caddy kikapcsolásának gyakorlati oka: a fejlesztői compose fájl nem akar publikus hálózati portot (80/443), nem akar Let's Encrypt-et (a droplet nélkülí hálózaton az ACME challenge-ek mindig timeout-olnak, és a Caddy restart-loop-ot produkál — ugyanaz a hiba, mint a [2026-09-28-i Caddy restart-loop milestone](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md)), és nem akarja a `caddy_data` / `caddy_config` volume-okat. A [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) `up` parancs `docker compose --env-file infra/.env.local -f infra/docker-compose.yml -f infra/docker-compose.local.yml up -d --build` néven fut, és a lokális override kikapcsolja a Caddy-t; a fejlesztő a NestJS-t közvetlenül a hostról hívja.
+A `local` env-ben a Caddy kikapcsolásának gyakorlati oka: a fejlesztői compose fájl nem akar publikus hálózati portot (80/443), nem akar Let's Encrypt-et (a droplet nélkülí hálózaton az ACME challenge-ek mindig timeout-olnak, és a Caddy restart-loop-ot produkál — ugyanaz a hiba, mint a [2026-09-28-i Caddy restart-loop milestone](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md)), és nem akarja a `caddy_data` / `caddy_config` volume-okat. A lokális stacket a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) `up` parancsa indítja (a pontos compose-hívás és a subcommandok: [`scripts/README.md`](../../scripts/README.md)), és a lokális override kikapcsolja a Caddy-t; a fejlesztő a NestJS-t közvetlenül a hostról hívja.
 
 ---
 
@@ -311,7 +311,7 @@ A Caddy-specifikus doksi mellett érdemes lenne a következő diagramokat is lé
 - [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile) — a Caddy template (commitolva)
 - [`infra/caddy/Caddyfile.rendered`](../../infra/caddy/Caddyfile.rendered) — a renderelt Caddyfile (gitignored)
 - [`infra/docker-compose.yml`](../../infra/docker-compose.yml) — a Caddy konténer definíciója (mem_limit, volume mount, network, `APP_ENV` propagáció az api service-en keresztül)
-- [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) — a `local` env override (`profiles: [never]` a Caddy-n, host port publikálás az api/postgres-nek); a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) ezt merge-öli
+- [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) — a `local` env override (`profiles: [never]` a Caddy-n, host port publikálás az api/postgres-nek); a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) ezt merge-öli (lásd [`scripts/README.md`](../../scripts/README.md))
 - [`deploy/deploy.sh`](../../deploy/deploy.sh) — a `render_caddyfile()` függvény + `APP_ENV` szelektor
 - [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) — a CI deploy; az `INFRA_ENV_DEV` / `INFRA_ENV_PROD` secretből renderel (`${{ secrets[format('INFRA_ENV_{0}', upper(inputs.app_env || 'dev'))] }}`)
 - [`infra/.env.example`](../../infra/.env.example) — a `DOMAIN` és `ACME_EMAIL` per-env sablonja
@@ -352,10 +352,10 @@ A garanciát két dolog adja:
 Ezen felül vészhelyzetre bevezettük a `down-all` parancsot:
 
 ```bash
-./deploy.sh down-all
+./deploy.sh down-all dev
 ```
 
-ami az **összes** Docker objektumot (konténer, hálózat, volume) törli a dropletről, és utána `./deploy.sh up`-pal tiszta lappal indul a stack. **Adatvesztés-veszélyes**, de a `pgdata` és `caddy_data` volume-ok is törlődnek — csak akkor használd, ha a stack teljesen wedged.
+ami az **összes** Docker objektumot (konténer, hálózat, volume) törli a dropletről, és utána `./deploy.sh up <target>`-tal tiszta lappal indul a stack. **Adatvesztés-veszélyes**, de a `pgdata` és `caddy_data` volume-ok is törlődnek — csak akkor használd, ha a stack teljesen wedged.
 
 ### 8.2 A Cloud Firewall / ACME timeout probléma
 

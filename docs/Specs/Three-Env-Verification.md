@@ -1,6 +1,7 @@
 # Three-Environment Verification — AIsztens
 
 **Status:** living spec
+**Last updated:** 2026-10-07
 **Audience:** anyone who wants to confirm the three-env separation actually
 works end-to-end. Use this after pulling the latest `main`, after a
 droplet reboot, or after any change to `deploy/`, `.github/workflows/`,
@@ -24,8 +25,9 @@ A few things that should already be true:
   separation plan lands here).
 - `docker` + `docker compose` v2 are on `PATH`.
 - You have SSH access to the dev droplet (`deployer@<HOST>` from
-  `deploy/.env`).
-- You can read `deploy/.env` locally (the `HOST` line) and you know the
+  `deploy/.env.dev` — the target-selected operator config; `deploy/.env` was
+  replaced by `deploy/.env.dev`/`deploy/.env.prod` on 2026-10-06).
+- You can read `deploy/.env.dev` locally (the `HOST` line) and you know the
   droplet's `REMOTE_DIR` (default `/opt/aisztens`).
 
 If you are about to verify the **prod** environment, the prod droplet
@@ -89,6 +91,11 @@ python -c "import yaml; yaml.safe_load(open('.github/workflows/deploy.yml').read
 # 1h. The dev-stack helper parses cleanly
 bash -n scripts/dev-stack.sh && echo SYNTAX_OK_DEV_STACK
 # Expect: SYNTAX_OK_DEV_STACK
+
+# 1i. The .env files are structurally valid (offline; see scripts/README.md)
+bash scripts/env-test/check-env-syntax.sh && echo ENV_SYNTAX_OK
+# Expect: ENV_SYNTAX_OK (all checks pass, 0 failed). For the live,
+# droplet-side access checks run scripts/env-test/check-env-live.sh.
 ```
 
 **If any of 1a–1h fails, do not proceed.** The rest of the doc assumes
@@ -144,7 +151,7 @@ docker compose --env-file infra/.env.local \
 ```
 
 If `APP_ENV` is anything other than `local`, **stop the stack and
-investigate** — `scripts/dev-stack.sh` is the only blessed entry point.
+investigate** — [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) is the only blessed entry point (see [`scripts/README.md`](../../scripts/README.md)).
 
 ### 2.4 The api serves
 
@@ -266,11 +273,11 @@ echo "DOMAIN=$DOMAIN APP_ENV=${APP_ENV:-unset}"
 
 Either trigger a real CI deploy (push to `dev`, or
 `Actions → Deploy to droplet → Run workflow` with `app_env=dev`), or
-run `deploy.sh up` from your local machine:
+run `deploy.sh up dev` from your local machine (`dev` is also the default):
 
 ```bash
 cd deploy/
-deploy.sh up
+deploy.sh up dev
 # Expect: the deploy banner includes:
 #   [deploy] Building & starting the stack (APP_ENV=dev) ...
 #   [deploy] docker compose ... up -d --build
@@ -341,13 +348,12 @@ curl -fsS https://web.aisztens.hu/ | grep -oE 'aisztens.hu|localhost' | sort -u
 ssh deployer@aisztens.hu "cd /opt/aisztens && bash scripts/test/stack-smoke.sh"
 # Expect: 6 liveness + 6 cross-service checks all PASS.
 #   The liveness module gained two VAPI webhook checks (5: Caddy 405
-#   pre-filter, 6: NestJS HMAC accept). They need a running `caddy`
-#   container and are derived from infra/.env (WEBHOOK_TARGET,
-#   VAPI_WEBHOOK_SECRET) — see scripts/test/lib/10-services.sh and
-#   docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md.
-#   (If stack-smoke.sh is missing on the droplet, that itself is a
-#   problem — deploy.sh is supposed to ship scripts/test/ along with the
-#   rest of the repo. Re-run deploy.sh.)
+#   pre-filter, 6: NestJS HMAC accept); they need a running `caddy`
+#   container and derive their target/secret from infra/.env. The suite and
+#   its checks are documented in scripts/README.md (see also
+#   docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md).
+#   (If stack-smoke.sh is missing on the droplet, deploy.sh did not ship
+#   scripts/test/ — re-run deploy.sh.)
 ```
 
 ### 3.8 The legacy infra/.env fallback still works
@@ -492,7 +498,7 @@ env + secrets), §3 takes ~2 min.
 | §2.3: banner reports `dev` or unset instead of `local` | `APP_ENV` is leaking from the shell | `unset APP_ENV` then re-run `scripts/dev-stack.sh up`. |
 | §2.5.1: CORS preflight returns 200 instead of 204 | Wrong FastifyAdapter CORS setup | The `main.ts:34` block uses `credentials: true` with an explicit allow-list — should be fine; check `apps/api/.env.local`. |
 | §2.7.2: the inserted row is missing | The Postgres volume was wiped between runs | Re-run §2.4.3 and §2.7.1. |
-| §3.3: banner reports `local` or unset on the dev droplet | deploy.yml didn't pass APP_ENV; the deploy.sh `app_env=dev` fell through to `infra/.env` (legacy) and `local_infra_env` resolution was wrong | Check `deploy/deploy.sh` for `APP_ENV=${APP_ENV:-dev}` and the `local_infra_env` block. Re-run `deploy.sh up`. |
+| §3.3: banner reports `local` or unset on the dev droplet | deploy.yml didn't pass APP_ENV, or a local shell exported `APP_ENV=local`. Since 2026-10-06 the target comes from the argument (default `dev`) and an invalid `APP_ENV` is rejected with exit 2 | Check the run's `config:` log line (`DEPLOY_ENV=… env_file=… APP_ENV=…`) in `deploy/log/latest.log`, and the `local_infra_env` block. Re-run `deploy.sh up dev`. |
 | §3.5.3: CORS DOES allow `https://api.aisztens.hu` | The CORS list in `infra/.env.dev` was edited incorrectly | Verify with `ssh deployer@aisztens.hu "grep ^CORS_ORIGINS /opt/aisztens/infra/.env"` — must NOT have `api.aisztens.hu`. |
 | §3.6.3: SPA also references `localhost` | An SPA `.env.dev` file got the wrong content | Verify with `ssh deployer@aisztens.hu "cat /opt/aisztens/apps/web/.env.dev"` — must contain `https://api.aisztens.hu/api`. |
 | §4.1.2: the api boot does NOT refuse with empty CORS | `apps/api/src/main.ts:42` isProd check is missing | The Step 2 commit `a054d0e` was lost — re-apply. |
@@ -517,7 +523,8 @@ a real-world check:
 
 ## 9. See also
 
-- [`docs/Specs/Local-Development.md`](Local-Development.md) — the developer-side workflow (`scripts/dev-stack.sh`, per-env files, `APP_ENV` propagation, pitfalls).
+- [`scripts/README.md`](../../scripts/README.md) — the script index (every script and folder, how to run them).
+- [`docs/Specs/Local-Development.md`](Local-Development.md) — the developer-side workflow (per-env files, `APP_ENV` propagation, pitfalls).
 - [`docs/Specs/Production-Runbook.md`](Production-Runbook.md) — what to do once the stack is on the droplet.
 - [`deploy/README.md`](../../deploy/README.md) — the deploy-side runbook (secrets table, workflow steps, `APP_ENV` matrix).
 - [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../history/2026-10-05--10-30-00-three-env-separation-plan.md) — the plan document.

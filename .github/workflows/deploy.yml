@@ -143,6 +143,9 @@ jobs:
             infra/.env.dev
             infra/.env.prod
             deploy/.env
+            deploy/.env.local
+            deploy/.env.dev
+            deploy/.env.prod
             deploy/ssh-keys/
 
       # ------------------------------------------------------------------

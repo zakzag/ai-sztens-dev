@@ -9,11 +9,16 @@
 #
 # USAGE
 #   Run from the repo root (WSL or Linux):
-#     bash scripts/_remove-ssh-passphrase.sh
+#     bash scripts/ssh/_remove-ssh-passphrase.sh [dev|prod]
+#
+#   The optional target selects which deploy env file SSH_KEY is read from,
+#   mirroring deploy.sh: `dev` (the default) reads deploy/.env.dev, `prod`
+#   reads deploy/.env.prod. See
+#   docs/history/2026-10-06-deploy-env-selection-plan.md.
 #
 # WHAT IT DOES
-#   1. Verifies that the key file referenced in `deploy/.env` (SSH_KEY) exists
-#      and is a private OpenSSH key (mode 0600, starts with "-----BEGIN").
+#   1. Verifies that the key file referenced in `deploy/.env.<target>` (SSH_KEY)
+#      exists and is a private OpenSSH key (mode 0600, starts with "-----BEGIN").
 #   2. Backs up the original key to `kalman-ssh-key-20260916.openssh.private.key.bak`
 #      in the same directory.
 #   3. Calls `ssh-keygen -p -f <key> -P "<old-passphrase>" -N ""` to remove
@@ -47,19 +52,32 @@ log() { printf '\n=== %s ===\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
-# 1. Resolve the key path from deploy/.env
+# 1. Resolve the key path from deploy/.env.<target>
+#
+# The target mirrors deploy.sh: dev (default) or prod. Only those two per-env
+# files are accepted — the bare deploy/.env was replaced by them.
 # ---------------------------------------------------------------------------
-log 'Resolving SSH key path from deploy/.env'
+DEPLOY_ENV="${1:-dev}"
 
-if [[ ! -f deploy/.env ]]; then
-  die 'deploy/.env not found. Copy deploy/.env.example first.'
+if [[ "$DEPLOY_ENV" != "dev" && "$DEPLOY_ENV" != "prod" ]]; then
+  die "invalid environment '$DEPLOY_ENV' — valid values are: dev, prod"
+fi
+
+DEPLOY_ENV_FILE="deploy/.env.${DEPLOY_ENV}"
+log "Resolving SSH key path from $DEPLOY_ENV_FILE"
+
+if [[ ! -f "$DEPLOY_ENV_FILE" ]]; then
+  if [[ -f deploy/.env ]]; then
+    die "$DEPLOY_ENV_FILE not found. The legacy deploy/.env was replaced by per-env files: mv deploy/.env deploy/.env.dev"
+  fi
+  die "$DEPLOY_ENV_FILE not found. Copy deploy/.env.example to $DEPLOY_ENV_FILE and fill in SSH_KEY."
 fi
 
 # shellcheck disable=SC1091
-SSH_KEY="$(grep -E '^SSH_KEY=' deploy/.env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+SSH_KEY="$(grep -E '^SSH_KEY=' "$DEPLOY_ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
 
 if [[ -z "$SSH_KEY" ]]; then
-  die 'SSH_KEY is empty in deploy/.env. Set it to the absolute path of the key.'
+  die "SSH_KEY is empty in $DEPLOY_ENV_FILE. Set it to the absolute path of the key."
 fi
 
 # Expand a leading "~/" to $HOME (bash only, not POSIX sh).

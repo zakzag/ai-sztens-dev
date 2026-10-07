@@ -9,24 +9,29 @@ network. They complement (do NOT replace) the in-process unit and e2e tests
 that live in [`apps/api/src/**/*.spec.ts`](../../apps/api/src/) and
 [`apps/api/test/`](../../apps/api/test/).
 
+> To validate the `.env` files themselves (offline syntax + explicit live
+> access), use the sibling suite [`scripts/env-test/`](../env-test/README.md).
+
 ## Quick start
 
 ```bash
-# 1. One-time: copy the env file and fill it in.
-cp infra/.env.example infra/.env
+# 1. One-time: copy the local per-env file and fill it in.
+cp infra/.env.example infra/.env.local
 
 # 2. Bring the stack up.
 pnpm test:stack:up
 
-# 3. Run the smoke suite.
-pnpm test:stack
+# 3. Run the smoke suite against the local per-env file.
+#    (The suite defaults to infra/.env; pass --env-file for the new layout.)
+bash scripts/test/stack-smoke.sh --env-file infra/.env.local
 
 # 4. (Optional) Tear the stack down when you're done.
 pnpm test:stack:down
 ```
 
 If the stack is already up (e.g. started via `deploy/deploy.sh up`), step 2
-is not needed — just run `pnpm test:stack`.
+is not needed — just run the suite, adding `--env-file infra/.env.local` for
+the local three-env layout.
 
 ## What it checks
 
@@ -72,7 +77,8 @@ stack-smoke.sh [--up] [--down] [--yes]
   (asks for confirmation unless `--yes` is also given).
 - `--yes` / `-y` — skip the teardown confirmation prompt.
 - `--compose-file <path>` — override `infra/docker-compose.yml`.
-- `--env-file <path>` — override `infra/.env`.
+- `--env-file <path>` — override the default `infra/.env` (use
+  `infra/.env.local` for the local three-env layout).
 
 ## Layout
 
@@ -88,6 +94,10 @@ scripts/test/
     ├── 20-cross-service.sh # cross-service "see each other" checks
     └── 99-teardown.sh  # optional teardown helper
 ```
+
+The sibling [`scripts/env-test/`](../env-test/README.md) suite validates the
+`.env` files themselves: offline syntax/consistency checks plus explicit
+live-access checks.
 
 ## Design notes
 

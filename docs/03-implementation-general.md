@@ -177,7 +177,7 @@ Two complementary layers cover the system end-to-end:
 | Layer | Where | What it tests |
 |---|---|---|
 | Unit & in-process e2e | `apps/api/src/**/*.spec.ts`, `apps/api/test/` | Business logic in isolation (controllers, services, DTOs) |
-| Stack smoke | `scripts/test/stack-smoke.sh` | Container-level contracts: every service in `infra/docker-compose.yml` is up, healthy, and can reach the others through the `internal` Docker network |
+| Stack smoke | [`scripts/test/`](../scripts/README.md) | Container-level contracts: every service in `infra/docker-compose.yml` is up, healthy, and can reach the others through the `internal` Docker network |
 
 Run them in this order on a developer machine before deploying:
 
@@ -194,6 +194,6 @@ pnpm test:stack:down    # optional cleanup
 
 The stack smoke suite is read-only with respect to the running stack — it
 does not modify containers, images, or volumes unless `--up` / `--down` are
-explicitly passed. See [`scripts/test/README.md`](../scripts/test/README.md)
-for the full list of checks and exit codes.
+explicitly passed. The scripts and their interface (subcommands, flags, exit
+codes) are documented in [`scripts/README.md`](../scripts/README.md).
 

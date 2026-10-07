@@ -1,0 +1,6 @@
+# Ignore every file inside deploy/log/ except the .gitkeep (which
+# keeps the directory itself tracked). Per-run log files and the
+# latest.log pointer are written by deploy/lib/logger.sh.
+*
+!.gitignore
+!.gitkeep

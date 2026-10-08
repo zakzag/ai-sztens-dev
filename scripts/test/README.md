@@ -88,12 +88,36 @@ scripts/test/
 ├── stack-smoke.sh      # entrypoint — runs all checks
 ├── stack-up.sh         # convenience wrapper for `docker compose up -d --build`
 ├── stack-down.sh       # convenience wrapper for `docker compose down`
-└── lib/
-    ├── 00-prelude.sh   # shared helpers (logging, assertion, dc wrappers)
-    ├── 10-services.sh  # per-service liveness checks
-    ├── 20-cross-service.sh # cross-service "see each other" checks
-    └── 99-teardown.sh  # optional teardown helper
+├── lib/
+│   ├── 00-prelude.sh   # shared helpers (logging, assertion, dc wrappers)
+│   ├── 10-services.sh  # per-service liveness checks
+│   ├── 20-cross-service.sh # cross-service "see each other" checks
+│   └── 99-teardown.sh  # optional teardown helper
+└── _deploy-sh-*.sh     # offline deploy/deploy.sh suites (no droplet needed)
 ```
+
+## Offline `deploy.sh` suites (`_deploy-sh-*.sh`)
+
+These are plain bash test scripts — no test framework, no network, no droplet. Each one
+copies `deploy/deploy.sh` into a throwaway "repo" together with `deploy/lib/`, and runs it
+against fixtures, so they are safe to run anywhere (including CI) and are a cheap guard
+after touching the deploy script:
+
+| Script | What it locks down |
+|---|---|
+| `_deploy-sh-env-selection-test.sh` | the `[dev\|prod]` target argument: selection precedence, usage errors (exit 2), the legacy `deploy/.env` migration hint |
+| `_deploy-sh-m1-test.sh` | the guard breadcrumbs (stage tags, exit codes, the logged `HOST` check) |
+| `_deploy-sh-m3-test.sh` | the local `infra/.env` path-resolution chain (self-contained copy of the old logic) |
+| `_deploy-sh-logger-test.sh` | `deploy/lib/logger.sh`: header/footer, level tagging, subprocess capture, retention, `latest.log` |
+| `_deploy-sh-remote-compose-path-test.sh` | the **remote identity** (`deployer`, never `root`) and the **remote env-file path** (`infra/.env`, never the local per-env name) plus the writability preflight, using stub `ssh`/`scp`/`rsync`/`pnpm` on `PATH` |
+
+```bash
+# Run them all from the repo root.
+for t in scripts/test/_deploy-sh-*.sh; do bash "$t" || echo "FAILED: $t"; done
+```
+
+Each suite prints `N passed, M failed` and exits non-zero on any failure. For the live,
+droplet-side access checks see [`../env-test/README.md`](../env-test/README.md).
 
 The sibling [`scripts/env-test/`](../env-test/README.md) suite validates the
 `.env` files themselves: offline syntax/consistency checks plus explicit

@@ -65,7 +65,7 @@ powershell -File scripts/test-syntax.ps1
 
 | Folder | What it is | Documentation |
 |---|---|---|
-| [`test/`](test/README.md) | Container-level smoke suite for the `infra/docker-compose.yml` stack (api / postgres / caddy / monitor). Wired to `pnpm test:stack`. | [`test/README.md`](test/README.md) |
+| [`test/`](test/README.md) | Container-level smoke suite for the `infra/docker-compose.yml` stack (api / postgres / caddy / monitor), wired to `pnpm test:stack`, **plus** the offline `_deploy-sh-*.sh` suites that exercise `deploy/deploy.sh` without a droplet (argument/target handling, the logger, the env-file paths, the remote identity). | [`test/README.md`](test/README.md) |
 | [`env-test/`](env-test/README.md) | `.env` validation: an offline syntax/consistency checker plus an explicit live-access checker. | [`env-test/README.md`](env-test/README.md) |
 | [`ssh/`](ssh/README.md) | Local SSH key tooling (PPK → OpenSSH conversion, key inspection, passphrase removal). | [`ssh/README.md`](ssh/README.md) |
 

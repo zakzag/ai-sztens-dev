@@ -76,6 +76,13 @@ set `SSH_KEY=/absolute/path/to/private_key` in the matching `deploy/.env.<target
 deploy script uses `ssh -o IdentitiesOnly=yes`, so only that key is offered — leaving it
 empty falls back to the agent + `~/.ssh` defaults.
 
+The `dev` target pins the passphrase-less deploy key
+[`deploy/ssh-keys/deploy.private.key`](ssh-keys/deploy.private.key)
+(`SSH_KEY=./deploy/ssh-keys/deploy.private.key`, `SSH_USER=deployer`). The GitHub Actions
+workflow uses the **same** key through the `DROPLET_SSH_KEY` secret *and* the same
+`deployer` account, so the two deploy paths are interchangeable and the key's public half
+must be in `/home/deployer/.ssh/authorized_keys` on the droplet (§8.1).
+
 Copy the four public keys next to [`deploy/ssh-keys/README.md`](ssh-keys/README.md):
 
 ```
@@ -100,7 +107,31 @@ This uploads the repository to `/opt/aisztens` and, as root, installs Docker and
 Compose plugin, creates the users (`tkovari`, `krak`, `deployer` with sudo;
 `aisztens` as app user), installs their SSH keys, and leaves UFW off by default.
 
-After this step you can switch `deploy/.env.dev` → `SSH_USER=deployer` (or stay on root).
+**`bootstrap` is the only command that needs a root login** — it installs packages and
+creates users. Every other command (`up`, `down`, `restart`, `ps`, `logs`, `upload`) runs
+as `deployer`, the same account the GitHub Actions workflow uses. For that one run either
+set `SSH_USER=root` in the env file or override it on the command line:
+
+```bash
+SSH_USER=root ./deploy/deploy.sh bootstrap      # once, on a fresh droplet
+```
+
+`deploy.sh` enforces this: the `bootstrap` command probes `sudo -n true` first and aborts
+with that exact command if the configured user has no passwordless sudo. The deploy key's
+public half must be authorised for `deployer` on the droplet (§8.1).
+
+> **Ownership of the deploy tree.** `upload()` is an rsync with `--delete` into
+> `/opt/aisztens`, so that directory and everything in it must be writable by `deployer`.
+> `assert_remote_ready()` probes exactly that before every upload and, when it is not
+> writable, aborts with the one-off fix:
+>
+> ```bash
+> ssh -i deploy/ssh-keys/deploy.private.key root@<host> \
+>   'mkdir -p /opt/aisztens && chown -R deployer:deployer /opt/aisztens'
+> ```
+>
+> The current dev droplet already passes (a `777` tree), but `777` is world-writable;
+> applying the `chown` above is the recommended hardening.
 
 ## 3. Start the stack
 
@@ -151,8 +182,8 @@ droplet is brought up by repeating steps 1–3 with the same `deploy/.env.dev` +
 
 ## 8. GitHub Actions deploy
 
-After the droplet has been bootstrapped once (steps 1–4 above) and
-`deploy/.env.dev` is set to `SSH_USER=deployer`, every merge into the `dev`
+After the droplet has been bootstrapped once (steps 1–4 above) and the deploy
+key is authorised for the `deployer` user, every merge into the `dev`
 branch is deployed to the droplet by
 [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml). A
 PR-only workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
@@ -165,7 +196,7 @@ Configure under **Settings → Secrets and variables → Actions**:
 | Secret | Value | Notes |
 |---|---|---|
 | `DROPLET_HOST` | Droplet public IPv4 or hostname | e.g. `164.92.248.194`. Currently a single value; when the prod droplet comes online, a second `DROPLET_HOST_PROD` secret and a per-env matrix step are needed. |
-| `DROPLET_SSH_KEY` | Private key matching [`deploy/ssh-keys/deployer.pub`](ssh-keys/deployer.pub) | Installed into `authorized_keys` by [`bootstrap.sh`](bootstrap.sh) |
+| `DROPLET_SSH_KEY` | The passphrase-less deploy key — the contents of [`deploy/ssh-keys/deploy.private.key`](ssh-keys/deploy.private.key) (gitignored) | Its **public** half must be in `/home/deployer/.ssh/authorized_keys` on the droplet, because the workflow logs in as `deployer`. The local `deploy.sh` uses the same key **and the same account**. |
 | `INFRA_ENV_DEV` | Full contents of [`infra/.env.dev`](../infra/.env.example) (multi-line, verbatim) | Renders `infra/.env.dev` on every deploy. The `workflow_dispatch` matrix default picks this for push to `dev`. |
 | `INFRA_ENV_PROD` | Full contents of `infra/.env.prod` (multi-line, verbatim) | Renders `infra/.env.prod` on every deploy. Only consumed when an operator dispatches the workflow with `app_env=prod` against a future prod droplet. |
 
@@ -178,30 +209,30 @@ The push trigger cannot accidentally target prod (the input does not exist for `
 
 ### 8.2 What the workflow does
 
-1. Renders `infra/.env.${APP_ENV}` from the matching GitHub Secret
-   (`INFRA_ENV_DEV` for `APP_ENV=dev`, `INFRA_ENV_PROD` for `APP_ENV=prod`).
-   The choice depends on the trigger:
-   - `push` to `dev` → `APP_ENV=dev` → renders `infra/.env.dev`.
-   - `workflow_dispatch` with `app_env=prod` → renders `infra/.env.prod`.
+1. Renders `infra/.env` from the matching GitHub Secret (`INFRA_ENV_DEV` for
+   `APP_ENV=dev`, `INFRA_ENV_PROD` for `APP_ENV=prod`). The per-env name selects
+   *which secret* is rendered, not which path: a droplet hosts one environment, so
+   the runtime file is always `infra/.env`. The choice depends on the trigger:
+   - `push` to `dev` → `APP_ENV=dev` → renders the `INFRA_ENV_DEV` secret.
+   - `workflow_dispatch` with `app_env=prod` → renders `INFRA_ENV_PROD`.
    The render step exports `APP_ENV` for all downstream steps via
    `$GITHUB_ENV`.
 2. SCPs the repo (minus `.git`, `node_modules`, build artifacts, the
    `apps/**/.env.{local,dev,prod}` and `infra/.env.{local,dev,prod}` per-env
    files, and `deploy/ssh-keys/`) to `/opt/aisztens` on the droplet.
-3. SCPs the secret-rendered `infra/.env.${APP_ENV}` on top (destination on
-   the droplet stays `/opt/aisztens/infra/.env` — the rename applies only
-   to the local repo working copy).
+3. SCPs the rendered `infra/.env` into `/opt/aisztens/infra/` — the exact path every
+   `docker compose --env-file` expects, and the same path `deploy.sh` writes.
 4. Builds the SPAs against the matching `apps/<app>/.env.${APP_ENV}` via
    the `--mode ${APP_ENV}` flag passed to `pnpm --filter ... build:${APP_ENV}`.
-6. SSHes in as `deployer` and runs
-   `APP_ENV=${APP_ENV} docker compose --env-file "infra/.env.${APP_ENV}" -f infra/docker-compose.yml up -d --build --remove-orphans`.
-7. Waits for the `api` container healthcheck (defined in
+5. SSHes in as `deployer` and runs
+   `APP_ENV=${APP_ENV} docker compose --env-file "infra/.env" -f infra/docker-compose.yml up -d --build --remove-orphans`.
+6. Waits for the `api` container healthcheck (defined in
    [`infra/docker-compose.yml`](../infra/docker-compose.yml)) to become
    `healthy`.
-8. Runs [`scripts/test/stack-smoke.sh`](../scripts/test/stack-smoke.sh)
+7. Runs [`scripts/test/stack-smoke.sh`](../scripts/test/stack-smoke.sh)
    against the live deployment. The 4 liveness + 6 cross-service checks are
    documented in [`scripts/README.md`](../scripts/README.md).
-7. On failure, dumps the last 500 log lines of every container into the
+8. On failure, dumps the last 500 log lines of every container into the
    workflow run so triage doesn't require manual SSH.
 
 ### 8.3 Triggering a manual deploy / rollback
@@ -219,10 +250,15 @@ merge. Concurrency is keyed `deploy-droplet` so two deploys cannot race.
   were not touched by the change keep running. To roll back definitively,
   push the previous commit to `dev` (or rerun the workflow with that
   commit checked out).
-- `DROPLET_SSH_KEY` is the deployer key (sudo + docker group, matching
-  the policy in [`bootstrap.sh`](bootstrap.sh:67)). For stricter
-  isolation, restrict `deployer`'s `sudoers` to `docker compose` and
-  `docker` only.
+- `DROPLET_SSH_KEY` is the passphrase-less deploy key; it authenticates as
+  `deployer` (sudo + docker group, matching the policy in
+  [`bootstrap.sh`](bootstrap.sh:67)). Both deploy paths — local `deploy.sh` and CI —
+  use it with that account, so a compromise of the key does not hand over a root
+  shell (it still needs `sudo`, which asks for a password on this droplet). The key is
+  **also** authorised for `root` at the SSH layer: that is how the one-off
+  `SSH_USER=root ./deploy/deploy.sh bootstrap` (and the ownership probe's documented
+  fix) works. For stricter isolation, restrict the key in `authorized_keys`
+  (`from=` / `restrict` / `command=`) and/or `deployer`'s `sudoers`.
 
 ## 9. Local development in WSL (Debian)
 

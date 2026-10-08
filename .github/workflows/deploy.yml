@@ -1,20 +1,23 @@
 # AIsztens — production deploy to the DigitalOcean droplet.
 #
 # Mirrors deploy/deploy.sh + deploy/bootstrap.sh but driven by GitHub Actions:
-#   1. Render infra/.env.${APP_ENV} from the matching INFRA_ENV_${APP_ENV}
-#      secret (INFRA_ENV_DEV for APP_ENV=dev, INFRA_ENV_PROD for APP_ENV=prod).
+#   1. Render infra/.env from the matching INFRA_ENV_${APP_ENV} secret
+#      (INFRA_ENV_DEV for APP_ENV=dev, INFRA_ENV_PROD for APP_ENV=prod).
 #      APP_ENV comes from `inputs.app_env` (workflow_dispatch) or defaults to
-#      `dev` for push events.
+#      `dev` for push events; it picks WHICH secret is rendered.
 #   2. SCP the repo to /opt/aisztens on the droplet (with --delete, like rsync)
-#   3. SCP infra/.env.${APP_ENV} (the secret-rendered file) on top of what was
-#      uploaded; on the droplet the destination stays infra/.env for compose
-#      compatibility (see apps/api/src/app.module.ts and infra/docker-compose.yml).
+#   3. SCP the secret-rendered infra/.env on top of what was uploaded. A droplet
+#      hosts exactly ONE environment, so the runtime env file on disk is always
+#      infra/.env — the per-env name exists only locally, as the SOURCE. Every
+#      compose command below therefore uses `--env-file infra/.env`, matching
+#      deploy/deploy.sh and scripts/test/stack-smoke.sh (see also
+#      docs/Specs/Three-Env-Verification.md §3.8).
 #   4. Install pnpm + Node 22, build the web + admin SPAs against the matching
 #      per-env API base URL via `pnpm ... build:${APP_ENV}` (Vite mode), then
 #      SCP the two apps/{web,admin}/dist/ folders to the droplet so the Caddy
 #      volume mounts have content to serve.
 #   5. SSH in as `deployer` and run `APP_ENV=${APP_ENV} docker compose up -d --build`
-#      with `--env-file "infra/.env.${APP_ENV}"`. APP_ENV is exported both as
+#      with `--env-file "infra/.env"`. APP_ENV is exported both as
 #      shell env (belt-and-braces) and via the compose `api.environment.APP_ENV`
 #      entry — see infra/docker-compose.yml:30.
 #   6. Wait for the `api` container to become `healthy` (uses the compose
@@ -25,8 +28,10 @@
 #
 # Required secrets (Settings → Secrets and variables → Actions):
 #   DROPLET_HOST        — droplet public IPv4 or hostname
-#   DROPLET_SSH_KEY     — private key matching deploy/ssh-keys/deployer.pub
-#                         (installed into authorized_keys by deploy/bootstrap.sh)
+#   DROPLET_SSH_KEY     — the deploy private key (deploy/ssh-keys/deploy.private.key,
+#                         passphrase-less). Because this workflow logs in as
+#                         `deployer`, its PUBLIC half must be present in
+#                         /home/deployer/.ssh/authorized_keys on the droplet.
 #   INFRA_ENV_DEV       — full contents of infra/.env.dev (multi-line; verbatim copy)
 #   INFRA_ENV_PROD      — full contents of infra/.env.prod (multi-line; verbatim copy)
 #
@@ -38,6 +43,13 @@
 #
 # The `deployer` user is created by deploy/bootstrap.sh with sudo + docker
 # group, so docker compose can run non-interactively without root SSH.
+#
+# The deploy key is passphrase-less (required for non-interactive CI). The same
+# key file is used by the local deploy/deploy.sh, which also logs in as
+# `deployer` (see deploy/.env.dev) — the two deploy paths are interchangeable.
+# Only `bootstrap` needs a root login, and that is a one-off, hand-run step
+# (SSH_USER=root ./deploy/deploy.sh bootstrap) performed before this workflow
+# becomes usable.
 
 name: Deploy to droplet
 
@@ -85,22 +97,24 @@ jobs:
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------------
-      # 2. Render infra/.env.${APP_ENV} from the matching GitHub secret.
+      # 2. Render infra/.env from the matching GitHub secret.
       #    APP_ENV comes from `inputs.app_env` (workflow_dispatch) or
-      #    defaults to `dev` for push events. The secret holds the full
-      #    multi-line file; we copy it verbatim into the per-env path.
+      #    defaults to `dev` for push events and selects WHICH secret is
+      #    used (INFRA_ENV_DEV / INFRA_ENV_PROD). The secret holds the full
+      #    multi-line file; we copy it verbatim to infra/.env — the single
+      #    runtime path on the droplet, which hosts one environment only.
       #    `chmod 600` matches the convention from deploy/README.md where
       #    the .env files are world-unreadable.
       # ------------------------------------------------------------------
-      - name: Render infra/.env.${APP_ENV} from secret
+      - name: Render infra/.env from the matching secret
         working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
           app_env="${{ inputs.app_env || 'dev' }}"
           mkdir -p infra
-          printf '%s\n' "$INFRA_ENV" > "infra/.env.${app_env}"
-          chmod 600 "infra/.env.${app_env}"
-          echo "Rendered infra/.env.${app_env} ($(wc -l < "infra/.env.${app_env}") lines)."
+          printf '%s\n' "$INFRA_ENV" > "infra/.env"
+          chmod 600 "infra/.env"
+          echo "Rendered infra/.env for APP_ENV=${app_env} ($(wc -l < "infra/.env") lines)."
           # Also expose APP_ENV to subsequent steps via $GITHUB_ENV.
           echo "APP_ENV=${app_env}" >> "$GITHUB_ENV"
         env:
@@ -150,17 +164,25 @@ jobs:
 
       # ------------------------------------------------------------------
       # 4. Push the secret-rendered infra/.env to the exact path the
-      #    compose stack expects. We SCP it separately so the secret
-      #    never travels inside the bulk upload (which uses `rm: true`).
+      #    compose stack expects, /opt/aisztens/infra/.env. We SCP it
+      #    separately so the secret never travels inside the bulk upload
+      #    (which uses `rm: true`).
+      #
+      #    NOTE: scp-action treats `target` as a DIRECTORY and recreates the
+      #    source path inside it. `target: .../infra/.env` therefore produced
+      #    infra/.env/infra/.env.dev instead of the file compose asks for, while
+      #    every compose step below asked for infra/.env.$APP_ENV — two halves
+      #    of the same path never agreed. Ship a file that is already named
+      #    `.env` and point the target at the directory.
       # ------------------------------------------------------------------
-      - name: Upload infra/.env.${APP_ENV} to droplet
+      - name: Upload the rendered infra/.env to droplet
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          source: "infra/.env.${{ env.APP_ENV }}"
-          target: ${{ env.REMOTE_DIR }}/infra/.env
+          source: "infra/.env"
+          target: ${{ env.REMOTE_DIR }}/infra
           overwrite: true
 
       # ------------------------------------------------------------------
@@ -239,7 +261,7 @@ jobs:
             # the `APP_ENV: ${APP_ENV:-dev}` line cannot silently run the
             # api container as APP_ENV=dev on a prod droplet.
             APP_ENV="$APP_ENV" docker compose \
-              --env-file "infra/.env.$APP_ENV" \
+              --env-file "infra/.env" \
               -f infra/docker-compose.yml \
               up -d --build --remove-orphans
 
@@ -263,7 +285,7 @@ jobs:
           command: |
             set -euo pipefail
             cd "$REMOTE_DIR"
-            api_id="$(docker compose --env-file "infra/.env.$APP_ENV" -f infra/docker-compose.yml ps -q api)"
+            api_id="$(docker compose --env-file "infra/.env" -f infra/docker-compose.yml ps -q api)"
             if [ -z "$api_id" ]; then
               echo "ERROR: api container id is empty — compose did not start it."
               exit 1
@@ -317,13 +339,13 @@ jobs:
             set +e  # best-effort: always show whatever logs exist
             cd "$REMOTE_DIR"
             echo "===== docker compose ps ====="
-            docker compose --env-file "infra/.env.$APP_ENV" -f infra/docker-compose.yml ps
+            docker compose --env-file "infra/.env" -f infra/docker-compose.yml ps
             echo
             echo "===== last 500 log lines per service ====="
-            docker compose --env-file "infra/.env.$APP_ENV" -f infra/docker-compose.yml \
+            docker compose --env-file "infra/.env" -f infra/docker-compose.yml \
               logs --no-color --tail=500
             echo
             echo "===== scripts/test/stack-smoke.sh last run (if present) ====="
             # If the smoke script wrote its own output, surface it too.
-            docker compose --env-file "infra/.env.$APP_ENV" -f infra/docker-compose.yml \
+            docker compose --env-file "infra/.env" -f infra/docker-compose.yml \
               logs --no-color monitor --tail=200 || true

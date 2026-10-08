@@ -1,7 +1,8 @@
 # Three-Environment Verification — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-07
+**Last updated:** 2026-10-07 — deploy identity is `deployer` for both paths and a
+droplet keeps exactly one runtime env file, `infra/.env` (see §1d, §3.2, §3.8, §7).
 **Audience:** anyone who wants to confirm the three-env separation actually
 works end-to-end. Use this after pulling the latest `main`, after a
 droplet reboot, or after any change to `deploy/`, `.github/workflows/`,
@@ -68,12 +69,16 @@ git ls-files \
   infra/.env.example apps/api/.env.example apps/web/.env.example apps/admin/.env.example
 # Expect: 4 lines (all four are tracked)
 
-# 1d. No stragglers — every tracked file references the new APP_ENV naming
-#     consistently (no leftover `infra/.env` outside the legacy fallback paths)
-git grep -nE 'infra/\.env(?![\./])' -- 'deploy/' '.github/workflows/'
-# Expect: 0 matches. (The non-greedy negative lookahead excludes
-#   `infra/.env.local`, `infra/.env.dev`, `infra/.env.prod`, `infra/.env.example`,
-#   `infra/.env.x.y`, and `infra/.env/` directory refs.)
+# 1d. The two env-file names are used for the right job:
+#       LOCAL SOURCE  = infra/.env.${APP_ENV}   (per env, chosen by the target)
+#       REMOTE PATH   = infra/.env              (a droplet hosts ONE environment)
+#     So: the per-env name must appear where a file is picked up locally, and
+#     every command that runs ON THE DROPLET must name `infra/.env`.
+git grep -nE 'docker compose[^\\]*--env-file "?infra/\.env\.' -- \
+  'deploy/' '.github/workflows/'
+# Expect: 0 matches (no remote command names the local per-env file).
+bash scripts/test/_deploy-sh-remote-compose-path-test.sh
+# Expect: 20 passed, 0 failed — the offline guard that locks this down.
 
 # 1e. No committed per-env secret file (the .env.example → .env.{local,dev,prod}
 #     rename should leave the real files gitignored)
@@ -83,6 +88,12 @@ git ls-files | grep -E '\.env\.(local|dev|prod)$'
 # 1f. The deploy.sh script parses cleanly
 bash -n deploy/deploy.sh && echo SYNTAX_OK_DEPLOY
 # Expect: SYNTAX_OK_DEPLOY
+
+# 1f2. The offline deploy.sh suites pass (no droplet, no network)
+for t in scripts/test/_deploy-sh-*.sh; do bash "$t" || echo "FAILED: $t"; done
+# Expect: no FAILED lines, apart from the two known pre-existing ones in §7
+#   (`_deploy-sh-m3-test.sh` needs the legacy local infra/.env, and
+#    `_deploy-sh-env-selection-test.sh` scenario 6 is flaky).
 
 # 1g. The deploy workflow parses as valid YAML
 python -c "import yaml; yaml.safe_load(open('.github/workflows/deploy.yml').read()); print('YAML_OK')"
@@ -278,10 +289,20 @@ run `deploy.sh up dev` from your local machine (`dev` is also the default):
 ```bash
 cd deploy/
 deploy.sh up dev
-# Expect: the deploy banner includes:
-#   [deploy] Building & starting the stack (APP_ENV=dev) ...
-#   [deploy] docker compose ... up -d --build
+# Expect: authenticated as deployer (from deploy/.env.dev: SSH_USER=deployer),
+#   the preflight line
+#     Preflight OK — /opt/aisztens is writable by deployer@<HOST>.
+#   then
+#     [deploy] Building & starting the stack (APP_ENV=dev) ...
+#     [deploy] docker compose ... up -d --build
 #   ... and ultimately the api container becomes healthy.
+#
+#   The config line records the identity and both env-file names:
+#     config: DEPLOY_ENV=dev env_file=deploy/.env.dev APP_ENV=dev ... SSH_USER=deployer
+#     env file: local source infra/.env.dev -> remote infra/.env (APP_ENV=dev)
+#
+#   `bootstrap` is the only command that needs a root login; it refuses to run
+#   as deployer without passwordless sudo and prints the exact command to use.
 ```
 
 ### 3.3 The droplet's boot banner
@@ -356,12 +377,18 @@ ssh deployer@aisztens.hu "cd /opt/aisztens && bash scripts/test/stack-smoke.sh"
 #   scripts/test/ — re-run deploy.sh.)
 ```
 
-### 3.8 The legacy infra/.env fallback still works
+### 3.8 The droplet keeps ONE env file: `infra/.env`
 
-The dev droplet's `/opt/aisztens/infra/.env` predates the rename. After
-the first deploy with this plan, deploy.sh copies the local
-`infra/.env.dev` to the droplet's `infra/.env` (the deploy destination
-is unchanged). Verify the file on the droplet:
+A droplet hosts exactly one environment, so its runtime env file is always
+`infra/.env`, whatever the deploy target is. The per-env name
+(`infra/.env.<target>`) exists **locally only**, as the source: `deploy.sh` copies it onto
+the droplet's `infra/.env`, and the CI does the same in
+[`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) (step 3 renders
+`infra/.env`, step 4 uploads it into `/opt/aisztens/infra/`). Remote compose commands
+therefore name the remote path — `--env-file infra/.env` — which is also what
+[`scripts/test/stack-smoke.sh`](../../scripts/test/stack-smoke.sh) and
+[`scripts/env-test/check-env-live.sh`](../../scripts/env-test/check-env-live.sh) already
+used. Verify the file on the droplet:
 
 ```bash
 ssh deployer@aisztens.hu "wc -l /opt/aisztens/infra/.env"
@@ -456,10 +483,13 @@ grep -E 'INFRA_ENV_(DEV|PROD)' .github/workflows/deploy.yml
 grep -A 8 'workflow_dispatch:' .github/workflows/deploy.yml
 # Expect: app_env input declared with options dev and prod, default dev.
 
-# 5.4 Every docker compose --env-file is now parameterized
-git grep -nE 'docker compose --env-file infra/\.env(?!/)' \
+# 5.4 Every remote docker compose --env-file names the REMOTE path
+git grep -nE 'docker compose .*--env-file "infra/\.env"' \
   .github/workflows/deploy.yml
-# Expect: empty (only the parameterized form `"infra/.env.\$APP_ENV"` remains).
+# Expect: matches in the up / healthcheck / log-dump steps — the droplet has one
+#   env file, `infra/.env`. No remote command may use the local per-env name.
+git grep -nE 'docker compose .*--env-file "infra/\.env\.' .github/workflows/deploy.yml
+# Expect: empty.
 
 # 5.5 The build step uses --mode
 grep -n 'build:${APP_ENV}' .github/workflows/deploy.yml
@@ -502,7 +532,12 @@ env + secrets), §3 takes ~2 min.
 | §3.5.3: CORS DOES allow `https://api.aisztens.hu` | The CORS list in `infra/.env.dev` was edited incorrectly | Verify with `ssh deployer@aisztens.hu "grep ^CORS_ORIGINS /opt/aisztens/infra/.env"` — must NOT have `api.aisztens.hu`. |
 | §3.6.3: SPA also references `localhost` | An SPA `.env.dev` file got the wrong content | Verify with `ssh deployer@aisztens.hu "cat /opt/aisztens/apps/web/.env.dev"` — must contain `https://api.aisztens.hu/api`. |
 | §4.1.2: the api boot does NOT refuse with empty CORS | `apps/api/src/main.ts:42` isProd check is missing | The Step 2 commit `a054d0e` was lost — re-apply. |
-| §5.4: a straggler `infra/.env` (no qualifier) survives | A new SSH step was added without the substitution | Update the new step to use `"infra/.env.$APP_ENV"`. |
+| §5.4: a remote command names the local per-env file | The per-env name is a LOCAL source name; a droplet has one env file | Use `--env-file infra/.env` remotely, `infra/.env.${APP_ENV}` locally. Guard: `bash scripts/test/_deploy-sh-remote-compose-path-test.sh`. |
+| §3.2: `the remote user cannot write /opt/aisztens` | That directory is not writable by `deployer` (rsync `--delete`, `mkdir`, `scp` all need it) | Run the fix the error prints: `ssh -i <deploy key> root@<HOST> 'mkdir -p /opt/aisztens && chown -R deployer:deployer /opt/aisztens'`. |
+| §3.2: `'bootstrap' must run as root` | `bootstrap` was attempted as `deployer`, which has no passwordless sudo on this droplet | `SSH_USER=root ./deploy/deploy.sh bootstrap` (one-off, hand-run). |
+| §3.2: `app: unbound variable` | A `local a="$1" b="$a"` declaration — bash expands all words before the builtin runs, so `$a` is unset and `set -u` aborts | One `local` per line (fixed in `ensure_spa_env()` on 2026-10-07). |
+| `_deploy-sh-env-selection-test.sh` scenario 6 fails intermittently | Pre-existing **flake**: the assertion greps `deploy/log/latest.log` for `APP_ENV=prod` immediately after a run that aborts on the empty `HOST`, so it races the `tee` capture / `latest.log` refresh | Not a regression: `HEAD` shows 28/1 under WSL bash while Git Bash shows 29/0 for the same commit. Make the assertion read the per-run file instead of `latest.log`. |
+| `_deploy-sh-m3-test.sh` always fails (`no infra/.env found`) | Pre-existing **stale** suite: it re-implements the pre-per-env `infra/.env` lookup in a local function instead of calling `deploy.sh`, and this checkout only has `infra/.env.dev` | Rewrite it against the current `COMPOSE_ENV_FILE_LOCAL` chain, or retire it in favour of `_deploy-sh-remote-compose-path-test.sh`. |
 
 ---
 

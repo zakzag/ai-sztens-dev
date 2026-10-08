@@ -114,8 +114,10 @@ if [ ! -f "$LOGGER_LIB" ]; then
   echo "[deploy] FATAL: logger library not found at $LOGGER_LIB" >&2
   exit 1
 fi
+
 # shellcheck source=lib/logger.sh disable=SC1091
 . "$LOGGER_LIB"
+
 # The logger derives the log directory from this, so the files always land in
 # deploy/log/ regardless of which directory the operator ran the script from.
 export DEPLOY_LOG_DIR_PARENT="$SCRIPT_DIR"
@@ -139,9 +141,11 @@ DEPLOY_START_TS="$(date +%s)"
 on_err() {
   local exit_code=$?
   local line=${1:-?}
+
   # The `[stage=…]` tag is appended by the logger from its own CURRENT_STAGE,
   # so the breadcrumb no longer has to be tracked (and cannot drift) here.
   log_error "FAILED at line=$line exit=$exit_code after $(( $(date +%s) - DEPLOY_START_TS ))s"
+
   # Best-effort remote context: only attempt if the ssh array + compose args
   # were already initialised. If we died during init (e.g. set -u on HOST=)
   # those are still unset and expanding them here would mask the real error.

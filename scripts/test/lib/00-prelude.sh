@@ -57,6 +57,19 @@ export ENV_FILE="${ENV_FILE:-$REPO_ROOT/infra/.env}"
 #   SMOKE_OPT_UP    — non-empty means also run `docker compose up -d --build`
 #   SMOKE_OPT_DOWN  — non-empty means run `docker compose down` after success
 #   SMOKE_OPT_YES   — non-empty means skip teardown confirmation prompt
+#
+# The image-based deploy model changed how `dc up` resolves files. The
+# base infra/docker-compose.yml references pre-built GHCR images only,
+# so a fresh checkout cannot `up -d --build` against it: the images are
+# not on the developer's machine. The local override re-adds `build:`
+# blocks for every application service, so a local run merges both
+# files. The droplet-side call (CI) uses just the base compose file.
+LOCAL_COMPOSE_OVERRIDE="$REPO_ROOT/infra/docker-compose.local.yml"
+if [ -f "$LOCAL_COMPOSE_OVERRIDE" ]; then
+  export COMPOSE_LOCAL_OVERRIDE="$LOCAL_COMPOSE_OVERRIDE"
+else
+  export COMPOSE_LOCAL_OVERRIDE=""
+fi
 
 # ---------------------------------------------------------------------------
 # Counters
@@ -93,10 +106,20 @@ dc() {
   # --project-directory anchors the compose call to the repo root so the
   # `context: ..` build in infra/app/Dockerfile resolves correctly even when
   # the script is invoked from a different cwd.
+  # When the local override exists we merge it on top of the base so a
+  # developer can `up -d --build` without a registry (the override
+  # re-adds `build:` blocks for api/web/admin/monitor). On the droplet
+  # the local override is never present and only the base compose file
+  # is used.
+  local -a files
+  files=(-f "$COMPOSE_FILE")
+  if [ -n "${COMPOSE_LOCAL_OVERRIDE:-}" ] && [ -f "$COMPOSE_LOCAL_OVERRIDE" ]; then
+    files+=(-f "$COMPOSE_LOCAL_OVERRIDE")
+  fi
   docker compose \
     --project-directory "$REPO_ROOT" \
     --env-file "$ENV_FILE" \
-    -f "$COMPOSE_FILE" \
+    "${files[@]}" \
     "$@"
 }
 

@@ -9,24 +9,29 @@ network. They complement (do NOT replace) the in-process unit and e2e tests
 that live in [`apps/api/src/**/*.spec.ts`](../../apps/api/src/) and
 [`apps/api/test/`](../../apps/api/test/).
 
+> To validate the `.env` files themselves (offline syntax + explicit live
+> access), use the sibling suite [`scripts/env-test/`](../env-test/README.md).
+
 ## Quick start
 
 ```bash
-# 1. One-time: copy the env file and fill it in.
-cp infra/.env.example infra/.env
+# 1. One-time: copy the local per-env file and fill it in.
+cp infra/.env.example infra/.env.local
 
 # 2. Bring the stack up.
 pnpm test:stack:up
 
-# 3. Run the smoke suite.
-pnpm test:stack
+# 3. Run the smoke suite against the local per-env file.
+#    (The suite defaults to infra/.env; pass --env-file for the new layout.)
+bash scripts/test/stack-smoke.sh --env-file infra/.env.local
 
 # 4. (Optional) Tear the stack down when you're done.
 pnpm test:stack:down
 ```
 
 If the stack is already up (e.g. started via `deploy/deploy.sh up`), step 2
-is not needed — just run `pnpm test:stack`.
+is not needed — just run the suite, adding `--env-file infra/.env.local` for
+the local three-env layout.
 
 ## What it checks
 
@@ -72,7 +77,8 @@ stack-smoke.sh [--up] [--down] [--yes]
   (asks for confirmation unless `--yes` is also given).
 - `--yes` / `-y` — skip the teardown confirmation prompt.
 - `--compose-file <path>` — override `infra/docker-compose.yml`.
-- `--env-file <path>` — override `infra/.env`.
+- `--env-file <path>` — override the default `infra/.env` (use
+  `infra/.env.local` for the local three-env layout).
 
 ## Layout
 
@@ -82,12 +88,40 @@ scripts/test/
 ├── stack-smoke.sh      # entrypoint — runs all checks
 ├── stack-up.sh         # convenience wrapper for `docker compose up -d --build`
 ├── stack-down.sh       # convenience wrapper for `docker compose down`
-└── lib/
-    ├── 00-prelude.sh   # shared helpers (logging, assertion, dc wrappers)
-    ├── 10-services.sh  # per-service liveness checks
-    ├── 20-cross-service.sh # cross-service "see each other" checks
-    └── 99-teardown.sh  # optional teardown helper
+├── lib/
+│   ├── 00-prelude.sh   # shared helpers (logging, assertion, dc wrappers)
+│   ├── 10-services.sh  # per-service liveness checks
+│   ├── 20-cross-service.sh # cross-service "see each other" checks
+│   └── 99-teardown.sh  # optional teardown helper
+└── _deploy-sh-*.sh     # offline deploy/deploy.sh suites (no droplet needed)
 ```
+
+## Offline `deploy.sh` suites (`_deploy-sh-*.sh`)
+
+These are plain bash test scripts — no test framework, no network, no droplet. Each one
+copies `deploy/deploy.sh` into a throwaway "repo" together with `deploy/lib/`, and runs it
+against fixtures, so they are safe to run anywhere (including CI) and are a cheap guard
+after touching the deploy script:
+
+| Script | What it locks down |
+|---|---|
+| `_deploy-sh-env-selection-test.sh` | the `[dev\|prod]` target argument: selection precedence, usage errors (exit 2), the legacy `deploy/.env` migration hint |
+| `_deploy-sh-m1-test.sh` | the guard breadcrumbs (stage tags, exit codes, the logged `HOST` check) |
+| `_deploy-sh-m3-test.sh` | the local `infra/.env` path-resolution chain (self-contained copy of the old logic) |
+| `_deploy-sh-logger-test.sh` | `deploy/lib/logger.sh`: header/footer, level tagging, subprocess capture, retention, `latest.log` |
+| `_deploy-sh-remote-compose-path-test.sh` | the **remote identity** (`deployer`, never `root`) and the **remote env-file path** (`infra/.env`, never the local per-env name) plus the writability preflight, using stub `ssh`/`scp`/`rsync`/`pnpm` on `PATH` |
+
+```bash
+# Run them all from the repo root.
+for t in scripts/test/_deploy-sh-*.sh; do bash "$t" || echo "FAILED: $t"; done
+```
+
+Each suite prints `N passed, M failed` and exits non-zero on any failure. For the live,
+droplet-side access checks see [`../env-test/README.md`](../env-test/README.md).
+
+The sibling [`scripts/env-test/`](../env-test/README.md) suite validates the
+`.env` files themselves: offline syntax/consistency checks plus explicit
+live-access checks.
 
 ## Design notes
 

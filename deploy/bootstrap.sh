@@ -17,8 +17,25 @@ set -euo pipefail
 SUDO_USERS="${SUDO_USERS:-tkovari,krak,deployer}"
 APP_USER="${APP_USER:-aisztens}"
 KEYS_DIR="${KEYS_DIR:-/opt/aisztens/deploy/ssh-keys}"
+# Same /opt/aisztens parent KEYS_DIR lives under, so it must agree. Used by
+# the post-loop chown/chmod block below to repair the two preconditions that
+# the `deployer` deploy path silently relied on before:
+#   (a) the tree must be OWNED by the login user so `rsync -a`'s `-t`/`-p`
+#       can set directory times (`failed to set times` is what the
+#       22:25 run died on; the deferred operator TODO was at
+#       docs/milestones/2026-10-07--16-36-00-deploy-deployer-user.milestone.md
+#       §6);
+#   (b) the two env files must be `0600` — scp inherits the source mode,
+#       and a drvfs source uploads `0666` if we let it.
+REMOTE_DIR="${REMOTE_DIR:-/opt/aisztens}"
 UFW_ENABLE="${UFW_ENABLE:-0}"
 TZ="${TZ:-Europe/Budapest}"
+# Account that owns the deploy tree after bootstrap. Default: deployer (the
+# least-privilege identity used by every command except `bootstrap` itself —
+# see deploy/deploy.sh). The chown below makes `deployer` capable of writing
+# into REMOTE_DIR, which is what `rsync -a` needs for `-t`/`-p` (CAP_FOWNER).
+# Root deploys keep working too, because root can write any tree.
+DEPLOY_USER="${DEPLOY_USER:-deployer}"
 # Size of the swap file provisioned by configure_swap(). Set to 0 to skip.
 # Default 2 GB is enough to absorb a DigitalOcean do-agent memory leak spike
 # on a 1-2 GB droplet without forcing the kernel into swap-thrash.
@@ -77,9 +94,21 @@ create_user() {
     install -d -o "$user" -g "$user" -m 700 "/home/$user/.ssh"
     install -o "$user" -g "$user" -m 600 "$keyfile" "/home/$user/.ssh/authorized_keys"
     log "Installed SSH key for $user"
-  else
-    log "WARNING: no public key at $keyfile — $user has no SSH access yet"
+    return 0
   fi
+  # Sudo users MUST have an SSH key — without it the deployer/owner login
+  # path is unreachable, the assertion in deploy/deploy.sh:assert_remote_ready
+  # will fail, and the operator is silently funnelled into root deploys
+  # (which is exactly the regression documented in
+  # docs/milestones/2026-10-07--16-36-00-deploy-deployer-user.milestone.md
+  # §6 "Operator, once"). Hard-fail so the bootstrap cannot exit 0 in a
+  # state where day-to-day deploys (run as $DEPLOY_USER) cannot log in.
+  if [ "$sudo_flag" = "1" ]; then
+    log "ERROR: no public key at $keyfile — sudo user '$user' needs SSH access"
+    return 1
+  fi
+  # App user (no sudo) is allowed to exist without SSH — log it and move on.
+  log "WARNING: no public key at $keyfile — $user has no SSH access yet"
 }
 
 # ---------------------------------------------------------------------------
@@ -155,11 +184,37 @@ main() {
   configure_swap
   install_docker
 
-  local user
+  local user rc=0
   for user in ${SUDO_USERS//,/ }; do
-    create_user "$user" 1
+    if ! create_user "$user" 1; then
+      rc=1
+    fi
   done
-  create_user "$APP_USER" 0
+  create_user "$APP_USER" 0 || rc=1
+  if [ "$rc" -ne 0 ]; then
+    log "ERROR: one or more users could not be provisioned; aborting bootstrap."
+    log "Fix: place the matching public key under $KEYS_DIR/<user>.pub and re-run."
+    exit 1
+  fi
+
+  # The two preconditions every day-to-day deploy depends on. Without them
+  # the next `deploy.sh up` either fails rsync with "failed to set times"
+  # (root-owned tree, deployer cannot utimes() dirs) or copies the secrets
+  # world-readable (scp propagates the source's mode, /mnt/e drvfs gives
+  # 0666). Both were left as an operator TODO in
+  # docs/milestones/2026-10-07--16-36-00-deploy-deployer-user.milestone.md
+  # §6; bootstrap now establishes them in the same root-privileged window
+  # so the operator never has to.
+  if [ -d "$REMOTE_DIR" ]; then
+    log "Setting ownership of $REMOTE_DIR to ${DEPLOY_USER}:${DEPLOY_USER} ..."
+    chown -R "$DEPLOY_USER:$DEPLOY_USER" "$REMOTE_DIR"
+    chmod 600 "$REMOTE_DIR/infra/.env" "$REMOTE_DIR/deploy/.env" 2>/dev/null || true
+    # Drop world-writable bits the WSL drvfs upload may have planted.
+    chmod -R o-w "$REMOTE_DIR"
+  else
+    log "NOTE: $REMOTE_DIR does not exist yet; ownership will be fixed by the"
+    log "      first successful `deploy.sh up`. To skip the cycle: chown it now."
+  fi
 
   configure_ufw
 

@@ -57,7 +57,7 @@ run_deploy() {
 clear_envs() { rm -f "$sandbox"/deploy/.env "$sandbox"/deploy/.env.dev "$sandbox"/deploy/.env.prod; }
 
 # write_env <target> <host>
-write_env() { printf 'HOST=%s\nSSH_USER=root\nREMOTE_DIR=/opt/aisztens\n' "$2" >"$sandbox/deploy/.env.$1"; }
+write_env() { printf 'HOST=%s\nSSH_USER=deployer\nREMOTE_DIR=/opt/aisztens\n' "$2" >"$sandbox/deploy/.env.$1"; }
 
 dump() {
   printf '        --- output (exit=%s) ---\n' "$rc"
@@ -203,7 +203,7 @@ assert_rc 1 "--verbose before the target is accepted"
 assert_out "HOST is not set in deploy/.env.dev" "the target was still resolved correctly"
 
 clear_envs
-printf 'HOST=\nSSH_USER=root\n' >"$sandbox/deploy/.env"
+printf 'HOST=\nSSH_USER=deployer\n' >"$sandbox/deploy/.env"
 run_deploy ps prod
 assert_rc 1 "a legacy deploy/.env is not used as a fallback"
 assert_out "Found the legacy deploy/.env" "the legacy file is detected"

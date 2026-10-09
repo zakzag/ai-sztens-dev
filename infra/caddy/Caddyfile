@@ -72,30 +72,26 @@ api.<DOMAIN> {
 	}
 }
 
-# Public website (visitor call-back form). Served as a static SPA from
-# /srv/web, mounted from apps/web/dist by docker-compose. The `try_files`
-# makes deep-link refreshes (e.g. /legal) fall back to /index.html so the
-# React Router takes over. Same-origin /api/* is proxied through to the
-# NestJS API as a safety net for anyone pasting the API URL under this host.
+# Public website (visitor call-back form). The static SPA is served by
+# the `web` container (nginx:1.27-alpine running the Vite build of
+# @callback/web). Caddy only terminates TLS and routes the request. The
+# /api/* handle below is a safety net for anyone pasting the API URL
+# under this host; the production SPA calls the API cross-origin.
 web.<DOMAIN> {
 	encode zstd gzip
-	root * /srv/web
-	try_files {path} /index.html
-	file_server
+	reverse_proxy web:80
 	handle /api/* {
 		reverse_proxy api:3000
 	}
 }
 
-# Admin dashboard SPA. Same shape as the web site but mounted from
-# /srv/admin (apps/admin/dist). In production the SPA calls
-# https://api.aisztens.hu/api/... cross-origin; the /api/* handle below
-# is only a safety net for same-origin probing.
+# Admin dashboard SPA. Same shape as the web site; the static assets
+# are served by the `admin` container. In production the SPA calls
+# https://api.<DOMAIN>/api/... cross-origin; the /api/* handle below is
+# only a safety net for same-origin probing.
 admin.<DOMAIN> {
 	encode zstd gzip
-	root * /srv/admin
-	try_files {path} /index.html
-	file_server
+	reverse_proxy admin:80
 	handle /api/* {
 		reverse_proxy api:3000
 	}

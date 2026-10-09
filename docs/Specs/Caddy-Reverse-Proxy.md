@@ -1,7 +1,7 @@
 # Caddy — Reverse Proxy és TLS termináció
 
 **Státusz:** Élő (a `docs/Specs/outdated/`-ba kerül, ha a relevanciája megszűnik)
-**Utolsó frissítés:** 2026-10-06 (háromkörnyezetes szétválasztás: a Caddy a `dev`/`prod` dropleteken fut, `local`-ban a [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override `profiles: [never]`-re teszi, így a fejlesztői stackben nincs Caddy — a Caddy csak a nyilvános TLS terminációért felelős; a per-env renderelést és a `APP_ENV`-alapú compose szekciót lásd lentebb a §3.3 / §4.2 szakaszokban. **§4.4 frissítve:** a VAPI guard konfigurációja `VAPI_WEBHOOK_CONFIG` tokennel érkezik, a `rawBody` pedig Nest *alkalmazás* opció — lásd [`docs/milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md`](../milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md)).
+**Utolsó frissítés:** 2026-10-08 (image-based deploy: a `web` és `admin` site-ok `reverse_proxy`‑ra váltottak, a Caddy a `web:80` és `admin:80` konténereket proxy‑zza — lásd [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md). A dropleten a runtime env fájl mindig `infra/.env`: egy droplet egy környezet, a per-env név csak lokális forrás — a §4.4 rotációs példa már `deployer`-ként lép be, ahogy a `deploy.sh` és a CI is. **háromkörnyezetes szétválasztás:** a Caddy a `dev`/`prod` dropleteken fut, `local`-ban a [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override `profiles: [never]`-re teszi, így a fejlesztői stackben nincs Caddy — a Caddy csak a nyilvános TLS terminációért felelős; a per-env renderelést és a `APP_ENV`-alapú compose szekciót lásd lentebb a §3.3 / §4.2 szakaszokban. **§4.4 frissítve:** a VAPI guard konfigurációja `VAPI_WEBHOOK_CONFIG` tokennel érkezik, a `rawBody` pedig Nest *alkalmazás* opció — lásd [`docs/milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md`](../milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md)).
 **Kapcsolódik:** [`docs/01-callback-assistant.md`](../01-callback-assistant.md), [`docs/02-flowchart.md`](../02-flowchart.md), [`docs/03-implementation-general.md`](../03-implementation-general.md), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md)
 
 ---
@@ -208,9 +208,14 @@ kérésenkénti `config.get()` hívást. A guard:
 ```bash
 # lokálisan: szerkeszd a repo gyökerében lévő infra/.env fájlt (gitignored)
 # vagy a deploy.sh deploy indítja a frissített .env scp-vel a dropletre
-ssh root@<HOST> "cd /opt/aisztens && \
+ssh deployer@<HOST> "cd /opt/aisztens && \
   docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --no-build api"
 ```
+
+> A `deployer` a `docker` csoportban van, ezért `sudo` nélkül futtathatja a
+> compose-t — ugyanezt a felhasználót használja a CI is (lásd
+> [`deploy/README.md`](../../deploy/README.md) §2). A `deploy.sh` is `deployer`-ként
+> lép be; a `bootstrap` az egyetlen root-os, kézzel futtatott lépés.
 
 Image-rebuild nem kell. Amíg VAPI az új kulcsra nincs átállítva, a bejövő webhookok 401-et kapnak — ez a várt viselkedés.
 

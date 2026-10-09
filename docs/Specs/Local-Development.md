@@ -1,6 +1,10 @@
 # Local Development — AIsztens
 
 **Status:** living spec
+**Last updated:** 2026-10-08 — image-based deploy: the local override now
+carries `build:` blocks for every application service so a fresh checkout
+can still build the stack from source without a registry
+([`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)).
 **Audience:** anyone setting up a local dev machine, or onboarding a new
 contributor.
 
@@ -44,6 +48,11 @@ It merges [`infra/docker-compose.yml`](../../infra/docker-compose.yml) with the
 override (formerly `infra/docker-compose.wsl.yml`, renamed in Step 3 of the
 plan), which:
 
+- adds `build:` blocks for every application service (`api`, `web`,
+  `admin`, `monitor`) so a fresh checkout can `up -d --build` from
+  source without a registry. The base compose file is image-only
+  (image-based deploy): the local override is what restores the build
+  context that the droplet never needs;
 - publishes the `api` service on host port `3000` — reachable at
   `http://localhost:3000`;
 - publishes the `postgres` service on host port `5432` — `psql` from the

@@ -33,13 +33,19 @@ pnpm build       # builds packages/shared first, then apps/api, apps/web, apps/a
 pnpm dev         # runs shared watcher + API (:3000) + web (:5173) + admin (:5174)
 ```
 
-Environment variables (copy the `.env.example` files as needed):
+Environment variables use a per-environment layout (`.env.local` for the
+developer machine, `.env.dev` for the dev droplet, `.env.prod` for the future
+prod droplet — the bare `.env` names are legacy). Copy the `.env.example`
+templates as needed:
 
 | File | Contents |
 |---|---|
-| `apps/api/.env` | `PORT`, `CORS_ORIGINS` |
-| `apps/web/.env` | `VITE_API_BASE_URL` |
-| `apps/admin/.env` | `VITE_API_BASE_URL` |
+| `apps/api/.env.local` / `.env.dev` / `.env.prod` | `PORT`, `CORS_ORIGINS` |
+| `apps/web/.env.local` / `.env.dev` / `.env.prod` | `VITE_API_BASE_URL` |
+| `apps/admin/.env.local` / `.env.dev` / `.env.prod` | `VITE_API_BASE_URL` |
+
+Validate every `.env` file offline, and find the other helper scripts, in
+[`scripts/README.md`](scripts/README.md).
 
 ### Useful scripts
 
@@ -50,7 +56,7 @@ Environment variables (copy the `.env.example` files as needed):
 | `pnpm test` | API unit tests |
 | `pnpm test:e2e` | API e2e tests (Fastify) |
 | `pnpm lint` | Lint all packages |
-| `scripts/dev-stack.sh up` | Bring up the **local Docker stack** (api :3000 + postgres :5432, Caddy disabled). Windows: `pwsh scripts/dev-stack.ps1 up`. |
+| [`scripts/README.md`](scripts/README.md) | The script index: local stack helper, `.env` checks, stack smoke tests, SSH tooling, AI-rule sync — and how to run each one. |
 
 Per-package scripts are runnable with `pnpm --filter <pkg> <script>`, e.g.
 `pnpm --filter @callback/api start:dev`.

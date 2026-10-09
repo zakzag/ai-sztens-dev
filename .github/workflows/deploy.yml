@@ -102,7 +102,12 @@ jobs:
       - name: Resolve APP_ENV and IMAGE_TAG
         id: resolve
         env:
-          INFRA_ENV: ${{ secrets[format('INFRA_ENV_{0}', upper((inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev'))))] }}
+          # GitHub Actions expressions have no `upper()` (or any case-conversion)
+          # function, so we cannot build the secret name with format+upper.
+          # `app_env` is constrained to `dev|prod` by upstream inputs; we
+          # resolve it the same way the `run:` step does and then pick the
+          # matching secret by equality.
+          INFRA_ENV: ${{ (inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev')) == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
           app_env="${{ inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev') }}"
@@ -133,7 +138,12 @@ jobs:
       # ------------------------------------------------------------------
       - name: Render infra/.env from the matching secret
         env:
-          INFRA_ENV: ${{ secrets[format('INFRA_ENV_{0}', upper((inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev'))))] }}
+          # GitHub Actions expressions have no `upper()` (or any case-conversion)
+          # function, so we cannot build the secret name with format+upper.
+          # `app_env` is constrained to `dev|prod` by upstream inputs; we
+          # resolve it the same way the `run:` step does and then pick the
+          # matching secret by equality.
+          INFRA_ENV: ${{ (inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev')) == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
           mkdir -p infra

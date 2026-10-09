@@ -83,10 +83,16 @@ jobs:
       #    VITE_API_BASE_URL; ACME_EMAIL is unused here but read for the
       #    sanity check that the secret is well-formed.
       # ------------------------------------------------------------------
+      # GitHub Actions expressions have no `upper()` (or any case-conversion)
+      # function, so we cannot build the secret name with format+upper. The
+      # `app_env` input is constrained to `dev|prod` by the workflow
+      # `inputs:` choice type, and on a plain `push` trigger `inputs.app_env`
+      # is empty — so the conditional below resolves to the right secret
+      # without any string manipulation.
       - name: Resolve APP_ENV and parse DOMAIN
         id: resolve
         env:
-          INFRA_ENV: ${{ secrets[format('INFRA_ENV_{0}', upper(inputs.app_env || 'dev'))] }}
+          INFRA_ENV: ${{ inputs.app_env == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
           app_env="${{ inputs.app_env || 'dev' }}"

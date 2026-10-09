@@ -1,6 +1,8 @@
-# 2026-10-09 — CI unit-test step fix: drop `-- --colors=false` for pnpm v10
+# 2026-10-09 — CI fixes (two related workflow issues)
 
-## Context
+## 1. Unit-test step: drop `-- --colors=false` for pnpm v10
+
+### Context
 
 GitHub Actions `CI` workflow failed at the unit-test step with:
 
@@ -77,10 +79,66 @@ bump. The 9 existing `*.spec.ts` files (e.g.
 [`apps/api/src/health/health.controller.spec.ts`](apps/api/src/health/health.controller.spec.ts))
 are now picked up by jest and run as intended.
 
-## How to verify
+## How to verify (CI test step)
 
 - Push a commit to `dev` (or open a PR into `main`/`dev`) and confirm the
   `build-test` job in GitHub Actions goes green at the
   **Unit tests (api)** step.
 - Locally: `pnpm --filter @callback/api test` should list 9+ test suites
   and report `Tests: N passed` instead of `No tests found`.
+
+---
+
+## 2. Workflow files: remove `upper()` from GitHub Actions expressions
+
+### Context
+
+`images.yml` failed to parse with:
+
+```
+Invalid workflow file: .github/workflows/images.yml#L1
+(Line: 89, Col: 22): Unrecognized function: 'upper'. Located at position 33
+within expression: secrets[format('INFRA_ENV_{0}', upper(inputs.app_env || 'dev'))]
+```
+
+The same broken `upper(...)` call also appeared twice in `deploy.yml`
+(lines 105 and 136) — `deploy.yml` would have failed with the same
+parser error the next time it was triggered.
+
+### Root cause
+
+GitHub Actions expressions have a small, fixed set of built-in functions:
+`contains`, `startsWith`, `endsWith`, `format`, `join`, `toJSON`,
+`fromJSON`, `hashFiles`. **There is no `upper()`, no `lower()`, no
+case-conversion at all** (this is a long-standing GitHub limitation; the
+only ways to get one are `actions/github-script` or a pre-computed env
+value).
+
+The intent of the expression was to look up either
+`secrets.INFRA_ENV_DEV` or `secrets.INFRA_ENV_PROD` based on the
+`app_env` input. Since that input is already type-constrained to
+`dev|prod` by the workflow `inputs:` choice type (and on `push` triggers
+it is empty → defaults to `dev`), the case-conversion step is redundant.
+
+### Fix
+
+Replaced the broken expression with a pure-equality check in all three
+places:
+
+- [`images.yml:89`](.github/workflows/images.yml:89) →
+  `inputs.app_env == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV`
+- [`deploy.yml:105`](.github/workflows/deploy.yml:105) →
+  `(inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev')) == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV`
+- [`deploy.yml:136`](.github/workflows/deploy.yml:136) → same as above
+
+In each case, a multi-line comment was added at the call site explaining
+the trap, so the next person does not re-introduce `upper(...)`.
+
+### How to verify (workflow parse)
+
+- `gh workflow view images.yml` (or push any commit) — GitHub no longer
+  rejects the file with `Unrecognized function: 'upper'`.
+- Trigger `images.yml` via `workflow_dispatch` with `app_env=prod` and
+  confirm the produced images are tagged `…:prod` (and the
+  `INFRA_ENV_PROD` secret is used). The `Resolve APP_ENV and parse DOMAIN`
+  step should print a non-empty `domain=…`.

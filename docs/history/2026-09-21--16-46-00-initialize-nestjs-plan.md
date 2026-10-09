@@ -7,7 +7,7 @@
 ## 1. Goal
 
 Install a working NestJS application at the repository root that is capable of hosting
-the "Callback Assistant" application described in the `docs/` folder, without implementing
+the "AIsztens" application described in the `docs/` folder, without implementing
 any of its functional units yet.
 
 ## 2. Context (from `docs/`)

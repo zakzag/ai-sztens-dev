@@ -1,0 +1,27 @@
+# Repository-wide end-of-line policy.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# On a Windows checkout with `core.autocrlf=true` every text file lands in the
+# working tree with CRLF endings. That is harmless for the SPA sources, but it
+# is fatal for the shell scripts in this repository: they are executed by bash
+# on WSL and on the droplet (`deploy/deploy.sh`, `scripts/dev-stack.sh`,
+# `scripts/test/*`), and a CRLF script dies with
+#
+#   bash: scripts/test/lib/10-services.sh: line 33: syntax error near
+#   unexpected token `$'{\r''
+#
+# Note that unlike PowerShell (which tolerates CRLF inside scripts), bash does
+# not: the `\r` becomes part of the token. Forcing LF in the repository (and in
+# every future checkout) removes the whole class of failure — including the
+# case where a CRLF copy of a script is rsynced to the droplet.
+#
+# PowerShell scripts keep CRLF (the native Windows convention; PS 5.1 reads
+# both, but CRLF is what every Windows editor expects).
+
+*.sh        text eol=lf
+*.bash      text eol=lf
+
+*.ps1       text eol=crlf
+*.psm1      text eol=crlf
+*.psd1      text eol=crlf

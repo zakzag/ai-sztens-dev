@@ -1,6 +1,17 @@
+# Prompt: Droplet setup — AI asszisztens alkalmazás DigitalOcean dropleten
+
+**Dátum:** 2026-09-18
+**Típus:** archív felhasználói prompt
+**Konverzió:** 2026-10-05 — `docs/prompts/2026-09-18-droplet-setup.txt` → `.md` formátum
+
+---
+
+## Nyers prompt
+
 Van egy projektem, ami egy AI asszisztens alkalmazás, aminek van egy része ami node.js-ben készült. Ez az alkalmazás egy digitalocean dropleten fut, amiből jelenleg csak 1 db kell. Ezen a dropleten egy ubuntu linux fog futni, és a következők szükségesek a futtatáshoz:
-- lesz 3 felhasználó: tkovari - az enyém, krak - a munkatársamé ,aisztens - ez lesz amivel a nodejs app fut és a deployer - ami deployolni tud mindent erre a gépre, ezek a felhasználók ssh kulccsal tudnak belépni, amik már léteznek.
-- lesz rajta egy postgres adatbázis, amibe a krak, tkovari és a aisztens felhasználó be tud lépni valami jelszóval, beállításokkal.
+
+- lesz 3 felhasználó: `tkovari` – az enyém, `krak` – a munkatársamé, `aisztens` – ez lesz amivel a nodejs app fut és a `deployer` – ami deployolni tud mindent erre a gépre, ezek a felhasználók ssh kulccsal tudnak belépni, amik már léteznek.
+- lesz rajta egy postgres adatbázis, amibe a `krak`, `tkovari` és a `aisztens` felhasználó be tud lépni valami jelszóval, beállításokkal.
 - lesz rajta az említett nodejs alkalmazás, ami folyamatosan fut, és hív külső apikat, valamint lesz hívva más api által (pl vapi)
 - lesz rajta egy monitorozó program, amelyik figyeli hogy a noejs app fut-e, és jelez, ha baj van
 - minden dockerben fut, hogy könnyen lehessen módosíytani a konfigot

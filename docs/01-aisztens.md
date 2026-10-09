@@ -1,4 +1,4 @@
-# Callback Assistant
+# AIsztens
 
 Automated call-back system: a website visitor requests a call-back through a form, the backend stores and validates the request, then a call worker initiates an AI-driven phone call, processes the results and executes configurable follow-up actions. EZt én írtam
 

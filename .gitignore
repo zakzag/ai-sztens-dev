@@ -41,10 +41,36 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
+.env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env.local
+.env.development
+.env.test
+.env.production
+
+# Per-environment overrides (real values, never commit).
+# Used by the three-env separation plan (docs/history/2026-10-05--10-30-00-three-env-separation-plan.md):
+#   .env.local  → developer machine (local WSL stack)
+#   .env.dev    → dev droplet
+#   .env.prod   → future prod droplet
+apps/**/.env.local
+apps/**/.env.dev
+apps/**/.env.prod
+infra/.env.local
+infra/.env.dev
+infra/.env.prod
+# deploy/.env.<target> is the per-droplet operator config selected by
+# `deploy.sh <command> <target>` (docs/history/2026-10-06-deploy-env-selection-plan.md).
+# It carries the droplet address and the absolute path of the SSH private key,
+# so it must never be committed. The bare `.env` rule above does NOT match these
+# names: without the three lines below, a `deploy/.env.dev` would be committable.
+deploy/.env.local
+deploy/.env.dev
+deploy/.env.prod
+# Whitelist the documented templates so they DO get committed.
+!apps/**/.env.example
+!infra/.env.example
 
 # Real public keys stay local; only placeholders are committed.
 *.pub

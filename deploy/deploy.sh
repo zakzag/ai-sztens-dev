@@ -1,7 +1,38 @@
 #!/usr/bin/env bash
-# Callback Assistant — deploy helper (run from YOUR local machine).
+# AIsztens — deploy helper (run from YOUR local machine).
 #
 # Requires: ssh, rsync (use Git Bash / WSL on Windows).
+#
+# HOW TO RUN IT (Windows)
+# -----------------------
+# Do NOT type `deploy/deploy.sh up` into PowerShell/cmd and do not
+# double-click the file. Windows resolves `.sh` through the Git Bash file
+# association (`git-bash.exe --no-cd "%L" %*`), which opens a *new, throwaway*
+# window and hands bash a backslash Windows path it cannot resolve, e.g.
+#   E:projectsAI2026-...-devdeploydeploy.sh: command not found
+# The window closes before the message can be read.
+#
+#   Git Bash / WSL:  ./deploy/deploy.sh up dev
+#   PowerShell/cmd:  bash deploy/deploy.sh up dev
+#   Windows wrapper: .\deploy\deploy.ps1 up dev
+#
+# SYNTAX
+# ------
+#   deploy.sh <command> [dev|prod] [--verbose]
+#
+# The second argument is the DEPLOY TARGET and selects which environment file
+# is loaded:
+#
+#   dev    -> deploy/.env.dev    (DEFAULT when the argument is omitted)
+#   prod   -> deploy/.env.prod
+#
+# `local` is deliberately NOT a valid target: deploy.sh never deploys to a local
+# droplet. The local stack is scripts/dev-stack.sh's job (it uses
+# infra/.env.local). Any other value is a usage error (exit code 2).
+#
+# The selected target also becomes APP_ENV, so the SPA build mode,
+# infra/.env.${APP_ENV} and the compose --env-file can never drift from the
+# droplet being targeted.
 #
 # Commands:
 #   upload     build SPAs locally, then rsync the repo (minus build artifacts)
@@ -9,11 +40,34 @@
 #   bootstrap  upload + run deploy/bootstrap.sh as root (first time only)
 #   up         upload + build & start the Docker stack
 #   down       stop the stack
+#   down-all   DESTRUCTIVE: remove every Docker object on the droplet
 #   restart    restart the stack
 #   ps         show container status
 #   logs       tail logs
 #
-# Configuration is read from deploy/.env (see deploy/.env.example).
+# Add `--verbose` (or DEPLOY_LOG_LEVEL=DEBUG) for per-command debug lines; it
+# may appear anywhere after the command.
+#
+# Configuration is read from deploy/.env.<target> (see deploy/.env.example).
+#
+# LOGGING
+# -------
+# Every run is captured by deploy/lib/logger.sh into
+# deploy/log/deploy-<timestamp>-<command>-<target>.log, including the output of
+# every subprocess. The newest run is always deploy/log/latest.log — read that
+# file after a failure; it contains the complete error and the exit code.
+
+# Guard: this file requires bash. Run through `sh`, PowerShell or cmd it would
+# either die on bash-only syntax (`set -o pipefail`, arrays) or — worse — be
+# handed to the `.sh` file association, which spawns a window that closes
+# before the message can be read.
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "[deploy] FATAL: run this script with bash, not sh/PowerShell/cmd." >&2
+  echo '[deploy]   Git Bash / WSL: ./deploy/deploy.sh <command>' >&2
+  echo '[deploy]   PowerShell/cmd: bash deploy/deploy.sh <command>' >&2
+  echo '[deploy]   Windows wrapper: .\deploy\deploy.ps1 <command>' >&2
+  exit 1
+fi
 
 set -euo pipefail
 
@@ -21,22 +75,52 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ---------------------------------------------------------------------------
+# Structured logging (deploy/lib/logger.sh).
+#
+# Sourced *before* anything else can fail, and before the ERR trap below is
+# installed, for two reasons:
+#   1. the trap calls log_error(), so log() must already exist — when the trap
+#      was declared above the old local log() definition, any failure in
+#      between replaced the real error with `log: command not found`;
+#   2. the capture has to be active before the first guard can abort, so an
+#      early failure (missing deploy/.env, …) still leaves a complete log.
+#
+# The module owns `log`, `log_info/warn/error/debug`, `log_stage` and the
+# `exec > >(tee -a …)` capture that mirrors every subprocess line into the file.
+# ---------------------------------------------------------------------------
+LOGGER_LIB="$SCRIPT_DIR/lib/logger.sh"
+if [ ! -f "$LOGGER_LIB" ]; then
+  echo "[deploy] FATAL: logger library not found at $LOGGER_LIB" >&2
+  exit 1
+fi
+# shellcheck source=lib/logger.sh disable=SC1091
+. "$LOGGER_LIB"
+# The logger derives the log directory from this, so the files always land in
+# deploy/log/ regardless of which directory the operator ran the script from.
+export DEPLOY_LOG_DIR_PARENT="$SCRIPT_DIR"
+
+# ---------------------------------------------------------------------------
 # M1 (PR #1 of the deploy hardening plan): stage breadcrumbs.
 #
 # Every abort should tell the operator *which phase* failed and dump a few
 # lines of remote context so they do not have to read the script. Stages
-# are coarse-grained labels set by set_stage() before each major step.
+# are coarse-grained labels set by log_stage() — which now comes from
+# deploy/lib/logger.sh and stamps them into every line as `[stage=…]`.
 # The ERR trap fires once on the first non-zero exit (set -e), prints the
 # banner, and re-exits with the original failure code.
+#
+# NOTE: this trap is deliberately declared *after* the logger was sourced
+# (see above); on_err() calls log_error(), which would be an undefined
+# command otherwise and would mask the real failure.
 # ---------------------------------------------------------------------------
-CURRENT_STAGE="init"
 DEPLOY_START_TS="$(date +%s)"
 
-log_stage()  { CURRENT_STAGE="$1"; log "→ stage=$1"; }
 on_err() {
   local exit_code=$?
   local line=${1:-?}
-  log "FAILED at stage=$CURRENT_STAGE line=$line exit=$exit_code after $(( $(date +%s) - DEPLOY_START_TS ))s"
+  # The `[stage=…]` tag is appended by the logger from its own CURRENT_STAGE,
+  # so the breadcrumb no longer has to be tracked (and cannot drift) here.
+  log_error "FAILED at line=$line exit=$exit_code after $(( $(date +%s) - DEPLOY_START_TS ))s"
   # Best-effort remote context: only attempt if the ssh array + compose args
   # were already initialised. If we died during init (e.g. set -u on HOST=)
   # those are still unset and expanding them here would mask the real error.
@@ -51,20 +135,237 @@ on_err() {
 }
 trap 'on_err $LINENO' ERR
 
-if [ -f "$SCRIPT_DIR/.env" ]; then
-  # shellcheck disable=SC1091
-  set -a; . "$SCRIPT_DIR/.env"; set +a
+# ---------------------------------------------------------------------------
+# Argument parsing:  deploy.sh <command> [dev|prod] [--verbose]
+#
+# This MUST happen before the env file is sourced, because the target decides
+# WHICH file is sourced (deploy/.env.dev vs deploy/.env.prod).
+#
+# Note: the positional parameters are shifted below, so anything later in this
+# script must refer to "$DEPLOY_CMD" rather than "$1".
+# ---------------------------------------------------------------------------
+DEPLOY_VALID_ENVS="dev prod"
+
+DEPLOY_CMD="${1:-}"
+shift || true   # tolerate being called with no argument at all
+
+DEPLOY_ENV_ARG=""
+DEPLOY_ENV=""
+DEPLOY_ENV_SOURCE=""
+DEPLOY_VERBOSE_ARG=""
+DEPLOY_ARG_ERROR=""
+APP_ENV_PREEXISTING="${APP_ENV:-}"
+
+for _arg in "$@"; do
+  case "$_arg" in
+    -v|--verbose)
+      DEPLOY_VERBOSE_ARG="--verbose"
+      ;;
+    -*)
+      # An unknown flag: report it verbatim.
+      DEPLOY_ARG_ERROR="unexpected argument '$_arg'"
+      break
+      ;;
+    *)
+      # Any bare word is a candidate target. It is deliberately NOT validated
+      # here: letting the validation further down reject it produces a better
+      # message ("invalid environment 'staging' — valid values are: dev, prod")
+      # than a generic "unexpected argument", and it names the valid values.
+      if [ -n "$DEPLOY_ENV_ARG" ]; then
+        DEPLOY_ARG_ERROR="two environments given ('$DEPLOY_ENV_ARG' and '$_arg')"
+        break
+      fi
+      DEPLOY_ENV_ARG="$_arg"
+      ;;
+  esac
+done
+unset _arg
+
+# Precedence: positional argument > APP_ENV environment variable > built-in
+# default. The argument winning keeps `APP_ENV=dev deploy.sh up prod` honest:
+# the droplet named on the command line is the droplet that gets deployed.
+if [ -n "$DEPLOY_ENV_ARG" ]; then
+  DEPLOY_ENV="$DEPLOY_ENV_ARG"
+  DEPLOY_ENV_SOURCE="argument"
+elif [ -n "$APP_ENV_PREEXISTING" ]; then
+  DEPLOY_ENV="$APP_ENV_PREEXISTING"
+  DEPLOY_ENV_SOURCE="APP_ENV environment variable"
+else
+  DEPLOY_ENV="dev"
+  DEPLOY_ENV_SOURCE="default"
 fi
 
-HOST="${HOST:?Set HOST= in deploy/.env}"
+# Export it before the logger starts, so the log header records the target and
+# every child process (pnpm, ssh, docker compose) sees the same value.
+export APP_ENV="$DEPLOY_ENV"
+
+# Start the log capture *before* the first guard can abort. Order is the whole
+# point: the HOST check below is the most likely early failure, and a run that
+# dies before deploy_log_init() leaves no artefact to inspect — which is
+# exactly how "deploy.sh just closes the window and shows nothing" became
+# undebuggable. `--verbose`/DEPLOY_LOG_LEVEL=DEBUG also keeps log_debug lines.
+# The target goes into the file name so `ls deploy/log/` distinguishes a dev run
+# from a prod run.
+# shellcheck disable=SC2086  # intentional word-splitting: the arg may be empty
+deploy_log_init "${DEPLOY_CMD:-run}-${DEPLOY_ENV}" $DEPLOY_VERBOSE_ARG
+
+# Usage has to be reachable *before* the HOST guard below: the command list is
+# exactly what an operator needs when deploy/.env is missing or still has an
+# empty HOST=, and `deploy.sh help` must not fail merely because no droplet is
+# configured yet. (Before this, help/usage was only handled at the very end of
+# the script — after the guard — so it was unreachable without a filled .env.)
+print_usage() {
+  cat <<'USAGE'
+AIsztens deploy helper.
+
+Usage:  ./deploy/deploy.sh <command> [dev|prod] [--verbose]      (Git Bash / WSL)
+        bash deploy/deploy.sh <command> [dev|prod] [--verbose]   (PowerShell / cmd)
+        .\deploy\deploy.ps1 <command> [dev|prod] [--verbose]     (Windows wrapper)
+
+Commands:
+  upload     build the SPAs locally + rsync the repo and the SPA bundles
+  bootstrap  upload + run deploy/bootstrap.sh as root (first time only)
+  up         upload + build & start the Docker stack
+  down       stop the stack (volumes are preserved)
+  down-all   DESTRUCTIVE: remove every Docker object on the droplet
+  restart    restart the stack
+  ps         show container status
+  logs       tail logs (-f)
+
+Target [dev|prod] selects the environment file AND the APP_ENV used for
+infra/.env.<target>, the SPA build mode and the compose --env-file:
+
+  dev        deploy/.env.dev   (DEFAULT when the argument is omitted)
+  prod       deploy/.env.prod
+
+  'local' is not a deploy target: the local stack is started by
+  scripts/dev-stack.sh (it uses infra/.env.local).
+
+Every run is logged to deploy/log/deploy-<timestamp>-<command>-<target>.log,
+including the output of every subprocess. The newest run is always
+deploy/log/latest.log — read that file after a failure; it contains the error
+and the exit code.
+USAGE
+}
+
+case "$DEPLOY_CMD" in
+  help|-h|--help)
+    print_usage
+    exit 0
+    ;;
+  "")
+    # No command at all: the usage text is more useful than the HOST error.
+    print_usage
+    exit 1
+    ;;
+esac
+
+# ---------------------------------------------------------------------------
+# Validate the target, then load the matching environment file.
+#
+# Validation runs *after* deploy_log_init on purpose: the rejection is printed
+# AND captured in deploy/log/, because a run with a mistyped target is still a
+# run worth being able to look up afterwards.
+# ---------------------------------------------------------------------------
+if [ -n "$DEPLOY_ARG_ERROR" ]; then
+  log_error "usage error: $DEPLOY_ARG_ERROR"
+  log_error "Usage: deploy.sh <command> [dev|prod] [--verbose]"
+  print_usage >&2
+  exit 2
+fi
+
+case " $DEPLOY_VALID_ENVS " in
+  *" $DEPLOY_ENV "*)
+    : # valid target
+    ;;
+  *)
+    log_error "invalid environment '${DEPLOY_ENV}' — valid values are: ${DEPLOY_VALID_ENVS// /, }"
+    log_error "It came from the ${DEPLOY_ENV_SOURCE}."
+    if [ "$DEPLOY_ENV" = "local" ]; then
+      log_error "'local' is not a deploy target: deploy.sh never deploys to a local droplet."
+      log_error "The local stack is started by scripts/dev-stack.sh (it uses infra/.env.local)."
+    fi
+    log_error "Aborted before any upload or remote command was executed."
+    exit 2
+    ;;
+esac
+
+# Tell the operator when the command line overrode a pre-existing APP_ENV
+# instead of silently ignoring it: a mismatch here is how you end up deploying
+# the dev bundle to the prod droplet.
+if [ -n "$DEPLOY_ENV_ARG" ] && [ -n "$APP_ENV_PREEXISTING" ] \
+   && [ "$APP_ENV_PREEXISTING" != "$DEPLOY_ENV_ARG" ]; then
+  log_warn "APP_ENV=$APP_ENV_PREEXISTING was set in the environment, but the command line asked for '$DEPLOY_ENV_ARG' — the command line wins."
+fi
+
+DEPLOY_ENV_FILE="$SCRIPT_DIR/.env.${DEPLOY_ENV}"
+DEPLOY_ENV_FILE_REL="deploy/.env.${DEPLOY_ENV}"
+
+if [ ! -f "$DEPLOY_ENV_FILE" ]; then
+  log_error "environment file not found: $DEPLOY_ENV_FILE_REL"
+  if [ -f "$SCRIPT_DIR/.env" ]; then
+    # Migration path (D1: no silent fallback — a fallback can deploy to the
+    # wrong droplet, which is worse than an abort).
+    log_error "Found the legacy deploy/.env instead — it has been replaced by per-env files."
+    log_error "Migration:  mv deploy/.env deploy/.env.dev   (then create deploy/.env.prod for the prod droplet)"
+  else
+    log_error "Fix: cp deploy/.env.example $DEPLOY_ENV_FILE_REL  then set HOST=<droplet ip or hostname>."
+  fi
+  log_error "Aborted before any upload or remote command was executed."
+  exit 1
+fi
+
+log_info "Loading $DEPLOY_ENV_FILE_REL (target '${DEPLOY_ENV}' from ${DEPLOY_ENV_SOURCE}) ..."
+# shellcheck disable=SC1091
+set -a; . "$DEPLOY_ENV_FILE"; set +a
+
+# Re-assert APP_ENV after sourcing: neither the env file nor the inherited
+# environment may override the selected target, because APP_ENV is what picks
+# infra/.env.${APP_ENV} and the SPA build mode. A mismatch there is the one
+# failure mode that pushes dev artefacts at a prod droplet.
+export APP_ENV="$DEPLOY_ENV"
+
+# HOST is the one value with no sensible default. Fail loudly *and through the
+# logger* instead of the bare `${HOST:?}` guard: bash exits on that expansion
+# before the ERR trap can run, so the operator got no stage banner, no log file
+# and no hint about which value was missing.
+if [ -z "${HOST:-}" ]; then
+  log_error "HOST is not set in $DEPLOY_ENV_FILE_REL — there is nothing to deploy to."
+  log_error "Fix: set HOST=<droplet ip or hostname> in $DEPLOY_ENV_FILE_REL (optionally SSH_USER, SSH_KEY)."
+  log_error "Aborted before any upload or remote command was executed."
+  exit 1
+fi
 SSH_USER="${SSH_USER:-root}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/aisztens}"
+
+# APP_ENV was already resolved from the deploy target in the argument-parsing
+# block above (argument > APP_ENV env var > dev) and re-asserted after the env
+# file was sourced — do NOT re-default it here, or a `prod` target could be
+# silently downgraded to `dev`. It selects which per-env file NestJS / Vite /
+# the docker compose `api` service load; the values are normalised in
+# `apps/api/src/config/app-env.ts`, and the droplet's compose
+# `environment:` block receives `APP_ENV=${APP_ENV}` (declared in
+# infra/docker-compose.yml).
+#
+#   dev   → the existing dev droplet (default).
+#   prod  → a future prod droplet; the deploy.yml workflow matrix uses
+#           `INFRA_ENV_PROD` for that.
+#
+# `local` is intentionally unreachable from here — see scripts/dev-stack.sh.
+#
+# SPA build mode follows APP_ENV by default; operators can override with
+# `SPA_BUILD_MODE=prod` for a one-off dev build of the prod bundle.
+SPA_BUILD_MODE="${SPA_BUILD_MODE:-${APP_ENV}}"
+
 # Used by build_spas() to compute the production API base URL the SPAs are
 # built against. Falls back to localhost for dry runs / local builds. The
-# source of truth for the apex domain is infra/.env (read on the droplet);
-# we read it locally if available so the SPA bundle picks up the right URL
-# at build time without round-tripping through SSH.
+# source of truth for the apex domain is infra/.env.${APP_ENV} (the new
+# per-env layout); we fall back to legacy infra/.env for the dev droplet
+# that pre-dates the three-env separation plan.
 DOMAIN="${DOMAIN:-}"
+if [ -z "$DOMAIN" ] && [ -f "$REPO_DIR/infra/.env.${APP_ENV}" ]; then
+  DOMAIN="$(grep -E '^DOMAIN=' "$REPO_DIR/infra/.env.${APP_ENV}" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+fi
 if [ -z "$DOMAIN" ] && [ -f "$REPO_DIR/infra/.env" ]; then
   DOMAIN="$(grep -E '^DOMAIN=' "$REPO_DIR/infra/.env" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
 fi
@@ -73,12 +374,33 @@ DOMAIN="${DOMAIN:-localhost}"
 # ACME_EMAIL is read the same way (defaults to nothing, which would make
 # Caddy fall back to its own placeholder — let's be explicit instead).
 ACME_EMAIL="${ACME_EMAIL:-}"
+if [ -z "$ACME_EMAIL" ] && [ -f "$REPO_DIR/infra/.env.${APP_ENV}" ]; then
+  ACME_EMAIL="$(grep -E '^ACME_EMAIL=' "$REPO_DIR/infra/.env.${APP_ENV}" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+fi
 if [ -z "$ACME_EMAIL" ] && [ -f "$REPO_DIR/infra/.env" ]; then
   ACME_EMAIL="$(grep -E '^ACME_EMAIL=' "$REPO_DIR/infra/.env" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
 fi
 ACME_EMAIL="${ACME_EMAIL:-admin@${DOMAIN}}"
 
-COMPOSE_ARGS="--env-file infra/.env -f infra/docker-compose.yml"
+# COMPOSE_ARGS uses the per-env file as the source of truth; falls back to
+# the legacy `infra/.env` path so a droplet that pre-dates the per-env
+# rename (i.e. the current dev droplet, which has only `/opt/aisztens/
+# infra/.env` on disk) keeps receiving the correct file. Note the
+# destination on the droplet is always `infra/.env` — the rename applies
+# locally to the repo working copy only (see docs/history/2026-10-05--
+# 10-30-00-three-env-separation-step0.md).
+COMPOSE_ENV_FILE_LOCAL="infra/.env.${APP_ENV}"
+if [ ! -f "$REPO_DIR/$COMPOSE_ENV_FILE_LOCAL" ]; then
+  COMPOSE_ENV_FILE_LOCAL="infra/.env"
+fi
+COMPOSE_ARGS="--env-file ${COMPOSE_ENV_FILE_LOCAL} -f infra/docker-compose.yml"
+
+# Record the resolved (non-secret) configuration in the log, so any run can be
+# reproduced from the artefact alone. Values only, names only — never SSH_KEY
+# and never anything out of infra/.env.
+log_info "config: DEPLOY_ENV=$DEPLOY_ENV env_file=$DEPLOY_ENV_FILE_REL APP_ENV=$APP_ENV SPA_BUILD_MODE=$SPA_BUILD_MODE DOMAIN=$DOMAIN REMOTE_DIR=$REMOTE_DIR SSH_USER=$SSH_USER"
+log_debug "compose: docker compose $COMPOSE_ARGS"
+log_debug "env file local: $COMPOSE_ENV_FILE_LOCAL (APP_ENV=$APP_ENV)"
 
 # rsync's `-e` only accepts the remote shell command + its options (NOT the
 # destination host), so keep the ssh command separate from the `user@host`
@@ -89,25 +411,68 @@ SSH_CMD=(ssh -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes ${SSH_KEY
 SSH=("${SSH_CMD[@]}" "$SSH_USER@$HOST")
 SCP=(scp -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes ${SSH_KEY:+-i "$SSH_KEY"})
 
-log() { echo "[deploy] $*"; }
+# NOTE: `log`, `log_info`, `log_warn`, `log_error`, `log_debug` and
+# `log_stage` are provided by deploy/lib/logger.sh, sourced at the top of this
+# script. The former `log() { echo "[deploy] $*"; }` used to live here.
 
 # ---------------------------------------------------------------------------
-# Build the two SPAs (apps/web, apps/admin) into apps/*/dist/. The SPAs
-# read `import.meta.env.VITE_API_BASE_URL` at build time, so we pass the
-# production URL inline. The same `DOMAIN` value is used by infra/caddy
-# on the droplet, so they stay in sync.
+# Ensure the per-env SPA file exists for the current build mode, seeding it
+# from the resolved `DOMAIN` when missing. Without this guard, a fresh
+# droplet (which only has `.env.example` rsynced) would fail
+# `pnpm ... build:dev` because `apps/<app>/.env.dev` is not tracked in
+# the repo (it is gitignored, by design — see `.gitignore:58`).
+#
+# After the first run, the per-env file lives on the build host and the
+# operator can hand-edit it for any future override. Subsequent deploys
+# do NOT overwrite an existing file — they only seed the first time.
+ensure_spa_env() {
+  local app="$1" mode="$2" env_file="$REPO_DIR/apps/$app/.env.$mode"
+  if [ -f "$env_file" ]; then
+    return 0
+  fi
+  log "Seeding apps/$app/.env.$mode (DOMAIN=$DOMAIN) ..."
+  case "$app" in
+    web|admin)
+      printf 'VITE_API_BASE_URL=https://api.%s/api\n' "$DOMAIN" > "$env_file"
+      ;;
+    *)
+      log "ERROR: ensure_spa_env called with unknown app '$app'"
+      return 1
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Build the two SPAs (apps/web, apps/admin) into apps/*/dist/.
+#
+# Vite resolves `import.meta.env.VITE_API_BASE_URL` at build time. The
+# value comes from per-env files (apps/<app>/.env.local / .env.dev /
+# .env.prod) selected by the `--mode` flag passed to `vite build`. Today
+# we always build for the dev droplet, so we pass `--mode dev`, which
+# makes Vite pick up `apps/<app>/.env.dev` (see the three-env separation
+# plan in docs/history/2026-10-05--10-30-00-three-env-separation-plan.md).
+# Future prod deploys will pass `--mode prod`.
+#
+# Previously this function injected the API URL inline via `VITE_API_BASE_URL=`
+# in front of the pnpm call. That bypassed the per-env file layout, made
+# the deploy script the source of truth for the production URL, and silently
+# overrode anything developers had set locally. The new `--mode dev` flow
+# keeps the deploy script honest and makes the SPA env files the single
+# source of truth for the built-in API URL.
 build_spas() {
   if ! command -v pnpm >/dev/null 2>&1; then
     log "pnpm not found on PATH; skipping SPA build. Install pnpm or run the build manually."
     return 0
   fi
-  local api_base="https://api.${DOMAIN}/api"
+  local build_mode="${SPA_BUILD_MODE:-dev}"
+  ensure_spa_env web  "$build_mode"
+  ensure_spa_env admin "$build_mode"
   log "Installing workspace dependencies ..."
   (cd "$REPO_DIR" && pnpm install --frozen-lockfile)
-  log "Building @callback/web against VITE_API_BASE_URL=$api_base ..."
-  (cd "$REPO_DIR" && VITE_API_BASE_URL="$api_base" pnpm --filter @callback/web build)
-  log "Building @callback/admin against VITE_API_BASE_URL=$api_base ..."
-  (cd "$REPO_DIR" && VITE_API_BASE_URL="$api_base" pnpm --filter @callback/admin build)
+  log "Building @callback/web (mode=$build_mode) ..."
+  (cd "$REPO_DIR" && pnpm --filter @callback/web "build:${build_mode}")
+  log "Building @callback/admin (mode=$build_mode) ..."
+  (cd "$REPO_DIR" && pnpm --filter @callback/admin "build:${build_mode}")
 }
 
 # ---------------------------------------------------------------------------
@@ -180,31 +545,34 @@ upload() {
     --exclude '.git' \
     --exclude '.env' \
     --exclude 'deploy/.env' \
+    --exclude 'deploy/.env.dev' \
+    --exclude 'deploy/.env.prod' \
+    --exclude 'deploy/.env.local' \
     --exclude 'infra/.env' \
     --exclude 'infra/caddy/Caddyfile.rendered' \
     --exclude 'deploy/ssh-keys/' \
     "$REPO_DIR/" "$SSH_USER@$HOST:$REMOTE_DIR/"
-  # Render runtime env files from the deploy/.env + infra/.env values (or the
-  # INFRA_ENV GitHub secret in CI) and ship them on top. We don't rely on the
-  # local copies being uploaded via rsync because they're gitignored.
-  if [ -f "$SCRIPT_DIR/.env" ]; then
-    log "Rendering deploy/.env on the droplet ..."
-    "${SCP[@]}" "$SCRIPT_DIR/.env" "$SSH_USER@$HOST:$REMOTE_DIR/deploy/.env"
-  fi
-  # Pick exactly one local copy of infra/.env and refuse to proceed if none
-  # exists. The previous implementation accepted `$REPO_DIR/../infra/.env`
-  # as sufficient but only ever assigned `local_infra_env` from
-  # `$REPO_DIR/infra/.env`; if only the parent-dir file existed the
-  # standalone `[ -f ... ] && ...` list returned 1 and `set -e` aborted the
-  # deploy (otherwise it would have tried to `scp ""`). Pin the choice
-  # here so the failure mode is "clear error" instead of either.
+  # Ship the SELECTED env file (deploy/.env.<target>) on top; the rsync above
+  # excludes both the legacy and the per-env deploy env files because they are
+  # gitignored and hold the operator's droplet address and SSH key path.
+  # The destination stays `deploy/.env` on the droplet: a droplet is a single
+  # environment, and that path is the documented contract there.
+  log "Shipping $DEPLOY_ENV_FILE_REL on the droplet ..."
+  "${SCP[@]}" "$DEPLOY_ENV_FILE" "$SSH_USER@$HOST:$REMOTE_DIR/deploy/.env"
+  # Pick exactly one local copy of infra/.env.${APP_ENV} (preferred; new
+  # per-env layout from the three-env separation plan) and fall back to the
+  # legacy `infra/.env` path so a droplet that pre-dates the rename still
+  # gets the correct file. Refuse to proceed if neither exists.
   local local_infra_env=""
-  if [ -f "$REPO_DIR/infra/.env" ]; then
+  if [ -f "$REPO_DIR/infra/.env.${APP_ENV}" ]; then
+    local_infra_env="$REPO_DIR/infra/.env.${APP_ENV}"
+  elif [ -f "$REPO_DIR/infra/.env" ]; then
+    log "Note: using legacy infra/.env (no infra/.env.${APP_ENV} found); switch to the per-env name to silence it."
     local_infra_env="$REPO_DIR/infra/.env"
   elif [ -f "$REPO_DIR/../infra/.env" ]; then
     local_infra_env="$REPO_DIR/../infra/.env"
   else
-    log "ERROR: no infra/.env found (looked in $REPO_DIR and $REPO_DIR/..). Copy infra/.env.example to infra/.env and fill it in before deploying."
+    log "ERROR: no infra/.env.${APP_ENV} or infra/.env found (APP_ENV=${APP_ENV}). Copy infra/.env.example to infra/.env.${APP_ENV} and fill it in before deploying."
     return 1
   fi
   log "Rendering infra/.env on the droplet (source: $local_infra_env) ..."
@@ -262,7 +630,10 @@ prune_legacy_stack() {
   "
 }
 
-case "${1:-}" in
+# NB: the positional parameters were shifted during argument parsing, so the
+# dispatch must read DEPLOY_CMD — `case "${1:-}"` here would look at the TARGET
+# and send every command into the unknown-command branch below.
+case "$DEPLOY_CMD" in
   upload)
     upload
     ;;
@@ -300,8 +671,12 @@ case "${1:-}" in
     prune_legacy_stack
     upload
     log_stage "compose_up"
-    log "Building & starting the stack ..."
-    run_remote "docker compose $COMPOSE_ARGS up -d --build"
+    log "Building & starting the stack (APP_ENV=${APP_ENV}) ..."
+    # APP_ENV is also declared in infra/docker-compose.yml's `api` service
+    # `environment:` block; we re-export it as shell env here as belt-and-
+    # braces so a future change that forgets the compose line cannot silently
+    # run the api container as APP_ENV=dev on a prod droplet.
+    run_remote "APP_ENV=${APP_ENV} docker compose $COMPOSE_ARGS up -d --build"
     log_stage "done"
     ;;
   down)
@@ -317,7 +692,13 @@ case "${1:-}" in
     run_remote "docker compose $COMPOSE_ARGS logs -f --tail=200"
     ;;
   *)
-    echo "Usage: $0 {upload|bootstrap|up|down|down-all|restart|ps|logs}"
+    # help / -h / --help / no argument were handled above, before the HOST
+    # guard (see print_usage), so this branch only sees a real unknown command.
+    # NB: the positional parameters were shifted during argument parsing, so
+    # this must use DEPLOY_CMD and not "$1" (which now holds the target).
+    log_error "unknown command '$DEPLOY_CMD'"
+    print_usage >&2
+    echo "See deploy/log/latest.log for the full log of the last run." >&2
     exit 1
     ;;
 esac

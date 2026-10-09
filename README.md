@@ -45,11 +45,12 @@ Environment variables (copy the `.env.example` files as needed):
 
 | Command | Effect |
 |---|---|
-| `pnpm dev` | Start all apps with watch mode |
+| `pnpm dev` | Start all apps with watch mode (NestJS + two Vite dev servers) |
 | `pnpm build` | Build the whole monorepo (topological order) |
 | `pnpm test` | API unit tests |
 | `pnpm test:e2e` | API e2e tests (Fastify) |
 | `pnpm lint` | Lint all packages |
+| `scripts/dev-stack.sh up` | Bring up the **local Docker stack** (api :3000 + postgres :5432, Caddy disabled). Windows: `pwsh scripts/dev-stack.ps1 up`. |
 
 Per-package scripts are runnable with `pnpm --filter <pkg> <script>`, e.g.
 `pnpm --filter @callback/api start:dev`.

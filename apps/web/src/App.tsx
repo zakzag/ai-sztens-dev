@@ -10,7 +10,7 @@ export function App() {
       <header className="border-b border-slate-800 bg-slate-900">
         <nav className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
           <Link to="/" className="text-lg font-semibold text-white">
-            Callback Assistant
+            AIsztens
           </Link>
           <div className="flex items-center gap-4 text-sm">
             <Link to="/" className="text-slate-400 hover:text-white">
@@ -37,7 +37,7 @@ export function App() {
 
       <footer className="border-t border-slate-800 bg-slate-900">
         <div className="mx-auto flex max-w-3xl justify-between px-4 py-4 text-xs text-slate-500">
-          <span>© {new Date().getFullYear()} Callback Assistant</span>
+          <span>© {new Date().getFullYear()} AIsztens</span>
           <Link to="/legal" className="hover:text-slate-200">
             Adatkezelés
           </Link>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Callback Assistant — one-time droplet bootstrap.
+# AIsztens — one-time droplet bootstrap.
 #
 # Run as root on a fresh Ubuntu droplet (nothing installed yet). Idempotent:
 # it is safe to re-run. It:

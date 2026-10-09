@@ -19,7 +19,7 @@ function ProtectedLayout() {
       <header className="border-b border-slate-800 bg-slate-900">
         <nav className="flex items-center justify-between px-6 py-3">
           <Link to="/" className="text-lg font-semibold text-white">
-            Callback Assistant — Admin
+            AIsztens — Admin
           </Link>
           <Routes>
             <Route

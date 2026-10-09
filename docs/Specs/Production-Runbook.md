@@ -1,14 +1,14 @@
 # Production Runbook — éles verifikáció deploy után
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-09-29 (deploy.sh PR #1: hibabanner + stage-szintek a `deploy.sh` trap-ből, `infra/.env` scp-bugfix, rsync kihagyja a `deploy/ssh-keys/` mappát; lásd 6.1 szakasz + `docs/history/2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.md`)
+**Utolsó frissítés:** 2026-10-06 (**deploy logger-integráció:** a [`deploy/deploy.sh`](../../deploy/deploy.sh) a [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh) loggert használja, minden futás teljes naplója a `deploy/log/latest.log`-ban van, a hiányzó `HOST=` guard pedig naplózott hibát ad; Windows-on a [`deploy/deploy.ps1`](../../deploy/deploy.ps1) wrapper indítja — lásd §6.1 + [`deploy/README.md`](../../deploy/README.md). `/api/vapi/*` HMAC ellenőrzés + Caddy pre-filter automatizálva a smoke suite-ban; a guard config tokenen + Buffer raw body-n alapul — lásd 4.4 + `docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
 ---
 
 ## 1. Mire való ez a runbook?
 
-Miután a `deploy/deploy.sh up` sikeresen lefutott a lokális gépen, a dropleten **kötelező** az alábbi verifikációs lépéseket végrehajtani, mielőtt a release-t késznek tekintenénk. A runbook célja:
+Miután a `deploy/deploy.sh up dev` (vagy `up prod`) sikeresen lefutott a lokális gépen, a dropleten **kötelező** az alábbi verifikációs lépéseket végrehajtani, mielőtt a release-t késznek tekintenénk. A runbook célja:
 
 1. **Megbizonyosodni róla, hogy minden konténer valóban `Up`**, nem csak `Created` — a `docker compose ps` kimenete néha megtévesztő, ha a stack indítása félbeszakadt (ez az 1.2-es pont részletezi).
 2. **Végigmérni a külső végpontokat** (apex + két subdomain + API health) Caddy-n keresztül — ez az, amit a látogató és a VAPI webhook hív.
@@ -19,7 +19,7 @@ Miután a `deploy/deploy.sh up` sikeresen lefutott a lokális gépen, a droplete
 
 ## 2. Mikor kell lefuttatni?
 
-- **Minden `deploy/deploy.sh up` után** a lokális gépen.
+- **Minden `deploy/deploy.sh up <target>` után** a lokális gépen.
 - **Minden alkalommal, amikor a `infra/docker-compose.yml`, a Caddyfile vagy az `infra/.env` változik**.
 - **Havonta egyszer** megelőző karbantartásként (tanúsítvány-lejárat, lemezterület, memória trendek).
 - **Incidens után**, ha a stack-et újra kellett indítani (pl. OOM-kill, host reboot, Docker daemon crash).
@@ -30,13 +30,13 @@ Miután a `deploy/deploy.sh up` sikeresen lefutott a lokális gépen, a droplete
 
 ```bash
 # A lokális gépen (Git Bash / WSL / Linux / macOS)
-ssh root@<HOST>                 # a deploy/.env HOST változója
+ssh root@<HOST>                 # a deploy/.env.dev HOST változója (dev target)
 cd /opt/aisztens                # a deploy.sh REMOTE_DIR alapértelmezettje
 ```
 
 A dropleten legyenek elérhetők:
 - `docker` + `docker compose` v2
-- A `deploy/.env` és `infra/.env` fájlok a `/opt/aisztens` alatt (a `deploy.sh` scp-zi fel)
+- A droleten a `deploy/.env` (a lokálisan kiválasztott `deploy/.env.<target>` másolata, amit a `deploy.sh` scp-z át) és az `infra/.env` fájlok a `/opt/aisztens` alatt
 - A `/opt/aisztens/infra/caddy/Caddyfile.rendered` (a `deploy.sh:render_caddyfile()` generálja)
 
 ---
@@ -149,6 +149,48 @@ docker compose exec monitor sh -c 'wget -qO- http://api:3000/healthz || echo "MO
 
 # A NestJS liveness endpoint közvetlenül a konténerből
 docker compose exec api wget -qO- http://127.0.0.1:3000/healthz
+
+# A VAPI webhook védelmi vonalak ellenőrzése (Caddy 405 + NestJS HMAC).
+# A Caddy pre-filter: POST X-Vapi-Signature nélkül → 405 az edge-ről.
+curl -i -X POST "https://api.aisztens.hu/api/vapi/webhooks/end-of-call-report" \
+  -H "Content-Type: application/json" \
+  -d '{"message":{"id":"evt-test","type":"end-of-call-report"}}'
+# Elvárt: HTTP/2 405 (a Caddy @vapi_match nem egyezik → respond "Method Not Allowed" 405)
+
+# A NestJS HMAC guard: helyes signature-rel POST → 200, helytelen → 401.
+# A secret az infra/.env VAPI_WEBHOOK_SECRET sorából jön, SOHA ne dump-old log-ba.
+SECRET="$(grep VAPI_WEBHOOK_SECRET /opt/aisztens/infra/.env | cut -d= -f2)"
+BODY='{"message":{"id":"evt-test-001","type":"end-of-call-report","call":{"id":"call-test-001"}}}'
+TS="$(date +%s)"
+SIG="$(printf '%s' "${TS}.${BODY}" | openssl dgst -sha256 -hmac "${SECRET}" | sed 's/^.*= //')"
+
+curl -i -X POST "https://api.aisztens.hu/api/vapi/webhooks/end-of-call-report" \
+  -H "Content-Type: application/json" \
+  -H "X-Vapi-Timestamp: ${TS}" \
+  -H "X-Vapi-Signature: sha256=${SIG}" \
+  -d "${BODY}"
+# Elvárt: HTTP/2 200 + JSON {"received":true,"id":"<uuid>"}
+
+# Helytelen signature-rel ugyanaz a payload → 401 (NestJS guard).
+curl -i -X POST "https://api.aisztens.hu/api/vapi/webhooks/end-of-call-report" \
+  -H "Content-Type: application/json" \
+  -H "X-Vapi-Timestamp: ${TS}" \
+  -H "X-Vapi-Signature: sha256=deadbeef" \
+  -d "${BODY}"
+# Elvárt: HTTP/2 401 (VapiSignatureGuard HMAC mismatch)
+```
+
+> **Automatizált változat:** ugyanez a három ellenőrzés fut a smoke suite
+> 5. és 6. checkjeként (`pnpm test:stack`); a suite dokumentációja:
+> [`scripts/README.md`](../../scripts/README.md). A `WEBHOOK_TARGET`
+> (`https://api.$DOMAIN`) és a `VAPI_WEBHOOK_SECRET` értékét a szkript automatikusan az
+> `infra/.env`-ből olvassa — de csak akkor futtatja a checkeket, ha a compose projektben fut
+> `caddy` konténer (a `local` override letiltja a Caddy-t, ott nincs mit tesztelni).
+>
+> **Fontos (2026-10-06):** a dev droplet még a VAPI előtti image-et futtatja, ezért a fenti
+> curl-ek `404`-et adnak, amíg a módosított API image és a renderelt Caddyfile ki nincs
+> telepítve. Ez nem regresszió, hanem a deploy hiánya — részletek:
+> [`docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`](../history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md).
 ```
 
 **Elvárt:**
@@ -156,6 +198,8 @@ docker compose exec api wget -qO- http://127.0.0.1:3000/healthz
 - `pg_isready`: `accepting connections`
 - A monitor belső wget-je: `{"status":"ok","uptime":N,"timestamp":"..."}`
 - A NestJS konténerből: ugyanaz a JSON body
+- A Caddy pre-filter: 405 az edge-ről, mielőtt a kérés elérné a NestJS-t
+- A HMAC guard: 200 helyes, 401 helytelen signature esetén
 
 ---
 
@@ -263,30 +307,72 @@ Ha bármelyik lépés `FAIL` vagy `PLACEHOLDER LEAK!` kiírást ad, a `docker co
 | A `docker compose ps` önmagában csak a postgres-t mutatja | A többi service `Created` státuszban van, mert a stack indítása félbeszakadt | Lásd 4.1 — futtasd a `ps -a` flag-gel, majd ha kell, `up -d --build` |
 | `healthcheck exitCode: 1` a `fetch('/healthz')` Node scriptben | A `node -e` parancs `process.exit(r.ok?0:1)` exit kódot ad, de a Docker ezt 0-nak tekinti, ha a fetch sikeres volt. Ha a `r.ok` `false`, a Node 1-es kóddal lép ki — ez a NestJS nem-elérhetőség tünete (még nem indult el, vagy a route nem él) | Lásd fentebb, `api Restarting` sor |
 
-### 6.1 A deploy hiba bannerének olvasása (PR #1, 2026-09-29)
+### 6.1 A deploy hiba bannerének olvasása (PR #1, 2026-09-29; logger-integráció 2026-10-06)
 
-A `deploy.sh` mostantól `set -euo pipefail` felett egy `ERR` trap-et is tartalmaz, amely minden nem nulla kilépéskor kiírja, hogy **melyik fázisban** halt el a script, és a `docker compose ps -a` + `docker compose logs --tail=20` utolsó sorait. A banner formátuma:
+A `deploy.sh` a `set -euo pipefail` felett egy `ERR` trap-et is tartalmaz, amely minden nem nulla kilépéskor kiírja, hogy **melyik fázisban** halt el a script, és a `docker compose ps -a` + `docker compose logs --tail=20` utolsó sorait.
+
+**2026-10-06-tól** a `deploy.sh` a [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh) loggert használja: minden sor ISO-8601 időbélyeget és severity szintet kap, a stage breadcrumb pedig nem a szövegbe ágyazva, hanem `[stage=…]` tag-ként jelenik meg (a `log_stage()` állítja be). A banner formátuma:
 
 ```
-[deploy] → stage=upload_rsync
-[deploy] Uploading /home/me/repo -> root@164.92.248.194:/opt/aisztens ...
-[deploy] FAILED at stage=upload_rsync line=215 exit=12 after 47s
+2026-10-06T15:55:28+02:00 [INFO ] [deploy] [stage=upload_rsync] Uploading /home/me/repo -> root@164.92.248.194:/opt/aisztens ...
+2026-10-06T15:56:15+02:00 [ERROR] [deploy] [stage=upload_rsync] FAILED at line=215 exit=12 after 47s
 NAME                    SERVICE    STATUS
 aisztens-postgres-1     postgres   Up 12 minutes (healthy)
 aisztens-api-1          api        Up 12 minutes
 aisztens-caddy-1        caddy      Restarting
 aisztens-monitor-1      monitor    Restarting
 ...
+2026-10-06T15:56:15+02:00 [ERROR] [deploy] ===== finished: exit=12 duration=47s log=/home/me/repo/deploy/log/deploy-20261006-155528-up.log =====
 ```
 
 A stage-értékek lehetséges készlete: `init`, `prune_legacy_stack`, `upload_rsync`, `upload_build_spas`, `compose_up`, `done`. A `line=` a deploy.sh belső sorszám, nem a távoli parancsé — a valódi okot a távoli `ps -a` + `logs` részben kell keresni.
 
-Ha a banner `stage=init` és a kilépés a `.env` betöltése előtt történt (pl. hiányzó `HOST=`), akkor a távoli `ps -a` rész szándékosan kimarad: a trap csak akkor hívja a drólet, ha az ssh-tömb már inicializálva van. Ez nem hiba, csak annyit jelent, hogy a deploy a konfiguráció betöltése előtt halt el — a lokális `.env` tartalmát kell ellenőrizni.
+#### A deploy target: `dev` vagy `prod`
+
+A `deploy.sh <command> [dev|prod] [--verbose]` második argumentuma választja ki a betöltendő env fájlt:
+
+| Target | Env fájl | `APP_ENV` |
+|---|---|---|
+| (nincs megadva) | `deploy/.env.dev` | `dev` |
+| `dev` | `deploy/.env.dev` | `dev` |
+| `prod` | `deploy/.env.prod` | `prod` |
+
+Ugyanez az érték lesz az `APP_ENV`, így az `infra/.env.<target>`, a SPA build mode és a compose `--env-file` nem tud eltérni a megcélzott droplettől. Érvénytelen érték (pl. `staging`, `local`) → használati hiba, **exit 2**; a `local` szándékosan nem célpont (a lokális stacket a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) indítja — lásd [`scripts/README.md`](../../scripts/README.md)).
+
+A target a log fájl nevébe is bekerül (`deploy-<timestamp>-<command>-<target>.log`), így a `deploy/log/` listából látszik, melyik droplethez tartozik egy futás.
+
+> A korábbi, target nélküli `deploy/.env` **megszűnt** (nincs rá visszaesés, mert az rossz dropletre deployolhatna). Migráció: `mv deploy/.env deploy/.env.dev`, majd `cp deploy/.env.example deploy/.env.prod` a prod dropletnek.
+
+#### A teljes log: `deploy/log/`
+
+A banner csak kivonat. **Minden futás** teljes naplót hagy a `deploy/log/` mappában; a logger `exec > >(tee -a …)` capture-je miatt az `ssh` / `rsync` / `scp` / `pnpm` / `docker compose` kimenete is benne van, nem csak a script saját sorai:
+
+```bash
+tail -n 50 deploy/log/latest.log     # az utolsó futás — hibakeresésnél ezt olvasd először
+bash deploy/deploy.sh up dev --verbose   # újrafuttatás DEBUG szintű log_debug / log_cmd sorokkal
+```
+
+| Útvonal | Mit tartalmaz |
+|---|---|
+| `deploy/log/deploy-<YYYYmmdd-HHMMSS>-<command>-<target>.log` | egy fájl futásonként; a legutóbbi `DEPLOY_LOG_KEEP` (alapértelmezés 20) marad meg |
+| `deploy/log/latest.log` | mindig a legutóbbi futás — **hiba után ezt olvasd először** |
+
+A `latest.log` szimbolikus link, ha a fájlrendszer támogatja; Windows-on (`ln -s` nélkül) másolat, ezért a logger a futás **végén**, a footer kiírása után frissíti — különben a másolat a headernél állna meg.
+
+Ha a banner `stage=init`, a deploy a konfiguráció betöltése előtt halt el (jellemzően hiányzó `HOST=`). Ilyenkor a távoli `ps -a` rész **szándékosan** kimarad: a trap csak akkor hívja a dropletre, ha az ssh-tömb már inicializálva van. A hiba így is megjelenik a logban, mert a `deploy_log_init` a guardok **előtt** fut:
+
+```
+2026-10-06T15:55:28+02:00 [ERROR] [deploy] HOST is not set in deploy/.env.dev — there is nothing to deploy to.
+2026-10-06T15:55:28+02:00 [ERROR] [deploy] Fix: set HOST=<droplet ip or hostname> in deploy/.env.dev (optionally SSH_USER, SSH_KEY).
+2026-10-06T15:55:28+02:00 [ERROR] [deploy] Aborted before any upload or remote command was executed.
+```
+
+> **Windows — hogyan kell indítani a deploy-t.** A `deploy/deploy.sh`-t **nem** szabad duplán kattintani, és PowerShell/cmd-ből sem `deploy/deploy.sh up` formában hívni: a Windows a `.sh` kiterjesztést a Git Bash fájltársításon (`git-bash.exe --no-cd "%L" %*`) keresztül oldja fel, ami egy **új, eldobható** terminálablakot nyit, és a bash-nek egy backslash-es Windows útvonalat ad át, amit az nem tud feloldani (`E:projects…devdeploydeploy.sh: command not found`). Az ablak bezárul, mielőtt a hiba elolvasható lenne — a deploy úgy tűnik, mintha „nem csinált volna semmit, és hibát sem írt volna ki". Helyette: `.\deploy\deploy.ps1 <command>` (ajánlott Windows-on), `bash deploy/deploy.sh <command>` (PowerShell/cmd), vagy `./deploy/deploy.sh <command>` (Git Bash / WSL). A wrapper a jelenlegi konzolba streamel, hiba esetén nyitva tartja az ablakot, kiírja a `deploy/log/latest.log` utolsó sorait, és továbbadja a kilépési kódot. Részletek: [`deploy/README.md`](../../deploy/README.md) §10.
 
 További, a PR #1 során bevezetett kisebb védelmek:
 
 * A `render_caddyfile()` mostantól `<DOMAIN>` / `<ACME_EMAIL>` tokenekkel dolgozik (korábban a komment és a kód mást használt — lásd `docs/history/2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.md` M2). Ha a `grep '<DOMAIN>'` bármit talál a `/opt/aisztens/infra/caddy/Caddyfile.rendered` fájlban, a deploy nem indult el.
-* A `deploy/.env` és `infra/.env` scp útvonala mostantól explicit: ha egyik sem található meg a `repo/infra/.env` és a `repo/../infra/.env` útvonalak egyikén sem, a deploy a `no infra/.env found ...` üzenettel leáll, mielőtt bármit írna a dropletre.
+* A `deploy/.env.<target>` és az `infra/.env` scp útvonala explicit: ha a `repo/infra/.env.<APP_ENV>` és a `repo/infra/.env` egyike sem található meg, a deploy a `no infra/.env.<APP_ENV> or infra/.env found ...` üzenettel leáll, mielőtt bármit írna a dropletre.
 * Az rsync mirror `--exclude 'deploy/ssh-keys/'` szabállyal bővült (korábban csak a CI workflow zárta ki ezt a mappát — lásd `.github/workflows/deploy.yml`). A helyi deploy most már semmiképpen nem másol privát SSH-kulcsokat a dropletre, függetlenül attól, hogy a `.gitignore` mit ignorál.
 
 ---
@@ -300,7 +386,7 @@ A repo-ban van egy kézzel futtatható smoke-szkript, amely a teljes callback-fl
 bash scripts/test/stack-smoke.sh https://<DOMAIN> https://api.<DOMAIN>
 ```
 
-**Éles környezetben csak saját, nem ügyfél telefonszámmal futtasd** — a szkript valódi `callback_requests` sort hoz létre az adatbázisban. A szkript részleteit lásd: [`scripts/test/stack-smoke.sh`](../../scripts/test/stack-smoke.sh) és [`scripts/test/README.md`](../../scripts/test/README.md).
+**Éles környezetben csak saját, nem ügyfél telefonszámmal futtasd** — a szkript valódi `callback_requests` sort hoz létre az adatbázisban. A szkript és a teljes check-lista dokumentációja: [`scripts/README.md`](../../scripts/README.md).
 
 ---
 
@@ -328,12 +414,17 @@ A `pgdata` és `caddy_data` named volume-ok ilyenkor is megmaradnak — nem vesz
 
 ### 9.1 Közvetlenül kapcsolódó fájlok
 
-- [`deploy/deploy.sh`](../../deploy/deploy.sh) — a deploy szkript (upload + build + render + up)
-- [`infra/docker-compose.yml`](../../infra/docker-compose.yml) — a stack definíciója
+- [`deploy/deploy.sh`](../../deploy/deploy.sh) — a deploy szkript (upload + build + render + up). Az `APP_ENV` szelektor (dev/prod) a `local_infra_env` feloldáson és a `COMPOSE_ARGS` összeállításán keresztül terjed.
+- [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) — a CI deploy. Az `INFRA_ENV_DEV` / `INFRA_ENV_PROD` titkokból renderel; a `workflow_dispatch.app_env` input dönti el, melyiket.
+- [`infra/docker-compose.yml`](../../infra/docker-compose.yml) — a stack definíciója; tartalmazza az `APP_ENV: ${APP_ENV:-dev}` sort az `api.environment:` blokkban.
+- [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) — a fejlesztői override (Caddy kikapcsolva, host portok publikusak); a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) ezt merge-öli (lásd [`scripts/README.md`](../../scripts/README.md)).
 - [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile) — a Caddy template
 - [`infra/caddy/Caddyfile.rendered`](../../infra/caddy/Caddyfile.rendered) — a renderelt Caddyfile (gitignored)
-- [`infra/.env.example`](../../infra/.env.example) — az `infra/.env` környezeti változói
-- [`scripts/test/stack-smoke.sh`](../../scripts/test/stack-smoke.sh) — teljes lifecycle smoke
+- [`infra/.env.example`](../../infra/.env.example) — a per-env séma dokumentációja (local / dev / prod blokkok). A tényleges fájlok: `infra/.env.local`, `infra/.env.dev`, `infra/.env.prod` (mind gitignored).
+- [`scripts/README.md`](../../scripts/README.md) — a script-index; a teljes lifecycle smoke suite itt van dokumentálva
+- [`docs/Specs/Local-Development.md`](Local-Development.md) — a fejlesztői oldali workflow dokumentációja (`scripts/dev-stack.sh`, per-env fájlok, APP_ENV terjedés)
+- [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md) — **az end-to-end manuális tesztelési útmutató**: parancsok + várt kimenet a local / dev / prod környezetek mindegyikére. Minden deploy vagy friss pull után fussa le a §1 (repo checks) és a saját env-ének megfelelő szakaszt (§2 local, §3 dev, §4 prod).
+- [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../history/2026-10-05--10-30-00-three-env-separation-plan.md) — a teljes három-env terv, ami ezt a struktúrát létrehozta
 
 ### 9.2 Specifikus deep-dive-ok
 

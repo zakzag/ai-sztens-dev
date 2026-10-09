@@ -22,7 +22,7 @@ laptop.
 | [`_fix-ssh-key.sh`](_fix-ssh-key.sh:1) | Bash | Repair step: copy the key file into `~/.ssh/` and tighten permissions (`0700` dir, `0600` key). |
 | [`_inspect-key.sh`](_inspect-key.sh:1) | Bash | Read-only diagnostic — show mode, size, first/last lines and file type of the local private key. |
 | [`_install-puttygen.sh`](_install-puttygen.sh:1) | Bash | Install `putty-tools` (provides `puttygen`) on Debian/Ubuntu via `apt-get`. |
-| [`_remove-ssh-passphrase.sh`](_remove-ssh-passphrase.sh:1) | Bash | Remove the passphrase from the key referenced in [`deploy/.env`](../../deploy/.env:14), with a backup and a verification step. |
+| [`_remove-ssh-passphrase.sh`](_remove-ssh-passphrase.sh:1) | Bash | Remove the passphrase from the key referenced in `deploy/.env.dev` (or `deploy/.env.prod` with a target argument), with a backup and a verification step. |
 
 The PowerShell / Bash wrappers for PPK conversion and the bash diagnostic
 helpers are the scripts you actually invoke; the passphrase-removal script is
@@ -37,8 +37,8 @@ flowchart LR
     A[deploy/ssh-keys/*.ppk] --> B[scripts/ssh/convert-ppk-to-openssh.ps1<br/>or _convert-ppk.sh]
     B --> C[~/.ssh/id_aisztens_krak<br/>mode 0600]
     C --> D[ssh-keygen -y -f ~/.ssh/id_aisztens_krak]
-    D --> E[SSH_KEY path in deploy/.env]
-    E --> F[deploy/deploy.sh up]
+    D --> E[SSH_KEY path in deploy/.env.dev]
+    E --> F[deploy/deploy.sh up dev]
 ```
 
 The steps above correspond to the "first-time setup" path; if you only need
@@ -159,7 +159,8 @@ the Linux-side `puttygen` CLI is not installed.
 
 ## `_remove-ssh-passphrase.sh`
 
-**Use it when:** the key referenced in `deploy/.env` (`SSH_KEY=`) is
+**Use it when:** the key referenced in `deploy/.env.dev` (`SSH_KEY=` — or
+`deploy/.env.prod` when you pass `prod` as the first argument) is
 encrypted and you want unattended deploys. Read
 [`docs/history/2026-09-23--19-16-40-ssh-key-config-in-deploy-sh.md`](../../docs/history/2026-09-23--19-16-40-ssh-key-config-in-deploy-sh.md)
 for the context — `deploy.sh` always passes
@@ -168,7 +169,9 @@ for the context — `deploy.sh` always passes
 
 - **Where to run:** repo root, in WSL or Linux.
 - **What it does:**
-  1. Reads `SSH_KEY=` from [`deploy/.env`](../../deploy/.env:14), expands
+  1. Reads `SSH_KEY=` from `deploy/.env.<target>` (`deploy/.env.dev` by
+     default, `deploy/.env.prod` with `bash scripts/ssh/_remove-ssh-passphrase.sh
+     prod`), expands
      `~`, verifies the file exists and starts with one of the standard
      OpenSSH/PEM headers.
   2. Backs the original key up to `<key>.bak.<UTC-timestamp>` and `chmod

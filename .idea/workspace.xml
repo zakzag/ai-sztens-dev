@@ -7,13 +7,35 @@
     <option name="selectedModelId" value="auto" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0bf25cbd-a929-4a4c-a0fb-3f140a273081" name="Changes" comment="refactor(scripts): reorganize SSH key management scripts into a dedicated directory">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+    <list default="true" id="0bf25cbd-a929-4a4c-a0fb-3f140a273081" name="Changes" comment="chore: update references from &quot;Callback Assistant&quot; to &quot;AIsztens&quot;, and some other changes">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/api/src/callback-requests/callback-requests.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/src/callback-requests/callback-requests.controller.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/apps/api/src/callback-requests/dto/create-callback-request.dto.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/src/callback-requests/dto/create-callback-request.dto.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/api/src/app.module.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/src/app.module.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/api/src/config/app-env.spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/src/config/app-env.spec.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/api/src/config/app-env.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/src/config/app-env.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/api/src/main.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/src/main.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/api/test/app.e2e-spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/test/app.e2e-spec.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/apps/api/test/health.e2e-spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/api/test/health.e2e-spec.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/milestones/2026-09-29--00-34-49-api-healthcheck-fail.milestone.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/milestones/2026-09-29--00-34-49-api-healthcheck-fail.milestone.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/Specs/Caddy-Reverse-Proxy.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/Specs/Caddy-Reverse-Proxy.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/Specs/Production-Runbook.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/Specs/Production-Runbook.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/Specs/Three-Env-Verification.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/Specs/Three-Env-Verification.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/history/2026-09-21--16-46-30-droplet-deploy-infra-plan.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/history/2026-09-21--16-46-30-droplet-deploy-infra-plan.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/prompts/2026-09-18-droplet-setup.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/infra/caddy/Caddyfile" beforeDir="false" afterPath="$PROJECT_DIR$/infra/caddy/Caddyfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/init.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/init.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/ssh/_convert-ppk.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_convert-ppk.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/ssh/_fix-ssh-key.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_fix-ssh-key.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/ssh/_inspect-key.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_inspect-key.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/ssh/_install-puttygen.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_install-puttygen.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/ssh/_remove-ssh-passphrase.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/ssh/_remove-ssh-passphrase.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test/_deploy-sh-m1-test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test/_deploy-sh-m1-test.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test/_deploy-sh-m3-test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test/_deploy-sh-m3-test.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test/lib/00-prelude.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test/lib/00-prelude.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test/lib/10-services.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test/lib/10-services.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test/lib/20-cross-service.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test/lib/20-cross-service.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test/lib/99-teardown.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test/lib/99-teardown.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test/stack-down.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test/stack-down.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test/stack-smoke.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test/stack-smoke.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test/stack-up.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test/stack-up.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -22,7 +44,7 @@
   </component>
   <component name="CopilotPersistence">
     <persistenceIdMap>
-      <entry key="_E:/projects/AI/2026-08-31-ai-sztens-dev" value="3K3prg4v6Ra64VFCLIAiP1uuJ1V" />
+      <entry key="_E:/projects/AI/2026-08-31-ai-sztens-dev" value="3K9J2cCkDLdvKWjyZRtmJVkVSmU" />
     </persistenceIdMap>
   </component>
   <component name="Git.Settings">
@@ -41,7 +63,11 @@
   }
 }</component>
   <component name="PackageJsonUpdateNotifier">
+    <dismissed value="$PROJECT_DIR$/apps/admin/package.json" />
+    <dismissed value="$PROJECT_DIR$/apps/api/package.json" />
+    <dismissed value="$PROJECT_DIR$/apps/web/package.json" />
     <dismissed value="$PROJECT_DIR$/package.json" />
+    <dismissed value="$PROJECT_DIR$/packages/shared/package.json" />
   </component>
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="CurrentFile" />
@@ -54,6 +80,19 @@
     <option name="inlineTemplate">
       <template>
         <option name="modeId" value="InlineAgent" />
+        <option name="model">
+          <model>
+            <option name="modelType" value="builtin_id" />
+            <option name="modelValue" value="auto" />
+          </model>
+        </option>
+        <option name="targetType" value="BACKGROUND" />
+        <option name="worktreeMode" value="WORKSPACE" />
+      </template>
+    </option>
+    <option name="panelTemplate">
+      <template>
+        <option name="modeId" value="Ask" />
         <option name="model">
           <model>
             <option name="modelType" value="builtin_id" />
@@ -88,7 +127,7 @@
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
     &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;advanced.settings&quot;,
     &quot;ts.external.directory.path&quot;: &quot;E:\\projects\\AI\\2026-08-31-ai-sztens-dev\\apps\\admin\\node_modules\\typescript\\lib&quot;
   }
 }</component>
@@ -148,6 +187,14 @@
       <workItem from="1790686379965" duration="7699000" />
       <workItem from="1790760460131" duration="3567000" />
       <workItem from="1790802191240" duration="8511000" />
+      <workItem from="1790963349706" duration="378000" />
+      <workItem from="1790963755897" duration="723000" />
+      <workItem from="1790964591090" duration="23000" />
+      <workItem from="1790965407580" duration="4406000" />
+      <workItem from="1791114328246" duration="1766000" />
+      <workItem from="1791187363916" duration="17217000" />
+      <workItem from="1791273782074" duration="3436000" />
+      <workItem from="1791278851431" duration="4716000" />
     </task>
     <task id="LOCAL-00001" summary="fixing server errors">
       <option name="closed" value="true" />
@@ -165,7 +212,15 @@
       <option name="project" value="LOCAL" />
       <updated>1790694147569</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="chore: update references from &quot;Callback Assistant&quot; to &quot;AIsztens&quot;, and some other changes">
+      <option name="closed" value="true" />
+      <created>1790964338425</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1790964338425</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -185,6 +240,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="fixing server errors" />
     <MESSAGE value="refactor(scripts): reorganize SSH key management scripts into a dedicated directory" />
-    <option name="LAST_COMMIT_MESSAGE" value="refactor(scripts): reorganize SSH key management scripts into a dedicated directory" />
+    <MESSAGE value="chore: update references from &quot;Callback Assistant&quot; to &quot;AIsztens&quot;, and some other changes" />
+    <option name="LAST_COMMIT_MESSAGE" value="chore: update references from &quot;Callback Assistant&quot; to &quot;AIsztens&quot;, and some other changes" />
   </component>
 </project>

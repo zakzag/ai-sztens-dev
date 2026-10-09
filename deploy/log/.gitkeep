@@ -1,0 +1,9 @@
+# The deploy/log/ directory holds per-run log files written by
+# deploy/lib/logger.sh (see docs/history/2026-10-06-deploy-script-logging-plan.md).
+#
+# This file is here only so git keeps the directory itself tracked;
+# the files inside are matched by .gitignore and are never committed.
+#
+# Useful paths once you have run a deploy:
+#   deploy/log/latest.log                 -> newest run (symlink or copy)
+#   deploy/log/deploy-YYYYmmdd-HHMMSS-*.log  -> one file per run

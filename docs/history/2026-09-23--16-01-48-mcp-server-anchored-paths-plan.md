@@ -49,7 +49,7 @@ E:\projects\AI\2026-08-28-MCPs\
    └─ lmstudio.mcp.json           ← switch to absolute paths
 ```
 
-The Callback Assistant workspace (`2026-08-31-ai-sztens-dev`) needs no code
+The AIsztens workspace (`2026-08-31-ai-sztens-dev`) needs no code
 changes. After the MCP server fix lands, the deletions from
 [`2026-09-23-deletion-candidates-audit.md`](2026-09-23-deletion-candidates-audit.md:1)
 can be applied once to clean up the historical leftovers, and the
@@ -291,7 +291,7 @@ The plan is considered complete when all of these hold:
    branch (regression guarantee).
 3. `examples/lmstudio.mcp.json` opens in a JSON validator without errors
    and contains absolute paths.
-4. After launching the MCP server with `cwd` set to the Callback Assistant
+4. After launching the MCP server with `cwd` set to the AIsztens
    project root, **no** `logs/`, `data/`, or `$null` file appears there.
 5. The deletion-cleanup block from
    [`2026-09-23-deletion-candidates-audit.md`](2026-09-23-deletion-candidates-audit.md:102)

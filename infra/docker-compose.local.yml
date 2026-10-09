@@ -1,0 +1,31 @@
+# AIsztens — local override (developer machine: WSL / native Linux / macOS).
+# Merged on top of infra/docker-compose.yml, so it does NOT change the droplet setup.
+#
+# The name was docker-compose.wsl.yml before the three-env separation plan
+# landed (Step 3, 2026-10-05); the rename reflects that the override is no
+# longer WSL-specific — it's the "local developer machine" profile.
+#
+# Usage (from the repo root):
+#   scripts/dev-stack.sh up
+# Or, the long form (what dev-stack.sh does under the hood):
+#   docker compose --env-file infra/.env.local \
+#     -f infra/docker-compose.yml \
+#     -f infra/docker-compose.local.yml up -d --build
+#
+# Reachable from the host at: http://localhost:3000/api
+
+services:
+  api:
+    # Expose the API on the host (WSL2 localhost is forwarded to Windows).
+    ports:
+      - "3000:3000"
+
+  postgres:
+    # Optional: allow local psql clients (Windows / WSL) to reach Postgres.
+    ports:
+      - "5432:5432"
+
+  caddy:
+    # No public DNS or Let's Encrypt on a local machine — keep Caddy off.
+    profiles:
+      - never

@@ -1,4 +1,4 @@
-# Plan: Email Assistant MVP Integration into the Callback Assistant Monorepo
+# Plan: Email Assistant MVP Integration into the AIsztens Monorepo
 
 - Date: 2026-09-21
 - Status: Approved for implementation
@@ -13,7 +13,7 @@ voice call-back product also needs.
 
 ## 2. Context
 
-- The current codebase hosts the **Callback Assistant** voice product:
+- The current codebase hosts the **AIsztens** voice product:
   `apps/api` (NestJS 12 + Fastify, ESM, strict), `apps/web`, `apps/admin`,
   `packages/shared`, an empty `packages/mcp-server`, and an `infra/` Docker
   stack (`api`, `postgres`, `caddy`, `monitor`).

@@ -1,7 +1,7 @@
 {
   "name": "@callback/api",
   "version": "0.0.1",
-  "description": "Callback Assistant API (NestJS + Fastify)",
+  "description": "AIsztens API (NestJS + Fastify)",
   "author": "",
   "private": true,
   "license": "UNLICENSED",

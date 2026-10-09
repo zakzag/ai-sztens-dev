@@ -28,6 +28,13 @@ services:
     mem_limit: 400m
     environment:
       NODE_ENV: production
+      # APP_ENV selects which per-env file NestJS loads at boot (see
+      # `apps/api/src/app.module.ts:30`). The default is `dev` for the
+      # currently running droplet; the future prod stack will pass `dev`
+      # here too — only the per-env secrets differ. To turn on prod,
+      # flip APP_ENV to `prod` AND set the prod-specific secrets in
+      # `infra/.env.prod`.
+      APP_ENV: ${APP_ENV:-dev}
       PORT: ${API_PORT:-3000}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       VAPI_WEBHOOK_SECRET: ${VAPI_WEBHOOK_SECRET:-}

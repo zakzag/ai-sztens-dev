@@ -1,0 +1,202 @@
+# AIsztens — build and push the four runtime images to GHCR.
+#
+# This workflow is the entry point of the image-based deploy model. It
+# produces, in a single job, every image the droplet needs to run:
+#
+#   ghcr.io/<owner>/aisztens-api
+#   ghcr.io/<owner>/aisztens-web
+#   ghcr.io/<owner>/aisztens-admin
+#   ghcr.io/<owner>/aisztens-monitor
+#
+# Each image is tagged with both an immutable `sha-<short>` (what the
+# droplet pins for exact rollback) and the env tag `dev` / `prod` (mutable
+# pointer to the latest published revision of that environment).
+#
+# Triggers
+#   * `push` to `dev`  -> always `APP_ENV=dev`
+#   * `workflow_dispatch` with `app_env=dev|prod`
+#
+# The workflow does NOT ship anything to the droplet; that is the job of
+# `.github/workflows/deploy.yml`, which consumes the `sha-<short>` tag
+# this workflow produces.
+#
+# Secrets / permissions required
+#   * Repository variable: GHCR_OWNER (defaults to ${{ github.repository_owner }})
+#   * permissions.packages: write (to push GHCR packages)
+#   * Secret: INFRA_ENV_DEV (full infra/.env.dev for DOMAIN/ACME_EMAIL)
+#   * Secret: INFRA_ENV_PROD (full infra/.env.prod for DOMAIN/ACME_EMAIL)
+#
+# Why a separate workflow and not an extension of `deploy.yml`:
+#   * build+push is also useful in isolation (e.g. `act`/local CI dry run,
+#     or for a future rollback that just needs to re-publish an old commit);
+#   * splitting keeps `deploy.yml` focused on droplet delivery.
+
+name: Build and push images
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+    inputs:
+      app_env:
+        description: 'Which environment to tag the images for (dev or prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+
+permissions:
+  contents: read
+  packages: write
+
+# Cancel in-flight runs for the same ref so a fast-follow push does not
+# queue a duplicate build.
+concurrency:
+  group: images-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # GHCR images live under the repo owner; lowercased because GHCR image
+  # names are case-insensitive but lowercase is the documented convention.
+  GHCR_OWNER: ${{ vars.GHCR_OWNER || github.repository_owner }}
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    name: Build and push (${{ inputs.app_env || 'dev' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. Source checkout
+      # ------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # 2. Resolve APP_ENV and the per-env secrets.
+      #    The DOMAIN value is what gets baked into the SPA images as
+      #    VITE_API_BASE_URL; ACME_EMAIL is unused here but read for the
+      #    sanity check that the secret is well-formed.
+      # ------------------------------------------------------------------
+      - name: Resolve APP_ENV and parse DOMAIN
+        id: resolve
+        env:
+          INFRA_ENV: ${{ secrets[format('INFRA_ENV_{0}', upper(inputs.app_env || 'dev'))] }}
+        run: |
+          set -euo pipefail
+          app_env="${{ inputs.app_env || 'dev' }}"
+          if [ -z "$INFRA_ENV" ]; then
+            echo "ERROR: INFRA_ENV_${app_env^^} secret is empty." >&2
+            exit 1
+          fi
+          domain="$(printf '%s\n' "$INFRA_ENV" | grep -E '^DOMAIN=' | head -n1 | cut -d= -f2- | tr -d '"' | tr -d \"'\" || true)"
+          if [ -z "$domain" ]; then
+            echo "ERROR: DOMAIN is not set in INFRA_ENV_${app_env^^}." >&2
+            exit 1
+          fi
+          # Expose the resolved values to subsequent steps.
+          echo "app_env=$app_env"          >> "$GITHUB_OUTPUT"
+          echo "domain=$domain"            >> "$GITHUB_OUTPUT"
+          echo "api_base=https://api.${domain}/api" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------
+      # 3. Log in to GHCR. $GITHUB_TOKEN is automatically granted the
+      #    `packages: write` scope for this workflow by the `permissions:`
+      #    block above. No PAT needed.
+      # ------------------------------------------------------------------
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ------------------------------------------------------------------
+      # 4. Buildx is needed for the cache + multi-tag push used below.
+      # ------------------------------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ------------------------------------------------------------------
+      # 5. Build and push the four images.
+      #    * `cache-from: type=gha` + `cache-to: type=gha,mode=max` use
+      #      the GitHub Actions cache to keep layers warm across runs.
+      #    * Each image is pushed with two tags:
+      #        - sha-<short>: immutable, what the droplet pins
+      #        - <app_env>:   mutable pointer, convenient for humans
+      # ------------------------------------------------------------------
+      - name: Compute image metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA::7}"
+          echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
+
+      # Build + push api (NestJS).
+      - name: Build and push api
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infra/app/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-api:sha-${{ steps.meta.outputs.short_sha }}
+            ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-api:${{ steps.resolve.outputs.app_env }}
+          build-args: |
+            APP_ENV=${{ steps.resolve.outputs.app_env }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Build + push web (public SPA).
+      - name: Build and push web
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infra/web/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-web:sha-${{ steps.meta.outputs.short_sha }}
+            ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-web:${{ steps.resolve.outputs.app_env }}
+          build-args: |
+            APP_ENV=${{ steps.resolve.outputs.app_env }}
+            VITE_API_BASE_URL=${{ steps.resolve.outputs.api_base }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Build + push admin (dashboard SPA).
+      - name: Build and push admin
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infra/admin/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-admin:sha-${{ steps.meta.outputs.short_sha }}
+            ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-admin:${{ steps.resolve.outputs.app_env }}
+          build-args: |
+            APP_ENV=${{ steps.resolve.outputs.app_env }}
+            VITE_API_BASE_URL=${{ steps.resolve.outputs.api_base }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Build + push monitor (watchdog).
+      - name: Build and push monitor
+        uses: docker/build-push-action@v5
+        with:
+          context: ./infra/monitor
+          file: infra/monitor/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-monitor:sha-${{ steps.meta.outputs.short_sha }}
+            ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-monitor:${{ steps.resolve.outputs.app_env }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

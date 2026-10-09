@@ -4,14 +4,21 @@ Runbook to take a fresh DigitalOcean droplet (Ubuntu, only `root`, no Docker) to
 running, monitored application. Everything is Docker Compose-based; the mandatory files
 live in [`infra/`](../infra) and this directory.
 
+> **Image-based deploy (2026-10-08).** The droplet is now **image-based**: every
+> application service is a pre-built image pulled from GHCR, not a build that
+> happens on the server. The repo and `pnpm` workspace are not copied to the
+> droplet at all. The deploy script ships three small files (compose,
+> `infra/.env`, rendered Caddyfile) and runs `docker compose pull && up -d`.
+> See [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md).
+
 ## Overview
 
 | Step | Where | What |
 |---|---|---|
-| 1. Local prep | your machine | Create `deploy/.env.dev`, copy real SSH keys into `deploy/ssh-keys/` |
+| 1. Local prep | your machine | Create `deploy/.env.dev`, copy real SSH keys into `deploy/ssh-keys/`, set `GHCR_OWNER` and (if private) `GHCR_PAT` |
 | 2. Bootstrap | droplet | [`deploy/bootstrap.sh`](bootstrap.sh): Docker + users + SSH keys + UFW |
-| 3. Runtime config | droplet | `infra/.env` (uploaded from `infra/.env.dev`) from [`infra/.env.example`](../infra/.env.example) |
-| 4. Start | droplet | `docker compose up -d --build` |
+| 3. Image registry | GHCR | `.github/workflows/images.yml` builds and pushes the four images; `deploy.yml` pulls them |
+| 4. Start | droplet | `docker compose pull && docker compose up -d` (no `--build`) |
 
 > ### How to run the deploy script on Windows
 >
@@ -139,14 +146,22 @@ public half must be authorised for `deployer` on the droplet (§8.1).
 ./deploy/deploy.sh up
 ```
 
-This uploads the latest files and runs:
+This ships the three small files the droplet needs (compose,
+`infra/.env` with `IMAGE_TAG` written in, rendered Caddyfile) and runs:
 
 ```bash
-docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+docker compose --env-file infra/.env -f infra/docker-compose.yml pull
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --remove-orphans
 ```
 
-Services started: `api` (NestJS + Fastify), `postgres` (roles created on first init),
-`caddy` (TLS + reverse proxy), `monitor` (watchdog polling `GET /api`).
+The droplet never builds anything. The images it pulls are produced by
+[`.github/workflows/images.yml`](../.github/workflows/images.yml) in CI and
+tagged `sha-<short>` + `<env>`.
+
+Services started: `api` (NestJS + Fastify), `web` (nginx serving the public
+SPA), `admin` (nginx serving the dashboard SPA), `postgres` (roles created
+on first init), `caddy` (TLS + reverse proxy), `monitor` (watchdog polling
+`GET /healthz`).
 
 ## 4. Verify
 
@@ -189,16 +204,18 @@ branch is deployed to the droplet by
 PR-only workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
 runs install + build + lint + unit tests before the merge is allowed in.
 
-### 8.1 Repository secrets
+### 8.1 Repository secrets and variables
 
 Configure under **Settings → Secrets and variables → Actions**:
 
-| Secret | Value | Notes |
+| Secret / variable | Value | Notes |
 |---|---|---|
-| `DROPLET_HOST` | Droplet public IPv4 or hostname | e.g. `164.92.248.194`. Currently a single value; when the prod droplet comes online, a second `DROPLET_HOST_PROD` secret and a per-env matrix step are needed. |
-| `DROPLET_SSH_KEY` | The passphrase-less deploy key — the contents of [`deploy/ssh-keys/deploy.private.key`](ssh-keys/deploy.private.key) (gitignored) | Its **public** half must be in `/home/deployer/.ssh/authorized_keys` on the droplet, because the workflow logs in as `deployer`. The local `deploy.sh` uses the same key **and the same account**. |
-| `INFRA_ENV_DEV` | Full contents of [`infra/.env.dev`](../infra/.env.example) (multi-line, verbatim) | Renders `infra/.env.dev` on every deploy. The `workflow_dispatch` matrix default picks this for push to `dev`. |
-| `INFRA_ENV_PROD` | Full contents of `infra/.env.prod` (multi-line, verbatim) | Renders `infra/.env.prod` on every deploy. Only consumed when an operator dispatches the workflow with `app_env=prod` against a future prod droplet. |
+| `DROPLET_HOST` (secret) | Droplet public IPv4 or hostname | e.g. `164.92.248.194`. When the prod droplet comes online, a second `DROPLET_HOST_PROD` secret and a per-env matrix step are needed. |
+| `DROPLET_SSH_KEY` (secret) | The passphrase-less deploy key — the contents of [`deploy/ssh-keys/deploy.private.key`](ssh-keys/deploy.private.key) (gitignored) | Its **public** half must be in `/home/deployer/.ssh/authorized_keys` on the droplet, because the workflow logs in as `deployer`. The local `deploy.sh` uses the same key **and the same account**. |
+| `INFRA_ENV_DEV` (secret) | Full contents of `infra/.env.dev` (multi-line, verbatim) | Renders `infra/.env` on every deploy. The `workflow_dispatch` matrix default picks this for push to `dev`. |
+| `INFRA_ENV_PROD` (secret) | Full contents of `infra/.env.prod` (multi-line, verbatim) | Renders `infra/.env` on every deploy. Only consumed when an operator dispatches the workflow with `app_env=prod` against a future prod droplet. |
+| `GHCR_OWNER` (variable) | GitHub org/user that owns the image packages | Used to construct the full image reference (`ghcr.io/<GHCR_OWNER>/aisztens-api` etc.). Defaults to `${{ github.repository_owner }}` if unset. |
+| `GHCR_PAT` (secret, optional) | PAT with `read:packages` | Only required when the repository is private and the droplet must `docker login ghcr.io` to pull images. |
 
 The `APP_ENV` selector (`dev` / `prod`) is set automatically:
 

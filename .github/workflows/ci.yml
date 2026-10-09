@@ -66,5 +66,12 @@ jobs:
       - name: Lint
         run: pnpm -r lint
 
+      # Run jest unit tests. The script in apps/api/package.json is a fixed
+      # `node ... jest.js` invocation with no arg forwarding, so passing flags
+      # through pnpm (`-- --foo`) is unsafe: pnpm v10 forwards them literally
+      # to jest, where positional args are treated as test file patterns
+      # (result: "No tests found"). Locally `npm test` strips the `--`, which
+      # is why this never surfaced there. Colors are off by default in CI
+      # because stdout is not a TTY, so no extra flag is needed.
       - name: Unit tests (api)
-        run: pnpm --filter @callback/api test -- --colors=false
+        run: pnpm --filter @callback/api test

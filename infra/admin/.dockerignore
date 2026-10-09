@@ -1,0 +1,31 @@
+# Image context for the @callback/admin SPA.
+# See infra/web/.dockerignore for the rationale.
+
+**/.env
+**/.env.*
+!**/.env.example
+
+node_modules
+**/node_modules
+
+dist
+**/dist
+build
+**/build
+coverage
+**/coverage
+.tmp
+.temp
+
+*.log
+
+.git
+.gitignore
+.github
+
+.vscode
+.idea
+docs
+deploy
+infra
+README.md

@@ -1,7 +1,7 @@
 # Production Runbook — éles verifikáció deploy után
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-10-07 (**deploy identity:** a `deploy.sh` minden parancsa — és a CI — `deployer`-ként lép be, a `bootstrap` az egyetlen kézzel futtatott root-os lépés; a dropleten a runtime env fájl mindig `infra/.env`, mert egy droplet = egy környezet, a per-env név csak lokális forrás — lásd §3 + [`deploy/README.md`](../../deploy/README.md) §2 + [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md) §3.2/§3.8. **deploy logger-integráció:** a [`deploy/deploy.sh`](../../deploy/deploy.sh) a [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh) loggert használja, minden futás teljes naplója a `deploy/log/latest.log`-ban van, a hiányzó `HOST=` guard pedig naplózott hibát ad; Windows-on a [`deploy/deploy.ps1`](../../deploy/deploy.ps1) wrapper indítja — lásd §6.1 + [`deploy/README.md`](../../deploy/README.md). `/api/vapi/*` HMAC ellenőrzés + Caddy pre-filter automatizálva a smoke suite-ban; a guard config tokenen + Buffer raw body-n alapul — lásd 4.4 + `docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`)
+**Utolsó frissítés:** 2026-10-08 (**image-based deploy:** a droplet mostantól kizárólag `docker compose pull && up -d`-t futtat, a forráskód és a `pnpm` workspace nem kerül a dropletre — a `web` és `admin` saját konténerben fut, a Caddy ezeket proxy‑zza; lásd [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md) + §4.6 lentebb. **deploy identity:** a `deploy.sh` minden parancsa — és a CI — `deployer`-ként lép be, a `bootstrap` az egyetlen kézzel futtatott root-os lépés; a dropleten a runtime env fájl mindig `infra/.env`, mert egy droplet = egy környezet, a per-env név csak lokális forrás — lásd §3 + [`deploy/README.md`](../../deploy/README.md) §2 + [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md) §3.2/§3.8. **deploy logger-integráció:** a [`deploy/deploy.sh`](../../deploy/deploy.sh) a [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh) loggert használja, minden futás teljes naplója a `deploy/log/latest.log`-ban van, a hiányzó `HOST=` guard pedig naplózott hibát ad; Windows-on a [`deploy/deploy.ps1`](../../deploy/deploy.ps1) wrapper indítja — lásd §6.1 + [`deploy/README.md`](../../deploy/README.md). `/api/vapi/*` HMAC ellenőrzés + Caddy pre-filter automatizálva a smoke suite-ban; a guard config tokenen + Buffer raw body-n alapul — lásd 4.4 + `docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
 ---
@@ -226,23 +226,20 @@ docker compose exec caddy cat /etc/caddy/Caddyfile | grep -E '<DOMAIN>|<ACME_EMA
 
 ---
 
-### 4.6 SPA bundle mountok
+### 4.6 SPA konténerek (image-based)
 
-A Caddy a [`docker-compose.yml`](../../infra/docker-compose.yml) szerint bind-mountolja az `apps/{web,admin}/dist` mappákat a `/srv/web` és `/srv/admin` útvonalakra. Ha ezek a mappák üresek (vagy nem léteznek) a dropleten, a Caddy konténer `failed to mount` hibával kilép.
+A `web` és `admin` site-okat a Caddy a `web:80` és `admin:80` konténerek felé proxy‑zza (lásd [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile)). A Caddy *nem* szolgál ki statikus fájlokat — az nginx konténer teszi a [`infra/web/nginx.conf`](../../infra/web/nginx.conf) és [`infra/admin/nginx.conf`](../../infra/admin/nginx.conf) alapján. Az image-eket a [`.github/workflows/images.yml`](../../.github/workflows/images.yml) buildeli, a droplet pullolja.
 
 ```bash
-# A dropleten
-ls -la /opt/aisztens/apps/web/dist    | head -20
-ls -la /opt/aisztens/apps/admin/dist  | head -20
-
-# A Caddy konténerben mountolva
-docker compose exec caddy ls -la /srv/web   | head -10
-docker compose exec caddy ls -la /srv/admin | head -10
+# A dropleten: a `web` és `admin` konténer fut, az `index.html` az image-be van égetve
+docker compose -f infra/docker-compose.yml --env-file infra/.env ps web admin
+docker compose -f infra/docker-compose.yml --env-file infra/.env exec web ls -la /usr/share/nginx/html | head -10
+docker compose -f infra/docker-compose.yml --env-file infra/.env exec admin ls -la /usr/share/nginx/html | head -10
 ```
 
-**Elvárt:** mindkét mappa tartalmazza az `index.html`-t és az `assets/` almappát.
+**Elvárt:** mindkét konténer `Up`, mindkét mappa tartalmazza az `index.html`-t és az `assets/` almappát.
 
-Ha a lokális mappák üresek, a `deploy.sh:build_spas()` kimaradt — tipikusan azért, mert a `pnpm` nem volt a lokális PATH-on a deploy idején.
+Ha a konténer `Restarting` / `Exited`, a pull valószínűleg 401‑et adott (privát GHCR esetén `GHCR_PAT` kell a dropleten), vagy a `IMAGE_TAG`/`GHCR_OWNER` nincs kitöltve az `infra/.env`-ben. A 2026-10-08 előtti elrendezés itt nem érvényes: a host `apps/{web,admin}/dist` mappa és a `WEB_DIST_PATH`/`ADMIN_DIST_PATH` bind mount megszűnt.
 
 ---
 

@@ -1,0 +1,37 @@
+# Image context for the @callback/web SPA.
+#
+# The Dockerfile copies the manifests + sources it needs explicitly, so
+# the safest pattern is to ignore everything not on its allowlist.
+# Anything not matched below will still be on the build host's tar
+# stream and consumed by the build stage, but the explicit COPYs are
+# the source of truth for what ends up in the final image.
+
+**/.env
+**/.env.*
+!**/.env.example
+
+node_modules
+**/node_modules
+
+dist
+**/dist
+build
+**/build
+coverage
+**/coverage
+.tmp
+.temp
+
+*.log
+
+.git
+.gitignore
+.github
+
+# Project-specific noise that never belongs in a build context.
+.vscode
+.idea
+docs
+deploy
+infra
+README.md

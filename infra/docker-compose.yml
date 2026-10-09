@@ -1,44 +1,62 @@
-# AIsztens — single-droplet runtime stack.
-# Everything runs in Docker so the config is easy to change and the machine
-# can be recreated quickly (see deploy/bootstrap.sh + deploy/deploy.sh).
+# AIsztens — single-droplet runtime stack (image-based).
+#
+# Every application component is a container. The droplet never builds
+# anything; it only `docker compose pull` + `up -d`s the pre-built images
+# published by `.github/workflows/images.yml` to GHCR.
+#
+#   GHCR_OWNER is the GitHub org/user that owns the package names.
+#   IMAGE_TAG pins the exact revision to run; the deploy workflow writes
+#   `sha-<short>` to the droplet so rollbacks are a one-line change.
 #
 # Services:
-#   api      - NestJS + Fastify API (built from the repo root by infra/app/Dockerfile)
+#   api      - NestJS + Fastify API image
+#   web      - public SPA image (nginx serving the Vite build)
+#   admin    - admin dashboard SPA image (nginx serving the Vite build)
 #   postgres - PostgreSQL with idempotent role/database init
 #   caddy    - reverse proxy + automatic TLS (Let's Encrypt)
 #   monitor  - watchdog that alerts when the API is down
 #
-# Usage (on the droplet):
-#   cp infra/.env.example infra/.env   # then fill in real values
-#   docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+# Local development does NOT use this file alone. scripts/dev-stack.sh
+# merges infra/docker-compose.local.yml, which re-adds `build:` blocks for
+# api/web/admin/monitor so developers can build from source without a
+# registry. The local override also disables caddy and publishes api +
+# postgres ports on the host (see infra/docker-compose.local.yml).
 
 name: aisztens
 
 services:
   api:
-    build:
-      context: ..            # repo root: pnpm workspace needs apps/* and packages/*
-      dockerfile: infra/app/Dockerfile
-    image: aisztens/api:latest
+    # GHCR_OWNER / IMAGE_TAG are kept here as the deploy-time contract:
+    # the droplet's `deploy/deploy.sh up` writes both into `infra/.env`
+    # before every `up`, and the image-based deploy workflow
+    # (`.github/workflows/images.yml`) always pins a concrete tag, so
+    # they are effectively required in dev/prod. The base compose uses
+    # the looser `${VAR:-default}` form (NOT the `${VAR:?…}` abort form)
+    # because the local override (`infra/docker-compose.local.yml`)
+    # replaces this `image:` with a locally-built one; if a developer
+    # runs the base compose on its own without setting GHCR_OWNER, the
+    # `:?` abort would fire BEFORE the override's `image:` directive is
+    # consulted, which would prevent `scripts/dev-stack.sh up` from ever
+    # working out of the box. The deploy path's safety net is the
+    # `images.yml` + `deploy.yml` chain, not a compose-level guard.
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-local}/aisztens-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    # Hard cap so a runaway heap cannot starve the host (the V8 heap is also
-    # bounded by NODE_OPTIONS=--max-old-space-size=384 in the Dockerfile, so
-    # the limit is honoured at the application level instead of the kernel
-    # OOM-killer firing inside a restart loop).
+    # Hard cap so a runaway heap cannot starve the host. NODE_OPTIONS is
+    # also set inside the image (-max-old-space-size=384) so the limit is
+    # honoured at the application level instead of the kernel OOM-killer
+    # firing inside a restart loop.
     mem_limit: 400m
     environment:
       NODE_ENV: production
-      # APP_ENV selects which per-env file NestJS loads at boot (see
-      # `apps/api/src/app.module.ts:30`). The default is `dev` for the
-      # currently running droplet; the future prod stack will pass `dev`
-      # here too — only the per-env secrets differ. To turn on prod,
-      # flip APP_ENV to `prod` AND set the prod-specific secrets in
-      # `infra/.env.prod`.
+      # APP_ENV selects which per-env file the API image baked in (see
+      # `apps/api/src/app.module.ts:30`). The deploy workflow always
+      # writes APP_ENV to infra/.env on the droplet, so this value is
+      # in practice always set; the default below is just a safety net
+      # for an operator who runs the stack by hand with an old .env.
       APP_ENV: ${APP_ENV:-dev}
       PORT: ${API_PORT:-3000}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       VAPI_WEBHOOK_SECRET: ${VAPI_WEBHOOK_SECRET:-}
-      # Database connection will be consumed here once persistence is wired in.
       DATABASE_URL: postgres://${AISZTENS_DB_USER:-aisztens}:${AISZTENS_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-callback}
     expose:
       - "${API_PORT:-3000}"
@@ -46,15 +64,6 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      # Hit the dedicated liveness endpoint (see apps/api/src/health/health.controller.ts).
-      # `/healthz` is intentionally excluded from the NestJS `api` global prefix
-      # (see main.ts) so the path stays stable even if the business routing
-      # changes. The shell snippet uses an explicit `process.exit(r.ok ? 0 : 1)`
-      # on BOTH branches so a future change in Node's default exit code can
-      # never silently turn a healthy response into a `Restarting` container.
-      # The start_period is generous (60s) because cold start on the first run
-      # after a deploy combines pnpm workspace symlink resolution, NestJS
-      # module init and Fastify listener binding.
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${API_PORT:-3000}/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
@@ -63,24 +72,49 @@ services:
     networks:
       - internal
 
+  web:
+    # Static SPA container: nginx serving the Vite build of @callback/web.
+    # Caddy terminates TLS and reverse-proxies https://web.<DOMAIN>/* to
+    # this container on the internal network. The API base URL is baked
+    # into the image at build time as VITE_API_BASE_URL; there is no
+    # per-request env from compose.
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-local}/aisztens-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    # SPA serving is essentially stateless; 32 MB is generous and keeps
+    # total stack RSS well under the droplet's available memory.
+    mem_limit: 32m
+    expose:
+      - "80"
+    networks:
+      - internal
+
+  admin:
+    # Same shape as `web`, serving the @callback/admin SPA.
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-local}/aisztens-admin:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    mem_limit: 32m
+    expose:
+      - "80"
+    networks:
+      - internal
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    # Cap Postgres so its default 25%-of-host shared_buffers cannot blow the
-    # 2 GB droplet. The three POSTGRES_* envs below are consumed by the
+    # Cap Postgres so its default 25%-of-host shared_buffers cannot blow
+    # a 2 GB droplet. The POSTGRES_* envs below are consumed by the
     # official image's docker-entrypoint.sh and translated into
-    # postgresql.conf settings (shared_buffers, effective_cache_size, work_mem).
+    # postgresql.conf settings (shared_buffers, effective_cache_size,
+    # work_mem).
     mem_limit: 400m
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-callback}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # Passed into the init script below via psql variables.
       TKOVARI_DB_PASSWORD: ${TKOVARI_DB_PASSWORD}
       KRAK_DB_PASSWORD: ${KRAK_DB_PASSWORD}
       AISZTENS_DB_USER: ${AISZTENS_DB_USER:-aisztens}
       AISZTENS_DB_PASSWORD: ${AISZTENS_DB_PASSWORD}
-      # Tuned for a 2 GB host + 400 MB container limit.
       POSTGRES_SHARED_BUFFERS: 128MB
       POSTGRES_EFFECTIVE_CACHE_SIZE: 512MB
       POSTGRES_WORK_MEM: 4MB
@@ -100,19 +134,19 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    # Caddy is small but TLS handshakes + large static SPA responses can
-    # spike RSS. 64 MB is plenty and matches our actual usage (~30 MB).
+    # TLS handshakes + large static SPA responses can spike RSS. 64 MB is
+    # plenty and matches our actual usage (~30 MB).
     mem_limit: 64m
     # IMPORTANT: This is the ONLY Caddy on the host. Binding 80/443 here
-    # means no other container (current or historical) may also bind these
-    # ports. `deploy/deploy.sh:up` actively prunes orphan containers from
-    # previous deployments to guarantee that.
+    # means no other container (current or historical) may also bind
+    # these ports. The deploy workflow's prune_legacy_stack step
+    # guarantees that on every push.
     #
-    # DigitalOcean Ubuntu droplets run `systemd-resolved` on 127.0.0.53:53
-    # as a stub resolver. The Docker bridge network cannot reach that
-    # address, so ACME DNS lookups fail with
+    # DigitalOcean Ubuntu droplets run `systemd-resolved` on
+    # 127.0.0.53:53 as a stub resolver. The Docker bridge network cannot
+    # reach that address, so ACME DNS lookups fail with
     # `lookup ... 127.0.0.53:53: read: connection refused` and Caddy
-    # never starts its HTTP listener. We pin an explicit public DNS so
+    # never starts its HTTP listener. Pin an explicit public DNS so
     # ACME registration and renewal work from inside the container.
     dns:
       - 1.1.1.1
@@ -126,31 +160,27 @@ services:
     volumes:
       # The Caddy container mounts the *rendered* Caddyfile (where the
       # `<DOMAIN>` / `<ACME_EMAIL>` placeholders in the template have
-      # already been replaced with the real values), NOT the template in
-      # `infra/caddy/Caddyfile`. `deploy/deploy.sh:render_caddyfile()` writes
-      # the rendered file on the droplet under infra/caddy/Caddyfile.rendered
-      # on every deploy.
+      # been replaced with the real values), NOT the template in
+      # infra/caddy/Caddyfile. The deploy workflow renders and ships the
+      # file on every push.
       - ./caddy/Caddyfile.rendered:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-      # Static SPA bundles, produced by `pnpm --filter @callback/web build`
-      # and `pnpm --filter @callback/admin build` in deploy/deploy.sh and
-      # rsynced to the droplet under apps/{web,admin}/dist/.
-      - ${WEB_DIST_PATH:-../apps/web/dist}:/srv/web:ro
-      - ${ADMIN_DIST_PATH:-../apps/admin/dist}:/srv/admin:ro
     depends_on:
       api:
+        condition: service_started
+      web:
+        condition: service_started
+      admin:
         condition: service_started
     networks:
       - internal
 
   monitor:
-    build:
-      context: ./monitor
-      dockerfile: Dockerfile
-    image: aisztens/monitor:latest
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-local}/aisztens-monitor:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    # Watchdog does almost nothing (curl + sleep). 32 MB is generous headroom.
+    # Watchdog does almost nothing (curl + sleep). 32 MB is generous
+    # headroom.
     mem_limit: 32m
     environment:
       # Default targets the dedicated `/healthz` endpoint exposed by

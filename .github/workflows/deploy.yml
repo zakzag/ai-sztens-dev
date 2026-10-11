@@ -233,7 +233,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          command: |
+          script: |
             set -euo pipefail
             env_file="$REMOTE_DIR/infra/.env"
             if [ ! -f "$env_file" ]; then
@@ -265,7 +265,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          command: |
+          script: |
             set -euo pipefail
             if [ -z "${GHCR_PAT:-}" ]; then
               echo "GHCR_PAT is not set; skipping ghcr.io login (anonymous pull is fine for public images)."
@@ -291,7 +291,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          command: |
+          script: |
             set -euo pipefail
             cd "$REMOTE_DIR"
             docker compose \
@@ -327,7 +327,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          command: |
+          script: |
             set -euo pipefail
             cd "$REMOTE_DIR"
             echo "Looking for services not running an image at :$IMAGE_TAG (api/web/admin/monitor only)..."
@@ -364,7 +364,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          command: |
+          script: |
             set -euo pipefail
             cd "$REMOTE_DIR"
             api_id="$(docker compose --env-file "infra/.env" -f infra/docker-compose.yml ps -q api)"
@@ -398,7 +398,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          command: |
+          script: |
             set -euo pipefail
             cd "$REMOTE_DIR"
             bash scripts/test/stack-smoke.sh
@@ -417,7 +417,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          command: |
+          script: |
             set +e  # best-effort: always show whatever logs exist
             cd "$REMOTE_DIR"
             echo "===== docker compose ps ====="

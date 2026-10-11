@@ -133,8 +133,15 @@ jobs:
 
       # ------------------------------------------------------------------
       # 3. Render infra/.env from the matching secret.
-      #    `chmod 600` matches the convention from deploy/README.md
-      #    where the .env files are world-unreadable.
+      #    The file is written with `chmod 0644` here, NOT `0600`, because
+      #    the next step (`appleboy/scp-action`) pre-packs the source
+      #    files with `tar` inside a container that runs under a different
+      #    uid, and a `0600` mode hides the file from that tar process
+      #    ("Permission denied" at run time). The droplet-side tightening
+      #    to `chmod 600` is performed by the ssh-action step that
+      #    immediately follows the scp-action step, so the file is
+      #    world-unreadable again before any other process on the host
+      #    can read it.
       # ------------------------------------------------------------------
       - name: Render infra/.env from the matching secret
         env:
@@ -148,7 +155,7 @@ jobs:
           set -euo pipefail
           mkdir -p infra
           printf '%s\n' "$INFRA_ENV" > "infra/.env"
-          chmod 600 "infra/.env"
+          chmod 0644 "infra/.env"
           # IMAGE_TAG and GHCR_OWNER are runtime-only values the droplet
           # needs to construct the image references; the secret holds
           # everything else (DOMAIN, DB passwords, …).
@@ -208,6 +215,34 @@ jobs:
           target: ${{ env.REMOTE_DIR }}
           overwrite: true
           strip_components: 0
+
+      # ------------------------------------------------------------------
+      # 5a. Re-tighten infra/.env to `chmod 600` on the droplet.
+      #     scp preserves the source file mode, so the file lands on the
+      #     droplet as 0644 (see step 3 comment for why we relaxed it).
+      #     Before any further step reads the file, restore the
+      #     "owner-only readable" posture documented in deploy/README.md.
+      #     This step is deliberately a no-op for the Caddyfile and
+      #     docker-compose.yml — only the .env carries secrets.
+      # ------------------------------------------------------------------
+      - name: Tighten infra/.env permissions on the droplet
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          REMOTE_DIR: ${{ env.REMOTE_DIR }}
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          command: |
+            set -euo pipefail
+            env_file="$REMOTE_DIR/infra/.env"
+            if [ ! -f "$env_file" ]; then
+              echo "ERROR: $env_file not found after scp — the scp step may have failed silently." >&2
+              exit 1
+            fi
+            chmod 600 "$env_file"
+            mode="$(stat -c '%a' "$env_file")"
+            echo "infra/.env on droplet is now mode $mode (was 644 after scp; 600 is the deploy/README.md convention)."
 
       # ------------------------------------------------------------------
       # 6. Log in to GHCR on the droplet (only when the repo is private;

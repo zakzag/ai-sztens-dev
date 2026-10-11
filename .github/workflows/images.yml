@@ -100,6 +100,15 @@ jobs:
             echo "ERROR: INFRA_ENV_${app_env^^} secret is empty." >&2
             exit 1
           fi
+          # Extract DOMAIN from the multi-line INFRA_ENV_* secret, stripping any
+          # surrounding quotes an operator may have added. DO NOT "simplify" the
+          # `tr` argument: inside `$(...)` a literal `'` is impossible to pass
+          # without one of { ANSI-C `$'\047'`, an intermediate shell var, or
+          # switching to `awk`. We use the ANSI-C form ($'\"\047' == " and ').
+          # A previous version used `tr -d \"'\"` here, which opened an
+          # unterminated single-quoted string at runtime and aborted parsing
+          # with `unexpected EOF while looking for matching ''` on the runner.
+          domain="$(printf '%s\n' "$INFRA_ENV" | grep -E '^DOMAIN=' | head -n1 | cut -d= -f2- | tr -d $'\"\047' || true)"
           if [ -z "$domain" ]; then
             echo "ERROR: DOMAIN is not set in INFRA_ENV_${app_env^^}." >&2
             exit 1

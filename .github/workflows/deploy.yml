@@ -170,8 +170,16 @@ jobs:
       - name: Render Caddyfile
         run: |
           set -euo pipefail
-          domain="$(grep -E '^DOMAIN=' infra/.env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d \"'\")"
-          acme_email="$(grep -E '^ACME_EMAIL=' infra/.env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d \"'\")"
+          # Strip surrounding quotes (if any) from the DOMAIN / ACME_EMAIL values
+          # written to infra/.env by the previous step. The two characters to
+          # strip are `"` and `'`. Inside `$(...)` a literal `'` is impossible
+          # to pass without one of { ANSI-C `$'\047'`, an intermediate shell
+          # var, or switching to `awk`. We use the ANSI-C form so the source
+          # line parses cleanly; do not "simplify" `\047` back to a literal `'`,
+          # that regresses to `unexpected EOF while looking for matching ''`.
+          _quote_chars=$'\"\047'
+          domain="$(grep -E '^DOMAIN=' infra/.env | head -n1 | cut -d= -f2- | tr -d "$_quote_chars")"
+          acme_email="$(grep -E '^ACME_EMAIL=' infra/.env | head -n1 | cut -d= -f2- | tr -d "$_quote_chars")"
           if [ -z "$domain" ] || [ -z "$acme_email" ]; then
             echo "ERROR: DOMAIN and ACME_EMAIL must be set in INFRA_ENV_*." >&2
             exit 1

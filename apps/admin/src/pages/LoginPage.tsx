@@ -38,7 +38,7 @@ export function LoginPage() {
           type="submit"
           className="w-full rounded-md bg-indigo-600 px-4 py-2.5 font-medium text-white hover:bg-indigo-500"
         >
-          Belépés
+          Login (Belépés)
         </button>
       </form>
     </div>

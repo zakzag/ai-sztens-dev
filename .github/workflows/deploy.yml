@@ -102,7 +102,12 @@ jobs:
       - name: Resolve APP_ENV and IMAGE_TAG
         id: resolve
         env:
-          INFRA_ENV: ${{ secrets[format('INFRA_ENV_{0}', upper((inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev'))))] }}
+          # GitHub Actions expressions have no `upper()` (or any case-conversion)
+          # function, so we cannot build the secret name with format+upper.
+          # `app_env` is constrained to `dev|prod` by upstream inputs; we
+          # resolve it the same way the `run:` step does and then pick the
+          # matching secret by equality.
+          INFRA_ENV: ${{ (inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev')) == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
           app_env="${{ inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev') }}"
@@ -133,7 +138,12 @@ jobs:
       # ------------------------------------------------------------------
       - name: Render infra/.env from the matching secret
         env:
-          INFRA_ENV: ${{ secrets[format('INFRA_ENV_{0}', upper((inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev'))))] }}
+          # GitHub Actions expressions have no `upper()` (or any case-conversion)
+          # function, so we cannot build the secret name with format+upper.
+          # `app_env` is constrained to `dev|prod` by upstream inputs; we
+          # resolve it the same way the `run:` step does and then pick the
+          # matching secret by equality.
+          INFRA_ENV: ${{ (inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev')) == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
           mkdir -p infra
@@ -160,8 +170,16 @@ jobs:
       - name: Render Caddyfile
         run: |
           set -euo pipefail
-          domain="$(grep -E '^DOMAIN=' infra/.env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d \"'\")"
-          acme_email="$(grep -E '^ACME_EMAIL=' infra/.env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d \"'\")"
+          # Strip surrounding quotes (if any) from the DOMAIN / ACME_EMAIL values
+          # written to infra/.env by the previous step. The two characters to
+          # strip are `"` and `'`. Inside `$(...)` a literal `'` is impossible
+          # to pass without one of { ANSI-C `$'\047'`, an intermediate shell
+          # var, or switching to `awk`. We use the ANSI-C form so the source
+          # line parses cleanly; do not "simplify" `\047` back to a literal `'`,
+          # that regresses to `unexpected EOF while looking for matching ''`.
+          _quote_chars=$'\"\047'
+          domain="$(grep -E '^DOMAIN=' infra/.env | head -n1 | cut -d= -f2- | tr -d "$_quote_chars")"
+          acme_email="$(grep -E '^ACME_EMAIL=' infra/.env | head -n1 | cut -d= -f2- | tr -d "$_quote_chars")"
           if [ -z "$domain" ] || [ -z "$acme_email" ]; then
             echo "ERROR: DOMAIN and ACME_EMAIL must be set in INFRA_ENV_*." >&2
             exit 1
@@ -218,6 +236,10 @@ jobs:
       # ------------------------------------------------------------------
       # 7. Pull the images and (re)start the stack. No `--build`: the
       #    droplet has no source tree and must not attempt to build.
+      #    `--force-recreate` ensures that an updated compose file or
+      #    a sha-pinned image always materialises; without it, containers
+      #    pinned to an old sha can survive a successful pull and leave
+      #    the host "live but stale".
       # ------------------------------------------------------------------
       - name: Pull and start the stack
         uses: appleboy/ssh-action@v1.0.3
@@ -238,7 +260,50 @@ jobs:
             APP_ENV="$APP_ENV" docker compose \
               --env-file "infra/.env" \
               -f infra/docker-compose.yml \
-              up -d --remove-orphans
+              up -d --remove-orphans --force-recreate
+
+      # ------------------------------------------------------------------
+      # 7a. Verify every service is actually running the IMAGE_TAG this
+      #     workflow resolved (sha-<short>), not a stale sha from an
+      #     earlier deploy (or hand-run leftovers like
+      #     `aisztens/api:latest` from a local-override deploy). After
+      #     `up -d --remove-orphans --force-recreate`, every application
+      #     service (api, web, admin, monitor) should report an image
+      #     reference that contains `:$IMAGE_TAG`. Postgres and caddy
+      #     are exempt — postgres is the official image and caddy uses
+      #     a floating `caddy:2-alpine` tag (no IMAGE_TAG pinning).
+      #     Failing here makes the workflow red and prevents the
+      #     "stack appears OK but is actually pinned to an old image"
+      #     class of silent regressions.
+      # ------------------------------------------------------------------
+      - name: Verify every service is running IMAGE_TAG
+        id: verify-tag
+        env:
+          REMOTE_DIR: ${{ env.REMOTE_DIR }}
+          IMAGE_TAG: ${{ steps.resolve.outputs.image_tag }}
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          command: |
+            set -euo pipefail
+            cd "$REMOTE_DIR"
+            echo "Looking for services not running an image at :$IMAGE_TAG (api/web/admin/monitor only)..."
+            bad="$(docker compose --env-file "infra/.env" -f infra/docker-compose.yml ps --format '{{.Service}} {{.Image}}' \
+                    | awk -v want=":$IMAGE_TAG" '$1 == "api" || $1 == "web" || $1 == "admin" || $1 == "monitor" { if (index($2, want) == 0) print $0 }')"
+            if [ -n "$bad" ]; then
+              echo ""
+              echo "ERROR: the following services are NOT running $IMAGE_TAG:"
+              echo "$bad" | sed 's/^/    /'
+              echo ""
+              echo "Re-pull + recreate is needed. This indicates the host has a stale"
+              echo "sha from an earlier run (or a hand-overridden image). To recover:"
+              echo "    docker compose --env-file infra/.env -f infra/docker-compose.yml \\"
+              echo "      pull && up -d --force-recreate"
+              exit 1
+            fi
+            docker compose --env-file "infra/.env" -f infra/docker-compose.yml ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}'
+            echo "All 4 application services are running $IMAGE_TAG."
 
       # ------------------------------------------------------------------
       # 8. Wait for the `api` container healthcheck to become `healthy`.

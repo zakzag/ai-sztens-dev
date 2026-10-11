@@ -42,7 +42,7 @@ function isHealthBody(value: unknown): value is HealthBody {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
-    v['status'] === 'ok' &&
+    v['status'] === 'oks' &&
     typeof v['uptime'] === 'number' &&
     typeof v['timestamp'] === 'string'
   );
@@ -83,7 +83,7 @@ describe('HealthController (e2e)', () => {
       const body: unknown = response.json();
       // Type-guard narrows `unknown` -> `HealthBody`; `expect()` would not.
       if (!isHealthBody(body)) throw new Error('health body shape mismatch');
-      expect(body.status).toBe('ok');
+      expect(body.status).toBe('oks');
       expect(typeof body.uptime).toBe('number');
       expect(body.uptime).toBeGreaterThanOrEqual(0);
       expect(typeof body.timestamp).toBe('string');

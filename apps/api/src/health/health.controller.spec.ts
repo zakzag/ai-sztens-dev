@@ -17,9 +17,9 @@ describe('HealthController', () => {
   });
 
   describe('check', () => {
-    it('returns status "ok"', () => {
+    it('returns status "oks"', () => {
       const result = controller.check();
-      expect(result.status).toBe('ok');
+      expect(result.status).toBe('oks');
     });
 
     it('returns a non-negative integer uptime', () => {

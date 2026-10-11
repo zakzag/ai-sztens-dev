@@ -5,7 +5,7 @@ export function HomePage() {
     <section className="space-y-6">
       <div className="rounded-xl bg-slate-900 p-8 shadow-sm ring-1 ring-slate-800">
         <h1 className="text-3xl font-bold text-white">
-          Nem értünk el? Hívjuk mi vissza Önt!
+          Nem értünk el? Hívjuk mi vissza Önt! Még ma!
         </h1>
         <p className="mt-3 text-slate-400">
           Adja meg elérhetőségeit, és szakértő kollégánk a lehető leghamarabb visszahívja.

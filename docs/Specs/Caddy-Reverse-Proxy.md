@@ -1,7 +1,7 @@
 # Caddy — Reverse Proxy és TLS termináció
 
 **Státusz:** Élő (a `docs/Specs/outdated/`-ba kerül, ha a relevanciája megszűnik)
-**Utolsó frissítés:** 2026-10-08 (image-based deploy: a `web` és `admin` site-ok `reverse_proxy`‑ra váltottak, a Caddy a `web:80` és `admin:80` konténereket proxy‑zza — lásd [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md). A dropleten a runtime env fájl mindig `infra/.env`: egy droplet egy környezet, a per-env név csak lokális forrás — a §4.4 rotációs példa már `deployer`-ként lép be, ahogy a `deploy.sh` és a CI is. **háromkörnyezetes szétválasztás:** a Caddy a `dev`/`prod` dropleteken fut, `local`-ban a [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override `profiles: [never]`-re teszi, így a fejlesztői stackben nincs Caddy — a Caddy csak a nyilvános TLS terminációért felelős; a per-env renderelést és a `APP_ENV`-alapú compose szekciót lásd lentebb a §3.3 / §4.2 szakaszokban. **§4.4 frissítve:** a VAPI guard konfigurációja `VAPI_WEBHOOK_CONFIG` tokennel érkezik, a `rawBody` pedig Nest *alkalmazás* opció — lásd [`docs/milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md`](../milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md)).
+**Utolsó frissítés:** 2026-10-11 (apex WordPress-szándék explicit rögzítése §A-ban; hardening: `deploy.yml` `Verify every service is running IMAGE_TAG` lépés + `compose up -d --force-recreate`; `deploy.sh up` compose-védelem — lásd [`docs/history/2026-10-11--15-50-00-image-based-deploy-host-up-and-hardening.md`](../history/2026-10-11--15-50-00-image-based-deploy-host-up-and-hardening.md)) (image-based deploy: a `web` és `admin` site-ok `reverse_proxy`‑ra váltottak, a Caddy a `web:80` és `admin:80` konténereket proxy‑zza — lásd [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md). A dropleten a runtime env fájl mindig `infra/.env`: egy droplet egy környezet, a per-env név csak lokális forrás — a §4.4 rotációs példa már `deployer`-ként lép be, ahogy a `deploy.sh` és a CI is. **háromkörnyezetes szétválasztás:** a Caddy a `dev`/`prod` dropleteken fut, `local`-ban a [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override `profiles: [never]`-re teszi, így a fejlesztői stackben nincs Caddy — a Caddy csak a nyilvános TLS terminációért felelős; a per-env renderelést és a `APP_ENV`-alapú compose szekciót lásd lentebb a §3.3 / §4.2 szakaszokban. **§4.4 frissítve:** a VAPI guard konfigurációja `VAPI_WEBHOOK_CONFIG` tokennel érkezik, a `rawBody` pedig Nest *alkalmazás* opció — lásd [`docs/milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md`](../milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md)).
 **Kapcsolódik:** [`docs/01-callback-assistant.md`](../01-callback-assistant.md), [`docs/02-flowchart.md`](../02-flowchart.md), [`docs/03-implementation-general.md`](../03-implementation-general.md), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md)
 
 ---
@@ -392,6 +392,23 @@ Ebben az esetben a belső konténer-háló működik (a docker-proxy figyel a80/
 #### Jelenlegi állapot
 
 A Caddy config és a konténer hálózat **100%-ban működik**, de a Let's Encrypt tanúsítványok beszerzése a Cloud Firewall-ön múlik. A droplet belsőleg minden tesztet teljesít (`docker stats`, `docker ps`, portok), a Caddy a `0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp` portokon figyel — csak a publikus ACME challenge-ek timeout-olnak.
+
+---
+
+## A. Apex (`aisztens.hu`) — szándékosan egy külön WordPress szerver
+
+A Caddy a dropleten **kizárólag a subdomaint szolgálja ki**: `api.aisztens.hu`, `web.aisztens.hu`, `admin.aisztens.hu`. Az apex `aisztens.hu` egy **másik, különálló szerveren** fut (WordPress), nem a mi Caddy-nkön. Ez nem bug, hanem szándékos felállás:
+
+| Host | Ki szolgálja ki | DNS (NAT64 nézet) |
+|---|---|---|
+| `api.aisztens.hu`   | Caddy → `api:3000`   | `64:ff9b::a45c:f8c2` (= `164.92.248.194`, a droplet) |
+| `web.aisztens.hu`   | Caddy → `web:80`     | `64:ff9b::a45c:f8c2` (= `164.92.248.194`, a droplet) |
+| `admin.aisztens.hu` | Caddy → `admin:80`   | `64:ff9b::a45c:f8c2` (= `164.92.248.194`, a droplet) |
+| `aisztens.hu`       | WordPress (másik szerver) | `64:ff9b::b950:3002` (= `185.80.48.2`) |
+
+A `Caddyfile.rendered`-ben lévő `aisztens.hu { redir https://web.aisztens.hu{uri} 307 }` blokk **kikerül a Caddy-ból** — sosem fut le, mert a `aisztens.hu` host soha nem jut el a dropletig. Ezt a `ssh.aisztens.hu` kivételével minden A rekordra igaz: a Caddy csak azt a három subdomainet szolgálja ki, amelyet a DNS a droplet IP-jére mutat.
+
+Ha a jövőben az apexet is a dropletre akarjuk átvinni, a regisztrátornál kell az `aisztens.hu` A rekordot `164.92.248.194`-re frissíteni, **de erre jelenleg nincs terv** — az apex WordPress marad a helyén.
 
 ---
 

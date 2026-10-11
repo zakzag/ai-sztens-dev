@@ -12,9 +12,9 @@ import { Controller, Get } from '@nestjs/common';
 @Controller('healthz')
 export class HealthController {
   @Get()
-  check(): { status: 'ok'; uptime: number; timestamp: string } {
+  check(): { status: 'oks'; uptime: number; timestamp: string } {
     return {
-      status: 'ok',
+      status: 'oks',
       uptime: Math.round(process.uptime()),
       timestamp: new Date().toISOString(),
     };

@@ -233,6 +233,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REMOTE_DIR
           script: |
             set -euo pipefail
             env_file="$REMOTE_DIR/infra/.env"
@@ -265,6 +266,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REMOTE_DIR,GHCR_PAT,GITHUB_ACTOR
           script: |
             set -euo pipefail
             if [ -z "${GHCR_PAT:-}" ]; then
@@ -291,6 +293,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REMOTE_DIR,APP_ENV
           script: |
             set -euo pipefail
             cd "$REMOTE_DIR"
@@ -327,6 +330,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REMOTE_DIR,IMAGE_TAG
           script: |
             set -euo pipefail
             cd "$REMOTE_DIR"
@@ -364,6 +368,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REMOTE_DIR,APP_ENV
           script: |
             set -euo pipefail
             cd "$REMOTE_DIR"
@@ -398,6 +403,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REMOTE_DIR
           script: |
             set -euo pipefail
             cd "$REMOTE_DIR"
@@ -417,6 +423,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REMOTE_DIR,APP_ENV
           script: |
             set +e  # best-effort: always show whatever logs exist
             cd "$REMOTE_DIR"

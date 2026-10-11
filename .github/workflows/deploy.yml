@@ -217,21 +217,27 @@ jobs:
       #    is configured.
       # ------------------------------------------------------------------
       - name: docker login ghcr.io (when GHCR_PAT is set)
-        if: ${{ secrets.GHCR_PAT != '' }}
+        # NOTE: `secrets.*` is not allowed in `if:` expressions in GitHub
+        # Actions, so the conditional is performed inside the step body.
+        # If GHCR_PAT is unset, the inner guard skips the login; this is
+        # the public-repo case where anonymous `docker pull` already works.
         uses: appleboy/ssh-action@v1.0.3
         env:
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          GITHUB_ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
           command: |
             set -euo pipefail
+            if [ -z "${GHCR_PAT:-}" ]; then
+              echo "GHCR_PAT is not set; skipping ghcr.io login (anonymous pull is fine for public images)."
+              exit 0
+            fi
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             echo "GHCR login OK as $GITHUB_ACTOR."
-        env:
-          GHCR_PAT: ${{ secrets.GHCR_PAT }}
-          GITHUB_ACTOR: ${{ github.actor }}
 
       # ------------------------------------------------------------------
       # 7. Pull the images and (re)start the stack. No `--build`: the
@@ -278,6 +284,7 @@ jobs:
       # ------------------------------------------------------------------
       - name: Verify every service is running IMAGE_TAG
         id: verify-tag
+        uses: appleboy/ssh-action@v1.0.3
         env:
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
           IMAGE_TAG: ${{ steps.resolve.outputs.image_tag }}

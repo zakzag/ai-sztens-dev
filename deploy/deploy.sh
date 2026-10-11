@@ -591,6 +591,21 @@ case "$DEPLOY_CMD" in
     ;;
   up)
     log_stage "up_start"
+    # Local-host sanity check: refuse to deploy from an old compose that
+    # still has `build:` blocks under api/ or monitor/ (those belong to
+    # the legacy source-build compose that was removed when we moved to
+    # image-based deploys). The droplet's
+    # `infra/docker-compose.yml.rendered` is overwritten on every `up`
+    # anyway, but this guard prevents a hand-runner from accidentally
+    # shipping the legacy file to a freshly bootstrapped droplet.
+    if grep -qE '^[[:space:]]+build:[[:space:]]*$' "$REPO_DIR/infra/docker-compose.yml"; then
+      log_error "infra/docker-compose.yml still has a 'build:' block — that's the legacy local-source compose."
+      log_error "Pull the latest main; an image-based deploy is the only supported path."
+      exit 1
+    fi
+    if ! grep -qE '^[[:space:]]+image:[[:space:]]+\\\$\\{?REGISTRY' "$REPO_DIR/infra/docker-compose.yml"; then
+      log_warn "infra/docker-compose.yml does not look like the image-based compose; double-check before continuing."
+    fi
     upload
     log_stage "compose_pull_up"
     log "Pulling and starting the stack (APP_ENV=${APP_ENV}, IMAGE_TAG=${IMAGE_TAG}) ..."

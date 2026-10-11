@@ -236,6 +236,10 @@ jobs:
       # ------------------------------------------------------------------
       # 7. Pull the images and (re)start the stack. No `--build`: the
       #    droplet has no source tree and must not attempt to build.
+      #    `--force-recreate` ensures that an updated compose file or
+      #    a sha-pinned image always materialises; without it, containers
+      #    pinned to an old sha can survive a successful pull and leave
+      #    the host "live but stale".
       # ------------------------------------------------------------------
       - name: Pull and start the stack
         uses: appleboy/ssh-action@v1.0.3
@@ -256,7 +260,50 @@ jobs:
             APP_ENV="$APP_ENV" docker compose \
               --env-file "infra/.env" \
               -f infra/docker-compose.yml \
-              up -d --remove-orphans
+              up -d --remove-orphans --force-recreate
+
+      # ------------------------------------------------------------------
+      # 7a. Verify every service is actually running the IMAGE_TAG this
+      #     workflow resolved (sha-<short>), not a stale sha from an
+      #     earlier deploy (or hand-run leftovers like
+      #     `aisztens/api:latest` from a local-override deploy). After
+      #     `up -d --remove-orphans --force-recreate`, every application
+      #     service (api, web, admin, monitor) should report an image
+      #     reference that contains `:$IMAGE_TAG`. Postgres and caddy
+      #     are exempt — postgres is the official image and caddy uses
+      #     a floating `caddy:2-alpine` tag (no IMAGE_TAG pinning).
+      #     Failing here makes the workflow red and prevents the
+      #     "stack appears OK but is actually pinned to an old image"
+      #     class of silent regressions.
+      # ------------------------------------------------------------------
+      - name: Verify every service is running IMAGE_TAG
+        id: verify-tag
+        env:
+          REMOTE_DIR: ${{ env.REMOTE_DIR }}
+          IMAGE_TAG: ${{ steps.resolve.outputs.image_tag }}
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: deployer
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          command: |
+            set -euo pipefail
+            cd "$REMOTE_DIR"
+            echo "Looking for services not running an image at :$IMAGE_TAG (api/web/admin/monitor only)..."
+            bad="$(docker compose --env-file "infra/.env" -f infra/docker-compose.yml ps --format '{{.Service}} {{.Image}}' \
+                    | awk -v want=":$IMAGE_TAG" '$1 == "api" || $1 == "web" || $1 == "admin" || $1 == "monitor" { if (index($2, want) == 0) print $0 }')"
+            if [ -n "$bad" ]; then
+              echo ""
+              echo "ERROR: the following services are NOT running $IMAGE_TAG:"
+              echo "$bad" | sed 's/^/    /'
+              echo ""
+              echo "Re-pull + recreate is needed. This indicates the host has a stale"
+              echo "sha from an earlier run (or a hand-overridden image). To recover:"
+              echo "    docker compose --env-file infra/.env -f infra/docker-compose.yml \\"
+              echo "      pull && up -d --force-recreate"
+              exit 1
+            fi
+            docker compose --env-file "infra/.env" -f infra/docker-compose.yml ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}'
+            echo "All 4 application services are running $IMAGE_TAG."
 
       # ------------------------------------------------------------------
       # 8. Wait for the `api` container healthcheck to become `healthy`.

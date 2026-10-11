@@ -20,6 +20,15 @@ scripts/
 └── test/                # container stack smoke suite  → test/README.md
 ```
 
+The image-based deploy model (2026-10-08) changed what `docker compose
+up -d --build` does against the base compose file: the base file is now
+image-only (the droplet has no source tree). The local override
+([`infra/docker-compose.local.yml`](../infra/docker-compose.local.yml))
+restores `build:` blocks for `api`/`web`/`admin`/`monitor` so
+`scripts/dev-stack.sh up --build` still works from source. The smoke
+suite's `dc` helper auto-merges the local override when present; the
+droplet-side CI call uses just the base compose file.
+
 ## Root scripts
 
 ### `dev-stack.sh` / `dev-stack.ps1` — local stack helper

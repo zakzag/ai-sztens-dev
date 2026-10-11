@@ -100,19 +100,6 @@ jobs:
             echo "ERROR: INFRA_ENV_${app_env^^} secret is empty." >&2
             exit 1
           fi
-          # Strip both single and double quotes from the DOMAIN value.
-          # The two-`tr` form `tr -d '"' | tr -d \"'\"` (or even the
-          # single-`tr` form `tr -d "\"'\"`) is unparseable inside the
-          # surrounding `$(...)`: an unescaped `'` opens a single-quoted
-          # string that is never closed, so bash aborts with
-          # "unexpected EOF while looking for matching `''`" and blames
-          # the wrong line. Storing the two-character set in a variable
-          # and letting `tr` expand it via the outer `"$(... )"` is the
-          # only way to keep `tr -d` happy without reaching for `awk`
-          # or ANSI-C `$'\047'` quoting. See
-          # docs/history/2026-10-11--14-39-17-images-yml-tr-quote-fix.md.
-          _quote_chars="\"'"
-          domain="$(printf '%s\n' "$INFRA_ENV" | grep -E '^DOMAIN=' | head -n1 | cut -d= -f2- | tr -d "$_quote_chars" || true)"
           if [ -z "$domain" ]; then
             echo "ERROR: DOMAIN is not set in INFRA_ENV_${app_env^^}." >&2
             exit 1

@@ -16,7 +16,7 @@
     "test:stack:down": "bash scripts/test/stack-down.sh"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0",
-    "prettier": "^3.4.2"
+    "concurrently": "^9.2.4",
+    "prettier": "^3.9.9"
   }
 }

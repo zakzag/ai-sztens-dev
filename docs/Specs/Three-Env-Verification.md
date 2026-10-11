@@ -1,8 +1,9 @@
 # Three-Environment Verification — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-07 — deploy identity is `deployer` for both paths and a
-droplet keeps exactly one runtime env file, `infra/.env` (see §1d, §3.2, §3.8, §7).
+**Last updated:** 2026-10-08 — image-based deploy: droplet pulls pre-built images
+from GHCR, never builds; `apps/{web,admin}/dist` host bind mounts removed (see
+[`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Previous note (2026-10-07): deploy identity is `deployer` for both paths and a droplet keeps exactly one runtime env file, `infra/.env` (see §1d, §3.2, §3.8, §7).
 **Audience:** anyone who wants to confirm the three-env separation actually
 works end-to-end. Use this after pulling the latest `main`, after a
 droplet reboot, or after any change to `deploy/`, `.github/workflows/`,

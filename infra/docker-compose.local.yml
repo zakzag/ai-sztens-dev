@@ -5,6 +5,13 @@
 # landed (Step 3, 2026-10-05); the rename reflects that the override is no
 # longer WSL-specific — it's the "local developer machine" profile.
 #
+# In the image-based deploy model, the BASE compose file references
+# pre-built images only (api/web/admin/monitor are `image:` references to
+# GHCR). The droplet has no source tree, so it cannot build anything. The
+# local override restores `build:` blocks for every application service
+# so `scripts/dev-stack.sh up` can still build from the repo on a
+# developer's machine without a registry.
+#
 # Usage (from the repo root):
 #   scripts/dev-stack.sh up
 # Or, the long form (what dev-stack.sh does under the hood):
@@ -16,9 +23,41 @@
 
 services:
   api:
+    # Build the api image from infra/app/Dockerfile at the repo root.
+    # The image is named to mirror the GHCR image so a `docker ps`
+    # inspection of either dev or production shows the same name.
+    build:
+      context: ..
+      dockerfile: infra/app/Dockerfile
+    image: aisztens-local/api:latest
     # Expose the API on the host (WSL2 localhost is forwarded to Windows).
     ports:
       - "3000:3000"
+
+  web:
+    # Build the web SPA image from infra/web/Dockerfile at the repo root.
+    # No port is published because the local stack disables Caddy (see
+    # below); the developer serves the SPA through `pnpm --filter
+    # @callback/web dev` on port 5173.
+    build:
+      context: ..
+      dockerfile: infra/web/Dockerfile
+    image: aisztens-local/web:latest
+
+  admin:
+    # Same as web; SPA dev runs through `pnpm --filter @callback/admin dev`
+    # on port 5174.
+    build:
+      context: ..
+      dockerfile: infra/admin/Dockerfile
+    image: aisztens-local/admin:latest
+
+  monitor:
+    # Build the watchdog image from infra/monitor/Dockerfile.
+    build:
+      context: ./monitor
+      dockerfile: Dockerfile
+    image: aisztens-local/monitor:latest
 
   postgres:
     # Optional: allow local psql clients (Windows / WSL) to reach Postgres.

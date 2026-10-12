@@ -33,21 +33,37 @@
 # The push trigger alone used to imply deploy; the explicit `workflow_run`
 # link below means a re-run of `images.yml` (e.g. after a manual push
 # with the right input) also produces a deploy for the matching env.
-# Concurrency is keyed per env so dev and prod never race each other.
+#
+# Why no workflow-level `concurrency:` block (an earlier revision had one
+# with `group: deploy-${{ matrix.app_env }}`, which fails the workflow-
+# file parse with `Unrecognized named-value: 'matrix'` because the
+# expression evaluator for `concurrency.group` only allows the
+# `github | inputs | vars | needs` contexts — `matrix` is per-job, not
+# per-workflow, and is not in the allowed list at this level):
+#   Per-env separation is already enforced by two other mechanisms, so
+#   the workflow-level `concurrency:` block is unnecessary:
+#     1. The job-level `if:` filter below lets exactly one of the two
+#        matrix entries run per trigger; the other is a no-op skip.
+#     2. `jobs.deploy.environment` binds each entry to its GitHub
+#        Environment (`dev` or `production`), which already provides
+#        the per-env secret-scope + manual-approval story that
+#        `concurrency.group` was meant to give.
+#   If a future change needs an explicit concurrency group, the key must
+#   use only workflow-level-allowed contexts (e.g. `github.ref` or the
+#   `inputs.app_env || github.ref_name || 'dev'` fallback chain).
 #
 # Why a 2-entry matrix for APP_ENV (the previous design used a single
 # workflow-level `env.APP_ENV` helper):
 #   GitHub Actions restricts the `env.*` context to step bodies. The
-#   expression evaluator that runs over `concurrency.group`,
-#   `jobs.<id>.name` and `jobs.<id>.environment` does NOT have `env.*`
-#   in its allowed-context list, so referencing `${{ env.APP_ENV }}`
-#   in those keys fails the workflow with
-#   `Unrecognized named-value: 'env'`. The fix is to put APP_ENV into
-#   a matrix entry, which IS in the allowed list. The matrix is
-#   static (always `app_env: [dev, prod]`); the job-level `if:`
-#   below picks the entry that matches the current trigger and
-#   skips the other one. The behaviour is otherwise identical to
-#   the previous `inputs.app_env || ... || 'dev'` chain.
+#   expression evaluator that runs over `jobs.<id>.name` and
+#   `jobs.<id>.environment` does NOT have `env.*` in its allowed-
+#   context list, so referencing `${{ env.APP_ENV }}` in those keys
+#   fails the workflow with `Unrecognized named-value: 'env'`. The
+#   fix is to put APP_ENV into a matrix entry, which IS in the
+#   allowed list. The matrix is static (always `app_env: [dev, prod]`);
+#   the job-level `if:` below picks the entry that matches the current
+#   trigger and skips the other one. The behaviour is otherwise
+#   identical to the previous `inputs.app_env || ... || 'dev'` chain.
 
 name: Deploy to droplet
 
@@ -69,12 +85,11 @@ on:
     workflows: [Build and push images]
     types: [completed]
 
-# Concurrency is keyed per env so dev and prod never race each other.
-# `matrix.app_env` is an allowed context in `concurrency.group`; `env.*`
-# would not be.
-concurrency:
-  group: deploy-${{ matrix.app_env }}
-  cancel-in-progress: false
+# NOTE: there is intentionally no workflow-level `concurrency:` block.
+# Per-env separation is enforced by the job-level `if:` filter below
+# (one of the two matrix entries runs per trigger; the other is a no-op
+# skip) and by `jobs.deploy.environment`, which binds each entry to its
+# GitHub Environment. See the file header comment for the rationale.
 
 env:
   REMOTE_DIR: /opt/aisztens

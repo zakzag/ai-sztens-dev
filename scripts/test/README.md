@@ -116,6 +116,33 @@ after touching the deploy script:
 for t in scripts/test/_deploy-sh-*.sh; do bash "$t" || echo "FAILED: $t"; done
 ```
 
+## CI-deploy (`deploy.yml`) suites
+
+The deploy workflow itself has one non-bash unit test, because the
+expression-language semantics of the `if:` chain (the matrix
+`matrix.app_env == …` selector) is easier to mirror in pure Python than
+in bash:
+
+| Script | What it locks down |
+|---|---|
+| `_deploy-yml-matrix-pick-test.py` | the deploy.yml job-level `if:` that picks the right matrix entry (`dev` or `prod`) for each trigger shape (push to dev, workflow_dispatch dev/prod, workflow_run from a dev push / prod dispatch, upstream-failure, …) — 14 scenarios in total |
+
+```bash
+# Run the CI-deploy matrix-pick test (Python 3, no third-party deps).
+python scripts/test/_deploy-yml-matrix-pick-test.py
+```
+
+This test was added in 2026-10-12 as part of the
+[deploy.yml `env.APP_ENV` → `matrix.app_env` refactor](../../docs/milestones/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.milestone.md).
+The reason it lives in `scripts/test/` (a directory otherwise populated
+by bash tests) is that the existing `for t in scripts/test/_deploy-sh-*.sh`
+loop in §"Offline `deploy.sh` suites" above is only a documentation
+convention — there is no machine-runner that picks up everything in
+this directory, so a Python test does not break the loop. A future
+hardening pass could move Python tests to `scripts/test/py/` and have
+the runner invoke `python3 scripts/test/py/_deploy-yml-matrix-pick-test.py`
+explicitly.
+
 Each suite prints `N passed, M failed` and exits non-zero on any failure. For the live,
 droplet-side access checks see [`../env-test/README.md`](../env-test/README.md).
 

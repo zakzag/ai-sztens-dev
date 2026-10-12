@@ -34,6 +34,20 @@
 # link below means a re-run of `images.yml` (e.g. after a manual push
 # with the right input) also produces a deploy for the matching env.
 # Concurrency is keyed per env so dev and prod never race each other.
+#
+# Why a 2-entry matrix for APP_ENV (the previous design used a single
+# workflow-level `env.APP_ENV` helper):
+#   GitHub Actions restricts the `env.*` context to step bodies. The
+#   expression evaluator that runs over `concurrency.group`,
+#   `jobs.<id>.name` and `jobs.<id>.environment` does NOT have `env.*`
+#   in its allowed-context list, so referencing `${{ env.APP_ENV }}`
+#   in those keys fails the workflow with
+#   `Unrecognized named-value: 'env'`. The fix is to put APP_ENV into
+#   a matrix entry, which IS in the allowed list. The matrix is
+#   static (always `app_env: [dev, prod]`); the job-level `if:`
+#   below picks the entry that matches the current trigger and
+#   skips the other one. The behaviour is otherwise identical to
+#   the previous `inputs.app_env || ... || 'dev'` chain.
 
 name: Deploy to droplet
 
@@ -55,39 +69,53 @@ on:
     workflows: [Build and push images]
     types: [completed]
 
-# Normalise the chosen env into a matrix-shaped env for the rest of the
-# job. Push always means `dev`; workflow_dispatch uses the operator's
-# pick; workflow_run mirrors the input of the upstream build job.
+# Concurrency is keyed per env so dev and prod never race each other.
+# `matrix.app_env` is an allowed context in `concurrency.group`; `env.*`
+# would not be.
 concurrency:
-  group: deploy-${{ env.APP_ENV }}
+  group: deploy-${{ matrix.app_env }}
   cancel-in-progress: false
 
 env:
   REMOTE_DIR: /opt/aisztens
-  # APP_ENV inference, in priority order:
-  #   1. workflow_dispatch input (operator's explicit choice)
-  #   2. workflow_run.inputs.app_env (upstream workflow_dispatch with input)
-  #   3. workflow_run.head_branch (push trigger on a known env branch)
-  #   4. github.ref_name (direct push to a known env branch — only 'dev' is
-  #      in push.branches, but we keep the same fallback shape for clarity)
-  #   5. 'dev' (safe default; the only env currently wired into
-  #      push.branches, so any unrecognised trigger routes to dev)
-  # Without step 3, a future `push.branches: [dev, prod]` plus a
-  # push to prod would silently deploy the prod-built image to the
-  # dev droplet (the original bug this guards against).
-  APP_ENV: ${{ inputs.app_env || (github.event.workflow_run.inputs.app_env || (github.event.workflow_run.head_branch == 'prod' && 'prod' || (github.event_name == 'push' && (github.ref_name == 'prod' && 'prod' || 'dev') || (github.event.workflow_run.head_branch == 'dev' && 'dev' || 'dev')))) }}
 
 jobs:
   deploy:
-    name: Deploy (${{ env.APP_ENV }}) + smoke-test
-    # Only run on a successful upstream build when this was triggered by
-    # `workflow_run`; otherwise always run.
+    name: Deploy (${{ matrix.app_env }}) + smoke-test
+    # Pick the matrix entry whose `app_env` matches the current trigger,
+    # and only run on a successful upstream build when this was triggered
+    # by `workflow_run` (otherwise always run).
+    #
+    # APP_ENV inference, in priority order:
+    #   1. workflow_dispatch input (operator's explicit choice)
+    #   2. workflow_run.inputs.app_env (upstream workflow_dispatch with input)
+    #   3. github.ref_name (push trigger — only 'dev' is in push.branches
+    #      today, but the same fallback shape handles a future prod push)
+    #   4. github.event.workflow_run.head_branch (workflow_run from a
+    #      push trigger on the upstream build workflow)
+    #   5. 'dev' (safe default; the only env currently wired into
+    #      push.branches, so any unrecognised trigger routes to dev)
+    # Without step 4, a future `push.branches: [dev, prod]` plus a push
+    # to prod would silently deploy the prod-built image to the dev
+    # droplet (the original bug this guard prevents).
     if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
+      matrix.app_env == (
+        inputs.app_env
+        || github.event.workflow_run.inputs.app_env
+        || (github.event_name == 'push' && github.ref_name)
+        || (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch)
+        || 'dev'
+      ) && (
+        github.event_name != 'workflow_run' ||
+        github.event.workflow_run.conclusion == 'success'
+      )
+    strategy:
+      fail-fast: false
+      matrix:
+        app_env: [dev, prod]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ env.APP_ENV == 'prod' && 'production' || 'dev' }}
+    environment: ${{ matrix.app_env == 'prod' && 'production' || 'dev' }}
 
     steps:
       # ------------------------------------------------------------------
@@ -110,21 +138,21 @@ jobs:
             packages
 
       # ------------------------------------------------------------------
-      # 2. Resolve APP_ENV and read the matching per-env secret.
-      #    APP_ENV is computed once at workflow level (see the
-      #    workflow-level `env:` block); this step just reads it back
-      #    and selects the matching secret. The script also produces
-      #    `image_tag` for downstream steps to pin to.
+      # 2. Resolve the per-env secret and IMAGE_TAG. APP_ENV is now
+      #    sourced from `matrix.app_env` (the matrix entry that survived
+      #    the `if:` filter) — no need to recompute the trigger chain.
+      #    The script also produces `image_tag` for downstream steps
+      #    to pin to.
       # ------------------------------------------------------------------
-      - name: Resolve APP_ENV and IMAGE_TAG
+      - name: Resolve INFRA_ENV and IMAGE_TAG
         id: resolve
         env:
           # GitHub Actions expressions have no `upper()` (or any case-conversion)
           # function, so we cannot build the secret name with format+upper.
-          # `app_env` is constrained to `dev|prod` by the env-level
-          # APP_ENV helper (see top of file); we resolve the matching
-          # secret by equality here.
-          INFRA_ENV: ${{ env.APP_ENV == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
+          # `app_env` is constrained to `dev|prod` by the matrix; we
+          # resolve the matching secret by equality here.
+          APP_ENV: ${{ matrix.app_env }}
+          INFRA_ENV: ${{ matrix.app_env == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
           app_env="$APP_ENV"
@@ -164,8 +192,8 @@ jobs:
         env:
           # GitHub Actions expressions have no `upper()` (or any case-conversion)
           # function, so we cannot build the secret name with format+upper.
-          # `app_env` is constrained to `dev|prod` by the env-level
-          # APP_ENV helper; the matching secret is selected by equality.
+          # `app_env` is constrained to `dev|prod` by the matrix; the
+          # matching secret is selected by equality.
           # NOTE: the appended block at the end of this step writes
           # APP_ENV / IMAGE_TAG / GHCR_OWNER / REGISTRY into the file,
           # which OVERWRITES any same-named values that the secret may
@@ -175,7 +203,8 @@ jobs:
           # secret ever contains APP_ENV / IMAGE_TAG / GHCR_OWNER /
           # REGISTRY, those values will be silently replaced; document
           # this in deploy/README.md and audit the secrets file.
-          INFRA_ENV: ${{ env.APP_ENV == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
+          APP_ENV: ${{ matrix.app_env }}
+          INFRA_ENV: ${{ matrix.app_env == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
           mkdir -p infra

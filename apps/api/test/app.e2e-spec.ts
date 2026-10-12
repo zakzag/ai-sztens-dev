@@ -40,6 +40,6 @@ describe('AppController (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.payload).toBe('Hello Beautiful World!');
+    expect(response.payload).toBe('Hello World!');
   });
 });

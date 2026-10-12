@@ -47,12 +47,12 @@ run_cross_service_checks() {
   # Hits the Fastify listener directly (not through the public reverse-proxy
   # site block, which would require a valid Host header). The default root
   # controller in apps/api/src/app.controller.ts returns the literal string
-  # "Hello Beautiful World!" — matching the unique substring is a strong
+  # "Hello World!" — matching the unique substring is a strong
   # proof of end-to-end reach. The substring must be kept in sync with
   # [apps/api/src/app.service.ts:6] if the greeting ever changes.
   assert_service_out "caddy->api" \
     "caddy can GET http://api:3000/api" \
-    "Hello Beautiful World" \
+    "Hello World" \
     dc_exec caddy wget -qO- http://api:3000/api
 
   # -----------------------------------------------------------------------

@@ -98,12 +98,12 @@ run_service_checks() {
   # installed inside the API image. Matches the existing compose healthcheck
   # command in infra/docker-compose.yml.
   # The expected substring is the literal returned by [apps/api/src/app.service.ts:6]
-  # ("Hello Beautiful World!"). Keep this in sync if the greeting ever changes —
+  # ("Hello World!"). Keep this in sync if the greeting ever changes —
   # the substring match is intentionally broader than the full string so a future
-  # tweak (e.g. "Hello Beautiful World 👋") does not break the suite.
+  # tweak (e.g. "Hello World 👋") does not break the suite.
   assert_service_out "api" \
     "GET /api returns 200 (greeting body)" \
-    "Hello Beautiful World" \
+    "Hello World" \
     dc_exec api node -e "fetch('http://127.0.0.1:3000/api').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
   # -----------------------------------------------------------------------

@@ -34,8 +34,19 @@ import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
  */
 interface HealthBody {
   status: 'ok';
+  deployDate: string | null;
+  commitHash: string | null;
   uptime: number;
   timestamp: string;
+}
+
+/**
+ * Build metadata is baked into the image at CI build time, so under a bare
+ * Jest run (no build args) both fields must be present and `null`. The guard
+ * accepts `string | null` so a CI-run image with real values also passes.
+ */
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
 }
 
 function isHealthBody(value: unknown): value is HealthBody {
@@ -43,6 +54,8 @@ function isHealthBody(value: unknown): value is HealthBody {
   const v = value as Record<string, unknown>;
   return (
     v['status'] === 'oks' &&
+    isNullableString(v['deployDate']) &&
+    isNullableString(v['commitHash']) &&
     typeof v['uptime'] === 'number' &&
     typeof v['timestamp'] === 'string'
   );
@@ -88,6 +101,10 @@ describe('HealthController (e2e)', () => {
       expect(body.uptime).toBeGreaterThanOrEqual(0);
       expect(typeof body.timestamp).toBe('string');
       expect(Number.isNaN(Date.parse(body.timestamp))).toBe(false);
+      // Build metadata is always present in the payload; it is `null` when the
+      // image was built without the CI build args (i.e. every Jest run).
+      expect(body.deployDate).toBeNull();
+      expect(body.commitHash).toBeNull();
     } finally {
       await app.close();
     }

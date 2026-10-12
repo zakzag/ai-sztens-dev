@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchCallbackRequests } from '../lib/api.js';
 import { useAuth } from '../auth/AuthContext.js';
+import { BuildInfoFooter } from '../components/BuildInfoFooter.js';
 
 function statusBadgeClass(status: string): string {
   if (status === 'queued') {
@@ -85,6 +86,9 @@ export function DashboardPage() {
           </table>
         </div>
       )}
+
+      {/* Which revision is actually being served? Baked in at image build time. */}
+      <BuildInfoFooter />
     </section>
   );
 }

@@ -179,7 +179,11 @@ investigate** — [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) is the on
 ```bash
 # 2.4.1 Healthcheck
 curl -fsS http://localhost:3000/healthz
-# Expect: 200, response body matches what HealthController returns
+# Expect: 200
+#   {"status":"oks","deployDate":null,"commitHash":null,"uptime":N,"timestamp":"..."}
+# A deployDate/commitHash lokálisan mindig null, mert a build metadata csak az
+# image build (`.github/workflows/images.yml`) során kerül a képbe — lásd
+# docs/Specs/Infrastructure-Docker.md §6.1.
 #   (NestJS health.controller.ts; typically returns "OK" or a JSON status).
 
 # 2.4.2 API root

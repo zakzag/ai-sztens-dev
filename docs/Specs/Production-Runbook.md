@@ -1,6 +1,10 @@
 # Production Runbook — éles verifikáció deploy után
 
 **Státusz:** Élő
+**Deploy metadata frissítés:** 2026-10-12 — a `/healthz` válasz `deployDate` +
+`commitHash` mezőkkel bővült, és a `web` / `admin` SPA front-oldalán megjelenik
+egy build-info sor (telepítés dátuma + commit hash). Lásd §4.2 és
+[`docs/history/2026-10-12--13-20-00-deploy-meta-version-display.md`](../history/2026-10-12--13-20-00-deploy-meta-version-display.md).
 **Utolsó frissítés:** 2026-10-12 (stack smoke test expectation fixes: a §4.2 táblázat `Hello World!` sora `Hello Beautiful World!`-re frissült, mert a NestJS root controller greetingje [`apps/api/src/app.service.ts:6`](../../apps/api/src/app.service.ts) azóta ezt adja vissza; lásd [`docs/history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md`](../history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md) + [`docs/milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md`](../milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md)). **2026-10-12** (image-based deploy: (image-based deploy: deploy.yml workflow-szintű APP_ENV helper a `dev|prod` kiválasztáshoz `inputs.app_env` / `workflow_run.inputs.app_env` / `workflow_run.head_branch` / `github.ref_name` forrásokból — kiküszöböli a `push to prod → deploy to dev` csendes regressziót; `Render infra/.env` fail-fast a secretben definiált `APP_ENV|IMAGE_TAG|GHCR_OWNER|REGISTRY` kulcsokra, hogy a workflow által append-elt értékek ne írhassanak felül csendben secret értékeket; `Render Caddyfile` '|' delimiter védelme a DOMAIN/ACME_EMAIL értékekben; `actions/checkout` `persist-credentials: false`; appleboy akciók SHA-pinre cserélve; lásd [`docs/history/2026-10-12--00-50-00-deploy-yml-deep-audit-and-hardening.md`](../history/2026-10-12--00-50-00-deploy-yml-deep-audit-and-hardening.md)) (**image-based deploy:** a droplet mostantól kizárólag `docker compose pull && up -d`-t futtat, a forráskód és a `pnpm` workspace nem kerül a dropletre — a `web` és `admin` saját konténerben fut, a Caddy ezeket proxy‑zza; lásd [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md) + §4.6 lentebb. **deploy identity:** a `deploy.sh` minden parancsa — és a CI — `deployer`-ként lép be, a `bootstrap` az egyetlen kézzel futtatott root-os lépés; a dropleten a runtime env fájl mindig `infra/.env`, mert egy droplet = egy környezet, a per-env név csak lokális forrás — lásd §3 + [`deploy/README.md`](../../deploy/README.md) §2 + [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md) §3.2/§3.8. **deploy logger-integráció:** a [`deploy/deploy.sh`](../../deploy/deploy.sh) a [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh) loggert használja, minden futás teljes naplója a `deploy/log/latest.log`-ban van, a hiányzó `HOST=` guard pedig naplózott hibát ad; Windows-on a [`deploy/deploy.ps1`](../../deploy/deploy.ps1) wrapper indítja — lásd §6.1 + [`deploy/README.md`](../../deploy/README.md). `/api/vapi/*` HMAC ellenőrzés + Caddy pre-filter automatizálva a smoke suite-ban; a guard config tokenen + Buffer raw body-n alapul — lásd 4.4 + `docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
@@ -93,6 +97,29 @@ A NestJS-nek **két root-szintű route-ja** van:
   healthcheck ÉS a monitor watchdog. A Caddy a `/healthz` útvonalat **nem**
   proxyzza külön, de a Fastify automatikusan kiszolgálja a NestJS saját
   listenerén, tehát a Caddy-n át közvetlenül is elérhető.
+
+  A válasz a liveness mezők mellett a **beégetett build metadatát** is
+  visszaadja, amivel egy futó konténer egy konkrét revízióhoz köthető:
+
+  ```json
+  {
+    "status": "oks",
+    "deployDate": "2026-10-12T12:34:56Z",
+    "commitHash": "0123456789abcdef0123456789abcdef01234567",
+    "uptime": 1234,
+    "timestamp": "2026-10-12T12:55:00.000Z"
+  }
+  ```
+
+  A `deployDate` / `commitHash` értékeket az `images.yml` build-time
+  argumentumként adja át (`DEPLOY_DATE` / `COMMIT_HASH`, lásd
+  [`infra/app/Dockerfile`](../../infra/app/Dockerfile)), tehát az image
+  építésének pillanatában rögzülnek és **nem** felülírhatók futásidőben.
+  Lokális (`start:dev`, `scripts/dev-stack.sh`) futtatásnál nincs ilyen build
+  arg, ezért mindkét mező `null` — ez nem hiba, hanem a graceful degradáció.
+  A healthcheck (`process.exit(r.ok?0:1)`) és a monitor watchdog kizárólag a
+  HTTP státuszkódra támaszkodik, ezért a mezők hozzáadása a liveness
+  kontraktust nem érinti.
 * `GET /api` — az `AppController.getHello()` üzleti smoke-route (a
   globális `api` prefix alatt). Ezt csak a frontend smoke tesztek és a
   deploy sanity-check hívja; **nem** a healthcheck.
@@ -107,8 +134,11 @@ curl -fsSI https://web.<DOMAIN>/ | head -n1
 # Admin SPA
 curl -fsSI https://admin.<DOMAIN>/ | head -n1
 
-# API liveness endpoint (dedikált, prefix-mentes)
+# API liveness endpoint (dedikált, prefix-mentes) + beégetett build metadata
 curl -fsS  https://api.<DOMAIN>/healthz && echo
+
+# A deployolt revízió azonosítása (egyeznie kell a kiadott SHA-val)
+curl -fsS  https://api.<DOMAIN>/healthz | grep -o '"commitHash":"[^"]*"'
 
 # API üzleti smoke route (opcionális, deploy sanity check)
 curl -fsS  https://api.<DOMAIN>/api && echo
@@ -119,7 +149,8 @@ curl -fsS  https://api.<DOMAIN>/api && echo
 | `https://<DOMAIN>/` | `HTTP/2 307` | Apex → web subdomain redirect |
 | `https://web.<DOMAIN>/` | `HTTP/2 200` | SPA `index.html` |
 | `https://admin.<DOMAIN>/` | `HTTP/2 200` | Admin SPA `index.html` |
-| `https://api.<DOMAIN>/healthz` | `HTTP/2 200` + JSON `{"status":"ok",...}` | Dedikált liveness endpoint (Docker healthcheck + monitor watchdog) |
+| `https://api.<DOMAIN>/healthz` | `HTTP/2 200` + JSON `{"status":"oks","deployDate":"…","commitHash":"…",...}` | Dedikált liveness endpoint (Docker healthcheck + monitor watchdog) + a deployolt revízió azonosítója |
+| `https://web.<DOMAIN>/`, `https://admin.<DOMAIN>/` | `HTTP/2 200` + a lap alján `Telepítve: … · Verzió: <40 hex>` | A SPA build-info sora ugyanazt a dátumot + hash-t mutatja, mint a `/healthz` (azonos `github.sha`, azonos `images.yml` futás) |
 | `https://api.<DOMAIN>/api` | `HTTP/2 200` + `text/plain "Hello Beautiful World!"` | Üzleti smoke route — a NestJS root controller greetingje ([`apps/api/src/app.service.ts:6`](../../apps/api/src/app.service.ts)) (opcionális) |
 
 Ha bármelyik `502` / `503` / `504`: a Caddy nem éri el a belső service-t. Lásd 4.7 „Hibadiagnosztikai mátrix".

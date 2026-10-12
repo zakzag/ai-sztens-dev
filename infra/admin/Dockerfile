@@ -15,6 +15,11 @@
 #   VITE_API_BASE_URL  — the public URL the SPA calls. Injected as
 #                        `import.meta.env.VITE_API_BASE_URL`; Vite gives
 #                        process environment precedence over .env files.
+#
+# Optional build args (supplied by `.github/workflows/images.yml`; left empty
+# for local builds, in which case the footer renders placeholder values):
+#   VITE_DEPLOY_DATE   — UTC build timestamp of the image, ISO 8601.
+#   VITE_COMMIT_HASH   — full 40-char git SHA of the deployed revision.
 # ---------------------------------------------------------------------------
 
 # --- Build stage -----------------------------------------------------------
@@ -42,9 +47,15 @@ COPY apps/admin apps/admin
 
 ARG APP_ENV=dev
 ARG VITE_API_BASE_URL
+ARG VITE_DEPLOY_DATE
+ARG VITE_COMMIT_HASH
 
+# Only `VITE_*`-prefixed variables are exposed to the client bundle, hence
+# the prefix on the metadata args.
 ENV APP_ENV=${APP_ENV} \
-    VITE_API_BASE_URL=${VITE_API_BASE_URL}
+    VITE_API_BASE_URL=${VITE_API_BASE_URL} \
+    VITE_DEPLOY_DATE=${VITE_DEPLOY_DATE} \
+    VITE_COMMIT_HASH=${VITE_COMMIT_HASH}
 
 RUN pnpm --filter @callback/shared build \
  && pnpm --filter @callback/admin "build:${APP_ENV}"

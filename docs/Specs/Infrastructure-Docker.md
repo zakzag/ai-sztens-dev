@@ -1,7 +1,8 @@
 # Infrastructure — Docker containers on the droplet
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-10-09 (image-based deploy: minden alkalmazás-komponens saját konténerben fut — `api`, `web`, `admin`, `postgres`, `caddy`, `monitor` — a droplet csak `docker compose pull && up -d`-t futtat; a forráskód és a pnpm workspace nem kerül a dropletre)
+**Utolsó frissítés:** 2026-10-12 (deploy metadata: az `images.yml` három új build-argot ad át — `COMMIT_HASH` / `DEPLOY_DATE` az api képnek, `VITE_COMMIT_HASH` / `VITE_DEPLOY_DATE` a `web`/`admin` képnek —, így a futó image egy konkrét revízióhoz köthető; lásd §6.1)
+**Korábbi frissítés:** 2026-10-09 (image-based deploy: minden alkalmazás-komponens saját konténerben fut — `api`, `web`, `admin`, `postgres`, `caddy`, `monitor` — a droplet csak `docker compose pull && up -d`-t futtat; a forráskód és a pnpm workspace nem kerül a dropletre)
 **Kapcsolódik:** [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
 
 ---
@@ -106,3 +107,25 @@ A szétválasztás két ponton történik:
 2. **Runtime-ban** — az [`infra/docker-compose.yml`](../../infra/docker-compose.yml) három külön service-t definiál, mindegyik a saját képére mutat. A Docker minden service-ből külön konténert indít, saját fájlrendszer-, processz- és hálózati névtérrel. A konténerek nem osztoznak fájlokon; csak az `internal` hálózaton, DNS-neveken keresztül beszélnek egymással, és a Caddy route-ol köztük.
 
 Így a „közös build hely" csak a közös forráskód (monorepo + `packages/shared`); az elkészült artifact-ok külön image-ekbe és külön konténerekbe kerülnek.
+
+### 6.1 Beégetett build metadata (deploy dátum + commit hash)
+
+Az [`.github/workflows/images.yml`](../../.github/workflows/images.yml) `Compute image metadata` lépése **egyetlen forrásból** számolja a metadata-t, így a három kép ugyanazt az értéket kapja egy adott revízióhoz:
+
+| Output | Érték | Felhasználás |
+|---|---|---|
+| `short_sha` | `github.sha` első 7 karaktere | Image tag (`sha-<7>`) — változatlan |
+| `commit_hash` | teljes `github.sha` (40 karakter) | api: `COMMIT_HASH`, SPA-k: `VITE_COMMIT_HASH` |
+| `deploy_date` | `date -u +%Y-%m-%dT%H:%M:%SZ` | api: `DEPLOY_DATE`, SPA-k: `VITE_DEPLOY_DATE` |
+
+A build-argok célja Dockerfile-onként:
+
+| Dockerfile | Build-arg | Hogyan kerül a képbe | Hol jelenik meg |
+|---|---|---|---|
+| [`infra/app/Dockerfile`](../../infra/app/Dockerfile) | `COMMIT_HASH`, `DEPLOY_DATE` | `ARG` + `ENV` a **runtime** stage-ben (egy intermediate stage ENV-je nem öröklődik át egy későbbi `FROM`-ba) | `GET /healthz` → `commitHash`, `deployDate` |
+| [`infra/web/Dockerfile`](../../infra/web/Dockerfile) | `VITE_COMMIT_HASH`, `VITE_DEPLOY_DATE` | `ARG` + `ENV` a **build** stage-ben, hogy a Vite lássa (csak `VITE_*` prefixű változó kerül a kliens bundle-be) | `web` kezdőlap jobb alsó build-info sora |
+| [`infra/admin/Dockerfile`](../../infra/admin/Dockerfile) | `VITE_COMMIT_HASH`, `VITE_DEPLOY_DATE` | ugyanaz, mint a `web`-nél | `admin` dashboard build-info sora |
+
+A `monitor` kép szándékosan nem kapja meg ezeket (nincs rájuk szüksége).
+
+Lokális buildnél (`scripts/dev-stack.sh up`, `pnpm --filter … dev`) a build-argok hiányoznak, ezért a Dockerfile-ok üres default-ot használnak: a `/healthz` `null`-t ad vissza, a SPA footer pedig `—` placeholdert renderel — egyik sem hiba, csak a graceful degradáció.

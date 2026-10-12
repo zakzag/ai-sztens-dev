@@ -18,6 +18,11 @@
 #                        process environment precedence over .env files, so
 #                        the value passed here wins without baking a .env
 #                        into the image.
+#
+# Optional build args (supplied by `.github/workflows/images.yml`; left empty
+# for local builds, in which case the footer renders placeholder values):
+#   VITE_DEPLOY_DATE   — UTC build timestamp of the image, ISO 8601.
+#   VITE_COMMIT_HASH   — full 40-char git SHA of the deployed revision.
 # ---------------------------------------------------------------------------
 
 # --- Build stage -----------------------------------------------------------
@@ -50,13 +55,18 @@ COPY apps/web apps/web
 
 ARG APP_ENV=dev
 ARG VITE_API_BASE_URL
+ARG VITE_DEPLOY_DATE
+ARG VITE_COMMIT_HASH
 
 # Export the build-time env so Vite resolves it. Vite's loadEnv gives
 # pre-existing process variables precedence over .env files, which is
 # exactly what we want for an image-based deploy: no per-env .env is
-# required inside the image.
+# required inside the image. Only `VITE_*`-prefixed variables are exposed
+# to the client bundle, hence the prefix on the metadata args.
 ENV APP_ENV=${APP_ENV} \
-    VITE_API_BASE_URL=${VITE_API_BASE_URL}
+    VITE_API_BASE_URL=${VITE_API_BASE_URL} \
+    VITE_DEPLOY_DATE=${VITE_DEPLOY_DATE} \
+    VITE_COMMIT_HASH=${VITE_COMMIT_HASH}
 
 RUN pnpm --filter @callback/shared build \
  && pnpm --filter @callback/web "build:${APP_ENV}"

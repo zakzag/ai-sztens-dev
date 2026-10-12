@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { BuildInfoFooter } from '../components/BuildInfoFooter.js';
 
 export function HomePage() {
   return (
@@ -31,6 +32,9 @@ export function HomePage() {
           </div>
         ))}
       </div>
+
+      {/* Which revision is actually being served? Baked in at image build time. */}
+      <BuildInfoFooter />
     </section>
   );
 }

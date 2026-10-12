@@ -148,8 +148,19 @@ jobs:
         id: meta
         run: |
           set -euo pipefail
+          # short_sha  — immutable image tag suffix (sha-<7 chars>).
+          # commit_hash — full 40-char SHA, baked into the images and shown in
+          #               the SPAs / `/healthz` so a running container can be
+          #               traced back to an exact revision.
+          # deploy_date — immutable UTC build time, same source of truth for
+          #               api, web and admin so all three report identical
+          #               metadata for a given revision.
           short_sha="${GITHUB_SHA::7}"
+          commit_hash="$GITHUB_SHA"
+          deploy_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
+          echo "commit_hash=$commit_hash" >> "$GITHUB_OUTPUT"
+          echo "deploy_date=$deploy_date" >> "$GITHUB_OUTPUT"
 
       # Build + push api (NestJS).
       - name: Build and push api
@@ -164,6 +175,8 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-api:${{ steps.resolve.outputs.app_env }}
           build-args: |
             APP_ENV=${{ steps.resolve.outputs.app_env }}
+            COMMIT_HASH=${{ steps.meta.outputs.commit_hash }}
+            DEPLOY_DATE=${{ steps.meta.outputs.deploy_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -181,6 +194,8 @@ jobs:
           build-args: |
             APP_ENV=${{ steps.resolve.outputs.app_env }}
             VITE_API_BASE_URL=${{ steps.resolve.outputs.api_base }}
+            VITE_DEPLOY_DATE=${{ steps.meta.outputs.deploy_date }}
+            VITE_COMMIT_HASH=${{ steps.meta.outputs.commit_hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -198,6 +213,8 @@ jobs:
           build-args: |
             APP_ENV=${{ steps.resolve.outputs.app_env }}
             VITE_API_BASE_URL=${{ steps.resolve.outputs.api_base }}
+            VITE_DEPLOY_DATE=${{ steps.meta.outputs.deploy_date }}
+            VITE_COMMIT_HASH=${{ steps.meta.outputs.commit_hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

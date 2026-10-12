@@ -143,6 +143,7 @@ jobs:
           # runner's git config.
           persist-credentials: false
           sparse-checkout: |
+            .github/scripts
             infra/docker-compose.yml
             infra/caddy/Caddyfile
             scripts/test
@@ -191,45 +192,18 @@ jobs:
           # function, so we cannot build the secret name with format+upper.
           # `app_env` is constrained to `dev|prod` by deploy-plan.sh; the
           # matching secret is selected by equality.
-          # NOTE: the appended block at the end of this step writes
-          # APP_ENV / IMAGE_TAG / GHCR_OWNER / REGISTRY into the file,
-          # which OVERWRITES any same-named values that the secret may
-          # have contained. The intent is for the secret to provide the
-          # static config (DOMAIN, ACME_EMAIL, DB passwords, etc.) and
-          # for the workflow to inject the runtime-only values. If the
-          # secret ever contains APP_ENV / IMAGE_TAG / GHCR_OWNER /
-          # REGISTRY, those values will be silently replaced; document
-          # this in deploy/README.md and audit the secrets file.
+          # The secret provides the static config (DOMAIN, ACME_EMAIL, DB
+          # passwords, …); the workflow owns APP_ENV / IMAGE_TAG /
+          # GHCR_OWNER / REGISTRY and appends them last. If the secret
+          # also defines any of those four keys (typical when it was
+          # pasted from the droplet's own infra/.env), render-infra-env.sh
+          # STRIPS those lines and emits a `::warning::` naming the keys,
+          # instead of failing the deploy.
           APP_ENV: ${{ needs.plan.outputs.app_env }}
+          IMAGE_TAG: ${{ steps.resolve.outputs.image_tag }}
+          GHCR_OWNER: ${{ vars.GHCR_OWNER || github.repository_owner }}
           INFRA_ENV: ${{ needs.plan.outputs.app_env == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
-        run: |
-          set -euo pipefail
-          mkdir -p infra
-          printf '%s\n' "$INFRA_ENV" > "infra/.env"
-          # Defensive: refuse to proceed if the secret defines any of the
-          # keys this step appends, because the appended values would
-          # silently overwrite them (last write wins). This makes a class
-          # of "secret drift" bugs loud rather than silent.
-          for key in APP_ENV IMAGE_TAG GHCR_OWNER REGISTRY; do
-            if grep -q -E "^${key}=" infra/.env; then
-              echo "ERROR: INFRA_ENV_${APP_ENV^^} secret defines ${key}= which would be silently overwritten by deploy.yml." >&2
-              echo "       Remove ${key}= from the secret (it is injected below) and re-run." >&2
-              exit 1
-            fi
-          done
-          chmod 0644 "infra/.env"
-          # IMAGE_TAG and GHCR_OWNER are runtime-only values the droplet
-          # needs to construct the image references; the secret holds
-          # everything else (DOMAIN, DB passwords, …).
-          {
-            echo ""
-            echo "# Written by deploy.yml"
-            echo "APP_ENV=${{ steps.resolve.outputs.app_env }}"
-            echo "IMAGE_TAG=${{ steps.resolve.outputs.image_tag }}"
-            echo "GHCR_OWNER=${{ vars.GHCR_OWNER || github.repository_owner }}"
-            echo "REGISTRY=ghcr.io"
-          } >> "infra/.env"
-          echo "Rendered infra/.env for APP_ENV=${{ steps.resolve.outputs.app_env }} (IMAGE_TAG=${{ steps.resolve.outputs.image_tag }})."
+        run: bash .github/scripts/render-infra-env.sh
 
       # ------------------------------------------------------------------
       # 4. Render the Caddyfile from infra/caddy/Caddyfile using the same

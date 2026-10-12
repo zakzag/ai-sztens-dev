@@ -1,15 +1,10 @@
-# AIsztens — production deploy to the DigitalOcean droplet.
+ # AIsztens — deploy to the DigitalOcean droplet (dev now, prod later).
 #
 # This workflow is the consumer of the images published by
 # `.github/workflows/images.yml`. It does NOT build anything; it ships
-# three small files (docker-compose.yml, infra/.env, Caddyfile.rendered)
-# and tells the droplet to `docker compose pull && up -d` against the
-# images already in GHCR.
-#
-# The `sha-<short>` tag to deploy is read from the latest successful
-# `images.yml` run that targeted the same APP_ENV. If the build workflow
-# has not yet produced an image (very first deploy, race between the two
-# workflows), this job fails fast and the operator re-runs it.
+# a few small files (docker-compose.yml, infra/.env, Caddyfile.rendered,
+# the smoke-test suite) and tells the droplet to
+# `docker compose pull && up -d` against the images already in GHCR.
 #
 # Required secrets (Settings → Secrets and variables → Actions):
 #   DROPLET_HOST        — droplet public IPv4 or hostname
@@ -25,52 +20,36 @@
 #                         login ghcr.io` and pull the images.
 #
 # Triggers:
-#   push to `dev`  -> APP_ENV=dev
-#   workflow_dispatch with `app_env`=dev|prod
-#   workflow_run on `images.yml` success (so every push to `dev` that
-#     published images also deploys them, with no manual dispatch)
+#   workflow_run on `images.yml` completion -> auto-deploy to dev, ONLY
+#     when images.yml succeeded, was started by a `push`, on branch `dev`.
+#     IMAGE_TAG = sha-<7 chars of workflow_run.head_sha> (the commit that
+#     images.yml actually built — NOT github.sha, which on workflow_run is
+#     the default-branch HEAD).
+#   workflow_dispatch with `app_env`=dev|prod (+ optional `image_tag`).
+#     IMAGE_TAG defaults to sha-<7 chars of the dispatched commit>; the
+#     images for that commit must already exist (run images.yml first).
 #
-# The push trigger alone used to imply deploy; the explicit `workflow_run`
-# link below means a re-run of `images.yml` (e.g. after a manual push
-# with the right input) also produces a deploy for the matching env.
+# There is deliberately NO `push` trigger: images.yml reacts to the push
+# and this workflow follows it via workflow_run. A direct push trigger
+# raced the image build and tried to pull a sha tag that did not exist yet.
 #
-# Why no workflow-level `concurrency:` block (an earlier revision had one
-# with `group: deploy-${{ matrix.app_env }}`, which fails the workflow-
-# file parse with `Unrecognized named-value: 'matrix'` because the
-# expression evaluator for `concurrency.group` only allows the
-# `github | inputs | vars | needs` contexts — `matrix` is per-job, not
-# per-workflow, and is not in the allowed list at this level):
-#   Per-env separation is already enforced by two other mechanisms, so
-#   the workflow-level `concurrency:` block is unnecessary:
-#     1. The job-level `if:` filter below lets exactly one of the two
-#        matrix entries run per trigger; the other is a no-op skip.
-#     2. `jobs.deploy.environment` binds each entry to its GitHub
-#        Environment (`dev` or `production`), which already provides
-#        the per-env secret-scope + manual-approval story that
-#        `concurrency.group` was meant to give.
-#   If a future change needs an explicit concurrency group, the key must
-#   use only workflow-level-allowed contexts (e.g. `github.ref` or the
-#   `inputs.app_env || github.ref_name || 'dev'` fallback chain).
+# NOTE: GitHub only fires `workflow_run` for workflow files that exist on
+# the repository's DEFAULT branch. Merge this file to the default branch
+# for the auto-deploy to work; manual dispatch works from any branch.
 #
-# Why a 2-entry matrix for APP_ENV (the previous design used a single
-# workflow-level `env.APP_ENV` helper):
-#   GitHub Actions restricts the `env.*` context to step bodies. The
-#   expression evaluator that runs over `jobs.<id>.name` and
-#   `jobs.<id>.environment` does NOT have `env.*` in its allowed-
-#   context list, so referencing `${{ env.APP_ENV }}` in those keys
-#   fails the workflow with `Unrecognized named-value: 'env'`. The
-#   fix is to put APP_ENV into a matrix entry, which IS in the
-#   allowed list. The matrix is static (always `app_env: [dev, prod]`);
-#   the job-level `if:` below picks the entry that matches the current
-#   trigger and skips the other one. The behaviour is otherwise
-#   identical to the previous `inputs.app_env || ... || 'dev'` chain.
+# Why a `plan` job instead of a matrix + job-level `if:`:
+#   `jobs.<id>.if` is evaluated BEFORE the matrix expands, so `matrix.*`
+#   there fails with `Unrecognized named-value: 'matrix'`. Allowed
+#   contexts in `jobs.<id>.if` are only github | inputs | vars | needs.
+#   The `plan` job runs `.github/scripts/deploy-plan.sh` (unit-tested in
+#   scripts/test/_deploy-plan-test.sh) and exposes the decision through
+#   `needs.plan.outputs.*`, which is allowed in `if:`, `name:` and
+#   `environment:`. Do NOT reintroduce `matrix.*` or `env.*` in job-level
+#   keys — scripts/test/_deploy-yml-concurrency-audit.py guards this.
 
 name: Deploy to droplet
 
 on:
-  push:
-    branches:
-      - dev
   workflow_dispatch:
     inputs:
       app_env:
@@ -81,115 +60,108 @@ on:
         options:
           - dev
           - prod
+      image_tag:
+        description: 'Optional image tag override (default: sha-<short commit of the selected ref>)'
+        required: false
+        default: ''
+        type: string
   workflow_run:
     workflows: [Build and push images]
     types: [completed]
 
-# NOTE: there is intentionally no workflow-level `concurrency:` block.
-# Per-env separation is enforced by the job-level `if:` filter below
-# (one of the two matrix entries runs per trigger; the other is a no-op
-# skip) and by `jobs.deploy.environment`, which binds each entry to its
-# GitHub Environment. See the file header comment for the rationale.
+permissions:
+  contents: read
 
 env:
   REMOTE_DIR: /opt/aisztens
 
 jobs:
+  # ----------------------------------------------------------------------
+  # plan — decide whether / where / what to deploy. No secrets, no SSH.
+  # ----------------------------------------------------------------------
+  plan:
+    name: Plan deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_deploy: ${{ steps.plan.outputs.should_deploy }}
+      app_env: ${{ steps.plan.outputs.app_env }}
+      image_tag: ${{ steps.plan.outputs.image_tag }}
+      ref: ${{ steps.plan.outputs.ref }}
+    steps:
+      - name: Checkout plan script
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts
+      - name: Decide deploy target
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_APP_ENV: ${{ inputs.app_env }}
+          INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+          HEAD_SHA: ${{ github.sha }}
+          WR_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WR_EVENT: ${{ github.event.workflow_run.event }}
+          WR_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WR_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: bash .github/scripts/deploy-plan.sh
+
   deploy:
-    name: Deploy (${{ matrix.app_env }}) + smoke-test
-    # Pick the matrix entry whose `app_env` matches the current trigger,
-    # and only run on a successful upstream build when this was triggered
-    # by `workflow_run` (otherwise always run).
-    #
-    # APP_ENV inference, in priority order:
-    #   1. workflow_dispatch input (operator's explicit choice)
-    #   2. workflow_run.inputs.app_env (upstream workflow_dispatch with input)
-    #   3. github.ref_name (push trigger — only 'dev' is in push.branches
-    #      today, but the same fallback shape handles a future prod push)
-    #   4. github.event.workflow_run.head_branch (workflow_run from a
-    #      push trigger on the upstream build workflow)
-    #   5. 'dev' (safe default; the only env currently wired into
-    #      push.branches, so any unrecognised trigger routes to dev)
-    # Without step 4, a future `push.branches: [dev, prod]` plus a push
-    # to prod would silently deploy the prod-built image to the dev
-    # droplet (the original bug this guard prevents).
-    if: >-
-      matrix.app_env == (
-        inputs.app_env
-        || github.event.workflow_run.inputs.app_env
-        || (github.event_name == 'push' && github.ref_name)
-        || (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch)
-        || 'dev'
-      ) && (
-        github.event_name != 'workflow_run' ||
-        github.event.workflow_run.conclusion == 'success'
-      )
-    strategy:
-      fail-fast: false
-      matrix:
-        app_env: [dev, prod]
+    name: Deploy (${{ needs.plan.outputs.app_env }}) + smoke-test
+    needs: plan
+    if: needs.plan.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ matrix.app_env == 'prod' && 'production' || 'dev' }}
+    environment: ${{ needs.plan.outputs.app_env == 'prod' && 'production' || 'dev' }}
+    # Serialize deploys per environment (needs.* is allowed here).
+    concurrency:
+      group: deploy-${{ needs.plan.outputs.app_env }}
+      cancel-in-progress: false
 
     steps:
       # ------------------------------------------------------------------
-      # 1. Get the source (only the small files we ship; the source tree
-      #    is otherwise unused).
+      # 1. Get the source (only the small files we ship) at the exact
+      #    commit being deployed.
       # ------------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.plan.outputs.ref }}
           # Defense-in-depth: do not persist the GITHUB_TOKEN in the
-          # runner's git config. No later step in this workflow uses
-          # git for push, so this is a no-op functionally and prevents
-          # any future step from accidentally inheriting write access.
+          # runner's git config.
           persist-credentials: false
           sparse-checkout: |
             infra/docker-compose.yml
             infra/caddy/Caddyfile
-            infra/caddy/Caddyfile.rendered
-            apps
-            packages
+            scripts/test
 
       # ------------------------------------------------------------------
-      # 2. Resolve the per-env secret and IMAGE_TAG. APP_ENV is now
-      #    sourced from `matrix.app_env` (the matrix entry that survived
-      #    the `if:` filter) — no need to recompute the trigger chain.
-      #    The script also produces `image_tag` for downstream steps
-      #    to pin to.
+      # 2. Resolve the per-env secret and expose app_env / image_tag to
+      #    the later steps (values come from the `plan` job).
       # ------------------------------------------------------------------
       - name: Resolve INFRA_ENV and IMAGE_TAG
         id: resolve
         env:
-          # GitHub Actions expressions have no `upper()` (or any case-conversion)
-          # function, so we cannot build the secret name with format+upper.
-          # `app_env` is constrained to `dev|prod` by the matrix; we
-          # resolve the matching secret by equality here.
-          APP_ENV: ${{ matrix.app_env }}
-          INFRA_ENV: ${{ matrix.app_env == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
+          # GitHub Actions expressions have no `upper()`; `app_env` is
+          # constrained to dev|prod by deploy-plan.sh, so the secret is
+          # selected by equality.
+          APP_ENV: ${{ needs.plan.outputs.app_env }}
+          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
+          INFRA_ENV: ${{ needs.plan.outputs.app_env == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
-          app_env="$APP_ENV"
           if [ -z "$INFRA_ENV" ]; then
-            echo "ERROR: INFRA_ENV_${app_env^^} secret is empty." >&2
+            echo "ERROR: INFRA_ENV_${APP_ENV^^} secret is empty (is it defined for the '${APP_ENV}' environment?)." >&2
             exit 1
           fi
-          # The sha tag is the most recent one for this env. We don't
-          # query GHCR for the latest published tag (that needs extra
-          # auth and is fragile); we derive it from the triggering build
-          # workflow when this is a workflow_run, otherwise from
-          # github.sha for push / dispatch.
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            short_sha="${GITHUB_SHA::7}"
-          else
-            short_sha="${GITHUB_SHA::7}"
+          if [ -z "$IMAGE_TAG" ]; then
+            echo "ERROR: plan job produced an empty IMAGE_TAG." >&2
+            exit 1
           fi
-          # The actual image tag the upstream `images.yml` workflow
-          # produced is the short SHA. README §8 documents the contract.
-          image_tag="sha-${short_sha}"
-          echo "app_env=$app_env"      >> "$GITHUB_OUTPUT"
-          echo "image_tag=$image_tag"  >> "$GITHUB_OUTPUT"
+          echo "app_env=$APP_ENV"     >> "$GITHUB_OUTPUT"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
       # ------------------------------------------------------------------
       # 3. Render infra/.env from the matching secret.
@@ -207,7 +179,7 @@ jobs:
         env:
           # GitHub Actions expressions have no `upper()` (or any case-conversion)
           # function, so we cannot build the secret name with format+upper.
-          # `app_env` is constrained to `dev|prod` by the matrix; the
+          # `app_env` is constrained to `dev|prod` by deploy-plan.sh; the
           # matching secret is selected by equality.
           # NOTE: the appended block at the end of this step writes
           # APP_ENV / IMAGE_TAG / GHCR_OWNER / REGISTRY into the file,
@@ -218,8 +190,8 @@ jobs:
           # secret ever contains APP_ENV / IMAGE_TAG / GHCR_OWNER /
           # REGISTRY, those values will be silently replaced; document
           # this in deploy/README.md and audit the secrets file.
-          APP_ENV: ${{ matrix.app_env }}
-          INFRA_ENV: ${{ matrix.app_env == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
+          APP_ENV: ${{ needs.plan.outputs.app_env }}
+          INFRA_ENV: ${{ needs.plan.outputs.app_env == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
           mkdir -p infra
@@ -304,17 +276,17 @@ jobs:
           echo "Caddyfile rendered for DOMAIN=$domain."
 
       # ------------------------------------------------------------------
-      # 5. Ship the three small files to the droplet. We do NOT rsync
-      #    the whole repo anymore; the droplet needs only the compose
-      #    file, the env, and the rendered Caddyfile.
+      # 5. Ship the small files to the droplet. We do NOT rsync the whole
+      #    repo; the droplet needs only the compose file, the env, the
+      #    rendered Caddyfile, and the smoke-test suite used in step 9.
       # ------------------------------------------------------------------
-      - name: Ship compose + env + Caddyfile to droplet
+      - name: Ship compose + env + Caddyfile + smoke tests to droplet
         uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          source: "infra/docker-compose.yml,infra/.env,infra/caddy/Caddyfile.rendered"
+          source: "infra/docker-compose.yml,infra/.env,infra/caddy/Caddyfile.rendered,scripts/test/stack-smoke.sh,scripts/test/lib"
           target: ${{ env.REMOTE_DIR }}
           overwrite: true
           strip_components: 0

@@ -1,98 +1,105 @@
 #!/usr/bin/env python3
-"""Verify deploy.yml post-fix state.
+"""Offline structural audit of .github/workflows/deploy.yml.
+
+Guards against the class of `Invalid workflow file` / `Unrecognized
+named-value` parse errors that GitHub only reports after a push.
 
 Checks:
   1. YAML parses.
-  2. No workflow-level `concurrency:` block remains.
-  3. Every remaining `${{ matrix.* }}` reference lives inside the
-     `jobs.deploy.*` subtree (i.e. at a line whose indent is >= the
-     `jobs.deploy:` indent), so none of them are evaluated at a
-     context where `matrix` is not allowed.
-  4. The Three-Env-Verification §5.2 grep check still passes.
+  2. No workflow-level `concurrency:` block.
+  3. No `matrix.` reference anywhere in non-comment code (the workflow
+     has no matrix; `matrix` is not allowed in `jobs.<id>.if`).
+  4. Every job-level `if:` / `name:` / `environment:` / `concurrency`
+     expression uses only contexts allowed at that level
+     (github | inputs | vars | needs [+ strategy/matrix for name/env]).
+     In particular no `env.`, `secrets.`, `steps.` or `matrix.` in `if:`.
+  5. Triggers: no `push`; `workflow_dispatch` and `workflow_run` present.
+  6. `jobs.deploy.needs == plan` and its `if:` reads needs.plan.outputs.
+  7. Three-Env §5.2 grep: >= 3 INFRA_ENV_(DEV|PROD) matches.
+
+Usage: python scripts/test/_deploy-yml-concurrency-audit.py  (exit 0 = pass)
 """
 from __future__ import annotations
+
 import re
 import sys
+
 import yaml
+
+PATH = ".github/workflows/deploy.yml"
+EXPR = re.compile(r"\$\{\{(.*?)\}\}", re.S)
+CTX = re.compile(r"(?<![\w.'])([a-z_]+)\.")
+IF_ALLOWED = {"github", "inputs", "vars", "needs"}
+JOB_KEY_ALLOWED = IF_ALLOWED | {"strategy", "matrix"}
+
+
+def contexts(expr: str) -> set[str]:
+    """Return the root context names referenced in an expression."""
+    no_strings = re.sub(r"'[^']*'", "''", expr)
+    return set(CTX.findall(no_strings))
+
+
+def strip_comments(text: str) -> str:
+    return "\n".join(
+        ln for ln in text.splitlines() if not ln.lstrip().startswith("#")
+    )
 
 
 def main() -> int:
-    path = ".github/workflows/deploy.yml"
-    text = open(path, encoding="utf-8").read()
+    text = open(PATH, encoding="utf-8").read()
+    failures: list[str] = []
 
-    # 1. YAML parses.
     try:
         doc = yaml.safe_load(text)
-    except yaml.YAMLError as e:
-        print(f"YAML_PARSE_FAIL: {e}")
+    except yaml.YAMLError as exc:
+        print(f"FAIL | YAML parse: {exc}")
         return 1
     print("OK | YAML parses")
 
-    # 2. No workflow-level concurrency block.
     if doc.get("concurrency"):
-        print(f"FAIL | workflow-level 'concurrency' block still present: {doc['concurrency']}")
-        return 1
-    print("OK | no workflow-level 'concurrency:' block")
+        failures.append("workflow-level 'concurrency:' block present")
 
-    # 3. Every matrix.* reference must be inside jobs.deploy.*.
-    lines = text.splitlines()
-    job_deploy_indent = None
-    for i, ln in enumerate(lines):
-        m = re.match(r"^(\s*)jobs:\s*$", ln)
-        if m:
-            for j in range(i + 1, len(lines)):
-                mm = re.match(r"^(\s*)deploy:\s*$", lines[j])
-                if mm:
-                    job_deploy_indent = len(mm.group(1))
-                    break
-            break
-    if job_deploy_indent is None:
-        print("FAIL | could not locate 'jobs.deploy:' indent")
-        return 1
+    if "matrix." in strip_comments(text):
+        failures.append("'matrix.' referenced in non-comment code")
 
-    bad = []
-    for i, ln in enumerate(lines, start=1):
-        if "matrix." not in ln or "${{" not in ln:
-            continue
-        # Strip the YAML comment portion (`#` ... end-of-line), so we don't
-        # match commented-out references in the file header.
-        hash_pos = ln.find("#")
-        code = ln if hash_pos == -1 else ln[:hash_pos]
-        if "matrix." not in code or "${{" not in code:
-            continue
-        indent = len(code) - len(code.lstrip(" "))
-        if indent < job_deploy_indent:
-            bad.append((i, ln.rstrip()))
-    if bad:
-        print("FAIL | matrix.* references outside jobs.deploy.* subtree:")
-        for i, ln in bad:
-            print(f"    line {i}: {ln}")
-        return 1
-    print(f"OK | all matrix.* references live inside jobs.deploy.* (indent>={job_deploy_indent})")
+    jobs = doc.get("jobs") or {}
+    for job_id, job in jobs.items():
+        raw_if = job.get("if")
+        if raw_if is not None:
+            bad = contexts(str(raw_if)) - IF_ALLOWED
+            if bad:
+                failures.append(f"jobs.{job_id}.if uses disallowed contexts {sorted(bad)}")
+        for key in ("name", "environment", "concurrency", "runs-on"):
+            value = job.get(key)
+            if value is None:
+                continue
+            for expr in EXPR.findall(str(value)):
+                bad = contexts(expr) - JOB_KEY_ALLOWED
+                if bad:
+                    failures.append(f"jobs.{job_id}.{key} uses disallowed contexts {sorted(bad)}")
 
-    # 4. Three-Env §5.2 grep: INFRA_ENV_(DEV|PROD) must still appear in deploy.yml.
+    # PyYAML parses the bare key `on` as boolean True.
+    triggers = doc.get("on", doc.get(True)) or {}
+    if "push" in triggers:
+        failures.append("'push' trigger present (races images.yml)")
+    for needed in ("workflow_dispatch", "workflow_run"):
+        if needed not in triggers:
+            failures.append(f"trigger '{needed}' missing")
+
+    deploy = jobs.get("deploy") or {}
+    if deploy.get("needs") != "plan":
+        failures.append(f"jobs.deploy.needs is {deploy.get('needs')!r}, expected 'plan'")
+    if "needs.plan.outputs.should_deploy" not in str(deploy.get("if")):
+        failures.append("jobs.deploy.if does not gate on needs.plan.outputs.should_deploy")
+
     matches = re.findall(r"INFRA_ENV_(?:DEV|PROD)", text)
     if len(matches) < 3:
-        print(f"FAIL | expected >=3 INFRA_ENV_(DEV|PROD) matches, got {len(matches)}")
-        return 1
-    print(f"OK | {len(matches)} INFRA_ENV_(DEV|PROD) matches (>= 3 required)")
+        failures.append(f"expected >=3 INFRA_ENV_(DEV|PROD) matches, got {len(matches)}")
 
-    # 5. jobs.deploy.environment still uses the matrix (allowed at job level).
-    env = (doc.get("jobs") or {}).get("deploy", {}).get("environment")
-    if "matrix.app_env" not in str(env):
-        print(f"FAIL | jobs.deploy.environment lost its matrix reference: {env!r}")
+    if failures:
+        for msg in failures:
+            print(f"FAIL | {msg}")
         return 1
-    print(f"OK | jobs.deploy.environment uses matrix.app_env: {env!r}")
-
-    # 6. jobs.deploy.strategy.matrix.app_env still [dev, prod].
-    strat = (doc.get("jobs") or {}).get("deploy", {}).get("strategy") or {}
-    matrix = strat.get("matrix", {})
-    if matrix.get("app_env") != ["dev", "prod"]:
-        print(f"FAIL | jobs.deploy.strategy.matrix.app_env is not [dev, prod]: {matrix}")
-        return 1
-    print("OK | jobs.deploy.strategy.matrix.app_env == [dev, prod]")
-
-    print()
     print("All post-fix verifications passed.")
     return 0
 

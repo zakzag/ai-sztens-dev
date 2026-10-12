@@ -47,18 +47,19 @@ run_case "dispatch empty env" 1 "app_env must be" -- \
   EVENT_NAME=workflow_dispatch HEAD_SHA="$SHA"
 run_case "dispatch bad sha" 1 "not a commit SHA" -- \
   EVENT_NAME=workflow_dispatch INPUT_APP_ENV=dev HEAD_SHA=nope
-run_case "wr push dev success uses head_sha" 0 "should_deploy=true" "app_env=dev" "image_tag=sha-fedcba9" "ref=$OTHER" -- \
-  EVENT_NAME=workflow_run WR_CONCLUSION=success WR_EVENT=push WR_HEAD_BRANCH=dev WR_HEAD_SHA="$OTHER" HEAD_SHA="$SHA"
+# workflow_run cases — the env is recovered from images.yml's run-name
+run_case "wr push dev default title" 0 "should_deploy=true" "app_env=dev" "image_tag=sha-fedcba9" "ref=$OTHER" -- \
+  EVENT_NAME=workflow_run WR_CONCLUSION=success WR_EVENT=push WR_HEAD_BRANCH=dev WR_HEAD_SHA="$OTHER" 'WR_TITLE=Build and push images (dev)'
+run_case "wr dispatch prod deploys prod" 0 "should_deploy=true" "app_env=prod" "ref=$OTHER" -- \
+  EVENT_NAME=workflow_run WR_CONCLUSION=success WR_EVENT=workflow_dispatch WR_HEAD_BRANCH=main WR_HEAD_SHA="$OTHER" 'WR_TITLE=Build and push images (prod)'
+run_case "wr push main (no env title) skips" 0 "should_deploy=false" "no (dev|prod) suffix" -- \
+  EVENT_NAME=workflow_run WR_CONCLUSION=success WR_EVENT=push WR_HEAD_BRANCH=main WR_HEAD_SHA="$OTHER" 'WR_TITLE=Build and push images'
 run_case "wr failure skips" 0 "should_deploy=false" -- \
-  EVENT_NAME=workflow_run WR_CONCLUSION=failure WR_EVENT=push WR_HEAD_BRANCH=dev WR_HEAD_SHA="$OTHER"
+  EVENT_NAME=workflow_run WR_CONCLUSION=failure WR_EVENT=push WR_HEAD_BRANCH=dev WR_HEAD_SHA="$OTHER" 'WR_TITLE=Build and push images (dev)'
 run_case "wr cancelled skips" 0 "should_deploy=false" -- \
-  EVENT_NAME=workflow_run WR_CONCLUSION=cancelled WR_EVENT=push WR_HEAD_BRANCH=dev WR_HEAD_SHA="$OTHER"
-run_case "wr from dispatch skips" 0 "should_deploy=false" "not 'push'" -- \
-  EVENT_NAME=workflow_run WR_CONCLUSION=success WR_EVENT=workflow_dispatch WR_HEAD_BRANCH=dev WR_HEAD_SHA="$OTHER"
-run_case "wr other branch skips" 0 "should_deploy=false" "only 'dev'" -- \
-  EVENT_NAME=workflow_run WR_CONCLUSION=success WR_EVENT=push WR_HEAD_BRANCH=main WR_HEAD_SHA="$OTHER"
+  EVENT_NAME=workflow_run WR_CONCLUSION=cancelled WR_EVENT=push WR_HEAD_BRANCH=dev WR_HEAD_SHA="$OTHER" 'WR_TITLE=Build and push images (dev)'
 run_case "wr missing head_sha fails" 1 "not a commit SHA" -- \
-  EVENT_NAME=workflow_run WR_CONCLUSION=success WR_EVENT=push WR_HEAD_BRANCH=dev
+  EVENT_NAME=workflow_run WR_CONCLUSION=success WR_EVENT=push WR_HEAD_BRANCH=dev 'WR_TITLE=Build and push images (dev)'
 run_case "unsupported event" 1 "unsupported event" -- \
   EVENT_NAME=push HEAD_SHA="$SHA"
 

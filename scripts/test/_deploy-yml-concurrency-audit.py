@@ -91,6 +91,14 @@ def main() -> int:
         failures.append(f"jobs.deploy.needs is {deploy.get('needs')!r}, expected 'plan'")
     if "needs.plan.outputs.should_deploy" not in str(deploy.get("if")):
         failures.append("jobs.deploy.if does not gate on needs.plan.outputs.should_deploy")
+    # The deploy job name must be static (no ${{ ... }}). A skipped job
+    # never starts, so the expression is never evaluated, and the UI
+    # shows the raw template. The plan step is the single source of
+    # truth for app_env / image_tag; the deploy job's per-run detail
+    # belongs in the step log, not in the title.
+    deploy_name = str(deploy.get("name", ""))
+    if "${{" in deploy_name and "}}" in deploy_name:
+        failures.append(f"jobs.deploy.name contains an unevaluated expression: {deploy_name!r}")
 
     matches = re.findall(r"INFRA_ENV_(?:DEV|PROD)", text)
     if len(matches) < 3:

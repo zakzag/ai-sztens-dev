@@ -20,11 +20,15 @@
 #                         login ghcr.io` and pull the images.
 #
 # Triggers:
-#   workflow_run on `images.yml` completion -> auto-deploy to dev, ONLY
-#     when images.yml succeeded, was started by a `push`, on branch `dev`.
+#   workflow_run on `images.yml` completion -> auto-deploy of the env the
+#     build was made for, ONLY when images.yml succeeded. The env is read
+#     from images.yml's `run-name` ("Build and push images (dev|prod)"),
+#     because the workflow_run payload carries no upstream inputs. Any
+#     upstream event (push or workflow_dispatch) and any branch is fine.
 #     IMAGE_TAG = sha-<7 chars of workflow_run.head_sha> (the commit that
 #     images.yml actually built — NOT github.sha, which on workflow_run is
-#     the default-branch HEAD).
+#     the default-branch HEAD). A prod build deploys to the `production`
+#     GitHub Environment (add required reviewers there for approval).
 #   workflow_dispatch with `app_env`=dev|prod (+ optional `image_tag`).
 #     IMAGE_TAG defaults to sha-<7 chars of the dispatched commit>; the
 #     images for that commit must already exist (run images.yml first).
@@ -106,10 +110,16 @@ jobs:
           WR_EVENT: ${{ github.event.workflow_run.event }}
           WR_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           WR_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          WR_TITLE: ${{ github.event.workflow_run.display_title }}
         run: bash .github/scripts/deploy-plan.sh
 
   deploy:
-    name: Deploy (${{ needs.plan.outputs.app_env }}) + smoke-test
+    # Static name; the env and image tag are surfaced in the plan job's
+    # `DEPLOY: …` line and in each step's header. Using a static name
+    # also avoids showing a raw `${{ … }}` expression for any skipped
+    # instance of this job (the expression is only evaluated when the
+    # job actually starts, which a `should_deploy=false` job never does).
+    name: Deploy + smoke-test
     needs: plan
     if: needs.plan.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest

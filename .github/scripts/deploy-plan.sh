@@ -21,6 +21,11 @@
 #   WR_EVENT         github.event.workflow_run.event (event that started images.yml)
 #   WR_HEAD_BRANCH   github.event.workflow_run.head_branch
 #   WR_HEAD_SHA      github.event.workflow_run.head_sha (commit images.yml built)
+#   WR_TITLE         github.event.workflow_run.display_title
+#                    (e.g. "Build and push images (dev)") — the
+#                    deploy.yml workflow does not receive the
+#                    `workflow_run` upstream's inputs, so the env is
+#                    recovered from the run-name we set on images.yml.
 #
 # Outputs:
 #   should_deploy  true | false
@@ -80,14 +85,20 @@ decide() {
     workflow_run)
       [ "${WR_CONCLUSION:-}" = "success" ] \
         || skip "upstream images.yml concluded '${WR_CONCLUSION:-}', not 'success'"
-      [ "${WR_EVENT:-}" = "push" ] \
-        || skip "upstream images.yml was started by '${WR_EVENT:-}', not 'push' (deploy dispatched builds manually)"
-      [ "${WR_HEAD_BRANCH:-}" = "dev" ] \
-        || skip "upstream images.yml ran on branch '${WR_HEAD_BRANCH:-}', only 'dev' auto-deploys"
-      app_env="dev"
+      # Determine the env the upstream built for. The workflow_run
+      # payload does NOT carry the upstream inputs, so we parse the env
+      # from images.yml's run-name ("Build and push images (dev|prod)").
+      # A push trigger has no input, so its run-name defaults to
+      # "(dev)" via the `${{ inputs.app_env || 'dev' }}` template.
+      wr_title="${WR_TITLE:-}"
+      if [[ "$wr_title" =~ \((dev|prod)\)$ ]]; then
+        app_env="${BASH_REMATCH[1]}"
+        reason="auto-deploy after images.yml build for $app_env"
+      else
+        skip "upstream images.yml run-name '${wr_title}' has no (dev|prod) suffix; the env cannot be determined from the workflow_run payload alone"
+      fi
       ref="${WR_HEAD_SHA:-}"
       image_tag="$(short_tag "$ref")"
-      reason="auto-deploy after images.yml push build on dev"
       ;;
     *)
       fail "unsupported event '${EVENT_NAME:-}'"

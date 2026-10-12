@@ -59,15 +59,27 @@ on:
 # job. Push always means `dev`; workflow_dispatch uses the operator's
 # pick; workflow_run mirrors the input of the upstream build job.
 concurrency:
-  group: deploy-${{ inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev') }}
+  group: deploy-${{ env.APP_ENV }}
   cancel-in-progress: false
 
 env:
   REMOTE_DIR: /opt/aisztens
+  # APP_ENV inference, in priority order:
+  #   1. workflow_dispatch input (operator's explicit choice)
+  #   2. workflow_run.inputs.app_env (upstream workflow_dispatch with input)
+  #   3. workflow_run.head_branch (push trigger on a known env branch)
+  #   4. github.ref_name (direct push to a known env branch — only 'dev' is
+  #      in push.branches, but we keep the same fallback shape for clarity)
+  #   5. 'dev' (safe default; the only env currently wired into
+  #      push.branches, so any unrecognised trigger routes to dev)
+  # Without step 3, a future `push.branches: [dev, prod]` plus a
+  # push to prod would silently deploy the prod-built image to the
+  # dev droplet (the original bug this guards against).
+  APP_ENV: ${{ inputs.app_env || (github.event.workflow_run.inputs.app_env || (github.event.workflow_run.head_branch == 'prod' && 'prod' || (github.event_name == 'push' && (github.ref_name == 'prod' && 'prod' || 'dev') || (github.event.workflow_run.head_branch == 'dev' && 'dev' || 'dev')))) }}
 
 jobs:
   deploy:
-    name: Deploy (${{ inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev') }}) + smoke-test
+    name: Deploy (${{ env.APP_ENV }}) + smoke-test
     # Only run on a successful upstream build when this was triggered by
     # `workflow_run`; otherwise always run.
     if: >-
@@ -75,7 +87,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ (inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev')) == 'prod' && 'production' || 'dev' }}
+    environment: ${{ env.APP_ENV == 'prod' && 'production' || 'dev' }}
 
     steps:
       # ------------------------------------------------------------------
@@ -85,6 +97,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # Defense-in-depth: do not persist the GITHUB_TOKEN in the
+          # runner's git config. No later step in this workflow uses
+          # git for push, so this is a no-op functionally and prevents
+          # any future step from accidentally inheriting write access.
+          persist-credentials: false
           sparse-checkout: |
             infra/docker-compose.yml
             infra/caddy/Caddyfile
@@ -94,23 +111,23 @@ jobs:
 
       # ------------------------------------------------------------------
       # 2. Resolve APP_ENV and read the matching per-env secret.
-      #    APP_ENV comes from `inputs.app_env` (workflow_dispatch) or
-      #    `github.event.workflow_run.inputs.app_env` (workflow_run), or
-      #    defaults to `dev` for push events. It selects which secret is
-      #    used (INFRA_ENV_DEV / INFRA_ENV_PROD).
+      #    APP_ENV is computed once at workflow level (see the
+      #    workflow-level `env:` block); this step just reads it back
+      #    and selects the matching secret. The script also produces
+      #    `image_tag` for downstream steps to pin to.
       # ------------------------------------------------------------------
       - name: Resolve APP_ENV and IMAGE_TAG
         id: resolve
         env:
           # GitHub Actions expressions have no `upper()` (or any case-conversion)
           # function, so we cannot build the secret name with format+upper.
-          # `app_env` is constrained to `dev|prod` by upstream inputs; we
-          # resolve it the same way the `run:` step does and then pick the
-          # matching secret by equality.
-          INFRA_ENV: ${{ (inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev')) == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
+          # `app_env` is constrained to `dev|prod` by the env-level
+          # APP_ENV helper (see top of file); we resolve the matching
+          # secret by equality here.
+          INFRA_ENV: ${{ env.APP_ENV == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
-          app_env="${{ inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev') }}"
+          app_env="$APP_ENV"
           if [ -z "$INFRA_ENV" ]; then
             echo "ERROR: INFRA_ENV_${app_env^^} secret is empty." >&2
             exit 1
@@ -147,14 +164,33 @@ jobs:
         env:
           # GitHub Actions expressions have no `upper()` (or any case-conversion)
           # function, so we cannot build the secret name with format+upper.
-          # `app_env` is constrained to `dev|prod` by upstream inputs; we
-          # resolve it the same way the `run:` step does and then pick the
-          # matching secret by equality.
-          INFRA_ENV: ${{ (inputs.app_env || (github.event.workflow_run.inputs.app_env || 'dev')) == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
+          # `app_env` is constrained to `dev|prod` by the env-level
+          # APP_ENV helper; the matching secret is selected by equality.
+          # NOTE: the appended block at the end of this step writes
+          # APP_ENV / IMAGE_TAG / GHCR_OWNER / REGISTRY into the file,
+          # which OVERWRITES any same-named values that the secret may
+          # have contained. The intent is for the secret to provide the
+          # static config (DOMAIN, ACME_EMAIL, DB passwords, etc.) and
+          # for the workflow to inject the runtime-only values. If the
+          # secret ever contains APP_ENV / IMAGE_TAG / GHCR_OWNER /
+          # REGISTRY, those values will be silently replaced; document
+          # this in deploy/README.md and audit the secrets file.
+          INFRA_ENV: ${{ env.APP_ENV == 'prod' && secrets.INFRA_ENV_PROD || secrets.INFRA_ENV_DEV }}
         run: |
           set -euo pipefail
           mkdir -p infra
           printf '%s\n' "$INFRA_ENV" > "infra/.env"
+          # Defensive: refuse to proceed if the secret defines any of the
+          # keys this step appends, because the appended values would
+          # silently overwrite them (last write wins). This makes a class
+          # of "secret drift" bugs loud rather than silent.
+          for key in APP_ENV IMAGE_TAG GHCR_OWNER REGISTRY; do
+            if grep -q -E "^${key}=" infra/.env; then
+              echo "ERROR: INFRA_ENV_${APP_ENV^^} secret defines ${key}= which would be silently overwritten by deploy.yml." >&2
+              echo "       Remove ${key}= from the secret (it is injected below) and re-run." >&2
+              exit 1
+            fi
+          done
           chmod 0644 "infra/.env"
           # IMAGE_TAG and GHCR_OWNER are runtime-only values the droplet
           # needs to construct the image references; the secret holds
@@ -173,6 +209,17 @@ jobs:
       # 4. Render the Caddyfile from infra/caddy/Caddyfile using the same
       #    `sed` logic that deploy/deploy.sh:render_caddyfile() uses.
       #    The droplet only ever sees the rendered file.
+      #
+      #    IMPORTANT: this step assumes the INFRA_ENV_* secret stores
+      #    DOMAIN and ACME_EMAIL in a form that survives a round-trip
+      #    through `grep | cut | tr` AND through the resulting Caddyfile
+      #    template substitution. Concretely:
+      #      - shell-style escape (`KEY="value"`) is OK and is the
+      #        convention; this step strips the surrounding quotes.
+      #      - bare unquoted `KEY=value with spaces` would break
+      #        `docker compose --env-file` parsing downstream.
+      #    Keep the INFRA_ENV_DEV / INFRA_ENV_PROD secrets consistent
+      #    with the format in infra/.env.example.
       # ------------------------------------------------------------------
       - name: Render Caddyfile
         run: |
@@ -185,6 +232,10 @@ jobs:
           # line parses cleanly; do not "simplify" `\047` back to a literal `'`,
           # that regresses to `unexpected EOF while looking for matching ''`.
           _quote_chars=$'\"\047'
+          # Defensive: bail out if the DOMAIN or ACME_EMAIL values contain
+          # the '|' character (would break the sed delimiter below). This
+          # is a guard, not a feature — if it ever trips, fix the secret,
+          # don't paper over the warning here.
           domain="$(grep -E '^DOMAIN=' infra/.env | head -n1 | cut -d= -f2- | tr -d "$_quote_chars")"
           acme_email="$(grep -E '^ACME_EMAIL=' infra/.env | head -n1 | cut -d= -f2- | tr -d "$_quote_chars")"
           if [ -z "$domain" ] || [ -z "$acme_email" ]; then
@@ -194,6 +245,14 @@ jobs:
           sed -e "s|<DOMAIN>|$domain|g" \
               -e "s|<ACME_EMAIL>|$acme_email|g" \
               infra/caddy/Caddyfile > infra/caddy/Caddyfile.rendered
+          if [ -n "$domain" ] && printf '%s' "$domain" | grep -q '|'; then
+            echo "ERROR: DOMAIN=$domain contains a '|' character which would break the sed replacement." >&2
+            exit 1
+          fi
+          if [ -n "$acme_email" ] && printf '%s' "$acme_email" | grep -q '|'; then
+            echo "ERROR: ACME_EMAIL=$acme_email contains a '|' character which would break the sed replacement." >&2
+            exit 1
+          fi
           if grep -q '<DOMAIN>\|<ACME_EMAIL>' infra/caddy/Caddyfile.rendered; then
             echo "ERROR: rendered Caddyfile still contains unresolved placeholders." >&2
             exit 1
@@ -206,7 +265,7 @@ jobs:
       #    file, the env, and the rendered Caddyfile.
       # ------------------------------------------------------------------
       - name: Ship compose + env + Caddyfile to droplet
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
@@ -226,7 +285,7 @@ jobs:
       #     docker-compose.yml — only the .env carries secrets.
       # ------------------------------------------------------------------
       - name: Tighten infra/.env permissions on the droplet
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         env:
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
         with:
@@ -257,7 +316,7 @@ jobs:
         # Actions, so the conditional is performed inside the step body.
         # If GHCR_PAT is unset, the inner guard skips the login; this is
         # the public-repo case where anonymous `docker pull` already works.
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         env:
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
@@ -285,7 +344,7 @@ jobs:
       #    the host "live but stale".
       # ------------------------------------------------------------------
       - name: Pull and start the stack
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         env:
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
           APP_ENV: ${{ steps.resolve.outputs.app_env }}
@@ -322,7 +381,7 @@ jobs:
       # ------------------------------------------------------------------
       - name: Verify every service is running IMAGE_TAG
         id: verify-tag
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         env:
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
           IMAGE_TAG: ${{ steps.resolve.outputs.image_tag }}
@@ -360,7 +419,7 @@ jobs:
       #    more diagnostic failure.
       # ------------------------------------------------------------------
       - name: Wait for api healthcheck
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         env:
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
           APP_ENV: ${{ steps.resolve.outputs.app_env }}
@@ -396,7 +455,7 @@ jobs:
       #    fails this step, which fails the workflow.
       # ------------------------------------------------------------------
       - name: Run stack smoke tests against live deployment
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         env:
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
         with:
@@ -415,7 +474,7 @@ jobs:
       # ------------------------------------------------------------------
       - name: Dump container logs on failure
         if: failure()
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         env:
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
           APP_ENV: ${{ steps.resolve.outputs.app_env }}

@@ -97,8 +97,22 @@ admin.<DOMAIN> {
 	}
 }
 
-# Apex: redirect to the public website. Until a real landing page is
-# mounted at the apex, this is the cleanest behaviour.
-<DOMAIN> {
-	redir https://web.<DOMAIN>{uri} 307
-}
+# Apex (`aisztens.hu`) is intentionally NOT served from this droplet.
+# Its DNS A record points at a separate WordPress server (a legacy
+# marketing site we are not migrating), so the apex is unreachable from
+# Caddy. If we kept an apex site block here, Caddy would request a Let's
+# Encrypt certificate for a host it does not serve, the http-01
+# challenge would be served by the WordPress server (which returns 404
+# for `.well-known/acme-challenge/...`), and ACME would loop forever
+# spamming the caddy log with `could not get certificate from issuer`
+# errors every ~10s. The redirect to web.<DOMAIN> is therefore a
+# no-op for users — the apex already serves the WordPress site
+# directly. See:
+#   docs/history/2026-10-11--19-29-00-apex-wordpress-intentional-clarification.md
+#   docs/Specs/Caddy-Reverse-Proxy.md §"Apex is not on this droplet"
+# If the apex is ever migrated to this droplet, RE-ADD the redirect
+# block below (it is intentionally omitted, not deleted):
+#
+#     <DOMAIN> {
+#         redir https://web.<DOMAIN>{uri} 307
+#     }

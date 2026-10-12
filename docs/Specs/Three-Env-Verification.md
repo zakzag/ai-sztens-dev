@@ -1,7 +1,16 @@
 # Three-Environment Verification — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-08 — image-based deploy: droplet pulls pre-built images
+**Last updated:** 2026-10-12 — stack smoke test fixes (see §3.7.1): the
+Caddy liveness check now probes `https://api.<DOMAIN>/healthz` instead
+of the disabled `:2019/config/` admin endpoint; the postgres roles
+check now passes `-U` so it authenticates as the POSTGRES_USER instead
+of the image's `root` user; the API greeting substring in the smoke
+assertions is now `Hello Beautiful World` to match
+[`apps/api/src/app.service.ts:6`](../../apps/api/src/app.service.ts) (see
+[`docs/history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md`](../history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md) +
+[`docs/milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md`](../milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md)).
+Previous update: 2026-10-08 — image-based deploy: droplet pulls pre-built images
 from GHCR, never builds; `apps/{web,admin}/dist` host bind mounts removed (see
 [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Previous note (2026-10-07): deploy identity is `deployer` for both paths and a droplet keeps exactly one runtime env file, `infra/.env` (see §1d, §3.2, §3.8, §7).
 **Audience:** anyone who wants to confirm the three-env separation actually
@@ -371,9 +380,15 @@ ssh deployer@aisztens.hu "cd /opt/aisztens && bash scripts/test/stack-smoke.sh"
 # Expect: 6 liveness + 6 cross-service checks all PASS.
 #   The liveness module gained two VAPI webhook checks (5: Caddy 405
 #   pre-filter, 6: NestJS HMAC accept); they need a running `caddy`
-#   container and derive their target/secret from infra/.env. The suite and
-#   its checks are documented in scripts/README.md (see also
-#   docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md).
+#   container and derive their target/secret from infra/.env. The Caddy
+#   liveness check (#3) probes `https://api.<DOMAIN>/healthz` from
+#   inside the caddy container — the admin API on :2019 is intentionally
+#   disabled (`admin off` in infra/caddy/Caddyfile), so the historical
+#   `:2019/config/` probe no longer applies. The check is gracefully
+#   skipped when DOMAIN is missing from infra/.env. The suite and its
+#   checks are documented in scripts/README.md (see also
+#   docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md and
+#   docs/history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md).
 #   (If stack-smoke.sh is missing on the droplet, deploy.sh did not ship
 #   scripts/test/ — re-run deploy.sh.)
 ```

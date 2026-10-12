@@ -47,10 +47,12 @@ run_cross_service_checks() {
   # Hits the Fastify listener directly (not through the public reverse-proxy
   # site block, which would require a valid Host header). The default root
   # controller in apps/api/src/app.controller.ts returns the literal string
-  # "Hello World!" — matching that is a strong proof of end-to-end reach.
+  # "Hello Beautiful World!" — matching the unique substring is a strong
+  # proof of end-to-end reach. The substring must be kept in sync with
+  # [apps/api/src/app.service.ts:6] if the greeting ever changes.
   assert_service_out "caddy->api" \
     "caddy can GET http://api:3000/api" \
-    "Hello World" \
+    "Hello Beautiful World" \
     dc_exec caddy wget -qO- http://api:3000/api
 
   # -----------------------------------------------------------------------
@@ -72,10 +74,18 @@ run_cross_service_checks() {
   # startup. We expect exactly three rows: aisztens (app role), tkovari and
   # krak (operator roles). The query is wrapped in a single line so psql -tAc
   # returns one row per role.
+  #
+  # We pass -U because `docker compose exec` defaults to the image's
+  # primary user (root for postgres:16-alpine), and psql authenticates
+  # over the unix socket as that OS user. The `root` role does not exist
+  # in postgres, so the call would return `FATAL: role "root" does not
+  # exist`. Forcing -U to POSTGRES_USER (which the postgres image
+  # initializes as a superuser) avoids that trap. This mirrors the
+  # postgres healthcheck in [infra/docker-compose.yml:127].
   assert_service_out "postgres-roles" \
     "roles aisztens, tkovari, krak exist" \
     "3" \
-    dc_exec postgres psql -tAc \
+    dc_exec postgres psql -tAc -U "${POSTGRES_USER:-postgres}" \
       "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak')"
 
   # -----------------------------------------------------------------------

@@ -12,6 +12,29 @@
 #   * dc_exec, dc_logs
 #   * PASS_COUNT / FAIL_COUNT counters
 
+# resolve_caddy_check_domain
+#
+# Fills in SMOKE_CADDY_TARGET (= DOMAIN) for the Caddy HTTPS healthz probe
+# when the caller did not export it. Reads $DOMAIN from $ENV_FILE
+# (infra/.env) — the same value the caddy container receives through
+# the compose `environment:` block, and the value baked into the
+# rendered Caddyfile.
+#
+# Exported so the wget sub-shell sees it. No-op when the value already
+# exists in the environment.
+resolve_caddy_check_domain() {
+  if [ -z "${SMOKE_CADDY_TARGET:-}" ]; then
+    if [ -z "${DOMAIN:-}" ] && [ -f "${ENV_FILE:-}" ]; then
+      DOMAIN="$(grep -E '^DOMAIN=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+      export DOMAIN
+    fi
+    if [ -n "${DOMAIN:-}" ]; then
+      SMOKE_CADDY_TARGET="${DOMAIN}"
+      export SMOKE_CADDY_TARGET
+    fi
+  fi
+}
+
 # resolve_webhook_check_env
 #
 # Fills in WEBHOOK_TARGET / VAPI_WEBHOOK_SECRET for checks 5+6 when the caller
@@ -49,9 +72,9 @@ resolve_webhook_check_env() {
 # run_service_checks
 #
 # Runs the six liveness checks in order:
-#   1. api            — GET /api returns 200 from inside the container
+#   1. api            — GET /api returns 200 + greeting body from inside the container
 #   2. postgres       — pg_isready succeeds
-#   3. caddy          — admin API at :2019 responds
+#   3. caddy          — HTTPS healthz through https://api.<DOMAIN> (TLS + routing + API)
 #   4. monitor        — at least one "API check" line in the logs
 #   5. caddy vapi 405 — POST /api/vapi/webhooks/* without X-Vapi-Signature → 405
 #   6. caddy vapi 200 — POST /api/vapi/webhooks/* with valid signature → 200
@@ -74,9 +97,13 @@ run_service_checks() {
   # Use Node's built-in fetch (Node 18+) so we don't depend on curl being
   # installed inside the API image. Matches the existing compose healthcheck
   # command in infra/docker-compose.yml.
+  # The expected substring is the literal returned by [apps/api/src/app.service.ts:6]
+  # ("Hello Beautiful World!"). Keep this in sync if the greeting ever changes —
+  # the substring match is intentionally broader than the full string so a future
+  # tweak (e.g. "Hello Beautiful World 👋") does not break the suite.
   assert_service_out "api" \
-    "GET /api returns 200 (\"Hello World!\")" \
-    "Hello World" \
+    "GET /api returns 200 (greeting body)" \
+    "Hello Beautiful World" \
     dc_exec api node -e "fetch('http://127.0.0.1:3000/api').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
   # -----------------------------------------------------------------------
@@ -90,15 +117,28 @@ run_service_checks() {
     dc_exec postgres pg_isready -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-callback}"
 
   # -----------------------------------------------------------------------
-  # 3. caddy — admin API on :2019.
+  # 3. caddy — TLS + routing + API reachable through the public edge.
   # -----------------------------------------------------------------------
-  # The caddy image ships wget (busybox). The /config/ endpoint returns the
-  # active Caddy config; any non-empty JSON response means the admin socket
-  # is up and the reverse-proxy config has loaded.
-  assert_service_out "caddy" \
-    "admin API on :2019/config/ responds" \
-    "apps" \
-    dc_exec caddy wget -qO- http://127.0.0.1:2019/config/
+  # We do NOT probe the admin API on :2019 anymore: the Caddyfile sets
+  # `admin off` in its global options ([infra/caddy/Caddyfile:39]) which
+  # intentionally disables the admin endpoint for security (no external
+  # admin surface). Instead we hit `https://api.<DOMAIN>/healthz` from
+  # inside the caddy container — that single probe proves:
+  #   * Caddy is up and has bound :443
+  #   * the rendered Caddyfile was loaded (otherwise no host matcher)
+  #   * the api.<DOMAIN> site block routes /healthz to api:3000
+  #   * the NestJS health endpoint responds 200
+  # The busybox `wget` in the caddy image ignores self-signed certs by
+  # default, so this works even before Let's Encrypt issues the cert.
+  resolve_caddy_check_domain
+  if [ -z "${SMOKE_CADDY_TARGET:-}" ]; then
+    log_info "Skipping Caddy HTTPS probe (no DOMAIN in ${ENV_FILE:-infra/.env} — export DOMAIN=example.com to enable)"
+  else
+    assert_service_out "caddy" \
+      "HTTPS healthz through api.<DOMAIN> responds" \
+      "200" \
+      dc_exec caddy wget -qO- --no-check-certificate "https://api.${SMOKE_CADDY_TARGET}/healthz"
+  fi
 
   # -----------------------------------------------------------------------
   # 4. monitor — watchdog has ticked at least once.

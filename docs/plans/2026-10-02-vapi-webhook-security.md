@@ -4,7 +4,7 @@
 **Státusz:** megvalósítva — a 2026-10-06-i audit szerint az első implementáció nem futott le
 (guard DI, `rawBody` opció, Buffer raw body, smoke checkek); a javítás és a hiányzó tesztek
 (`vapi-webhooks.service.spec.ts`, `vapi-webhooks.controller.spec.ts`, boot teszt) elkészültek.
-Lásd: [`docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`](../docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md)
+Lásd: [`docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`](../history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md)
 **Szerző:** architect mode (Zoo)
 **Érintett területek:** [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile:42), [`apps/api/src/`](../../apps/api/src/), [`infra/.env.example`](../../infra/.env.example:33), [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md)
 

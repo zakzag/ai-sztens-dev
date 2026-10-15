@@ -108,6 +108,8 @@ A szétválasztás két ponton történik:
 
 Így a „közös build hely" csak a közös forráskód (monorepo + `packages/shared`); az elkészült artifact-ok külön image-ekbe és külön konténerekbe kerülnek.
 
+> **Image-based deploy (2026-10-08 óta):** a fenti táblázat mind a hat konténert lefedi (`api`, `web`, `admin`, `postgres`, `caddy`, `monitor`), és az alkalmazás-image-ek (`api`, `web`, `admin`, `monitor`) **nem** a hoston futó build-ből, hanem a CI által GHCR-re push-olt artifact-okból származnak (lásd [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Az SPA bundle-ök az image-be vannak égetve (`/usr/share/nginx/html` a `web`/`admin` konténerben), és nincs hostoldali bind mount. A lokális fejlesztéshez az `infra/docker-compose.local.yml` override visszahozza a `build:` blokkokat.
+
 ### 6.1 Beégetett build metadata (deploy dátum + commit hash)
 
 Az [`.github/workflows/images.yml`](../../.github/workflows/images.yml) `Compute image metadata` lépése **egyetlen forrásból** számolja a metadata-t, így a három kép ugyanazt az értéket kapja egy adott revízióhoz:
@@ -129,3 +131,41 @@ A build-argok célja Dockerfile-onként:
 A `monitor` kép szándékosan nem kapja meg ezeket (nincs rájuk szüksége).
 
 Lokális buildnél (`scripts/dev-stack.sh up`, `pnpm --filter … dev`) a build-argok hiányoznak, ezért a Dockerfile-ok üres default-ot használnak: a `/healthz` `null`-t ad vissza, a SPA footer pedig `—` placeholdert renderel — egyik sem hiba, csak a graceful degradáció.
+
+### 6.2 A Postgres NEM saját image — hivatalos image + egyszeri init
+
+A `postgres` az egyetlen alkalmazás-szolgáltatás, amit **nem** az
+[`.github/workflows/images.yml`](../../.github/workflows/images.yml) állít elő.
+A compose a hivatalos `postgres:16-alpine` image-re hivatkozik, ezért:
+
+- a `docker compose pull` a **Docker Hubról** húzza (nem a GHCR-ről), így egy
+  elrontott `GHCR_OWNER` a Postgres-t nem érinti;
+- **mentes az `IMAGE_TAG` pinning alól** — a [`deploy.yml`](../../.github/workflows/deploy.yml)
+  „Verify every service is running IMAGE_TAG" lépése csak az `api`, `web`,
+  `admin` és `monitor` service-eket ellenőrzi;
+- az `up -d --remove-orphans --force-recreate` minden deploy-nál újra
+  létrehozza a konténert, de az adat a `pgdata` named volume-ban marad, tehát
+  túléli az újralétrehozást.
+
+Az [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh) a
+`/docker-entrypoint-initdb.d` könyvtárba van bind-mountolva
+(`./postgres/init:/docker-entrypoint-initdb.d:ro`), és a hivatalos entrypoint
+**kizárólag az üres `pgdata` volume első inicializálásakor** futtatja; a későbbi
+indítások `Skipping initialization`-t logolnak, és nem futtatják újra. A script
+idempotens, ezért kézzel bármikor újrafuttatható:
+
+```bash
+docker compose --env-file infra/.env -f infra/docker-compose.yml \
+  exec -T postgres bash /docker-entrypoint-initdb.d/01-roles.sh
+```
+
+A `infra/postgres/init` könyvtárat minden deploy elküldi a dropletre — a
+`.github/workflows/deploy.yml` `scp` forráslistája és a `deploy/deploy.sh`
+`upload()` függvénye is tartalmazza. Enélkül egy friss droplet **role-ok
+nélkül** inicializálná a Postgrest (a bind mount forrása üres lenne), és az API
+az első DB-hívásnál `role "aisztens" does not exist` hibát kapna.
+
+> A scriptben **tilos** `DO $$ … $$` blokkba tenni a psql-változókat: a psql a
+> `:'var'` / `:"var"` helyettesítést lexikailag végzi, és dollar-quote-olt
+> stringen belül **nem** interpolál, így a szerver `syntax error at or near ":"`-t
+> dob. A feltételes DDL ezért `\gexec`-et használ.

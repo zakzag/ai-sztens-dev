@@ -37,14 +37,29 @@ the local three-env layout.
 
 Two layers of checks, all executed from the host via `docker compose exec`:
 
-### Per-service liveness (4 checks)
+### Per-service liveness (6 checks, one per application container)
+
+The image-based deploy (2026-10-08) introduced two more application
+containers (`web`, `admin`) that the smoke suite must also probe. The
+list below reflects the current `infra/docker-compose.yml` (image-based
+build, no `build:` blocks):
 
 | Service  | Check                                                       |
 |----------|-------------------------------------------------------------|
-| api      | `GET /api` returns 200 with the `Hello World!` body         |
-| postgres | `pg_isready -U postgres -d callback` exits 0                |
-| caddy    | `GET http://127.0.0.1:2019/config/` returns a non-empty body|
+| api      | `GET /api` returns 200 with the `Hello Beautiful World!` body |
+| web      | `GET /` returns 200 + `text/html` (nginx serves the SPA)     |
+| web-admin | `GET /` returns 200 + `text/html` (nginx serves the dashboard SPA) |
+| postgres | `pg_isready` exits 0 (user/DB resolved from `infra/.env`)    |
+| caddy    | `GET https://api.<DOMAIN>/healthz` returns the prod-shaped     |
 | monitor  | At least one `API check`/`API is reachable` line in the log  |
+
+The suite **does NOT** probe the Caddy admin API (`:2019/config/`).
+That endpoint is intentionally disabled (`admin off` in
+[`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile)) and the admin UI
+itself is not exposed on the local stack (the `local` override sets
+`caddy: profiles: [never]`), so the canonical liveness check is the
+HTTPS `/healthz` endpoint that the docker healthcheck and the monitor
+watchdog both call.
 
 ### Cross-service — do they see each other? (6 checks)
 
@@ -52,10 +67,15 @@ Two layers of checks, all executed from the host via `docker compose exec`:
 |-------------------------------|------------------------------------------------------------------|
 | `caddy` resolves `api`        | `getent hosts api`                                               |
 | `api` resolves `postgres`     | `getent hosts postgres`                                          |
-| `caddy → api` HTTP request    | `wget http://api:3000/api` → expects `Hello World`               |
+| `caddy → api` HTTP request    | `wget http://api:3000/healthz` → expects `{"status":"ok",...}`   |
 | `api → postgres` TCP connect  | `bash -c "exec 3<>/dev/tcp/postgres/5432"`                        |
 | Postgres roles exist          | `psql -tAc "... WHERE rolname IN ('aisztens','tkovari','krak')"` |
 | `monitor` ticked              | log scan inside the monitor container                             |
+
+The 6th and 7th checks (VAPI webhook pre-filter and HMAC accept) live
+in the **live** stack smoke suite ([`scripts/test/stack-smoke.sh`](scripts/test/stack-smoke.sh))
+— they require a running `caddy` container and derive their target/secret
+from `infra/.env`, which the local suite does not always have.
 
 ## Exit codes
 
@@ -169,8 +189,18 @@ live-access checks.
 
 - The script does not validate VAPI webhook payloads. Webhook integration
   tests require a stubbed VAPI server and belong in a separate plan.
-- `apps/web` and `apps/admin` are not part of the droplet compose stack yet
-  (see commented blocks in `infra/caddy/Caddyfile`), so they are not
-  exercised here.
+  The **live** stack smoke suite ([`stack-smoke.sh`](stack-smoke.sh))
+  has two VAPI webhook checks (Caddy 405 pre-filter + NestJS HMAC
+  accept); the local suite deliberately skips them because it requires
+  a running `caddy` container and a real `infra/.env` `VAPI_WEBHOOK_SECRET`.
+- `apps/web` and `apps/admin` are part of the droplet compose stack since
+  the 2026-10-08 image-based deploy (they live as their own `nginx`-served
+  SPA containers; the SPA bundles are baked into the image). The local
+  override ([`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml))
+  also builds them from source. The liveness table above covers the new
+  containers. The commented blocks in
+  [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile) that the old
+  copy referenced were removed on 2026-10-12 (`caddyfile-apex-block-removed`
+  history).
 - No load, soak, or chaos tests. This is a smoke suite, not a benchmarking
   suite.

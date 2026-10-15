@@ -109,12 +109,15 @@ run_service_checks() {
   # -----------------------------------------------------------------------
   # 2. postgres — pg_isready inside the container.
   # -----------------------------------------------------------------------
-  # We let compose interpolate the env vars from infra/.env. Note that
   # postgres only exposes the port on the `internal` network — we are
   # exec'ing INTO postgres itself, so localhost is the right host.
+  # The user/database names are read from $ENV_FILE (infra/.env) instead of
+  # being hard-coded, so the check cannot drift from the compose config.
   assert_service "postgres" \
-    "pg_isready -U postgres -d callback" \
-    dc_exec postgres pg_isready -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-callback}"
+    "pg_isready (postgres is accepting connections)" \
+    dc_exec postgres pg_isready \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)"
 
   # -----------------------------------------------------------------------
   # 3. caddy — TLS + routing + API reachable through the public edge.
@@ -127,16 +130,20 @@ run_service_checks() {
   #   * Caddy is up and has bound :443
   #   * the rendered Caddyfile was loaded (otherwise no host matcher)
   #   * the api.<DOMAIN> site block routes /healthz to api:3000
-  #   * the NestJS health endpoint responds 200
+  #   * the NestJS health endpoint answers with its liveness JSON
   # The busybox `wget` in the caddy image ignores self-signed certs by
   # default, so this works even before Let's Encrypt issues the cert.
   resolve_caddy_check_domain
   if [ -z "${SMOKE_CADDY_TARGET:-}" ]; then
     log_info "Skipping Caddy HTTPS probe (no DOMAIN in ${ENV_FILE:-infra/.env} — export DOMAIN=example.com to enable)"
   else
+    # `wget -qO-` prints the response BODY only — the HTTP status code is
+    # never in it. Asserting on the literal "200" therefore failed on a
+    # perfectly healthy stack. Assert on a stable field of the liveness
+    # payload instead ([apps/api/src/health/health.controller.ts]).
     assert_service_out "caddy" \
-      "HTTPS healthz through api.<DOMAIN> responds" \
-      "200" \
+      "HTTPS healthz through api.<DOMAIN> returns the liveness JSON" \
+      '"status":"oks"' \
       dc_exec caddy wget -qO- --no-check-certificate "https://api.${SMOKE_CADDY_TARGET}/healthz"
   fi
 

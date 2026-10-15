@@ -5,7 +5,7 @@
 `commitHash` mezőkkel bővült, és a `web` / `admin` SPA front-oldalán megjelenik
 egy build-info sor (telepítés dátuma + commit hash). Lásd §4.2 és
 [`docs/history/2026-10-12--13-20-00-deploy-meta-version-display.md`](../history/2026-10-12--13-20-00-deploy-meta-version-display.md).
-**Utolsó frissítés:** 2026-10-12 (image-based deploy: a workflow-szintű `concurrency:` blokk **törölve**, mert a `concurrency.group` expression evaluator csak a `github | inputs | vars | needs` context-eket engedi — a `matrix` context **nem** érhető el workflow-szinten, így a korábbi `concurrency.group = deploy-${{ matrix.app_env }}` szintén `Unrecognized named-value: 'matrix'` hibát dobott. A per-env szeparáció most kizárólag a job-szintű `if:` filteren (egy mátrix entry fut / trigger; a másik skip) és a `jobs.deploy.environment` GitHub-Environment bindingon múrik. Lásd [`docs/history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md`](../history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md) + [`docs/milestones/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.milestone.md`](../milestones/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.milestone.md)). 2026-10-12 (image-based deploy: a korábbi workflow-szintű `env.APP_ENV` helper kiváltva egy 2-elemű `matrix.app_env`-re (`dev|prod`), mert a `env.*` context **nem** érhető el `jobs.<id>.name` / `jobs.<id>.environment` helyeken — a GitHub Actions expression parser `Unrecognized named-value: 'env'` hibát dobott, és a workflow minden pushra elbukott. A mátrix entry-t egy job-szintű `if:` választja ki a `inputs.app_env` / `workflow_run.inputs.app_env` / `github.ref_name` / `workflow_run.head_branch` fallback-lánccal; a `matrix.*` context a `jobs.<id>.name` és `jobs.<id>.environment` kulcsokban (és a step-ek `env:` blokkjában) megengedett, így `jobs.<id>.environment = ${{ matrix.app_env == 'prod' && 'production' || 'dev' }}` ismét érvényes. Lásd [`docs/history/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md`](../history/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md) + [`docs/milestones/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.milestone.md`](../milestones/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.milestone.md)). 2026-10-12 (stack smoke test expectation fixes: a §4.2 táblázat `Hello World!` sora `Hello Beautiful World!`-re frissült, mert a NestJS root controller greetingje [`apps/api/src/app.service.ts:6`](../../apps/api/src/app.service.ts) azóta ezt adja vissza; lásd [`docs/history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md`](../history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md) + [`docs/milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md`](../milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md)). **2026-10-12** (image-based deploy: (image-based deploy: deploy.yml workflow-szintű APP_ENV helper a `dev|prod` kiválasztáshoz `inputs.app_env` / `workflow_run.inputs.app_env` / `workflow_run.head_branch` / `github.ref_name` forrásokból — kiküszöböli a `push to prod → deploy to dev` csendes regressziót; `Render infra/.env` fail-fast a secretben definiált `APP_ENV|IMAGE_TAG|GHCR_OWNER|REGISTRY` kulcsokra, hogy a workflow által append-elt értékek ne írhassanak felül csendben secret értékeket; `Render Caddyfile` '|' delimiter védelme a DOMAIN/ACME_EMAIL értékekben; `actions/checkout` `persist-credentials: false`; appleboy akciók SHA-pinre cserélve; lásd [`docs/history/2026-10-12--00-50-00-deploy-yml-deep-audit-and-hardening.md`](../history/2026-10-12--00-50-00-deploy-yml-deep-audit-and-hardening.md)) (**image-based deploy:** a droplet mostantól kizárólag `docker compose pull && up -d`-t futtat, a forráskód és a `pnpm` workspace nem kerül a dropletre — a `web` és `admin` saját konténerben fut, a Caddy ezeket proxy‑zza; lásd [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md) + §4.6 lentebb. **deploy identity:** a `deploy.sh` minden parancsa — és a CI — `deployer`-ként lép be, a `bootstrap` az egyetlen kézzel futtatott root-os lépés; a dropleten a runtime env fájl mindig `infra/.env`, mert egy droplet = egy környezet, a per-env név csak lokális forrás — lásd §3 + [`deploy/README.md`](../../deploy/README.md) §2 + [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md) §3.2/§3.8. **deploy logger-integráció:** a [`deploy/deploy.sh`](../../deploy/deploy.sh) a [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh) loggert használja, minden futás teljes naplója a `deploy/log/latest.log`-ban van, a hiányzó `HOST=` guard pedig naplózott hibát ad; Windows-on a [`deploy/deploy.ps1`](../../deploy/deploy.ps1) wrapper indítja — lásd §6.1 + [`deploy/README.md`](../../deploy/README.md). `/api/vapi/*` HMAC ellenőrzés + Caddy pre-filter automatizálva a smoke suite-ban; a guard config tokenen + Buffer raw body-n alapul — lásd 4.4 + `docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`)
+**Utolsó frissítés:** 2026-10-13 (deploy-process konzisztencia takarítás: a §9.1 `deploy.yml` leírás a 2-elemű `matrix` helyett a **`plan` job** modellt írja le — `.github/scripts/deploy-plan.sh`, `needs.plan.outputs.*`, `workflow_run` / `workflow_dispatch` trigger, nincs `push` trigger és nincs `matrix`; a §6 pnpm-native OOM sora már nem javasol `--build`-et a dropleten, hanem CI-oldali image-újrabuildet; a §6.1 banner-minta `[stage=upload_rsync]` → `[stage=upload_files]`, és az rsync-mirror bekezdés helyett a 3 fájlos `scp` leírás szerepel. Az image-based deploy (2026-10-08) óta a droplet nem buildel és nem kap forráskódot.)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
 ---
@@ -62,24 +62,35 @@ A `docker compose ps` **alapértelmezetten csak a futó konténereket mutatja**.
 docker compose --env-file infra/.env -f infra/docker-compose.yml ps -a
 ```
 
-**Elvárt kimenet** (mind a négy sor `Up`, a postgresnél `(healthy)`):
+**Elvárt kimenet** (mind a hat sor `Up`, a postgresnél `(healthy)`):
 
 ```
-NAME                    IMAGE                     SERVICE    STATUS
-aisztens-postgres-1     postgres:16-alpine        postgres   Up X minutes (healthy)
-aisztens-api-1          aisztens/api:latest       api        Up X minutes
-aisztens-caddy-1        caddy:2-alpine            caddy      Up X minutes
-aisztens-monitor-1      aisztens/monitor:latest   monitor    Up X minutes
+NAME                    IMAGE                                                SERVICE    STATUS
+aisztens-postgres-1     postgres:16-alpine                                   postgres   Up X minutes (healthy)
+aisztens-api-1          ghcr.io/<owner>/aisztens-api:sha-<short>             api        Up X minutes
+aisztens-web-1          ghcr.io/<owner>/aisztens-web:sha-<short>             web        Up X minutes
+aisztens-admin-1        ghcr.io/<owner>/aisztens-admin:sha-<short>           admin      Up X minutes
+aisztens-caddy-1        caddy:2-alpine                                       caddy      Up X minutes
+aisztens-monitor-1      ghcr.io/<owner>/aisztens-monitor:sha-<short>         monitor    Up X minutes
 ```
 
-**Ha bármelyik `Created`, `Exited` vagy `Restarting`:**
+Az image nevek a deploy workflow által kiírt `IMAGE_TAG` értéket tükrözik
+(a `git short SHA` a `images.yml` futásából). A `docker compose ps
+--format '{{.Service}} {{.Image}}'` parancsot a CI deploy workflow
+utolsó lépésben is ellenőrzi (`Verify every service is running
+IMAGE_TAG`), így egy régi, leállított image-en ragadt konténer azonnal
+látszik.
 
 ```bash
 # A pontos hiba a service logban van
 docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=200 <service>
 
-# Majd indítsd újra a stacket
-docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+# Image-based deploy: a droplet nem buildel. Húzd újra a GHCR image-et
+# és erőltesd a konténer újraindítását. A `--force-recreate` biztosítja,
+# hogy az új image vagy compose file módosítás tényleg érvényesüljön.
+docker compose --env-file infra/.env -f infra/docker-compose.yml pull
+docker compose --env-file infra/.env -f infra/docker-compose.yml \
+  up -d --remove-orphans --force-recreate
 ```
 
 A 4-es fejezet „Hibadiagnosztikai mátrix" szekció részletezi, mit jelentenek az egyes hibaállapotok.
@@ -180,7 +191,7 @@ docker compose exec caddy caddy list-certificates
 
 ```bash
 # Postgres readiness
-docker compose exec postgres pg_isready -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-callback}"
+docker compose exec postgres pg_isready -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-aisztens_db}"
 
 # A monitor watchdog éri-e el az API-t? (a watchdog /healthz-t hív)
 docker compose exec monitor sh -c 'wget -qO- http://api:3000/healthz || echo "MONITOR FAILED"'
@@ -311,7 +322,7 @@ echo -n 'admin:   '; curl -fsSI "https://admin.${DOMAIN}/"      | head -n1 || ec
 echo -n 'api:     '; curl -fsS  "https://api.${DOMAIN}/healthz" && echo || echo FAIL
 echo
 echo '=== 3. Internal services ==='
-docker compose exec -T postgres pg_isready -U aisztens -d callback
+docker compose exec -T postgres pg_isready -U postgres -d aisztens_db
 echo
 echo '=== 4. Rendered Caddyfile (must be empty) ==='
 grep -E '<DOMAIN>|<ACME_EMAIL>' infra/caddy/Caddyfile.rendered && echo 'PLACEHOLDER LEAK!' || echo 'Caddyfile clean.'
@@ -329,17 +340,17 @@ Ha bármelyik lépés `FAIL` vagy `PLACEHOLDER LEAK!` kiírást ad, a `docker co
 
 | Tünet | Valószínű ok | Teendő |
 |---|---|---|
-| `ps -a` mutatja a konténert, de státusz `Created` | A `docker compose up -d --build` nem futott le, vagy a build hibázott | Futtasd: `docker compose ... up -d --build`, majd `logs --tail=100 <service>` |
+| `ps -a` mutatja a konténert, de státusz `Created` | A `docker compose ... up -d` futása félbeszakadt (image-pull timeout, SSH drop) — a 2026-10-08 image-based deploy óta nincs `--build` a dropleten | Futtasd: `docker compose --env-file infra/.env -f infra/docker-compose.yml pull && up -d --force-recreate`, majd `logs --tail=100 <service>` |
 | `api` `Restarting` / `Exited (1)` healthcheck `exitCode: 1` | A NestJS még nem áll kész (`start_period: 60s` sem volt elég), VAGY a `/healthz` route nem érhető el. Ellenőrizd: `docker compose exec api wget -qO- http://127.0.0.1:3000/healthz` | Ha a NestJS lassan indul, növeld a `start_period`-et; ha a route 404, a `main.ts` `exclude` listája elvesztette a `healthz`-t |
 | `api` `Restarting` / `Exited (1)` típusú egyéb hiba | `DATABASE_URL` connect hiba — jellemzően `AISZTENS_DB_PASSWORD` üres az `infra/.env`-ben (a jelenlegi kódban nincs DB driver, tehát ez a hiba csak a jövőben aktiválódik) | `grep -E '^(POSTGRES_PASSWORD\|AISZTENS_DB_PASSWORD)=' infra/.env` — töltsd ki |
 | `caddy` `Restarting` / `Exited (1)` | A renderelt Caddyfile placeholdert tartalmaz (`<DOMAIN>`) | Futtasd újra a deploy-t, vagy manuálisan: `sed -i 's\|<DOMAIN>\|$DOMAIN\|g' infra/caddy/Caddyfile` |
-| `caddy` `Exited (1)` `open /srv/web: no such file or directory` | A SPA dist mappa nincs a dropleten | Ellenőrizd az `apps/{web,admin}/dist` tartalmát; ha üres, a `deploy.sh:build_spas()` kimaradt |
+| `caddy` `Exited (1)` `open /srv/web: no such file or directory` | **Legacy:** a SPA bundle-öket 2026-10-08 előtt bind mountolta a Caddy (`/srv/web`); image-based deploy óta a `web` és `admin` konténerek szolgálják ki a SPA-t, és ez az üzenet nem fordulhat elő | Ha mégis előfordul, a `web` / `admin` image-ek pull-ja nem futott le — ellenőrizd a `ghcr.io/<owner>/aisztens-{web,admin}:$IMAGE_TAG` image-ek elérhetőségét a GHCR-en |
 | `caddy` log: `http-01 challenge failed` | DNS A rekord nem a droplet IP-jére mutat, vagy a 80-as port zárva | `dig +short <DOMAIN>` + Cloud Firewall 80/443 szabályok |
 | `ps` OK, de `https://api.<DOMAIN>/healthz` → `502` | Caddy nem éri el a belső `api:3000`-et (rossz network vagy konténer leállt) | `docker compose exec caddy wget -qO- http://api:3000/healthz` |
 | `monitor` `Restarting` | Az api konténer még nem indult el (`start_period: 60s`) | Várj 60-90 másodpercet, vagy ellenőrizd az api logot; ha a `/healthz` route-ot a NestJS nem szolgáltatja, a watchdog is `down` alertet küld |
 | A konténer `killed` / `OOMKilled` | Memóriakorlát elérve | Lásd [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md) |
-| `api` `Restarting` rövid ciklusokban (5-60 mp), `top`-ban `pnpm-native` 60+ % CPU, `dmesg`-ben `Memory cgroup out of memory: Killed process ... (pnpm-native)` | A runtime image a `pnpm --filter … start:prod` wrappert használja, aminek a `pnpm-native` lockfile-verify helperje ~380 MB RSS-sel jár, és átlépi a 400 MB `mem_limit`-et. A kernel OOM-killere megöli, mielőtt a Node elindulna. | Ellenőrizd, hogy az image a `node apps/api/dist/main.js` CMD-t használja-e (lásd [`infra/app/Dockerfile`](../../infra/app/Dockerfile)). Ha a régi `pnpm …` CMD fut, frissítsd a CMD-et és rebuildelj: `docker compose ... up -d --build`. Teljes diagnózis: [`docs/history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md`](../history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md) |
-| A `docker compose ps` önmagában csak a postgres-t mutatja | A többi service `Created` státuszban van, mert a stack indítása félbeszakadt | Lásd 4.1 — futtasd a `ps -a` flag-gel, majd ha kell, `up -d --build` |
+| `api` `Restarting` rövid ciklusokban (5-60 mp), `top`-ban `pnpm-native` 60+ % CPU, `dmesg`-ben `Memory cgroup out of memory: Killed process ... (pnpm-native)` | A runtime image a `pnpm --filter … start:prod` wrappert használja, aminek a `pnpm-native` lockfile-verify helperje ~380 MB RSS-sel jár, és átlépi a 400 MB `mem_limit`-et. A kernel OOM-killere megöli, mielőtt a Node elindulna. | Ellenőrizd, hogy az image a `node apps/api/dist/main.js` CMD-t használja-e (lásd [`infra/app/Dockerfile`](../../infra/app/Dockerfile)). Ha a régi `pnpm …` CMD fut, javítsd a CMD-t, majd **buildeld újra az image-et a CI-ben** ([`.github/workflows/images.yml`](../../.github/workflows/images.yml)), és a dropleten csak `docker compose --env-file infra/.env -f infra/docker-compose.yml pull` + `up -d --force-recreate` fusson (a droplet nem buildel — nincs `--build`). Teljes diagnózis: [`docs/history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md`](../history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md) |
+| A `docker compose ps` önmagában csak a postgres-t mutatja | A többi service `Created` státuszban van, mert a stack indítása félbeszakadt | Lásd 4.1 — futtasd a `ps -a` flag-gel, majd ha kell, `pull && up -d --force-recreate` (image-based deploy: nincs `--build`) |
 | `healthcheck exitCode: 1` a `fetch('/healthz')` Node scriptben | A `node -e` parancs `process.exit(r.ok?0:1)` exit kódot ad, de a Docker ezt 0-nak tekinti, ha a fetch sikeres volt. Ha a `r.ok` `false`, a Node 1-es kóddal lép ki — ez a NestJS nem-elérhetőség tünete (még nem indult el, vagy a route nem él) | Lásd fentebb, `api Restarting` sor |
 
 ### 6.1 A deploy hiba bannerének olvasása (PR #1, 2026-09-29; logger-integráció 2026-10-06)
@@ -349,8 +360,8 @@ A `deploy.sh` a `set -euo pipefail` felett egy `ERR` trap-et is tartalmaz, amely
 **2026-10-06-tól** a `deploy.sh` a [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh) loggert használja: minden sor ISO-8601 időbélyeget és severity szintet kap, a stage breadcrumb pedig nem a szövegbe ágyazva, hanem `[stage=…]` tag-ként jelenik meg (a `log_stage()` állítja be). A banner formátuma:
 
 ```
-2026-10-06T15:55:28+02:00 [INFO ] [deploy] [stage=upload_rsync] Uploading /home/me/repo -> root@164.92.248.194:/opt/aisztens ...
-2026-10-06T15:56:15+02:00 [ERROR] [deploy] [stage=upload_rsync] FAILED at line=215 exit=12 after 47s
+2026-10-06T15:55:28+02:00 [INFO ] [deploy] [stage=upload_files] Shipping 3 files to deployer@164.92.248.194:/opt/aisztens ...
+2026-10-06T15:56:15+02:00 [ERROR] [deploy] [stage=upload_files] FAILED at line=215 exit=12 after 47s
 NAME                    SERVICE    STATUS
 aisztens-postgres-1     postgres   Up 12 minutes (healthy)
 aisztens-api-1          api        Up 12 minutes
@@ -360,7 +371,7 @@ aisztens-monitor-1      monitor    Restarting
 2026-10-06T15:56:15+02:00 [ERROR] [deploy] ===== finished: exit=12 duration=47s log=/home/me/repo/deploy/log/deploy-20261006-155528-up.log =====
 ```
 
-A stage-értékek lehetséges készlete: `init`, `prune_legacy_stack`, `upload_rsync`, `upload_build_spas`, `compose_up`, `done`. A `line=` a deploy.sh belső sorszám, nem a távoli parancsé — a valódi okot a távoli `ps -a` + `logs` részben kell keresni.
+A stage-értékek lehetséges készlete: `init`, `upload_files`, `remote_preflight`, `up_start`, `compose_pull_up`, `compose_verify`, `done` (a `prune_legacy_stack` stage-t az image-based deploy kivezette — a `docker compose up -d --remove-orphans` már elég a konkurens konténerek eltávolítására). A `line=` a deploy.sh belső sorszám, nem a távoli parancsé — a valódi okot a távoli `ps -a` + `logs` részben kell keresni.
 
 #### A deploy target: `dev` vagy `prod`
 
@@ -380,7 +391,7 @@ A target a log fájl nevébe is bekerül (`deploy-<timestamp>-<command>-<target>
 
 #### A teljes log: `deploy/log/`
 
-A banner csak kivonat. **Minden futás** teljes naplót hagy a `deploy/log/` mappában; a logger `exec > >(tee -a …)` capture-je miatt az `ssh` / `rsync` / `scp` / `pnpm` / `docker compose` kimenete is benne van, nem csak a script saját sorai:
+A banner csak kivonat. **Minden futás** teljes naplót hagy a `deploy/log/` mappában; a logger `exec > >(tee -a …)` capture-je miatt az `ssh` / `scp` / `docker compose` kimenete is benne van, nem csak a script saját sorai:
 
 ```bash
 tail -n 50 deploy/log/latest.log     # az utolsó futás — hibakeresésnél ezt olvasd először
@@ -408,7 +419,7 @@ További, a PR #1 során bevezetett kisebb védelmek:
 
 * A `render_caddyfile()` mostantól `<DOMAIN>` / `<ACME_EMAIL>` tokenekkel dolgozik (korábban a komment és a kód mást használt — lásd `docs/history/2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.md` M2). Ha a `grep '<DOMAIN>'` bármit talál a `/opt/aisztens/infra/caddy/Caddyfile.rendered` fájlban, a deploy nem indult el.
 * A `deploy/.env.<target>` és az `infra/.env` scp útvonala explicit: ha a `repo/infra/.env.<APP_ENV>` és a `repo/infra/.env` egyike sem található meg, a deploy a `no infra/.env.<APP_ENV> or infra/.env found ...` üzenettel leáll, mielőtt bármit írna a dropletre.
-* Az rsync mirror `--exclude 'deploy/ssh-keys/'` szabállyal bővült (korábban csak a CI workflow zárta ki ezt a mappát — lásd `.github/workflows/deploy.yml`). A helyi deploy most már semmiképpen nem másol privát SSH-kulcsokat a dropletre, függetlenül attól, hogy a `.gitignore` mit ignorál.
+* Az `upload()` csak három fájlt küld `scp`-vel (`infra/docker-compose.yml`, a renderelt `infra/.env`, `infra/caddy/Caddyfile.rendered`), ezért privát SSH-kulcs vagy teljes forrásfa soha nem kerülhet a dropletre — a korábbi rsync-alapú teljes-repo feltöltés (és annak `--exclude 'deploy/ssh-keys/'` szabálya) az image-based deploy (2026-10-08) bevezetésével megszűnt.
 
 ---
 
@@ -449,8 +460,8 @@ A `pgdata` és `caddy_data` named volume-ok ilyenkor is megmaradnak — nem vesz
 
 ### 9.1 Közvetlenül kapcsolódó fájlok
 
-- [`deploy/deploy.sh`](../../deploy/deploy.sh) — a deploy szkript (upload + build + render + up). Az `APP_ENV` szelektor (dev/prod) a `local_infra_env` feloldáson és a `COMPOSE_ARGS` összeállításán keresztül terjed.
-- [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) — a CI deploy. Az `INFRA_ENV_DEV` / `INFRA_ENV_PROD` titkokból renderel; a `workflow_dispatch.app_env` input dönti el, melyiket. A 2026-10-12 mátrix-refaktor óta a workflow két statikus mátrix entry-ből (`dev`, `prod`) áll, és egy job-szintű `if:` választja ki a triggernek megfelelőt (push / dispatch / workflow_run); a `jobs.<id>.environment` a `matrix.app_env`-ből olvas (`${{ matrix.app_env == 'prod' && 'production' || 'dev' }}`), mert az `env.*` context a workflow-szintű `env:` helperben nem érhető el. A 2026-10-12 14:50 javítás óta a workflow-szintű `concurrency:` blokk törölve: a `concurrency.group` expression evaluator nem engedi a `matrix` context-et workflow-szinten (csak `github | inputs | vars | needs` engedélyezett), és a per-env szeparációt most kizárólag a job-szintű `if:` filter + `jobs.deploy.environment` (GitHub Environment binding) biztosítja — lásd [`docs/history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md`](../history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md) és [`docs/history/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md`](../history/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md).
+- [`deploy/deploy.sh`](../../deploy/deploy.sh) — a deploy szkript (upload 3 fájlt + render + up). Az `APP_ENV` szelektor (dev/prod) a `local_infra_env` feloldáson és a `COMPOSE_ARGS` összeállításán keresztül terjed. Image-based deploy: a szkript nem buildel, csak `docker compose pull && up -d`-t futtat a dropleten.
+- [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) — a CI deploy (nem buildel; a `images.yml` által GHCR-re pusholt image-eket pullolja). Az `INFRA_ENV_DEV` / `INFRA_ENV_PROD` titkokból rendereli az `infra/.env`-et és a `Caddyfile.rendered`-et; a `dev`/`prod` kiválasztást a **`plan` job** végzi ([`.github/scripts/deploy-plan.sh`](../../.github/scripts/deploy-plan.sh)), amely `should_deploy | app_env | image_tag | ref` kimeneteket ír a `GITHUB_OUTPUT`-ba. A `deploy` job `needs: plan` + `if: needs.plan.outputs.should_deploy == 'true'` formában fut; a GitHub Environment kötést a `needs.plan.outputs.app_env`-ből oldja fel. Trigger: `workflow_run` (az `images.yml` sikeres futása után) vagy `workflow_dispatch` — **nincs `push` trigger és nincs `matrix`**. Lásd [`docs/history/2026-10-12--15-09-00-deploy-yml-plan-job.md`](../history/2026-10-12--15-09-00-deploy-yml-plan-job.md).
 - [`infra/docker-compose.yml`](../../infra/docker-compose.yml) — a stack definíciója; tartalmazza az `APP_ENV: ${APP_ENV:-dev}` sort az `api.environment:` blokkban.
 - [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) — a fejlesztői override (Caddy kikapcsolva, host portok publikusak); a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) ezt merge-öli (lásd [`scripts/README.md`](../../scripts/README.md)).
 - [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile) — a Caddy template

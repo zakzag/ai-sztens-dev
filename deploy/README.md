@@ -104,15 +104,27 @@ Point DNS `A` records for `DOMAIN` (and `api.DOMAIN`) at the droplet's public IP
 
 ## 2. Bootstrap the droplet
 
-From your machine (needs `ssh` + `rsync`; on Windows use Git Bash or WSL):
+From your machine (needs `ssh` + `scp`; on Windows use Git Bash or WSL):
 
 ```bash
 ./deploy/deploy.sh bootstrap
 ```
 
-This uploads the repository to `/opt/aisztens` and, as root, installs Docker and the
-Compose plugin, creates the users (`tkovari`, `krak`, `deployer` with sudo;
-`aisztens` as app user), installs their SSH keys, and leaves UFW off by default.
+`deploy.sh bootstrap` ships **only what bootstrap needs**: the three deploy
+files (`docker-compose.yml`, `infra/.env`, `Caddyfile.rendered`) into
+`/opt/aisztens/`, the four `deploy/ssh-keys/*.pub` public keys into
+`/opt/aisztens/deploy/ssh-keys/`, and then SSHes in as root to run
+[`deploy/bootstrap.sh`](bootstrap.sh). The droplet **never receives
+application source code** — this is the image-based deploy model; `pnpm`,
+`node_modules`, and the repo source stay on the build host / CI runner.
+
+The bootstrap script itself installs Docker Engine + the Compose plugin,
+creates the users (`tkovari`, `krak`, `deployer` with sudo; `aisztens` as
+app user), installs their SSH keys from the public halves just shipped,
+sets the timezone to `Europe/Budapest`, configures a 2 GB swap file, and
+`chown`s the deploy tree to `deployer` so the post-bootstrap deploy path
+can write it. It leaves UFW off by default (the DO cloud firewall handles
+public ingress). The bootstrap is idempotent: safe to re-run.
 
 **`bootstrap` is the only command that needs a root login** — it installs packages and
 creates users. Every other command (`up`, `down`, `restart`, `ps`, `logs`, `upload`) runs
@@ -127,18 +139,21 @@ SSH_USER=root ./deploy/deploy.sh bootstrap      # once, on a fresh droplet
 with that exact command if the configured user has no passwordless sudo. The deploy key's
 public half must be authorised for `deployer` on the droplet (§8.1).
 
-> **Ownership of the deploy tree.** `upload()` is an rsync with `--delete` into
-> `/opt/aisztens`, so that directory and everything in it must be writable by `deployer`.
-> `assert_remote_ready()` probes exactly that before every upload and, when it is not
-> writable, aborts with the one-off fix:
+> **Ownership of the deploy tree.** Every `deploy.sh` command except
+> `bootstrap` runs as `deployer`, and the three files uploaded by `upload()`
+> (`docker-compose.yml`, `infra/.env`, `Caddyfile.rendered`) have to land
+> inside `/opt/aisztens/`. `assert_remote_ready()` probes that
+> `deployer@<host>` can write the target directory before every upload and,
+> when it cannot, aborts with the one-off fix:
 >
 > ```bash
 > ssh -i deploy/ssh-keys/deploy.private.key root@<host> \
 >   'mkdir -p /opt/aisztens && chown -R deployer:deployer /opt/aisztens'
 > ```
 >
-> The current dev droplet already passes (a `777` tree), but `777` is world-writable;
-> applying the `chown` above is the recommended hardening.
+> `bootstrap.sh` runs this `chown` automatically when invoked from
+> `deploy.sh bootstrap`. If a later deploy ever fails the preflight probe,
+> re-run `bootstrap` (it is idempotent) or apply the chown manually.
 
 ## 3. Start the stack
 
@@ -167,9 +182,15 @@ on first init), `caddy` (TLS + reverse proxy), `monitor` (watchdog polling
 
 ```bash
 ./deploy/deploy.sh ps
-curl https://api.<DOMAIN>/api          # "Hello World!"
+curl https://api.<DOMAIN>/api          # "Hello Beautiful World!" (api greeting)
+curl https://api.<DOMAIN>/healthz      # {"status":"oks",...}
 curl https://<DOMAIN>/api/callback-requests
 ```
+
+`api.<DOMAIN>/healthz` returns the build metadata baked into the image at
+build time (deploy date + commit hash) so you can confirm which revision is
+running. See [`docs/Specs/Production-Runbook.md`](../docs/Specs/Production-Runbook.md)
+for the full post-deploy verification checklist.
 
 Postgres is reachable from the host/droplet shell by any of the three DB users once the
 container is up (credentials come from `infra/.env`).
@@ -210,47 +231,97 @@ Configure under **Settings → Secrets and variables → Actions**:
 
 | Secret / variable | Value | Notes |
 |---|---|---|
-| `DROPLET_HOST` (secret) | Droplet public IPv4 or hostname | e.g. `164.92.248.194`. When the prod droplet comes online, a second `DROPLET_HOST_PROD` secret and a per-env matrix step are needed. |
+| `DROPLET_HOST` (secret) | Droplet public IPv4 or hostname (the **current** target droplet — currently the dev one) | e.g. `164.92.248.194`. When a second droplet comes online, the workflow's `inputs.app_env` dispatch needs to select the prod host as well as the prod env secret (`DROPLET_HOST` cannot express two; this is a known follow-up when the prod droplet is provisioned). |
 | `DROPLET_SSH_KEY` (secret) | The passphrase-less deploy key — the contents of [`deploy/ssh-keys/deploy.private.key`](ssh-keys/deploy.private.key) (gitignored) | Its **public** half must be in `/home/deployer/.ssh/authorized_keys` on the droplet, because the workflow logs in as `deployer`. The local `deploy.sh` uses the same key **and the same account**. |
-| `INFRA_ENV_DEV` (secret) | Full contents of `infra/.env.dev` (multi-line, verbatim) | Renders `infra/.env` on every deploy. The `workflow_dispatch` matrix default picks this for push to `dev`. |
-| `INFRA_ENV_PROD` (secret) | Full contents of `infra/.env.prod` (multi-line, verbatim) | Renders `infra/.env` on every deploy. Only consumed when an operator dispatches the workflow with `app_env=prod` against a future prod droplet. |
+| `INFRA_ENV_DEV` (secret) | Full contents of `infra/.env.dev` (multi-line, verbatim) | Renders `infra/.env` on every deploy. Picked when `app_env=dev`. |
+| `INFRA_ENV_PROD` (secret) | Full contents of `infra/.env.prod` (multi-line, verbatim) | Renders `infra/.env` on every deploy. Picked when `app_env=prod` (i.e. when an operator dispatches the workflow with `app_env=prod` against a future prod droplet). |
 | `GHCR_OWNER` (variable) | GitHub org/user that owns the image packages | Used to construct the full image reference (`ghcr.io/<GHCR_OWNER>/aisztens-api` etc.). Defaults to `${{ github.repository_owner }}` if unset. |
 | `GHCR_PAT` (secret, optional) | PAT with `read:packages` | Only required when the repository is private and the droplet must `docker login ghcr.io` to pull images. |
 
 The `APP_ENV` selector (`dev` / `prod`) is set automatically:
 
-- **`push` to `dev` branch** → no `inputs.app_env` → `APP_ENV=dev` → renders from `INFRA_ENV_DEV` → deploys to the dev droplet.
-- **`workflow_dispatch`** → the operator picks `dev` or `prod` from a choice input → `APP_ENV` is set from that pick → the matching secret is rendered.
+- **`images.yml` completion on the `dev` branch** (`workflow_run` → `deploy.yml`) → `APP_ENV=dev` → renders from `INFRA_ENV_DEV` → deploys the dev droplet.
+- **`images.yml` `workflow_dispatch` with `app_env=prod`** → `APP_ENV=prod` → renders from `INFRA_ENV_PROD` → deploys the prod droplet. The title carries the env, so the deploy workflow can read it from `workflow_run.display_title`.
+- **`deploy.yml` `workflow_dispatch`** → the operator picks `dev` or `prod` from a choice input → the matching secret is rendered, the matching image tag is pulled.
 
-The push trigger cannot accidentally target prod (the input does not exist for `push`). Prod deploys are gated by the GitHub `production` environment protection rule (recommended: require a manual reviewer on the `prod` deployer before it can run).
+The `deploy.yml` `push` trigger is **deliberately absent**: the push runs
+`images.yml`, which in turn triggers `deploy.yml` via `workflow_run`. A
+direct push trigger raced the image build and tried to pull a sha tag that
+did not exist yet. Prod deploys are gated by the GitHub `production`
+environment protection rule on the `deploy.yml` job (recommended: require a
+manual reviewer on the `prod` deployer before it can run).
 
 ### 8.2 What the workflow does
 
-1. Renders `infra/.env` from the matching GitHub Secret (`INFRA_ENV_DEV` for
-   `APP_ENV=dev`, `INFRA_ENV_PROD` for `APP_ENV=prod`). The per-env name selects
-   *which secret* is rendered, not which path: a droplet hosts one environment, so
-   the runtime file is always `infra/.env`. The choice depends on the trigger:
-   - `push` to `dev` → `APP_ENV=dev` → renders the `INFRA_ENV_DEV` secret.
-   - `workflow_dispatch` with `app_env=prod` → renders `INFRA_ENV_PROD`.
-   The render step exports `APP_ENV` for all downstream steps via
-   `$GITHUB_ENV`.
-2. SCPs the repo (minus `.git`, `node_modules`, build artifacts, the
-   `apps/**/.env.{local,dev,prod}` and `infra/.env.{local,dev,prod}` per-env
-   files, and `deploy/ssh-keys/`) to `/opt/aisztens` on the droplet.
-3. SCPs the rendered `infra/.env` into `/opt/aisztens/infra/` — the exact path every
-   `docker compose --env-file` expects, and the same path `deploy.sh` writes.
-4. Builds the SPAs against the matching `apps/<app>/.env.${APP_ENV}` via
-   the `--mode ${APP_ENV}` flag passed to `pnpm --filter ... build:${APP_ENV}`.
-5. SSHes in as `deployer` and runs
-   `APP_ENV=${APP_ENV} docker compose --env-file "infra/.env" -f infra/docker-compose.yml up -d --build --remove-orphans`.
-6. Waits for the `api` container healthcheck (defined in
-   [`infra/docker-compose.yml`](../infra/docker-compose.yml)) to become
-   `healthy`.
-7. Runs [`scripts/test/stack-smoke.sh`](../scripts/test/stack-smoke.sh)
-   against the live deployment. The 4 liveness + 6 cross-service checks are
-   documented in [`scripts/README.md`](../scripts/README.md).
-8. On failure, dumps the last 500 log lines of every container into the
-   workflow run so triage doesn't require manual SSH.
+The workflow is image-based: `.github/workflows/images.yml` builds the four
+runtime images (`aisztens-api`, `aisztens-web`, `aisztens-admin`,
+`aisztens-monitor`) and pushes them to GHCR with an immutable `sha-<short>`
+tag (what the droplet pins) and a mutable `<APP_ENV>` tag. This
+[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) workflow is the
+**consumer** of those images — it never builds anything on the droplet.
+
+Steps:
+
+1. **Plan.** A dedicated `plan` job (no secrets, no SSH) calls
+   [`.github/scripts/deploy-plan.sh`](../.github/scripts/deploy-plan.sh) and
+   exposes `should_deploy | app_env | image_tag | ref` outputs. The decision is
+   driven by the event:
+   - `workflow_run` (triggered by `images.yml` completion): deploys the env
+     the build was made for (`dev` by default; `prod` for a `prod` build) when
+     the build succeeded; skips otherwise. The `IMAGE_TAG` is `sha-<short>` of
+     `workflow_run.head_sha` (the commit that was actually built — NOT
+     `github.sha`, which on `workflow_run` is the default-branch HEAD).
+   - `workflow_dispatch`: deploys the env picked by the `app_env` input
+     (`dev`/`prod`); the operator may also override `image_tag`. The images
+     for that commit must already exist (run `images.yml` first).
+2. **Checkout.** Only the small files the droplet needs
+   (`.github/scripts`, `infra/docker-compose.yml`, `infra/caddy/Caddyfile`,
+   `scripts/test`) are checked out, at the exact commit being deployed.
+3. **Resolve secrets.** The per-env secret (`INFRA_ENV_DEV` for `dev`,
+   `INFRA_ENV_PROD` for `prod`) is selected by the `app_env` output and written
+   to `infra/.env` on the runner. The workflow appends `APP_ENV` /
+   `IMAGE_TAG` / `GHCR_OWNER` / `REGISTRY` last; if the secret already
+   declared any of those four, `render-infra-env.sh` strips them and warns
+   instead of failing.
+4. **Render Caddyfile.** `<DOMAIN>` and `<ACME_EMAIL>` placeholders in
+   `infra/caddy/Caddyfile` are replaced with the values from the rendered
+   `infra/.env`, producing `infra/caddy/Caddyfile.rendered`. The droplet only
+   ever sees the rendered file. A defensive grep guarantees no placeholder
+   survives into the deployed config.
+5. **Ship to droplet.** `appleboy/scp-action` uploads
+   `infra/docker-compose.yml`, `infra/.env`, `infra/caddy/Caddyfile.rendered`
+   and `scripts/test/` into `/opt/aisztens/` as `deployer`. `infra/.env` lands
+   with mode `0644` for scp compatibility (see step 6).
+6. **Tighten permissions.** `chmod 600 infra/.env` on the droplet, in its
+   own ssh step, before any further step reads it. The compose file and
+   Caddyfile carry no secrets, so they stay at the default `0644`.
+7. **`docker login ghcr.io`.** Only when `GHCR_PAT` is set (private repo);
+   skipped for anonymous pull on public images.
+8. **Pull and start.** `docker compose pull` then
+   `up -d --remove-orphans --force-recreate`. No `--build`: the droplet has
+   no source tree. `--force-recreate` ensures that an updated compose file or
+   a sha-pinned image always materialises; without it, containers pinned to
+   an old sha can survive a successful pull.
+9. **Verify every service is on the right image tag.** Each application
+   service (`api`, `web`, `admin`, `monitor`) is checked to report an image
+   reference containing `:$IMAGE_TAG`. Postgres and Caddy are exempt
+   (postgres is the official image; Caddy uses a floating `caddy:2-alpine`
+   tag). Failing here prevents the "stack appears OK but is pinned to an
+   old image" class of silent regressions.
+10. **Wait for the `api` healthcheck** to become `healthy` (up to ~150 s, far
+    more than the `start_period: 60s` documented in `infra/docker-compose.yml`).
+11. **Run the smoke suite.** [`scripts/test/stack-smoke.sh`](../scripts/test/stack-smoke.sh)
+    against the live deployment. Failure fails the workflow.
+12. **On failure, dump container logs.** The last 500 log lines per service
+    (200 for `monitor`) are dumped into the workflow run so the operator does
+    not need manual SSH for triage.
+
+The push trigger is deliberately absent from this workflow: `images.yml`
+reacts to the push and this workflow follows it via `workflow_run`. A direct
+`push` trigger raced the image build and tried to pull a sha tag that did
+not exist yet. The deploy path and the local `deploy.sh` path do the same
+thing — both consume the GHCR images, neither builds anything on the
+droplet.
 
 ### 8.3 Triggering a manual deploy / rollback
 

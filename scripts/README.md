@@ -29,6 +29,13 @@ restores `build:` blocks for `api`/`web`/`admin`/`monitor` so
 suite's `dc` helper auto-merges the local override when present; the
 droplet-side CI call uses just the base compose file.
 
+The `up -d --build` invocations below (the `pnpm test:stack:up` script,
+the smoke `--up` flag, and the per-stack snippet in §"Limitations") are
+all **local**: they only run when the developer machine has the
+`infra/docker-compose.local.yml` override in scope. The droplet never
+runs `docker compose up -d --build` — there is no source tree to build
+from, and the images come from GHCR (`ghcr.io/<owner>/aisztens-{api,web,admin,monitor}:sha-<short>`). On the droplet the equivalent is `docker compose --env-file infra/.env -f infra/docker-compose.yml pull && up -d --remove-orphans --force-recreate`.
+
 ## Root scripts
 
 ### `dev-stack.sh` / `dev-stack.ps1` — local stack helper

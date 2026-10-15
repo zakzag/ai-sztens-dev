@@ -1,7 +1,24 @@
 # Three-Environment Verification — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-12 — stack smoke test fixes (see §3.7.1): the
+**Deploy-process consistency (2026-10-13):** §4 no longer describes a
+`deploy.yml` `matrix` (it uses the `plan` job now), and §6/§7 no longer
+assume `pnpm install` / `pnpm build` / droplet-side `apps/*/.env.dev` run
+on the host — the application images are baked in CI.
+**Last updated:** 2026-10-13 — image-based deploy consistency cleanup: §3.1
+local pre-deploy check now sources `infra/.env.dev` (per-env, not legacy
+`infra/.env`); §3.2 expected deploy log switched from
+`Building & starting the stack ... up -d --build` to
+`Pulling and starting the stack ... pull && up -d --remove-orphans`
+(the droplet never builds, the CI workflow `images.yml` pushes the
+GHCR images); §3.6 SPA bundle checks now read from
+`/usr/share/nginx/html/assets/*.js` *inside* the `web`/`admin`
+containers (the bundles are image-baked; there is no
+`/srv/{web,admin}` host folder any more); §5.5 CI workflow check
+replaced from `grep 'build:${APP_ENV}' .github/workflows/deploy.yml`
+to `grep 'VITE_API_BASE_URL' .github/workflows/images.yml` (the
+SPA `--mode` flag was retired when `deploy.yml` stopped building).
+Previous update: 2026-10-12 — stack smoke test fixes (see §3.7.1): the
 Caddy liveness check now probes `https://api.<DOMAIN>/healthz` instead
 of the disabled `:2019/config/` admin endpoint; the postgres roles
 check now passes `-U` so it authenticates as the POSTGRES_USER instead
@@ -152,7 +169,7 @@ scripts/dev-stack.sh up
 #   [dev-stack] Stack is up. Open one of:
 #     - http://localhost:3000/healthz          (NestJS healthcheck)
 #     - http://localhost:3000/api              (NestJS API root)
-#     - psql -h localhost -U aisztens -d callback  (Postgres on :5432)
+#     - psql -h localhost -U aisztens -d aisztens_db  (Postgres on :5432)
 
 # 2.2.2 Verify the seed was created
 ls -l infra/.env.local
@@ -245,13 +262,13 @@ cat apps/web/.env.dev
 docker compose --env-file infra/.env.local \
   -f infra/docker-compose.yml \
   -f infra/docker-compose.local.yml \
-  exec postgres psql -U aisztens -d callback -c "SELECT count(*) FROM callback_requests;"
+  exec postgres psql -U aisztens -d aisztens_db -c "SELECT count(*) FROM callback_requests;"
 # Expect: a positive integer (the row inserted by §2.4.3). If you see 0,
 #   that is also fine — it means the test row didn't make it in. Either
 #   way, the connection works.
 
 # 2.7.2 The callback_requests table actually has the row from §2.4.3
-docker compose ... exec postgres psql -U aisztens -d callback \
+docker compose ... exec postgres psql -U aisztens -d aisztens_db \
   -c "SELECT email FROM callback_requests ORDER BY created_at DESC LIMIT 1;"
 # Expect: verify@example.com (the email from §2.4.3)
 ```
@@ -282,23 +299,30 @@ deployment target is the existing `aisztens.hu`.
 ### 3.1 Local pre-deploy checks
 
 ```bash
-# 3.1.1 The deploy.sh has APP_ENV in scope (CI does this via $GITHUB_ENV;
-#        locally you have to set it yourself)
+# 3.1.1 The deploy.sh has APP_ENV in scope (CI does this via $GITHUB_OUTPUT
+#        and the `plan` job; locally you have to set it yourself — the
+#        second positional argument to `deploy.sh up`, or a pre-set
+#        `APP_ENV` env var, or the default `dev`)
 cd deploy/
-. .env          # set HOST etc.
-set -a; . infra/.env.dev 2>/dev/null  # NO-OP if infra/.env.dev does not
-                                     # yet exist locally (legacy path)
+. .env.dev      # the dev target's per-target operator config
+set -a; . ../infra/.env.dev 2>/dev/null  # per-env DOMAIN / ACME_EMAIL
 echo "DOMAIN=$DOMAIN APP_ENV=${APP_ENV:-unset}"
 # Expect: DOMAIN=aisztens.hu APP_ENV=dev
-#   (If APP_ENV is unset and you have not migrated infra/.env → infra/.env.dev
-#    locally, deploy.sh will still pick up infra/.env and set APP_ENV=dev.)
+#   (If APP_ENV is unset, deploy.sh falls back to `dev`.)
+
+# 3.1.2 The deploy target is `dev|prod` only — `local` is a hard error
+#        with exit code 2 (deploy.sh does not deploy to a local droplet;
+#        the local stack is started by scripts/dev-stack.sh).
+./deploy.sh help 2>&1 | head -30
+# Expect: usage text mentioning dev|prod, no mention of `local` as a deploy target.
 ```
 
 ### 3.2 Deploy (or simulate)
 
-Either trigger a real CI deploy (push to `dev`, or
-`Actions → Deploy to droplet → Run workflow` with `app_env=dev`), or
-run `deploy.sh up dev` from your local machine (`dev` is also the default):
+Either trigger a real CI deploy (`workflow_run` from `images.yml` after a
+push to `dev`, or `Actions → Deploy to droplet → Run workflow` with
+`app_env=dev`), or run `deploy.sh up dev` from your local machine (`dev`
+is also the default):
 
 ```bash
 cd deploy/
@@ -307,9 +331,12 @@ deploy.sh up dev
 #   the preflight line
 #     Preflight OK — /opt/aisztens is writable by deployer@<HOST>.
 #   then
-#     [deploy] Building & starting the stack (APP_ENV=dev) ...
-#     [deploy] docker compose ... up -d --build
-#   ... and ultimately the api container becomes healthy.
+#     [deploy] Pulling and starting the stack (APP_ENV=dev) ...
+#     [deploy] docker compose ... pull
+#     [deploy] docker compose ... up -d --remove-orphans
+#   ... and ultimately the api container becomes healthy. The droplet
+#   never builds anything — the images were pushed by images.yml in CI
+#   and are pulled from GHCR (see §3.7.1 for the running revision).
 #
 #   The config line records the identity and both env-file names:
 #     config: DEPLOY_ENV=dev env_file=deploy/.env.dev APP_ENV=dev ... SSH_USER=deployer
@@ -362,19 +389,32 @@ curl -i -H "Origin: https://api.aisztens.hu" \
 
 ### 3.6 The deployed SPAs hit the dev API URL
 
+The SPAs are baked into the `web` / `admin` images, so the assets live
+inside those containers at `/usr/share/nginx/html/assets/`, not on the
+droplet's host filesystem. To verify the URL the UI uses:
+
 ```bash
-# 3.6.1 The web SPA's baked-in URL
-ssh deployer@aisztens.hu "grep -l aisztens.hu /srv/web/assets/*.js 2>&1 | head -1"
+# 3.6.1 The web SPA's baked-in URL (inside the web container)
+ssh deployer@aisztens.hu "cd /opt/aisztens && \
+  docker compose --env-file infra/.env -f infra/docker-compose.yml exec web \
+    grep -l aisztens.hu /usr/share/nginx/html/assets/*.js 2>&1 | head -1"
 # Expect: at least one .js file path
 
-# 3.6.2 The admin SPA's baked-in URL
-ssh deployer@aisztens.hu "grep -l aisztens.hu /srv/admin/assets/*.js 2>&1 | head -1"
+# 3.6.2 The admin SPA's baked-in URL (inside the admin container)
+ssh deployer@aisztens.hu "cd /opt/aisztens && \
+  docker compose --env-file infra/.env -f infra/docker-compose.yml exec admin \
+    grep -l aisztens.hu /usr/share/nginx/html/assets/*.js 2>&1 | head -1"
 # Expect: at least one .js file path
 
-# 3.6.3 Confirm the URL is the dev one (not localhost)
+# 3.6.3 Confirm the URL is the dev one (not localhost), via the live SPA
 curl -fsS https://web.aisztens.hu/ | grep -oE 'aisztens.hu|localhost' | sort -u
 # Expect: only 'aisztens.hu' appears
 ```
+
+The historical `/srv/web` and `/srv/admin` paths are gone — the SPAs
+are baked into the GHCR images. If a deploy ever leaves those host
+folders behind, it is on the pre-image-based revision (see
+[`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)).
 
 ### 3.7 Smoke tests
 
@@ -423,22 +463,24 @@ ssh deployer@aisztens.hu "head -3 /opt/aisztens/infra/.env"
 
 ## 4. Prod env verification (droplet, ~15 minutes) `[if-prod-exists]`
 
-Skip this entire section until a prod droplet exists. The deploy.yml
-matrix is dormant by design — pushing nothing triggers a prod deploy.
+Skip this entire section until a prod droplet exists. There is no
+`matrix` any more (the `plan` job replaced it) and no `push` trigger, so
+no push can accidentally target prod.
 
 The day the prod droplet is provisioned:
 
-1. Add `DROPLET_HOST_PROD` and `DROPLET_SSH_KEY_PROD` GitHub Secrets
-   (the current single-`DROPLET_HOST` secret is the dev one).
-2. Wire the `deploy.yml` matrix to pick the prod pair when
-   `inputs.app_env == 'prod'`. (One PR; ~15 lines.)
-3. Set `INFRA_ENV_PROD` to a fresh per-env file: `infra/.env.prod`
+1. Provide the prod droplet connection. `deploy.yml` reads the single
+   `DROPLET_HOST` / `DROPLET_SSH_KEY` secret pair, so either point those
+   at the prod droplet for the manual run, or add a prod pair and select
+   it from `needs.plan.outputs.app_env` (one small PR).
+2. Set `INFRA_ENV_PROD` to a fresh per-env file: `infra/.env.prod`
    with `<prod-domain>` replaced by the real apex and all secrets unique
    (NOT a copy of `infra/.env.dev`).
-4. Add a manual-reviewer protection rule on the GitHub `production`
+3. Add a manual-reviewer protection rule on the GitHub `production`
    environment.
-5. Trigger via **Actions → Deploy to droplet → Run workflow →
-   app_env=prod**. The push-to-`dev` path cannot accidentally target prod.
+4. Trigger via **Actions → Deploy to droplet → Run workflow →
+   app_env=prod**. The push-to-`dev` path cannot accidentally target prod
+   (it only feeds `images.yml`, whose run-name suffix is `(dev)`).
 
 ### 4.1 The prod-only fail-closed guard
 
@@ -450,10 +492,16 @@ ssh deployer@<prod-host> "cd /opt/aisztens && \
 
 # 4.1.2 Empty CORS_ORIGINS in prod refuses to start.
 # (You cannot test this on a live prod droplet without breaking it.
-#  Smoke-test on a fresh staging droplet instead.)
+#  Smoke-test on a fresh staging droplet instead. The staging droplet is
+#  image-based too — there is no `--build`; instead rebuild and push the
+#  `aisztens-api` image in CI, then on the droplet `pull api` and
+#  `up -d --force-recreate --no-deps api`.)
 ssh deployer@<staging-host> \
   "cd /opt/aisztens && CORS_ORIGINS= APP_ENV=prod docker compose \
-   --env-file infra/.env.dev -f infra/docker-compose.yml up -d --build api"
+   --env-file infra/.env.prod -f infra/docker-compose.yml \
+   pull api && \
+   docker compose --env-file infra/.env.prod -f infra/docker-compose.yml \
+   up -d --force-recreate --no-deps api"
 # Then tail the api log:
 ssh deployer@<staging-host> "cd /opt/aisztens && \
   docker compose logs api 2>&1 | grep -E 'Bootstrap|Refusing'"
@@ -511,9 +559,9 @@ git grep -nE 'docker compose .*--env-file "infra/\.env"' \
 git grep -nE 'docker compose .*--env-file "infra/\.env\.' .github/workflows/deploy.yml
 # Expect: empty.
 
-# 5.5 The build step uses --mode
-grep -n 'build:${APP_ENV}' .github/workflows/deploy.yml
-# Expect: at least one line (the web SPA build call).
+# 5.5 The image workflow uses --build-arg for the SPA base URL
+grep -n 'VITE_API_BASE_URL' .github/workflows/images.yml
+# Expect: at least one line (the web + admin SPA image build).
 
 # 5.6 The 'up' SSH call exports APP_ENV
 grep -B 1 -A 4 'docker compose \\$' .github/workflows/deploy.yml
@@ -531,7 +579,7 @@ For a fresh repo state on a developer machine with a fast SSD:
 |---|---|
 | §1 Repo checks | 30 s |
 | §2 Local (full down/up cycle + curl probes) | 5–10 min (dominated by the first `docker compose up -d --build` cold-start) |
-| §3 Dev (deploy + smoke + curl) | 10–15 min (dominated by `pnpm install` + `pnpm build:dev` for web + admin) |
+| §3 Dev (deploy + smoke + curl) | 2–5 min (dominated by the GHCR image pull — the droplet no longer runs `pnpm install` / `pnpm build:dev`; the SPA/API images are built in CI) |
 | §4 Prod | same as §3, only on the prod host |
 | §5 CI | 30 s |
 
@@ -550,12 +598,12 @@ env + secrets), §3 takes ~2 min.
 | §2.7.2: the inserted row is missing | The Postgres volume was wiped between runs | Re-run §2.4.3 and §2.7.1. |
 | §3.3: banner reports `local` or unset on the dev droplet | deploy.yml didn't pass APP_ENV, or a local shell exported `APP_ENV=local`. Since 2026-10-06 the target comes from the argument (default `dev`) and an invalid `APP_ENV` is rejected with exit 2 | Check the run's `config:` log line (`DEPLOY_ENV=… env_file=… APP_ENV=…`) in `deploy/log/latest.log`, and the `local_infra_env` block. Re-run `deploy.sh up dev`. |
 | §3.5.3: CORS DOES allow `https://api.aisztens.hu` | The CORS list in `infra/.env.dev` was edited incorrectly | Verify with `ssh deployer@aisztens.hu "grep ^CORS_ORIGINS /opt/aisztens/infra/.env"` — must NOT have `api.aisztens.hu`. |
-| §3.6.3: SPA also references `localhost` | An SPA `.env.dev` file got the wrong content | Verify with `ssh deployer@aisztens.hu "cat /opt/aisztens/apps/web/.env.dev"` — must contain `https://api.aisztens.hu/api`. |
+| §3.6.3: SPA also references `localhost` | The image was built with the wrong `VITE_API_BASE_URL` (the `web`/`admin` bundles are baked at CI build time; there is no droplet-side `apps/*/.env.dev`) | Verify in `images.yml` that `VITE_API_BASE_URL=https://api.<DOMAIN>/api` is passed, then rebuild + push the `web`/`admin` images and re-pull on the droplet. |
 | §4.1.2: the api boot does NOT refuse with empty CORS | `apps/api/src/main.ts:42` isProd check is missing | The Step 2 commit `a054d0e` was lost — re-apply. |
 | §5.4: a remote command names the local per-env file | The per-env name is a LOCAL source name; a droplet has one env file | Use `--env-file infra/.env` remotely, `infra/.env.${APP_ENV}` locally. Guard: `bash scripts/test/_deploy-sh-remote-compose-path-test.sh`. |
-| §3.2: `the remote user cannot write /opt/aisztens` | That directory is not writable by `deployer` (rsync `--delete`, `mkdir`, `scp` all need it) | Run the fix the error prints: `ssh -i <deploy key> root@<HOST> 'mkdir -p /opt/aisztens && chown -R deployer:deployer /opt/aisztens'`. |
+| §3.2: `the remote user cannot write /opt/aisztens` | That directory is not writable by `deployer` (`scp` and `mkdir` need it; the image-based deploy no longer rsyncs the repo) | Run the fix the error prints: `ssh -i <deploy key> root@<HOST> 'mkdir -p /opt/aisztens && chown -R deployer:deployer /opt/aisztens'`. |
 | §3.2: `'bootstrap' must run as root` | `bootstrap` was attempted as `deployer`, which has no passwordless sudo on this droplet | `SSH_USER=root ./deploy/deploy.sh bootstrap` (one-off, hand-run). |
-| §3.2: `app: unbound variable` | A `local a="$1" b="$a"` declaration — bash expands all words before the builtin runs, so `$a` is unset and `set -u` aborts | One `local` per line (fixed in `ensure_spa_env()` on 2026-10-07). |
+| §3.2: `app: unbound variable` | A `local a="$1" b="$a"` declaration — bash expands all words before the builtin runs, so `$a` is unset and `set -u` aborts | One `local` per line (historical fix from 2026-10-07; the helper that hit it no longer exists — `deploy.sh` does not build SPAs any more). |
 | `_deploy-sh-env-selection-test.sh` scenario 6 fails intermittently | Pre-existing **flake**: the assertion greps `deploy/log/latest.log` for `APP_ENV=prod` immediately after a run that aborts on the empty `HOST`, so it races the `tee` capture / `latest.log` refresh | Not a regression: `HEAD` shows 28/1 under WSL bash while Git Bash shows 29/0 for the same commit. Make the assertion read the per-run file instead of `latest.log`. |
 | `_deploy-sh-m3-test.sh` always fails (`no infra/.env found`) | Pre-existing **stale** suite: it re-implements the pre-per-env `infra/.env` lookup in a local function instead of calling `deploy.sh`, and this checkout only has `infra/.env.dev` | Rewrite it against the current `COMPOSE_ENV_FILE_LOCAL` chain, or retire it in favour of `_deploy-sh-remote-compose-path-test.sh`. |
 

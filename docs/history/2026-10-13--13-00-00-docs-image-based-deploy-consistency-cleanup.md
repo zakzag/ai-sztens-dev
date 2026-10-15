@@ -1,0 +1,89 @@
+# Docs — image-based deploy konzisztencia takarítás
+
+**Dátum:** 2026-10-13
+**Hatás:** A repository "mostani" állapotára jellemző referencia-dokumentumok (deploy readme, runbook, cheatsheet, debug playbook, Caddy spec, three-env-verification spec) átírva, hogy konzisztensek legyenek a 2026-10-08-as image-based deploy modellel. A history/ és milestones/ mappák tartalma (korábbi dátumú fájlok) szándékosan érintetlen maradt — azok a döntéstörténet részei, és a régi folyamatot dokumentálják, ahogy az a maguk idejében érvényes volt.
+
+## Mi változott
+
+A forráskód (`.github/workflows/images.yml`, `.github/workflows/deploy.yml`, `infra/docker-compose.yml`, `deploy/deploy.sh`) és a friss hév kontextus (`ghcr.io/.../aisztens-{api,web,admin,monitor}:sha-<short>` image-alapú deploy, droplet sohuja miatt soha nem build-el, 6 konténer a 4 helyett) nem változott. A változás csak a "mostani" referencia-dokumentumokban van: azok a dokumentumok, amiket egy új közreműködő a "hogyan működik ma" kérdésre olvas.
+
+| Fájl | Változás |
+|---|---|
+| `deploy/README.md` §2 | `bootstrap` parancs: a dropleten csak 3 fájl + 4 SSH pubkey landol; az "uploads the repository" mondat törölve |
+| `deploy/README.md` §2 (Ownership box) | `upload()` rsync → scp; a `chown` okát a `bootstrap` adja automatikusan |
+| `deploy/README.md` §4 | "Hello World!" → "Hello Beautiful World!" + `/healthz` build metadata; Production Runbook §4.2-re mutat |
+| `deploy/README.md` §8.1 | `DROPLET_HOST` sor: nincs `DROPLET_HOST_PROD` (egy `DROPLET_HOST` van, prod-ot egy másik droplet host-ot kapna dispatch során) |
+| `deploy/README.md` §8.1 trigger lista | `push` trigger (ami a régi deploy.yml-en volt) | `workflow_run` (images.yml completion) + `workflow_dispatch` |
+| `deploy/README.md` §8.2 | "Mi történik" leírás: a teljes nyolc lépéses folyamat átírva a `plan` job + `pull && up -d --force-recreate` + verify-image-tag lépésre (a régi "SCPs the repo", "Build the SPAs via --mode ${APP_ENV}", "up -d --build" leírása törölve) |
+| `docs/docker-debug-playbook.md` | Bevezető: 4 konténer → 6 konténer; a "fix used to be `up -d --build <service>`" kontextus megmaradt; a forgatókönyvek (most 6 konténer) tisztázva |
+| `docs/docker-debug-playbook.md` §1 | A quick-triage parancsok kiegészítve `--env-file infra/.env`-vel (IMAGE_TAG / GHCR_OWNER feloldás) |
+| `docs/docker-debug-playbook.md` §2.3 | Fix: `up -d --build api` → "commit → images.yml pushes → `pull api && up -d --force-recreate --no-deps api`" |
+| `docs/docker-debug-playbook.md` §2.5 | Fix: `up -d --build` → `pull && up -d --remove-orphans --force-recreate` |
+| `docs/docker-debug-playbook.md` §2.14 | A SPA 404 forgatókönyv: most `web` / `admin` image-ből jön, nincs host `dist/` mappa; a `pnpm build` + `scp dist` recovery törölve |
+| `docs/docker-debug-playbook.md` §2.18 | `deploy.sh rsync fails`: legacy scenario-ként jelölve (az image-based deploy kivezetet az rsync utat) |
+| `docs/docker-debug-playbook.md` §3.2 / §3.4 / §3.5 / §3.6 | `docker compose -f infra/docker-compose.yml …` → `docker compose --env-file infra/.env -f infra/docker-compose.yml …` |
+| `docs/docker-debug-playbook.md` §4 | A bundle 6 service-re nevet lop (`api web admin postgres caddy monitor`); §3.6 mount táblázat `web`/`admin` image-baked |
+| `docs/docker-cheatsheet.md` | Bevezető: 4 konténer → 6 konténer; "image-based (2026-10-08)" + `/tmp` nincs /srv/web bind mount; §6 §11 §14 példák kiegészítve |
+| `docs/Specs/Caddy-Reverse-Proxy.md` | §2 4 konténer → 6 konténer; §2.1 3-as + 4-es alpont: SPA bundle /usr/share/nginx/html a konténerben, Caddy `reverse_proxy web:80` / `reverse_proxy admin:80` |
+| `docs/Specs/Caddy-Reverse-Proxy.md` §3.1 | mermaid diagram SPA subgraph: `web`/`admin` image-konténer node-ok |
+| `docs/Specs/Caddy-Reverse-Proxy.md` §3.2 | "SPA bundle-öket bind mount-on kapja" mondat törölve |
+| `docs/Specs/Caddy-Reverse-Proxy.md` §4.1 4. + 5. sor | `root * /srv/web` + `try_files {path} /index.html` → `reverse_proxy web:80` (admin hasonló) |
+| `docs/Specs/Production-Runbook.md` §4.1 | 4 soros ps táblázat → 6 soros (api, web, admin, postgres, caddy, monitor) GHCR image nevekkel |
+| `docs/Specs/Production-Runbook.md` §6 hibadiagnosztikai mátrix | `Created` sor: `up -d --build` → `pull && up -d --force-recreate`; `caddy open /srv/web` sor: "legacy" jelöléssel |
+| `docs/Specs/Production-Runbook.md` §6.1 | Logger stage lista: `init` / `prune_legacy_stack` / `upload_rsync` / `upload_build_spas` / `compose_up` / `done` → `init` / `upload_files` / `remote_preflight` / `up_start` / `compose_pull_up` / `compose_verify` / `done` |
+| `docs/Specs/Production-Runbook.md` §9.1 | `deploy.sh` leírása kiegészítve "image-based deploy: a szkript nem buildel, csak pull && up -d"-vel |
+| `docs/Specs/Three-Env-Verification.md` §3.1 | "Local pre-deploy checks": a legacy `. .env` + `infra/.env` ág törölve; most `infra/.env.local`/`infra/.env.dev`/`infra/.env.prod` konvenció |
+| `docs/Specs/Three-Env-Verification.md` §3.2 | Expected log: "Building & starting the stack ... up -d --build" → "Pulling and starting the stack ... pull && up -d --remove-orphans" |
+| `docs/Specs/Three-Env-Verification.md` §3.6 | SPA bundle check: `/srv/web` + `/srv/admin` host paths → `/usr/share/nginx/html/assets/*.js` inside `web` / `admin` containers |
+| `docs/Specs/Three-Env-Verification.md` §5.5 | "build step uses --mode" check: `grep build:${APP_ENV} .github/workflows/deploy.yml` → `grep VITE_API_BASE_URL .github/workflows/images.yml` |
+
+## Ami nem változott (szándékosan)
+
+| Fájl | Miért maradt |
+|---|---|
+| `docs/history/2026-09-21--…-tól:` 2026-10-08-ig | Döntéstörténet: az egyes commit-ek a maguk idejében a helyes folyamatot írta; az image-based deploy általuk vált azzá, ami ma van |
+| `docs/milestones/2026-09-28--…-tól:` 2026-10-08-ig | Ugyanaz: decision-grade összefoglalók a régi hibákról / döntésekről |
+| `docs/Specs/Infrastructure-Docker.md` | A §6. táblázat (`apps/web/dist`, `apps/admin/dist` Dockerfile-ökben) technikailag helyes: a Dockerfile-ok **ezt a kimeneti útvonalat** állítják elő, és a fájl a buildet írja le — a host mappa kérdése külön téma |
+| `docs/Specs/Local-Development.md` §2 | A lokális override `build:` blokkjai ma is helyesek (lokálisan még mindig buildelünk; a `apps/web/dist` a hoston van lokális build esetén) |
+| `docs/snapshot-2026-10-01.md` | Definíció szerint 2026-10-01 állapot; a régi folyamatot írja le szándékosan |
+
+## Ami a listában maradt (a felhasználó átnézi)
+
+A konzisztencia-ellenőrzés után a következő fájlokban maradtak olyan elemek, amiket a felhasználó át akar nézni / javítani:
+
+1. **`scripts/test/README.md`** — a smoke suite `docker compose down`-nal dolgozik, és a §"Cross-service" táblázat 6 check-et sorol, de a "liveness" táblázat 4 (api/postgres/caddy/monitor) — a mostani 6 konténer + VAPI webhook checkek kontextusában ez a táblázat frissítésre szorul (a VAPI HMAC + healthz endpoint checkek 2026-10-12 óta élnek, de a doksi nem tükrözi). Továbbá: a §3 §172-174 "Out of scope" doksi azt írja "apps/web and apps/admin are not part of the droplet compose stack yet (see commented blocks in `infra/caddy/Caddyfile`)" — most már saját konténerek, és a kommentek a Caddyfile-ból kikerültek (2026-10-12 history).
+
+2. **`infra/monitor/README.md`** — a §"Usage" blokkban `up -d --build`-et mutat a monitor Dockerfile-ra, de a monitor most image-alapú (`ghcr.io/<owner>/aisztens-monitor`). A README emellett a §42-46 "Diagnosed documentation drift" szekcióban jelzi, hogy két további más doksi referencia is elavult (docker-debug-playbook §2.16, Production-Runbook §6 "monitor" sor) — ezeket a szerzett javítás kéne, de a monitor README-t nem. Az image-based kontextust érdemes hozzáadni.
+
+3. **`scripts/README.md`** §23-30 — leírja az image-based deploy-t és a lokális override `build:` blokkját, de a doksi a §75-76-ban továbbra is `docker compose up -d --build` parancsokat használ (ez lokálisan OK, de a `pnpm test:stack:up` parancs is `up -d --build`-et ír, ami lokálisan helyes).
+
+4. **`docs/Specs/Production-Runbook.md` §4.1** "Ha bármelyik `Created`" recovery parancs még mindig `up -d --build` — frissítendő `pull && up -d --force-recreate`-re (a §6 mátrix sorát javítottam, de a §4.1 recovery blokkot nem).
+
+5. **`docs/Specs/Three-Env-Verification.md` §4.1.2** staging droplet `up -d --build api` — a staging is image-based, frissítendő.
+
+6. **`docs/Specs/Caddy-Reverse-Proxy.md` §1 3. sor** ("Statikus fájl-kiszolgálás") — azt írja, hogy a Caddy "a SPA bundle-öket" szolgálja ki ezzel. Most a Caddy nem statikus fájlokat szolgál ki, hanem reverse-proxyzik a `web`/`admin` nginx konténerek felé. Az 1. szekasz egy elméleti leírás (Caddy képességei), így technikai értelemben nem hibás, de a "we use this" kontextust finomítani kellene.
+
+7. **`docs/Specs/Infrastructure-Docker.md` §100-103** — a Dockerfile-ok táblázatában a `@callback/web` + `apps/web/dist` kombináció a buildet írja le, de a szövegkörnyezet nem említi, hogy ez most már image-baked (nem host bind mount).
+
+8. **`docs/Specs/Local-Development.md` §5** "The legacy `infra/.env` path still works on the current dev droplet" — a legacy `infra/.env` dropleten lévő útvonal valóban létezik (a `deploy.sh` oda másolja a per-env fájlt), de a "can be renamed on disk" follow-up note egy megoldatlan P0 hátralék.
+
+9. **`docs/Specs/Caddy-Reverse-Proxy.md` §3.2** "A Caddy a `docker-compose.yml` `internal` network tagján látja az `api` konténert" — most 6 konténert lát (`api`, `web`, `admin`, `postgres`, `caddy`, `monitor`); a `caddy` és `postgres` nem hálózati célpontok, csak a `web`/`admin`/`api`. A lista felfrissítendő.
+
+10. **`docs/docker-cheatsheet.md`** egyes §2, §3, §5, §7, §8, §9, §10, §15 parancsai — a `docker compose -f infra/docker-compose.yml …` parancsok egy részében nincs `--env-file` flag. A bevezetőben hozzáadott tip2 (minden `docker compose` parancshoz adj `--env-file infra/.env`) jelzi a konvenciót, de az egyes §-okban nem írtam be mindenhol. A §11 mount táblázat és a §14 one-linerek konzisztensek; a többi §-ban egy-két `exec` / `ps` / `logs` parancs --env-file nélkül maradt, ami a tip2-vel együtt használható, de egy az egyben kimásolva "no such service" hibát adna IMAGE_TAG alapján szolgáltatást keresve.
+
+## Listaelemek javítása (2026-10-13, "proceed" jelzésre)
+
+A fenti 10 listaelem javítása a "proceed" felhasználói jóváhagyás után megtörtént:
+
+| # | Fájl | Változás |
+|---|------|---------|
+| 1 | `scripts/test/README.md` | "Per-service liveness" táblázat 4 → 6 konténer (api, web, admin, postgres, caddy, monitor); a `Hello World!` → `Hello Beautiful World!`; §"Limitations" frissítve (apps/web és apps/admin konténerek, no commented blocks); VAPI HMAC checkek a "live" smoke suite-ba helyezve |
+| 2 | `infra/monitor/README.md` | "Usage" blokk kiegészítve image-based kontextussal (dropleten `pull && up -d monitor`, lokálisan az override-ön keresztül `up -d --build`); "Diagnosed documentation drift" blokk lezárva, a jelzett doksik javítva (docker-debug-playbook §2.16, Production-Runbook §6 "monitor" sor) |
+| 3 | `docs/Specs/Production-Runbook.md` §4.1 recovery | `up -d --build` → `pull && up -d --remove-orphans --force-recreate` (image-based deploy: nincs build a dropleten) |
+| 4 | `docs/Specs/Three-Env-Verification.md` §4.1.2 | staging droplet `up -d --build api` → `pull api && up -d --force-recreate --no-deps api` + image-based staging kontextus |
+| 5 | `docs/Specs/Caddy-Reverse-Proxy.md` §1 3. sor | "we use this" kontextus törölve; a `file_server` képességet most "nem használjuk" jelöléssel láttuk el (a `reverse_proxy` a használt út) |
+| 6 | `docs/Specs/Caddy-Reverse-Proxy.md` §3.2 | `api` konténer → teljes stack (6 konténer), a reverse proxy csak az `api`, `web`, `admin` konténereket címzi |
+| 7 | `docs/Specs/Infrastructure-Docker.md` §6 | Új image-based-deploy note a táblázat alatt (6 konténer, image-baked SPA, lokális override `build:` blokkok visszaállítják) |
+| 8 | `docs/Specs/Local-Development.md` §5 | "Legacy `infra/.env` still works" → explicit leírás: a per-env lokális forrásfájl → `infra/.env` a dropleten, a per-env rename egy jövőbeli migration (nem P0) |
+| 9 | `scripts/README.md` bevezető | Kiegészítő bekezdés, hogy a `up -d --build` hívások lokálisak; a dropleten `pull && up -d --remove-orphans --force-recreate` |
+| 10 | `docs/docker-cheatsheet.md` §2/§3/§5/§7/§8/§9/§10/§15 | Minden `docker compose -f infra/docker-compose.yml …` parancs kiegészítve `--env-file infra/.env`-vel (replace_all) |

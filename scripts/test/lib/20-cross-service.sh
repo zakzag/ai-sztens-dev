@@ -82,11 +82,24 @@ run_cross_service_checks() {
   # exist`. Forcing -U to POSTGRES_USER (which the postgres image
   # initializes as a superuser) avoids that trap. This mirrors the
   # postgres healthcheck in [infra/docker-compose.yml:127].
+  #
+  # FLAG ORDER MATTERS. `-c` consumes the NEXT argv as its argument, so the
+  # historical form `psql -tAc -U user "SQL"` made `-c` swallow `-U` and the
+  # SQL text was sent as the username:
+  #   FATAL: role "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tko" does not exist
+  # Keep `-U`/`-d` BEFORE the `-At -c` pair.
+  #
+  # The user/database names come from $ENV_FILE (infra/.env) via
+  # resolve_env_value, so this check cannot drift from the compose config
+  # (the old hard-coded `callback` did not exist on the droplet, whose
+  # POSTGRES_DB is `aisztens_db`).
   assert_service_out "postgres-roles" \
     "roles aisztens, tkovari, krak exist" \
     "3" \
-    dc_exec postgres psql -tAc -U "${POSTGRES_USER:-postgres}" \
-      "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak')"
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak')"
 
   # -----------------------------------------------------------------------
   # 6. monitor -> api — restated for symmetry with the per-service check.

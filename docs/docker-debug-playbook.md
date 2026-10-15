@@ -2,11 +2,25 @@
 
 A scenario-driven, copy-paste-ready playbook for debugging the AIsztens
 production stack ([`infra/docker-compose.yml`](../infra/docker-compose.yml):
-`api`, `postgres`, `caddy`, `monitor`) and the droplet that hosts it.
+`api`, `web`, `admin`, `postgres`, `caddy`, `monitor`) and the droplet that
+hosts it.
 
-The scenarios below are **not theoretical**: every one of them maps to a
-real incident that already happened on `ssh.aisztens.hu`. The history files
-are linked for the curious; this playbook is the fast path to resolution.
+The stack is **image-based** (since 2026-10-08): every application
+container runs a pre-built image pulled from GHCR, and the droplet never
+builds anything. The container count is six (not four): the public
+website and the admin dashboard are each their own `nginx`-served SPA
+container. Where a scenario's fix used to be `docker compose up -d
+--build <service>`, the modern equivalent is "rebuild and push the image
+in CI, then `docker compose pull && up -d --force-recreate <service>`".
+The scenarios below were written against the older four-service / on-host
+build stack; their diagnostic value is unchanged but the **fix** for
+several scenarios now lives upstream of the droplet, in
+`.github/workflows/images.yml`.
+
+The scenarios themselves are **not theoretical**: every one of them maps
+to a real incident that already happened on `ssh.aisztens.hu`. The history
+files are linked for the curious; this playbook is the fast path to
+resolution.
 
 > **How to use this file:** jump to the symptom you see in §2, follow the
 > "Then do this" steps verbatim, and only consult §3 if you need the
@@ -56,11 +70,12 @@ pwd && cat /etc/hostname                # droplet: ssh.aisztens.hu
 # Move to the project root if you are on the droplet
 cd /opt/aisztens || cd "$(git rev-parse --show-toplevel)"
 
-# 1. Container state — include Created/Exited with -a
-docker compose -f infra/docker-compose.yml ps -a
+# 1. Container state — include Created/Exited with -a. Always pass
+#    --env-file so the compose file picks up IMAGE_TAG / GHCR_OWNER / APP_ENV.
+docker compose --env-file infra/.env -f infra/docker-compose.yml ps -a
 
 # 2. Last 100 log lines per service, timestamps on
-docker compose -f infra/docker-compose.yml logs --tail=100 -t
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=100 -t
 
 # 3. Live resource snapshot (RSS / CPU / I/O)
 docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}'
@@ -73,8 +88,14 @@ If a container is in `Restarting` / `Exited` / `OOMKilled`, jump straight
 to the matching subsection in §2 with its name in hand.
 
 > **Memory aid:** if you remember nothing else, remember this:
-> `docker compose ps -a && docker compose logs --tail=200 -t <service>`.
+> `docker compose --env-file infra/.env -f infra/docker-compose.yml ps -a && docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=200 -t <service>`.
 > These two commands resolve ~80 % of every incident we have logged.
+> The `--env-file infra/.env` is **required**: `IMAGE_TAG` and `GHCR_OWNER`
+> are the only way `infra/docker-compose.yml` can resolve the GHCR image
+> references — without the env file the compose substitutes `latest` and
+> `local` defaults and may pull the wrong image. Every command below
+> that names `infra/docker-compose.yml` is implicitly assumed to carry
+> `--env-file infra/.env`; the §2 / §3 blocks already use that form.
 
 ---
 
@@ -204,10 +225,15 @@ already ran in the **build stage**, so the runtime image has a complete
 `node_modules` and a compiled `dist/`. We bypass the wrapper that does the
 expensive lockfile-verify on every cold start.
 
-After editing, rebuild on the droplet:
+After editing, rebuild the image in CI (commit the change; `images.yml`
+pushes the new `aisztens-api:<sha>` tag), then on the droplet:
 
 ```bash
-docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build api
+# Pull the new image and force-recreate only the api service
+docker compose --env-file infra/.env -f infra/docker-compose.yml \
+  pull api
+docker compose --env-file infra/.env -f infra/docker-compose.yml \
+  up -d --force-recreate --no-deps api
 docker logs --tail=50 aisztens-api-1 | head -40    # confirm Node starts
 ```
 
@@ -309,10 +335,13 @@ The SPA dist folders do not exist on the droplet. Go to [§2.14](#214-spa-subdom
 
 ### 2.5 `docker compose ps` shows only postgres; the rest are `Created`
 
-**What it means:** the last `docker compose up -d --build` was
-interrupted (network glitch, SSH drop, timeout), so containers were
+**What it means:** the last `docker compose pull && up -d --force-recreate`
+was interrupted (network glitch, SSH drop, timeout), so containers were
 **created** but never **started**. `docker compose ps` (without `-a`)
 hides `Created` containers — that is why "only postgres" is visible.
+This is the image-based-deploy equivalent of the older "build was
+interrupted" scenario: with images already in GHCR, the only way to end
+up in `Created` is the `pull` or `up` step being killed mid-flight.
 
 **Then do this:**
 
@@ -320,9 +349,10 @@ hides `Created` containers — that is why "only postgres" is visible.
 # 1. Show EVERY container, including stopped / created
 docker compose --env-file infra/.env -f infra/docker-compose.yml ps -a
 
-# 2. Start whatever is Created / Exited
+# 2. Resume: re-pull and force-recreate whatever is Created / Exited
 cd /opt/aisztens
-docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+docker compose --env-file infra/.env -f infra/docker-compose.yml pull
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --remove-orphans --force-recreate
 
 # 3. Verify
 docker compose --env-file infra/.env -f infra/docker-compose.yml ps -a
@@ -355,7 +385,7 @@ docker compose exec api getent hosts postgres
 docker compose exec api wget -qO- http://postgres:5432 || echo "tcp OK"
 
 # 3. Does postgres actually accept connections?
-docker compose exec postgres pg_isready -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-callback}"
+docker compose exec postgres pg_isready -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-aisztens_db}"
 
 # 4. Is the DATABASE_URL correct?
 docker compose exec api env | grep -E 'DATABASE_URL|POSTGRES'
@@ -439,7 +469,7 @@ machine against the droplet), do this **only temporarily**:
 docker run --rm -it --name debug-psql \
   --network aisztens_internal \
   -e PGPASSWORD="${AISZTENS_DB_PASSWORD}" \
-  postgres:16-alpine psql -h postgres -U aisztens -d callback
+  postgres:16-alpine psql -h postgres -U aisztens -d aisztens_db
 
 # Or, if you must bind to the host directly, edit docker-compose.yml:
 #   postgres:
@@ -587,27 +617,45 @@ Source: [`Specs/Production-Runbook.md`](Specs/Production-Runbook.md) §4.3, [`hi
 
 ### 2.14 SPA subdomains return 404 / `ERR_FILE_NOT_FOUND`
 
+**What it means:** since 2026-10-08 (image-based deploy), the `web` and
+`admin` SPA bundles are **baked into their own nginx containers** — the
+droplet has no `apps/web/dist` or `/srv/web` host folder, and Caddy
+`reverse_proxy`s to the SPA containers. A 404 therefore means the SPA
+container is not running, not that the build is missing on the host.
+
 **Then do this:**
 
 ```bash
-# 1. Do the dist folders exist on the droplet?
-ssh root@ssh.aisztens.hu 'ls -la /opt/aisztens/apps/web/dist /opt/aisztens/apps/admin/dist'
+# 1. Are the SPA containers up?
+docker compose --env-file infra/.env -f infra/docker-compose.yml ps web admin
+# Expect: Up. If Restarting / Exited, see §2.1.
+
+# 2. Does the container actually serve the SPA index?
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec web ls /usr/share/nginx/html
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec admin ls /usr/share/nginx/html
 # Expect: index.html + assets/.
 
-# 2. Does the Caddy container see them?
-docker compose exec caddy ls -la /srv/web /srv/admin
-# Expect: same content.
+# 3. Does Caddy reach them through the internal network?
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy \
+  wget -qO- http://web:80/ | head -5
+# Expect: the SPA index.html (HTML doctype at the top).
 
-# 3. If either is empty: the SPA build step was skipped during the
-#    GitHub Actions deploy.  Re-run it manually:
-cd apps/web && VITE_API_BASE_URL=https://api.aisztens.hu/api pnpm build && cd -
-cd apps/admin && VITE_API_BASE_URL=https://api.aisztens.hu/api pnpm build && cd -
-scp -r apps/web/dist apps/admin/dist root@ssh.aisztens.hu:/opt/aisztens/apps/
-
-docker compose --env-file infra/.env -f infra/docker-compose.yml restart caddy
+# 4. Are they on the right image tag?  An old image can carry an old bundle
+#    baked into it.  See the deploy workflow's "Verify every service is
+#    running IMAGE_TAG" step for the canonical check; the droplet-side
+#    equivalent is:
+docker compose --env-file infra/.env -f infra/docker-compose.yml ps --format \
+  '{{.Service}} {{.Image}}' | awk '$1=="web" || $1=="admin"'
+# Expect: image references containing :$IMAGE_TAG.
 ```
 
-Source: [`history/2026-09-25--14-56-56-deploy-yml-spa-build-fix.md`](history/2026-09-25--14-56-56-deploy-yml-spa-build-fix.md).
+The pre-image-based-deploy recovery (re-run `pnpm build` and rsync the
+dist folder) is no longer applicable — `images.yml` builds the bundles,
+and rolling back means rolling the image. See
+[`history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
+for the migration that retired that path. The original incident fix is
+preserved at
+[`history/2026-09-25--14-56-56-deploy-yml-spa-build-fix.md`](history/2026-09-25--14-56-56-deploy-yml-spa-build-fix.md).
 
 ---
 
@@ -690,18 +738,20 @@ sudo truncate -s 0 /var/lib/docker/containers/<id>/<id>-json.log
 
 ### 2.18 `deploy.sh` rsync fails with `bash: line 1: <host>: command not found`
 
-**What it means:** the rsync `-e` argument was contaminated with the
-`user@host` pair. rsync then appends the destination host again,
-producing `ssh <opts> user@host <host> rsync …`, and the remote shell
-tries to execute `<host>` as a command.
+**What it means:** the historical rsync `-e` argument was contaminated
+with the `user@host` pair. rsync then appended the destination host
+again, producing `ssh <opts> user@host <host> rsync …`, and the remote
+shell tried to execute `<host>` as a command.
 
-**Then do this:**
-
-1. The fix is already in [`deploy/deploy.sh`](../deploy/deploy.sh) (one-liner
-   was applied 2026-09-24). If you are on an older revision, pull master.
-2. Verify locally: `bash -n deploy/deploy.sh` should print `syntax OK`.
-
-Source: [`history/2026-09-24--20-02-39-deploy-sh-rsync-host-bug-fix.md`](history/2026-09-24--20-02-39-deploy-sh-rsync-host-bug-fix.md).
+**Status: legacy scenario.** The image-based deploy (2026-10-08) removed
+the rsync path from `deploy.sh` entirely; the droplet no longer receives
+the repository. The remaining uploads are `scp` calls of three small
+files (`docker-compose.yml`, `infra/.env`, `Caddyfile.rendered`) and
+`deploy/ssh-keys/*.pub`. The historical fix and its reproduction are
+preserved at
+[`history/2026-09-24--20-02-39-deploy-sh-rsync-host-bug-fix.md`](history/2026-09-24--20-02-39-deploy-sh-rsync-host-bug-fix.md)
+— if a similar error re-appears after a future change to `deploy.sh`,
+start from there.
 
 ---
 
@@ -740,11 +790,11 @@ docker inspect aisztens-api-1 | jq '.[0].RestartCount'
 ### 3.2 Logs
 
 ```bash
-docker compose -f infra/docker-compose.yml logs --tail=200 -t          # all services
-docker compose -f infra/docker-compose.yml logs -f api                # follow api
-docker compose -f infra/docker-compose.yml logs --since 30m api       # last 30 min
-docker logs --tail=500 aisztens-api-1                                 # raw
-docker logs --tail=500 aisztens-api-1 2>&1 | grep -E 'error|warn'     # errors only
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=200 -t          # all services
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f api                # follow api
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --since 30m api       # last 30 min
+docker logs --tail=500 aisztens-api-1                                                       # raw
+docker logs --tail=500 aisztens-api-1 2>&1 | grep -E 'error|warn'                           # errors only
 
 # Where is the log file?
 sudo ls -l /var/lib/docker/containers/*/*-json.log
@@ -769,11 +819,11 @@ sudo dmesg --since '-1h' | grep -i 'killed process'
 ### 3.4 Inside a running container
 
 ```bash
-docker compose -f infra/docker-compose.yml exec api sh          # interactive shell
-docker compose -f infra/docker-compose.yml exec api node -e 'console.log(process.memoryUsage())'
-docker compose -f infra/docker-compose.yml exec postgres psql -U aisztens -d callback
-docker compose -f infra/docker-compose.yml exec caddy caddy validate --config /etc/caddy/Caddyfile
-docker compose -f infra/docker-compose.yml exec caddy caddy list-certificates
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api sh          # interactive shell
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node -e 'console.log(process.memoryUsage())'
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec postgres psql -U aisztens -d aisztens_db
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy caddy validate --config /etc/caddy/Caddyfile
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy caddy list-certificates
 ```
 
 ### 3.5 Networking
@@ -792,8 +842,10 @@ dig +short api.aisztens.hu                                           # public DN
 ```bash
 docker volume ls
 docker volume inspect aisztens_pgdata | jq '.[0].Mountpoint'
-docker compose exec caddy ls -la /srv/web /srv/admin
-docker compose exec postgres ls -la /var/lib/postgresql/data
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy cat /etc/caddy/Caddyfile
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec web ls /usr/share/nginx/html
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec admin ls /usr/share/nginx/html
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec postgres ls -la /var/lib/postgresql/data
 sudo du -sh /var/lib/docker/volumes/* | sort -h | tail
 ```
 
@@ -862,15 +914,15 @@ and attach it. The bundle removes ~90 % of the back-and-forth.
     docker info | head -30
     echo
     echo '== compose ps -a =='
-    docker compose -f infra/docker-compose.yml ps -a
+    docker compose --env-file infra/.env -f infra/docker-compose.yml ps -a
     echo
     echo '== docker stats (no-stream) =='
     docker stats --no-stream --no-trunc
     echo
     echo '== Logs per service (last 200 lines) =='
-    for s in api postgres caddy monitor; do
+    for s in api web admin postgres caddy monitor; do
       echo "----- $s -----"
-      docker compose -f infra/docker-compose.yml logs --tail=200 -t "$s" 2>&1 || true
+      docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=200 -t "$s" 2>&1 || true
     done
     echo
     echo '== docker events (last 1h) =='

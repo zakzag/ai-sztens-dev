@@ -1,7 +1,12 @@
 # Local Development — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-08 — image-based deploy: the local override now
+**Last updated:** 2026-10-13 — deploy-process consistency: the `dev` boot
+row no longer claims a `deploy.yml` push trigger (that workflow now reacts
+via `workflow_run` / `workflow_dispatch`), and §5 no longer references the
+removed `deploy.sh:ensure_spa_env()` helper — the SPA API URL is the
+`VITE_API_BASE_URL` build arg of `.github/workflows/images.yml`.
+**Previous update:** 2026-10-08 — image-based deploy: the local override now
 carries `build:` blocks for every application service so a fresh checkout
 can still build the stack from source without a registry
 ([`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)).
@@ -21,7 +26,7 @@ It complements the droplet-side runbook
 | Env | Where it runs | Config files it reads | How it boots |
 |---|---|---|---|
 | **local** | The developer's own machine (Windows / WSL / Linux / macOS) | [`infra/.env.local`](../../infra/.env.example) + [`apps/api/.env.local`](../../apps/api/.env.example) + `apps/web/.env.local` + `apps/admin/.env.local` | [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) `up` |
-| **dev** | The currently running droplet (`aisztens.hu`) | [`infra/.env.dev`](../../infra/.env.example) (rendered into `infra/.env` on the droplet by deploy.sh) + [`deploy/.env.dev`](../../deploy/.env.example) (operator/SSH config for the dev droplet) + compose `environment:` block | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up dev` (or plain `up` — `dev` is the default target) or the `.github/workflows/deploy.yml` push trigger |
+| **dev** | The currently running droplet (`aisztens.hu`) | [`infra/.env.dev`](../../infra/.env.example) (rendered into `infra/.env` on the droplet by `deploy.sh` or the CI deploy) + [`deploy/.env.dev`](../../deploy/.env.example) (operator/SSH config for the dev droplet) + compose `environment:` block | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up dev` (or plain `up` — `dev` is the default target), or auto-deploy by [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) via its `workflow_run` trigger (after `images.yml` publishes the images), or a manual `workflow_dispatch` |
 | **prod** | A **future** dedicated production droplet (does not exist yet) | [`infra/.env.prod`](../../infra/.env.example) (dormant template; replace `<prod-domain>` with the real apex when provisioning) + `deploy/.env.prod` (operator/SSH config for the prod droplet) | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up prod`, or the same deploy pipeline dispatched manually with `app_env=prod` |
 
 All real env files are **gitignored** — only `*.env.example` templates are
@@ -124,25 +129,35 @@ one place, the others propagate.
 
 ## 5. Common pitfalls
 
-- **The droplet's `apps/web/.env.dev` and `apps/admin/.env.dev` are NOT
-  in the source tree.** They live only on the build host (the
-  developer machine for local builds, or the deploy.sh runner for
-  CI builds). [`deploy/deploy.sh:ensure_spa_env()`](../../deploy/deploy.sh:104)
-  seeds them on the first build and never overwrites — if the operator
-  hand-edits them, the change survives across deploys.
+- **The SPA API URL is baked into the image at build time, not read from a
+  droplet-side file.** The image-based deploy (2026-10-08) retired the
+  host-side `apps/{web,admin}/.env.dev` files and the
+  `deploy/deploy.sh:ensure_spa_env()` helper that used to seed them: the SPA
+  base URL now arrives as the `VITE_API_BASE_URL` build arg of
+  [`.github/workflows/images.yml`](../../.github/workflows/images.yml)
+  (derived from the `DOMAIN` in the `INFRA_ENV_*` secret). The droplet only
+  pulls the finished `web` / `admin` images and never builds them.
 
-- **Don't put secrets in `apps/*/.env.{dev,prod}`.** Those files are
-  shipped to the SPA bundle at build time (`vite build --mode X`
-  bakes `import.meta.env.VITE_*` into the JS). Real secrets belong in
-  `infra/.env.{dev,prod}` only, which never enters the SPA bundle.
+- **Don't put secrets in `apps/*/.env.{dev,prod}`.** During a local
+  `vite build --mode X` those files are baked into the SPA bundle
+  (`import.meta.env.VITE_*` ends up in the JS); in the image-based CI path
+  the equivalent values arrive as the `VITE_*` build args of
+  [`.github/workflows/images.yml`](../../.github/workflows/images.yml).
+  Either way, only public values may go into a `VITE_*` variable. Real
+  secrets belong in `infra/.env.{dev,prod}` only, which never enters the
+  SPA bundle.
 
-- **The legacy `infra/.env` path still works on the current dev
-  droplet.** After the three-env plan, the deploy copies the local
-  `infra/.env.dev` to the remote `infra/.env` (the droplet's compose
-  `--env-file` flag points at the legacy path because that path is
-  unchanged on disk). Deployments keep working; over time the
-  droplet's `infra/.env` can be renamed on disk, but that's a follow-up
-  — not part of the plan.
+- **The legacy `infra/.env` path is the runtime env on the droplet.**
+  The image-based deploy (2026-10-08) ships `infra/.env.${APP_ENV}` →
+  `infra/.env` on the droplet; the compose `--env-file infra/.env` flag
+  points at this single canonical file because a droplet hosts ONE
+  environment. The per-env name (`infra/.env.<target>`) exists
+  **locally only**, as the source. A future migration could rename
+  the runtime path to `infra/.env.${APP_ENV}` on disk as well, but
+  every compose invocation, the smoke suite, and `check-env-live.sh`
+  are pinned to `infra/.env` — see
+  [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md) §1d
+  for the offline guard that locks this down.
 
 - **The `local` env is NOT shipped to the droplet.** `scripts/dev-stack.sh`
   does not scp anything; the API container is your local machine.

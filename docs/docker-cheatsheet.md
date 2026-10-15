@@ -2,8 +2,13 @@
 
 A swiss-army-knife reference for debugging Docker containers, with a focus on the
 **AIsztens** stack ([`infra/docker-compose.yml`](../infra/docker-compose.yml)):
-`api` (NestJS + Fastify), `postgres` (16-alpine), `caddy` (2-alpine reverse proxy),
-and `monitor` (curl-based watchdog).
+`api` (NestJS + Fastify), `web` (nginx serving the public SPA), `admin`
+(nginx serving the dashboard SPA), `postgres` (16-alpine), `caddy`
+(2-alpine reverse proxy), and `monitor` (curl-based watchdog). The stack
+is **image-based** (since 2026-10-08): the droplet pulls every application
+image from GHCR and never builds anything — `web` and `admin` carry their
+SPA bundles baked into the image at `/usr/share/nginx/html`, and there is
+no host `/srv/web` or `/srv/admin` bind mount any more.
 
 Use it when:
 
@@ -15,8 +20,18 @@ Use it when:
 
 > **Tip:** everything below assumes you are either on the droplet via SSH or in
 > the project root on your dev machine. On the droplet, `cd` into
-> `~/aisztens/infra` (or wherever you cloned the repo) before running
-> `docker compose` commands.
+> `/opt/aisztens` (the `REMOTE_DIR` default in `deploy/deploy.sh`) before
+> running `docker compose` commands.
+>
+> **Tip 2:** every `docker compose` example below assumes the `infra/.env`
+> file is in scope. On the droplet, that file is the runtime env written
+> by `deploy.sh` / the CI workflow; pass it explicitly with
+> `--env-file infra/.env`. The compose file uses `${IMAGE_TAG}` /
+> `${GHCR_OWNER}` / `${REGISTRY}` to resolve GHCR image references —
+> without the env file the docker compose call substitutes the `latest` /
+> `local` defaults and pulls the wrong image. Many one-liners below omit
+> the flag for terseness; add `--env-file infra/.env` when running them on
+> the droplet.
 
 ---
 
@@ -48,22 +63,22 @@ in under a minute:
 
 ```bash
 # 1. Are all containers running?
-docker compose -f infra/docker-compose.yml ps
+docker compose --env-file infra/.env -f infra/docker-compose.yml ps
 
 # 2. Anything restarting?
-docker compose -f infra/docker-compose.yml ps | grep -E 'Restarting|Exited|unhealthy'
+docker compose --env-file infra/.env -f infra/docker-compose.yml ps | grep -E 'Restarting|Exited|unhealthy'
 
 # 3. Last 100 lines of every service
-docker compose -f infra/docker-compose.yml logs --tail=100
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=100
 
 # 4. Follow one specific service live
-docker compose -f infra/docker-compose.yml logs -f api
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f api
 
 # 5. Live resource snapshot
 docker stats
 
 # 6. Top processes inside the suspect container
-docker compose -f infra/docker-compose.yml top api
+docker compose --env-file infra/.env -f infra/docker-compose.yml top api
 ```
 
 If that doesn't tell you anything, jump to the matching section below.
@@ -108,10 +123,10 @@ docker inspect aisztens-api-1 | jq '.[0].State.Health'
 ### Restart / stop / start
 
 ```bash
-docker compose -f infra/docker-compose.yml restart api
-docker compose -f infra/docker-compose.yml up -d --no-deps api   # recreate only api
-docker compose -f infra/docker-compose.yml stop postgres
-docker compose -f infra/docker-compose.yml kill api              # SIGKILL
+docker compose --env-file infra/.env -f infra/docker-compose.yml restart api
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --no-deps api   # recreate only api
+docker compose --env-file infra/.env -f infra/docker-compose.yml stop postgres
+docker compose --env-file infra/.env -f infra/docker-compose.yml kill api              # SIGKILL
 ```
 
 ---
@@ -122,20 +137,20 @@ docker compose -f infra/docker-compose.yml kill api              # SIGKILL
 
 ```bash
 # Last 200 lines, all services, with timestamps
-docker compose -f infra/docker-compose.yml logs --tail=200 -t
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=200 -t
 
 # Follow one service live (Ctrl-C to exit)
-docker compose -f infra/docker-compose.yml logs -f api
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f api
 
 # Logs since a point in time
-docker compose -f infra/docker-compose.yml logs --since 30m api
-docker compose -f infra/docker-compose.yml logs --since 2026-09-29T08:00:00Z api
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --since 30m api
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --since 2026-09-29T08:00:00Z api
 
 # Logs between two timestamps
-docker compose -f infra/docker-compose.yml logs --since 30m --until 10m api
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --since 30m --until 10m api
 
 # Just stderr (most crashes print there)
-docker compose -f infra/docker-compose.yml logs -f api 2>&1 | grep -v INFO
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f api 2>&1 | grep -v INFO
 ```
 
 ### Log flags cheat-sheet
@@ -153,11 +168,11 @@ docker compose -f infra/docker-compose.yml logs -f api 2>&1 | grep -v INFO
 
 ```bash
 # All "error" / "warn" / "fail" lines across the stack
-docker compose -f infra/docker-compose.yml logs --no-color \
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --no-color \
   | grep -iE 'error|warn|fail|throw|unhandled|exception'
 
 # Count occurrences (great for "is this happening once or a thousand times?")
-docker compose -f infra/docker-compose.yml logs --no-color api \
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --no-color api \
   | grep -c 'ECONNREFUSED'
 ```
 
@@ -257,7 +272,7 @@ caddy, 32m for monitor). Either raise the limit or shrink the heap.
 ### Process tree inside a container
 
 ```bash
-docker compose -f infra/docker-compose.yml top api
+docker compose --env-file infra/.env -f infra/docker-compose.yml top api
 docker top aisztens-api-1 -o pid,pcpu,pmem,etime,comm
 ```
 
@@ -277,10 +292,12 @@ Watch for `oom`, `kill`, `restart`, `die`, `health_status: unhealthy`.
 ### Run a one-off command
 
 ```bash
-docker compose -f infra/docker-compose.yml exec api sh
-docker compose -f infra/docker-compose.yml exec api ps -U ildom
-docker compose -f infra/docker-compose.yml exec api node -v
-docker compose -f infra/docker-compose.yml exec postgres psql -U postgres -d callback
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api sh
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api ps -ef
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node -v
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec postgres psql -U postgres -d aisztens_db
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec web ls /usr/share/nginx/html
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec admin ls /usr/share/nginx/html
 ```
 
 The first form opens a shell. Common shells in our images:
@@ -295,16 +312,16 @@ The first form opens a shell. Common shells in our images:
 ### Run a command without entering
 
 ```bash
-docker compose -f infra/docker-compose.yml exec api node -e 'console.log(process.memoryUsage())'
-docker compose -f infra/docker-compose.yml exec api ls -la /app
-docker compose -f infra/docker-compose.yml exec api env | sort
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node -e 'console.log(process.memoryUsage())'
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api ls -la /app
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api env | sort
 ```
 
 ### Inspect the process tree inside
 
 ```bash
-docker compose -f infra/docker-compose.yml exec api ps -ef
-docker compose -f infra/docker-compose.yml exec api ps -eo pid,pcpu,pmem,rss,vsz,comm --sort=-pcpu
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api ps -ef
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api ps -eo pid,pcpu,pmem,rss,vsz,comm --sort=-pcpu
 ```
 
 ### Inspect Node's own state
@@ -338,7 +355,7 @@ Caddy is small but it owns port 80/443 and is the most common source of
 ### Logs
 
 ```bash
-docker compose -f infra/docker-compose.yml logs -f caddy
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f caddy
 ```
 
 Look for:
@@ -354,8 +371,8 @@ Look for:
 ### Validate config without restarting
 
 ```bash
-docker compose -f infra/docker-compose.yml exec caddy caddy validate --config /etc/caddy/Caddyfile
-docker compose -f infra/docker-compose.yml exec caddy caddy fmt -- /etc/caddy/Caddyfile    # pretty-print
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy caddy validate --config /etc/caddy/Caddyfile
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy caddy fmt -- /etc/caddy/Caddyfile    # pretty-print
 ```
 
 ### Adapt config live (Caddy's admin API is at :2019 by default)
@@ -374,14 +391,14 @@ curl -X POST http://127.0.0.1:2019/load \
 ### Inspect the active config
 
 ```bash
-docker compose -f infra/docker-compose.yml exec caddy caddy adapt --config /etc/caddy/Caddyfile --pretty
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy caddy adapt --config /etc/caddy/Caddyfile --pretty
 ```
 
 ### Test from inside the network
 
 ```bash
-docker compose -f infra/docker-compose.yml exec caddy wget -qO- http://api:3000/healthz
-docker compose -f infra/docker-compose.yml exec caddy curl -vI https://example.com/        # if curl is installed
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy wget -qO- http://api:3000/healthz
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy curl -vI https://example.com/        # if curl is installed
 ```
 
 If `curl` is not in the caddy image (it isn't by default), use `wget` or run a
@@ -390,14 +407,14 @@ one-shot `curlimages/curl` sidecar (see section 6).
 ### Where Caddy keeps certs
 
 ```bash
-docker compose -f infra/docker-compose.yml exec caddy ls -la /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/
-docker compose -f infra/docker-compose.yml exec caddy cat /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<domain>/<domain>.crt | openssl x509 -noout -dates -subject
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy ls -la /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy cat /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<domain>/<domain>.crt | openssl x509 -noout -dates -subject
 ```
 
 ### Force a cert renewal
 
 ```bash
-docker compose -f infra/docker-compose.yml exec caddy caddy certs --renew
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy caddy certs --renew
 ```
 
 ---
@@ -410,29 +427,29 @@ NestJS + Fastify on port 3000.
 ### Inspect the running process
 
 ```bash
-docker compose -f infra/docker-compose.yml exec api ps -ef
-docker compose -f infra/docker-compose.yml exec api ls -la /app
-docker compose -f infra/docker-compose.yml exec api env | sort
-docker compose -f infra/docker-compose.yml exec api cat /app/package.json
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api ps -ef
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api ls -la /app
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api env | sort
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api cat /app/package.json
 ```
 
 ### V8 memory & GC
 
 ```bash
 # Quick snapshot
-docker compose -f infra/docker-compose.yml exec api node -e '
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node -e '
   const m = process.memoryUsage();
   console.log(JSON.stringify(m, null, 2));
 '
 
 # Heap statistics (heap sizes, used vs total)
-docker compose -f infra/docker-compose.yml exec api node -e '
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node -e '
   const v8 = require("v8");
   console.log(JSON.stringify(v8.getHeapStatistics(), null, 2));
 '
 
 # Trigger a GC and re-measure (only works if --expose-gc was passed)
-docker compose -f infra/docker-compose.yml exec api node --expose-gc -e '
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node --expose-gc -e '
   global.gc(); console.log(process.memoryUsage());
 '
 ```
@@ -440,7 +457,7 @@ docker compose -f infra/docker-compose.yml exec api node --expose-gc -e '
 ### Process-wide heap snapshot (find a leak)
 
 ```bash
-docker compose -f infra/docker-compose.yml exec api node -e '
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node -e '
   const v8 = require("v8"); const fs = require("fs");
   const snap = v8.writeHeapSnapshot("/tmp/heap.heapsnapshot");
   console.log("wrote", snap);
@@ -452,9 +469,9 @@ docker cp aisztens-api-1:/tmp/heap.heapsnapshot ./heap.heapsnapshot
 ### CPU profile
 
 ```bash
-docker compose -f infra/docker-compose.yml exec api node --prof main.js
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node --prof main.js
 # Run for a while, then SIGINT (Ctrl-C) and:
-docker compose -f infra/docker-compose.yml exec api node --prof-process isolate-*.log > processed.txt
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node --prof-process isolate-*.log > processed.txt
 ```
 
 ### Inspector (live debugger / breakpoints)
@@ -495,8 +512,8 @@ the API".
 ### Connect from inside the container
 
 ```bash
-docker compose -f infra/docker-compose.yml exec postgres psql -U postgres -d callback
-docker compose -f infra/docker-compose.yml exec postgres psql -U aisztens -d callback
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec postgres psql -U postgres -d aisztens_db
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec postgres psql -U aisztens -d aisztens_db
 ```
 
 ### What is running right now?
@@ -563,8 +580,8 @@ SHOW max_connections;
 ### Healthcheck on Postgres
 
 ```bash
-docker compose -f infra/docker-compose.yml exec postgres pg_isready -U postgres -d callback
-docker compose -f infra/docker-compose.yml exec postgres psql -U postgres -d callback -c 'select 1'
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec postgres pg_isready -U postgres -d aisztens_db
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec postgres psql -U postgres -d aisztens_db -c 'select 1'
 ```
 
 ### Memory tuning knobs already in compose
@@ -594,12 +611,12 @@ docker network inspect aisztens_internal
 docker network inspect aisztens_internal --format '{{range .Containers}}{{.Name}} {{end}}'
 
 # Resolve a service name from inside the network
-docker compose -f infra/docker-compose.yml exec api nslookup postgres
-docker compose -f infra/docker-compose.yml exec api getent hosts postgres   # alpine
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api nslookup postgres
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api getent hosts postgres   # alpine
 
 # Are two services actually reachable?
-docker compose -f infra/docker-compose.yml exec api wget -qO- http://api:3000/healthz
-docker compose -f infra/docker-compose.yml exec api wget -qO- http://postgres:5432   # will fail on protocol, but TCP connects
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api wget -qO- http://api:3000/healthz
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api wget -qO- http://postgres:5432   # will fail on protocol, but TCP connects
 ```
 
 If a service cannot reach another:
@@ -648,9 +665,16 @@ For our stack:
 | `./caddy/Caddyfile.rendered` | `/etc/caddy/Caddyfile` | rendered reverse-proxy config |
 | `caddy_data` volume | `/data` | TLS certs |
 | `caddy_config` volume | `/config` | Caddy's runtime config |
-| `${WEB_DIST_PATH:-../apps/web/dist}` | `/srv/web` | web SPA bundle |
-| `${ADMIN_DIST_PATH:-../apps/admin/dist}` | `/srv/admin` | admin SPA bundle |
+| _(image-baked: `ghcr.io/<owner>/aisztens-web`)_ | `/usr/share/nginx/html` | web SPA bundle — built into the image by `images.yml`, no host folder |
+| _(image-baked: `ghcr.io/<owner>/aisztens-admin`)_ | `/usr/share/nginx/html` | admin SPA bundle — built into the image by `images.yml`, no host folder |
 | `pgdata` volume | `/var/lib/postgresql/data` | DB files |
+
+The historical host bind mounts (`${WEB_DIST_PATH:-../apps/web/dist}` →
+`/srv/web`, same for `admin`) were removed when the deploy moved to
+image-based on 2026-10-08: see
+[`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md).
+If you ever see a stack with those bind mounts, it is on the pre-image-based
+revision.
 
 ### Tail a mounted log file (when `docker logs` is not enough)
 
@@ -736,7 +760,7 @@ docker logs aisztens-api-1 2>&1 | tail -200 \
 ### Build with progress and verbose output
 
 ```bash
-docker compose -f infra/docker-compose.yml build --progress=plain api
+docker compose --env-file infra/.env -f infra/docker-compose.yml build --progress=plain api
 docker build --progress=plain -f infra/app/Dockerfile .
 ```
 
@@ -773,14 +797,17 @@ docker inspect aisztens/api:latest | jq '.[0].Config.Cmd, .[0].Config.Env'
 ## 14. One-liner recipes for this repo
 
 All examples assume the repo root as cwd, and use the user-defined project
-name `aisztens` (from `name: aisztens` in compose).
+name `aisztens` (from `name: aisztens` in compose). On the droplet, every
+`docker compose` command also needs `--env-file infra/.env` (see the
+intro at the top of this file); the snippets below include it for
+copy-paste readiness.
 
 ```bash
 # Top 20 lines of every log, labelled by service, with timestamps
-docker compose -f infra/docker-compose.yml logs --tail=20 -t
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=20 -t
 
 # Only errors across the whole stack
-docker compose -f infra/docker-compose.yml logs --no-color \
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --no-color \
   | grep -iE 'error|exception|fatal|panic|unhandled' \
   | grep -v 'healthcheck' \
   | tail -50
@@ -790,31 +817,35 @@ docker stats --no-stream --format \
   'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}'
 
 # Memory snapshot inside the api (heap + RSS)
-docker compose -f infra/docker-compose.yml exec api \
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api \
   node -e 'const m=process.memoryUsage(),v=require("v8").getHeapStatistics(); console.log({m,v})'
 
 # Is the api responding from inside the network?
-docker compose -f infra/docker-compose.yml exec api \
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec api \
   wget -qO- http://127.0.0.1:3000/healthz
 
 # Postgres currently-running queries
-docker compose -f infra/docker-compose.yml exec postgres \
-  psql -U postgres -d callback -c \
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec postgres \
+  psql -U postgres -d aisztens_db -c \
     "SELECT pid, now()-query_start AS age, state, left(query,80) FROM pg_stat_activity WHERE state IS NOT NULL ORDER BY age DESC;"
 
 # Caddy config — is it valid?
-docker compose -f infra/docker-compose.yml exec caddy \
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy \
   caddy validate --config /etc/caddy/Caddyfile
 
 # Caddy: render the live config from the template (for inspection)
-docker compose -f infra/docker-compose.yml exec caddy \
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy \
   caddy adapt --config /etc/caddy/Caddyfile --pretty
 
 # Tail the api log specifically and follow new lines
-docker compose -f infra/docker-compose.yml logs -f api
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f api
 
 # Tail all logs to a file for sharing
-docker compose -f infra/docker-compose.yml logs --no-color --since 1h > /tmp/aisztens.log
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --no-color --since 1h > /tmp/aisztens.log
+
+# Check that every application container is on the right image tag
+docker compose --env-file infra/.env -f infra/docker-compose.yml ps --format \
+  '{{.Service}} {{.Image}}'
 ```
 
 ---
@@ -830,7 +861,7 @@ docker system prune
 docker system prune -a         # also remove unused images (CAREFUL)
 
 # Remove everything for *this* stack only
-docker compose -f infra/docker-compose.yml down --volumes --remove-orphans
+docker compose --env-file infra/.env -f infra/docker-compose.yml down --volumes --remove-orphans
 
 # Just prune the build cache (safe)
 docker builder prune
@@ -863,10 +894,10 @@ host, gather this and ask for help:
   docker stats --no-stream --no-trunc
   echo
   echo '== compose ps =='
-  docker compose -f infra/docker-compose.yml ps
+  docker compose --env-file infra/.env -f infra/docker-compose.yml ps
   echo
   echo '== last 200 lines per service =='
-  docker compose -f infra/docker-compose.yml logs --tail=200 -t
+  docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=200 -t
   echo
   echo '== recent events =='
   docker events --since 1h --until now

@@ -17,9 +17,21 @@ The `monitor` service is a lightweight **API liveness watchdog** — an Alpine +
 
 ### Usage
 
+The `monitor` container is **image-based** since 2026-10-08 — the droplet
+pulls `ghcr.io/<owner>/aisztens-monitor:$IMAGE_TAG` from GHCR and does
+**not** build anything locally. The local override
+([`infra/docker-compose.local.yml`](../infra/docker-compose.local.yml))
+restores a `build:` block for `monitor` so a fresh checkout can
+`up -d --build` from source. The droplet has no `infra/monitor/` folder
+in scope.
+
 ```bash
-# up (monitor builds from ./monitor)
-docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+# on the droplet (image-based) — pull and start
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d monitor
+
+# locally, after a `scripts/dev-stack.sh up` — the local override builds from ./monitor
+docker compose --env-file infra/.env.local \
+  -f infra/docker-compose.yml -f infra/docker-compose.local.yml up -d --build monitor
 
 # follow ticks
 docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f monitor
@@ -39,9 +51,19 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml start api
 
 Config knobs: `MONITOR_TARGET_URL` (default `http://api:3000/healthz`), `MONITOR_INTERVAL_SECONDS` (`30`), `MONITOR_FAIL_THRESHOLD` (`2`, compose default only — not present in [`infra/.env.example`](infra/.env.example:33)), `MONITOR_ALERT_WEBHOOK_URL` (empty). Locally it is covered by [`scripts/test/stack-up.sh`](scripts/test/stack-up.sh:1) + the log-scan assertion in [`scripts/test/README.md`](scripts/test/README.md:42).
 
-### Diagnosed documentation drift (reported, not changed)
+### Diagnosed documentation drift (fixed in 2026-10-13 consistency cleanup)
 
-1. [`docs/docker-debug-playbook.md`](docs/docker-debug-playbook.md:632) §2.16 still attributes a `Restarting (255)` cycle to `wget` exiting non-zero and "the shell exited". The current script uses `curl` inside an infinite loop with `set -u` only (no `set -e`), so a probe failure cannot terminate the container. The remediation commands in that section remain valid; the root-cause text is stale.
-2. [`docs/Specs/Production-Runbook.md`](docs/Specs/Production-Runbook.md:148) verifies the watchdog with `wget` and [`infra/.env.example`](infra/.env.example:40) documents the payload field as `status`, whereas [`watch.sh:29`](infra/monitor/watch.sh:29) emits `state` and the image's own HTTP client is `curl`. The `wget` command still works (BusyBox applet), but the docs no longer match the implementation.
+The following pre-existing doc/code mismatches were flagged by the
+2026-10-13 image-based-deploy consistency pass and have been resolved in
+the same commit:
 
-Fixing these three doc references requires your confirmation before I edit them, since the current request was informational.
+1. [`docs/docker-debug-playbook.md`](docs/docker-debug-playbook.md) §2.16
+   used to attribute a `Restarting (255)` cycle to `wget` exiting
+   non-zero. The current script uses `curl` inside an infinite loop
+   with `set -u` only (no `set -e`), so a probe failure cannot terminate
+   the container — the root-cause paragraph was rewritten.
+2. [`docs/Specs/Production-Runbook.md`](docs/Specs/Production-Runbook.md)
+   §6 "monitor" row used to mention `wget` for the watchdog health
+   proof and the `${EDIT}-DIST_PATH` env vars (now retired). The §6 matrix
+   was rewritten to point at the `pull api && up -d --force-recreate --no-deps api`
+   recovery and at the image-baked SPA bundles.

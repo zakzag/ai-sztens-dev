@@ -1,7 +1,8 @@
 # Plan: Product Documentation Structure
 
 - Date: 2026-09-16
-- Status: Draft for review
+- Status: Draft for review — plan storage decision **superseded 2026-10-19**: plans now live in
+  `docs/plans/`, `docs/history/` holds only post-implementation change summaries
 - Scope: Define the documentation flow from business brainstorm to development, and fix the spec docs accordingly.
 
 ## 1. Goal
@@ -18,7 +19,7 @@ fill in next and which artifact is the single source of truth for each concern.
 | Functional documentation | A dedicated **functional specification** replaces a standalone `02-MVP.md`                                                  |
 | MVP marking | Each function gets a **`MVP?`** column + priority (`P0/P1/P2`); the MVP scope is derived from it, not maintained separately |
 | Documentation order | Business → Functional (WHAT) → Technical (HOW) → Implementation plan                                                        |
-| Plan storage | All plans go to `docs/history/<YYYY-MM-DD>-<short-description>-plan.md`                                                     |
+| Plan storage | All plans go to `docs/plans/<YYYY-MM-DD--HH-ii-ss>-<short-description>-plan.md` (moved out of `docs/history/` on 2026-10-19) |
 
 ## 3. Documentation Flow
 
@@ -29,7 +30,7 @@ fill in next and which artifact is the single source of truth for each concern.
         ↓
 Technical design               (HOW — architecture, flowchart, framework-agnostic spec)
         ↓
-Implementation plan            (docs/history/<date>-...-plan.md)
+Implementation plan            (docs/plans/<date>-...-plan.md)
 ```
 
 - [`01-Brainstorming.md`](../Specs/01-Kickoff-meeting.md) — meeting agenda / business decisions.

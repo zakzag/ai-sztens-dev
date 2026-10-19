@@ -19,18 +19,18 @@ DNS A records for all four names already point at `164.92.248.194`
 ## Constraints (read from the source files)
 
 1. The NestJS API sets a global `/api` prefix
-   ([`apps/api/src/main.ts:16`](apps/api/src/main.ts:16)), so every HTTP
+   ([`apps/api/src/main.ts:16`](../../apps/api/src/main.ts:16)), so every HTTP
    endpoint lives at `/api/...`. From the SPA's point of view, the
    **API base URL is `https://api.aisztens.hu/api`**.
 2. The API uses an explicit CORS allow-list driven by the
    `CORS_ORIGINS` env var
-   ([`apps/api/src/main.ts:19`](apps/api/src/main.ts:19)).
+   ([`apps/api/src/main.ts:19`](../../apps/api/src/main.ts:19)).
    With `credentials: true` (line 25), the browser will reject any
    preflight whose `Access-Control-Allow-Origin` is not echoed exactly.
 3. Both SPAs read `import.meta.env.VITE_API_BASE_URL` at build time and
    fall back to `'/api'` (which only works with the Vite dev proxy —
-   [`apps/admin/src/lib/api.ts:3`](apps/admin/src/lib/api.ts:3),
-   [`apps/web/src/lib/api.ts:4`](apps/web/src/lib/api.ts:4)).
+   [`apps/admin/src/lib/api.ts:3`](../../apps/admin/src/lib/api.ts:3),
+   [`apps/web/src/lib/api.ts:4`](../../apps/web/src/lib/api.ts:4)).
    The production **build** therefore has to be compiled with
    `VITE_API_BASE_URL=https://api.aisztens.hu/api` injected into the
    environment. Otherwise the SPAs would POST to `https://admin.aisztens.hu/api`
@@ -38,7 +38,7 @@ DNS A records for all four names already point at `164.92.248.194`
 4. SPA routing requires `try_files {path} /index.html` so deep-links
    like `https://admin.aisztens.hu/callback-requests/123` resolve to
    the React entry point. Already shown in the commented-out example
-   at [`infra/caddy/Caddyfile:34`](infra/caddy/Caddyfile:34).
+   at [`infra/caddy/Caddyfile:34`](../../infra/caddy/Caddyfile:34).
 
 ## Required changes
 
@@ -122,7 +122,7 @@ volumes:
 
 `WEB_DIST_PATH` and `ADMIN_DIST_PATH` are already defined (defaulting
 to `../apps/web/dist` and `../apps/admin/dist`) in
-[`infra/.env.example:44`](infra/.env.example:44), so no new env vars
+[`infra/.env.example:44`](../../infra/.env.example:44), so no new env vars
 are required. The `infra/.env` for the droplet should keep those
 defaults.
 
@@ -216,11 +216,11 @@ environment-specific values out of source).
 
 ### 6. Health endpoint for the API
 
-The current API root controller ([`apps/api/src/app.controller.ts`](apps/api/src/app.controller.ts:1))
+The current API root controller ([`apps/api/src/app.controller.ts`](../../apps/api/src/app.controller.ts:1))
 returns a plain string `getHello()`. With `setGlobalPrefix('api')`, it
 becomes reachable at `https://api.aisztens.hu/api` (returns the
 "Hello World" string). That is enough for the monitor
-([`infra/monitor/watch.sh`](infra/monitor/watch.sh:1)) to poll, and
+([`infra/monitor/watch.sh`](../../infra/monitor/watch.sh:1)) to poll, and
 good enough for a manual `curl` smoke test.
 
 If we want a structured JSON health response, add `@Get('healthz')`
@@ -257,7 +257,7 @@ returning `{ status: 'ok' }`. Nice-to-have, not blocking.
 - **`monitor` container crash.** Still in `Restarting (255)`. Out of
   scope for this plan — document as a separate follow-up.
 - **`apps/admin` Auth.** The current
-  [`apps/admin/src/auth/AuthContext.tsx`](apps/admin/src/auth/AuthContext.tsx:1)
+  [`apps/admin/src/auth/AuthContext.tsx`](../../apps/admin/src/auth/AuthContext.tsx:1)
   is not yet wired to a real auth flow. Out of scope for routing — but
   any future auth implementation must still work cross-origin (the
   admin SPA is on a different origin than the API).

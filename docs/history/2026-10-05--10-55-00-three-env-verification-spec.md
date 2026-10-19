@@ -1,6 +1,6 @@
 # 2026-10-05 10:55 — Three-env separation · verification spec (post-Step 5)
 
-**Plan:** [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md).
+**Plan:** [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md).
 **Scope:** documentation only — no runtime change. Closes a gap flagged in
 the plan's "open questions" list (operator-facing verification recipe).
 

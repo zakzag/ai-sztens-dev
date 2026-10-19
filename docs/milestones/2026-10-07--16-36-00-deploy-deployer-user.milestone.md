@@ -1,7 +1,7 @@
 # Milestone — deploy runs as `deployer`, and both deploy paths agree on `infra/.env`
 
 **Date:** 2026-10-07 16:36 (Europe/Budapest) · **Author:** code mode (Zoo)
-**Narrative:** [`docs/history/2026-10-07--16-36-00-deploy-deployer-user-and-remote-env-path.md`](../history/2026-10-07--16-36-00-deploy-deployer-user-and-remote-env-path.md) · **Plan:** [`…-deploy-deployer-user-plan.md`](../history/2026-10-07-deploy-deployer-user-plan.md)
+**Narrative:** [`docs/history/2026-10-07--16-36-00-deploy-deployer-user-and-remote-env-path.md`](../history/2026-10-07--16-36-00-deploy-deployer-user-and-remote-env-path.md) · **Plan:** [`…-deploy-deployer-user-plan.md`](../plans/2026-10-07-deploy-deployer-user-plan.md)
 
 ## 1. Problem / feature
 

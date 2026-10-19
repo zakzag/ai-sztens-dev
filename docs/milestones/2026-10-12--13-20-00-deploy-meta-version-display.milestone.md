@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-12 13:20
 **Type:** feature touching deploy artefacts + application code
-**Plan:** [`docs/history/2026-10-12-deploy-meta-version-display-plan.md`](../history/2026-10-12-deploy-meta-version-display-plan.md)
+**Plan:** [`docs/plans/2026-10-12-deploy-meta-version-display-plan.md`](../plans/2026-10-12-deploy-meta-version-display-plan.md)
 **Narrative:** [`docs/history/2026-10-12--13-20-00-deploy-meta-version-display.md`](../history/2026-10-12--13-20-00-deploy-meta-version-display.md)
 
 ## 1. Problem

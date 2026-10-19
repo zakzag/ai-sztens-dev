@@ -6,7 +6,7 @@
 `.github/workflows/deploy.yml`, `scripts/ssh/_remove-ssh-passphrase.sh`, four `docs/Specs/` files,
 a new offline test.
 **History entry:** `docs/history/2026-10-06--16-40-00-deploy-env-selection.md`
-**Plan:** `docs/history/2026-10-06-deploy-env-selection-plan.md`
+**Plan:** `docs/plans/2026-10-06-deploy-env-selection-plan.md`
 
 ## 1. Problem / feature
 

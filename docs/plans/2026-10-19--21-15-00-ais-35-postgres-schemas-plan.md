@@ -105,7 +105,7 @@ flowchart LR
 | `scripts/test/lib/20-cross-service.sh` | séma + jogosultság smoke checkek |
 | `docs/Specs/Infrastructure-Docker.md` | §6.2 frissítés |
 | `docs/Specs/Local-Development.md` | init scriptekre hivatkozás frissítése |
-| `docs/history/2026-10-19--21-15-00-ais-35-postgres-schemas-plan.md` | ez a terv |
+| `docs/plans/2026-10-19--21-15-00-ais-35-postgres-schemas-plan.md` | ez a terv |
 | `docs/history/2026-10-19--*.md` | változás-napló bejegyzés az implementáció után |
 | `docs/milestones/2026-10-19--*.milestone.md` | milestone |
 

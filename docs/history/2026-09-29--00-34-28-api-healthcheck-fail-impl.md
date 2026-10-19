@@ -2,7 +2,7 @@
 
 **Dátum:** 2026-09-28 (CEST)
 **Szerző:** Zoo (code mode)
-**Terv:** [`2026-09-28-api-healthcheck-fail-plan.md`](2026-09-28-api-healthcheck-fail-plan.md)
+**Terv:** [`2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](../plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md)
 **Állapot:** kész, deploy-ra vár
 
 ---
@@ -113,6 +113,6 @@ minimális.
 
 ## 7. Kapcsolódó dokumentumok
 
-* **Terv:** [`docs/history/2026-09-28-api-healthcheck-fail-plan.md`](2026-09-28-api-healthcheck-fail-plan.md)
+* **Terv:** [`docs/plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](../plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md)
 * **Milestone:** [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 * **Előzmény:** [`docs/history/2026-09-28-dual-stack-port-collision-fix-impl.md`](2026-09-28-dual-stack-port-collision-fix-impl.md) — a port-ütközés javítása, ami a CPU-terhelést megoldotta, de ezt a maradék healthcheck-hibát hagyta hátra.

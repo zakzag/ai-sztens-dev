@@ -174,9 +174,9 @@ why we need a `plan` job to publish its decision.
 | [`scripts/test/_deploy-yml-matrix-pick-test.py`](../../scripts/test/_deploy-yml-matrix-pick-test.py) | **Deleted.** Subsumed by `_deploy-plan-test.sh`. |
 | [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md) | `Utolsó frissítés` bullet for the plan-job refactor; §9.1 deploy.yml bullet rewritten. |
 | [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md) | `Utolsó frissítés` bullet; §7.1 deploy.yml bullet rewritten. |
-| [`docs/history/2026-10-12--15-09-00-deploy-yml-plan-job.md`](../../docs/history/2026-10-12--15-09-00-deploy-yml-plan-job.md) | **New.** Day-to-day narrative. |
+| [`docs/plans/2026-10-12--15-09-00-deploy-yml-plan-job.md`](../../docs/plans/2026-10-12--15-09-00-deploy-yml-plan-job.md) | **New.** Day-to-day narrative. |
 | [`docs/milestones/2026-10-12--15-09-00-deploy-yml-plan-job.milestone.md`](../../docs/milestones/2026-10-12--15-09-00-deploy-yml-plan-job.milestone.md) | **New.** Decision-grade summary. |
-| [`plans/2026-10-12--15-09-00-deploy-yml-plan-job.md`](../../plans/2026-10-12--15-09-00-deploy-yml-plan-job.md) | **New.** This plan. |
+| [`plans/2026-10-12--15-09-00-deploy-yml-plan-job.md`](2026-10-12--15-09-00-deploy-yml-plan-job.md) | **New.** This plan. |
 
 ## 5. Verification
 

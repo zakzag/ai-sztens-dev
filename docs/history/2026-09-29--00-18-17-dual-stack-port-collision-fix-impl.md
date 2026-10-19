@@ -1,7 +1,7 @@
 # Implementáció: dual-stack port-ütközés és Cloud Firewall / DNS fix
 
 **Dátum:** 2026-09-28 (CEST)
-**Előzmény:** [`docs/history/2026-09-28-dual-stack-port-collision-fix-plan.md`](2026-09-28-dual-stack-port-collision-fix-plan.md)
+**Előzmény:** [`docs/plans/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md`](../plans/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md)
 **Kapcsolódó milestone:** [`docs/milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md`](../milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md)
 
 ---

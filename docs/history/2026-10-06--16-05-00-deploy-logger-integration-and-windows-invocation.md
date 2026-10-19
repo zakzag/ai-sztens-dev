@@ -3,7 +3,7 @@
 **Date:** 2026-10-06 16:05
 **Status:** done
 **Scope:** [`deploy/deploy.sh`](../../deploy/deploy.sh), [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh), [`deploy/deploy.ps1`](../../deploy/deploy.ps1) (new), `deploy/.env` (seeded, gitignored), [`deploy/README.md`](../../deploy/README.md), [`docs/Specs/Production-Runbook.md`](../Specs/Production-Runbook.md) §6.1, [`scripts/test/_deploy-sh-m1-test.sh`](../../scripts/test/_deploy-sh-m1-test.sh), [`scripts/test/_deploy-sh-logger-test.sh`](../../scripts/test/_deploy-sh-logger-test.sh)
-**Related:** [logging plan](2026-10-06-deploy-script-logging-plan.md), [milestone](../milestones/2026-10-06--16-05-00-deploy-logger-integration-and-windows-invocation.milestone.md)
+**Related:** [logging plan](../plans/2026-10-06-deploy-script-logging-plan.md), [milestone](../milestones/2026-10-06--16-05-00-deploy-logger-integration-and-windows-invocation.milestone.md)
 
 ---
 

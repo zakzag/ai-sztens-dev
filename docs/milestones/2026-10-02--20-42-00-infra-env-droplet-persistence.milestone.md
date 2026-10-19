@@ -82,5 +82,5 @@ grep -oE '^[A-Z0-9_]+=' /opt/aisztens/infra/.env | tr -d '=' | sort
   uses `wget` although the image ships `curl`; [`infra/.env.example:40`](../../infra/.env.example:40)
   documents the webhook field as `status` while [`watch.sh:29`](../../infra/monitor/watch.sh:29) sends `state`.
 - Secrets still live as plaintext env files; the 3-phase secret-management plan in
-  [`docs/history/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md`](../history/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md)
+  [`docs/plans/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md`](../plans/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md)
   is still unimplemented.

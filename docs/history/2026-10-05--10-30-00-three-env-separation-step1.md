@@ -1,6 +1,6 @@
 # 2026-10-05 10:30 — Three-env separation · Step 1 (Vite modes)
 
-**Plan:** [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md) — Step 1 of 5.
+**Plan:** [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — Step 1 of 5.
 **Scope:** SPAs (`apps/web`, `apps/admin`) and [`deploy/deploy.sh:build_spas()`](../../deploy/deploy.sh:99). The NestJS API is **not** touched in this step (that lands in Step 2).
 
 ## What changed
@@ -122,4 +122,4 @@ Adds --mode dev / --mode prod Vite scripts and per-env files
 (apps/{web,admin}/.env.local|.env.dev|.env.prod). The deploy script
 seeds .env.dev from DOMAIN on the first build so a fresh droplet
 just works. See
-docs/history/2026-10-05--10-30-00-three-env-separation-plan.md
+docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md

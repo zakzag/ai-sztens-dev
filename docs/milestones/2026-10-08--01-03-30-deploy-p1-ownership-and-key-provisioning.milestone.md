@@ -1,7 +1,7 @@
 # Milestone — bootstrap now installs SSH keys and chowns the deploy tree
 
 **Date:** 2026-10-08 01:03 (Europe/Budapest) · **Author:** code mode (Zoo)
-**Narrative:** [`../history/2026-10-08--01-03-30-deploy-p1-ownership-and-key-provisioning.md`](../history/2026-10-08--01-03-30-deploy-p1-ownership-and-key-provisioning.md) · **Plan:** [`…-deploy-p1-ownership-and-key-provisioning-plan.md`](../history/2026-10-07-deploy-p1-ownership-and-key-provisioning-plan.md)
+**Narrative:** [`../history/2026-10-08--01-03-30-deploy-p1-ownership-and-key-provisioning.md`](../history/2026-10-08--01-03-30-deploy-p1-ownership-and-key-provisioning.md) · **Plan:** [`…-deploy-p1-ownership-and-key-provisioning-plan.md`](../plans/2026-10-07-deploy-p1-ownership-and-key-provisioning-plan.md)
 
 ## 1. Problem / feature
 

@@ -1,7 +1,7 @@
 # Stack Smoke Tests — Execution Log
 
 **Date:** 2026-09-22
-**Related plan:** [`2026-09-21-stack-smoke-tests-plan.md`](2026-09-21-stack-smoke-tests-plan.md)
+**Related plan:** [`2026-09-21--19-12-19-stack-smoke-tests-plan.md`](../plans/2026-09-21--19-12-19-stack-smoke-tests-plan.md)
 
 ## What was built
 

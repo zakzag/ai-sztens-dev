@@ -1,6 +1,6 @@
 # 2026-10-05 10:30 — Three-env separation · Step 0 (`infra/.env` → `infra/.env.dev`)
 
-**Scope:** Step 0 of [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md).
+**Scope:** Step 0 of [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md).
 No behaviour change on the dev droplet; this only prepares the file layout for the steps that follow.
 
 ## What changed

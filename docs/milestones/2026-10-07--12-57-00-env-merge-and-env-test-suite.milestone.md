@@ -1,7 +1,7 @@
 # Milestone — env merge (old clone → current repo) + `.env` test suite
 
 **Date:** 2026-10-07
-**Plan:** [`../history/2026-10-07-env-merge-old-new-and-env-tests-plan.md`](../history/2026-10-07-env-merge-old-new-and-env-tests-plan.md)
+**Plan:** [`../plans/2026-10-07-env-merge-old-new-and-env-tests-plan.md`](../plans/2026-10-07-env-merge-old-new-and-env-tests-plan.md)
 **History:** [`../history/2026-10-07--12-57-00-env-merge-and-env-test-suite.md`](../history/2026-10-07--12-57-00-env-merge-and-env-test-suite.md)
 
 ## 1. Problem / feature

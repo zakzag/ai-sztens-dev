@@ -1,7 +1,7 @@
 # Deploy key switch — new passphrase-less key for local (`root`) and CI (`deployer`)
 
 **Date:** 2026-10-07 15:35 (Europe/Budapest)
-**Plan:** [`2026-10-07-deploy-root-ssh-key-plan.md`](2026-10-07-deploy-root-ssh-key-plan.md)
+**Plan:** [`2026-10-07-deploy-root-ssh-key-plan.md`](../plans/2026-10-07-deploy-root-ssh-key-plan.md)
 **Milestone:** [`../milestones/2026-10-07--15-35-00-deploy-key-root-and-deployer.milestone.md`](../milestones/2026-10-07--15-35-00-deploy-key-root-and-deployer.milestone.md)
 
 ## Request

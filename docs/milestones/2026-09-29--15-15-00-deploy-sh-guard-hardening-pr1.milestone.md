@@ -1,7 +1,7 @@
 # Milestone — `deploy.sh` hardening PR #1 (M1, M2, M3, M10)
 
 **Date:** 2026-09-29
-**Plan:** [`docs/history/2026-09-29--14-38-32-deploy-sh-guard-hardening-plan.md`](../history/2026-09-29--14-38-32-deploy-sh-guard-hardening-plan.md)
+**Plan:** [`docs/plans/2026-09-29--14-38-32-deploy-sh-guard-hardening-plan.md`](../plans/2026-09-29--14-38-32-deploy-sh-guard-hardening-plan.md)
 **History:** [`docs/history/2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.md`](../history/2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.md)
 
 ## 1. Problem

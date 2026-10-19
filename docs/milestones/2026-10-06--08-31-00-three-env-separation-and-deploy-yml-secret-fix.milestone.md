@@ -24,7 +24,7 @@ The project had **one** runtime environment that was overloaded:
 
 Three orthogonal axes had to be aligned: **API config** (which env file NestJS reads), **deploy config** (which droplet is targeted, which secret is upstreamed), and **local-dev tooling** (how the stack comes up without the Caddy/ACME overhead). Each had its own source of truth, so the natural design was a **single label** ([`APP_ENV`](../../apps/api/src/config/app-env.ts:19)) propagated from the shell → compose `environment:` → NestJS process.
 
-Alternatives considered (see [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../../history/2026-10-05--10-30-00-three-env-separation-plan.md) §5):
+Alternatives considered (see [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) §5):
 
 - **Reuse `NODE_ENV`** instead of inventing `APP_ENV`: rejected because NestJS / class-validator treat `NODE_ENV=production` as a side-effect switch (strips unknowns). The label must be orthogonal to build-vs-runtime semantics.
 - **Filename convention `.env.local / .env.dev / .env.production`** (NestJS / Vite defaults) vs `.env.local / .env.dev / .env.prod` (project's own): the chosen three-letter form is shorter and matches the `APP_ENV` value space; the Vite `build:${APP_ENV}` script alias already encodes it.
@@ -38,7 +38,7 @@ Failure-mode policy:
 
 ## 4. Solution / implementation
 
-Five-step plan landed on `main` (see [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../../history/2026-10-05--10-30-00-three-env-separation-plan.md) for the full plan):
+Five-step plan landed on `main` (see [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) for the full plan):
 
 | # | Commit | What it did |
 |---|---|---|

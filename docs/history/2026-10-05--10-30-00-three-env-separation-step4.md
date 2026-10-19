@@ -1,6 +1,6 @@
 # 2026-10-05 10:30 — Three-env separation · Step 4 (deploy.sh `APP_ENV` selector + CI matrix)
 
-**Plan:** [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md) — Step 4 of 5.
+**Plan:** [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — Step 4 of 5.
 **Scope:** [`deploy/deploy.sh`](../../deploy/deploy.sh:1) and [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml). This is the actual deploy-side on-ramp to a future prod droplet.
 
 ## What changed
@@ -84,7 +84,7 @@ ssh deployer@aisztens.hu "cd /opt/aisztens && \
 ## What is intentionally NOT in this step
 
 - No actual CI run on prod — the prod droplet doesn't exist yet. The matrix is dormant until someone provisions it.
-- No secrets split beyond `INFRA_ENV_DEV` / `INFRA_ENV_PROD` — the broader "split the monolith into DOMAIN / ACME_EMAIL / INFRA_DB_SECRETS / INFRA_API_SECRETS" plan from [`docs/history/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md`](../2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md) remains for a future follow-up.
+- No secrets split beyond `INFRA_ENV_DEV` / `INFRA_ENV_PROD` — the broader "split the monolith into DOMAIN / ACME_EMAIL / INFRA_DB_SECRETS / INFRA_API_SECRETS" plan from [`docs/plans/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md`](../plans/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md) remains for a future follow-up.
 - The `DROPLET_HOST` and `DROPLET_SSH_KEY` secrets are still single-instance. For a real prod droplet we need a second pair (`DROPLET_HOST_PROD`, `DROPLET_SSH_KEY_PROD`) and `if`-eq gating in Step 3/5/6/7/8 to pick the right pair based on `APP_ENV`. That's a one-line follow-up commit when the prod host is provisioned.
 
 ## Recommended commit message
@@ -102,4 +102,4 @@ feat(deploy): APP_ENV selector + per-environment secrets (three-env step 4)
   SPA files are picked up. All docker compose invocations switch to
   --env-file "infra/.env.${APP_ENV}".
 
-Step 4 of docs/history/2026-10-05--10-30-00-three-env-separation-plan.md.
+Step 4 of docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md.

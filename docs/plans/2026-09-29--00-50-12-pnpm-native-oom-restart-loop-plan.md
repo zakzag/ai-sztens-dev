@@ -3,7 +3,7 @@
 **Dátum:** 2026-09-28 (CEST)
 **Szerző:** Zoo (code mode)
 **Állapot:** terv, jóváhagyásra vár
-**Előzmény:** [`2026-09-29--00-34-28-api-healthcheck-fail-impl.md`](2026-09-29--00-34-28-api-healthcheck-fail-impl.md) (lokálban commitolva, de a dropletre soha nem került fel), [`2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md), [`2026-09-29--00-18-00-dual-stack-port-collision-fix.milestone.md`](../milestones/2026-09-29--00-18-00-dual-stack-port-collision-fix.milestone.md)
+**Előzmény:** [`2026-09-29--00-34-28-api-healthcheck-fail-impl.md`](../history/2026-09-29--00-34-28-api-healthcheck-fail-impl.md) (lokálban commitolva, de a dropletre soha nem került fel), [`2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md), [`2026-09-29--00-18-00-dual-stack-port-collision-fix.milestone.md`](../milestones/2026-09-29--00-18-00-dual-stack-port-collision-fix.milestone.md)
 
 ---
 
@@ -71,7 +71,7 @@ A `dmesg` bizonyítja, hogy a `pnpm-native` önmagában ~380 MB `anon-rss`-re te
 
 ### 3.3 A korábbi „healthcheck-fail fix" soha nem került deploy-ra
 
-A [`2026-09-29--00-34-28-api-healthcheck-fail-impl.md`](2026-09-29--00-34-28-api-healthcheck-fail-impl.md) dokumentálja, hogy a `/healthz` dedikált endpoint és a `process.exit(r.ok?0:1)` healthcheck-parancs lokálban commitolva van. A dropleten futó image azonban `2026-09-28T19:01:38`-kor épült (4 órával az impl előtt), és a `/opt/aisztens/infra/.env` is a régi `MONITOR_TARGET_URL=http://api:3000/api` értéket tartalmazza. Vagyis az előző „fix" commitolva van, de **a dropletre sosem került fel**, és azóta is a régi, OOM-loop-os image fut.
+A [`2026-09-29--00-34-28-api-healthcheck-fail-impl.md`](../history/2026-09-29--00-34-28-api-healthcheck-fail-impl.md) dokumentálja, hogy a `/healthz` dedikált endpoint és a `process.exit(r.ok?0:1)` healthcheck-parancs lokálban commitolva van. A dropleten futó image azonban `2026-09-28T19:01:38`-kor épült (4 órával az impl előtt), és a `/opt/aisztens/infra/.env` is a régi `MONITOR_TARGET_URL=http://api:3000/api` értéket tartalmazza. Vagyis az előző „fix" commitolva van, de **a dropletre sosem került fel**, és azóta is a régi, OOM-loop-os image fut.
 
 ### 3.4 A `do-agent` user a `top`-ban: a konténer PID-je, nem host-process
 
@@ -190,7 +190,7 @@ A legkisebb kockázatú, leginkrobb „a gyökeret célozza" megoldás az „A" 
 
 ### 5.4 A korábbi impl-ek visszavonása
 
-Nincs szükség visszavonásra — a [`2026-09-29--00-34-28-api-healthcheck-fail-impl.md`](2026-09-29--00-34-28-api-healthcheck-fail-impl.md) commitjai (a `/healthz` controller, a `setGlobalPrefix` `exclude`, a docker-compose healthcheck blokk, a `MONITOR_TARGET_URL` alapérték a `.env.example`-ban) mind érvényben maradnak. Ez a terv csak kiegészíti őket a Dockerfile CMD-módosítással és a docker-compose monitor-default szinkronizálással.
+Nincs szükség visszavonásra — a [`2026-09-29--00-34-28-api-healthcheck-fail-impl.md`](../history/2026-09-29--00-34-28-api-healthcheck-fail-impl.md) commitjai (a `/healthz` controller, a `setGlobalPrefix` `exclude`, a docker-compose healthcheck blokk, a `MONITOR_TARGET_URL` alapérték a `.env.example`-ban) mind érvényben maradnak. Ez a terv csak kiegészíti őket a Dockerfile CMD-módosítással és a docker-compose monitor-default szinkronizálással.
 
 ### 5.5 Specs doksi frissítése
 

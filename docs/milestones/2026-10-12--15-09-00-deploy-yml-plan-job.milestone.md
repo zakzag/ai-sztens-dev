@@ -70,7 +70,7 @@ Two safe fixes were considered:
 | [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:1) | `Utolsó frissítés` bullet prepended (plan-job refactor); §9.1 deploy.yml bullet rewritten. |
 | [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md:1) | `Utolsó frissítés` bullet prepended; §7.1 deploy.yml bullet rewritten. |
 | [`docs/history/2026-10-12--15-09-00-deploy-yml-plan-job.md`](../history/2026-10-12--15-09-00-deploy-yml-plan-job.md:1) | Day-to-day narrative. |
-| [`plans/2026-10-12--15-09-00-deploy-yml-plan-job.md`](../plans/2026-10-12--15-09-00-deploy-yml-plan-job.md:1) | Design plan. |
+| [`docs/plans/2026-10-12--15-09-00-deploy-yml-plan-job.md`](../plans/2026-10-12--15-09-00-deploy-yml-plan-job.md:1) | Design plan. |
 
 ## 5. Outcome and how to verify
 

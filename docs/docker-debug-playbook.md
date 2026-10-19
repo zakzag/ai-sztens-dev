@@ -134,7 +134,7 @@ dmesg --since '-1h' | grep -i 'killed process' | tail -40
 | `aisztens-caddy-1` | ACME challenge failed (firewall / DNS) | [§2.13](#213-acme-logs-timeout-during-connect-likely-firewall-problem) |
 | `aisztens-monitor-1` | `wget` returns non-zero on first probe before `api` is up | [§2.16](#216-monitor-container-restarting-255-after-deploy) |
 
-Source incidents: [`history/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](history/2026-09-29--00-30-10-api-healthcheck-fail-plan.md), [`history/2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md`](milestones/2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md).
+Source incidents: [`plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md), [`history/2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md`](milestones/2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md).
 
 ---
 
@@ -178,9 +178,9 @@ docker stats --no-stream aisztens-api-1
    out, and only after `free -h` on the host confirms the headroom.
    Bumping a limit without understanding the leak is how the host
    itself ends up in swap-thrash — see
-   [`history/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](history/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md).
+   [`plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md).
 
-Source: [`history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md`](history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md).
+Source: [`plans/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md`](plans/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md).
 
 ---
 
@@ -237,7 +237,7 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml \
 docker logs --tail=50 aisztens-api-1 | head -40    # confirm Node starts
 ```
 
-Source: [`history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md`](history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md).
+Source: [`plans/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md`](plans/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md).
 
 ---
 
@@ -304,7 +304,7 @@ Defence: [`deploy/deploy.sh:prune_legacy_stack()`](../deploy/deploy.sh) runs
 on every `up` and removes the legacy project; a single Caddy container is
 the documented rule.
 
-Source: [`history/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md`](history/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md).
+Source: [`plans/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md`](plans/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md).
 
 #### 2.4c `lookup ... 127.0.0.53:53: read: connection refused`
 
@@ -401,7 +401,7 @@ docker compose exec api env | grep -E 'DATABASE_URL|POSTGRES'
 | `depends_on: postgres: condition: service_healthy` failed | api never gets `service_started` until postgres is `healthy` | Wait for `pg_isready` to return; if it loops, check the password envs. |
 | Two api replicas, one healthcheck-race | Random `ECONNREFUSED` during deploy | This stack has 1 replica per service — if you scale it, stop. |
 
-Source: [`docker-compose.yml`](../infra/docker-compose.yml) (DATABASE_URL), [`history/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](history/2026-09-29--00-30-10-api-healthcheck-fail-plan.md) §3.
+Source: [`docker-compose.yml`](../infra/docker-compose.yml) (DATABASE_URL), [`plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md) §3.
 
 ---
 
@@ -515,7 +515,7 @@ grep -n "setGlobalPrefix" apps/api/src/main.ts
    [§2.3](#23-pnpm-native-dominates-top-at-60--cpu) so Node starts
    directly.
 
-Source: [`history/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](history/2026-09-29--00-30-10-api-healthcheck-fail-plan.md).
+Source: [`plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md).
 
 ---
 
@@ -652,7 +652,7 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml ps --format \
 The pre-image-based-deploy recovery (re-run `pnpm build` and rsync the
 dist folder) is no longer applicable — `images.yml` builds the bundles,
 and rolling back means rolling the image. See
-[`history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
+[`plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
 for the migration that retired that path. The original incident fix is
 preserved at
 [`history/2026-09-25--14-56-56-deploy-yml-spa-build-fix.md`](history/2026-09-25--14-56-56-deploy-yml-spa-build-fix.md).
@@ -673,7 +673,7 @@ This is the *symptom* the playbook treats as a category. Match the
 | `containerd-shim` | A container exceeds its reservation but not its limit | investigate per-container `docker stats` |
 | any host process (`kswapd0`, `systemd-journal`) | the host itself is under memory pressure | [§2.17](#217-disk-fills-up-no-space-left-on-device-in-buildpull) + bump droplet tier |
 
-Source: [`history/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](history/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md).
+Source: [`plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md).
 
 ---
 
@@ -976,14 +976,14 @@ and attach it. The bundle removes ~90 % of the back-and-forth.
   - [`2026-09-25-…-caddyfile-env-substitution-fix.md`](history/2026-09-25--14-10-10-caddyfile-env-substitution-fix.md) *(SUPERSEDED — see header)*
   - [`2026-09-25-…-three-subdomain-routing-impl.md`](history/2026-09-25--14-43-32-three-subdomain-routing-impl.md)
   - [`2026-09-25-…-deploy-yml-spa-build-fix.md`](history/2026-09-25--14-56-56-deploy-yml-spa-build-fix.md)
-  - [`2026-09-27-…-container-mem-limits-after-oom-plan.md`](history/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md)
+  - [`2026-09-27-…-container-mem-limits-after-oom-plan.md`](plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md)
   - [`2026-09-27-…-container-mem-limits-impl.md`](history/2026-09-27--01-19-19-container-mem-limits-impl.md)
   - [`2026-09-28-…-production-runbook-and-docker-compose-ps-gotcha.md`](history/2026-09-28--19-22-51-production-runbook-and-docker-compose-ps-gotcha.md)
-  - [`2026-09-29-…-dual-stack-port-collision-fix-plan.md`](history/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md)
+  - [`2026-09-29-…-dual-stack-port-collision-fix-plan.md`](plans/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md)
   - [`2026-09-29-…-dual-stack-port-collision-fix-impl.md`](history/2026-09-29--00-18-17-dual-stack-port-collision-fix-impl.md)
-  - [`2026-09-29-…-api-healthcheck-fail-plan.md`](history/2026-09-29--00-30-10-api-healthcheck-fail-plan.md)
+  - [`2026-09-29-…-api-healthcheck-fail-plan.md`](plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md)
   - [`2026-09-29-…-api-healthcheck-fail-impl.md`](history/2026-09-29--00-34-28-api-healthcheck-fail-impl.md)
-  - [`2026-09-29-…-pnpm-native-oom-restart-loop-plan.md`](history/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md)
+  - [`2026-09-29-…-pnpm-native-oom-restart-loop-plan.md`](plans/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md)
 
 ### Milestones
 

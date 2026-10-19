@@ -3,7 +3,7 @@
 - Date: 2026-09-26 (initial) / 2026-09-28 (corrected after server-side diagnosis)
 - Status: Done
 - Scope: Apply the plan in
-  [`2026-09-26-container-mem-limits-after-oom-plan.md`](2026-09-26-container-mem-limits-after-oom-plan.md)
+  [`2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](../plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md)
   plus the Caddyfile fix discovered by `docker logs` on the droplet.
 
 ## 1. What the plan originally thought was the cause
@@ -166,7 +166,7 @@ one memory spike away from an OOM-kill cascade.
   stack under real traffic. The mem limits make it safe today, but if VAPI
   webhook volume grows or the DB grows beyond `shared_buffers=128MB`,
   consider upgrading to the 2 GB Basic tier ($12/month) — see
-  [`2026-09-26-container-mem-limits-after-oom-plan.md`](2026-09-26-container-mem-limits-after-oom-plan.md)
+  [`2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](../plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md)
   §3 for the memory budget.
 - The previous
   [`2026-09-25-caddyfile-env-substitution-fix.md`](2026-09-25-caddyfile-env-substitution-fix.md)

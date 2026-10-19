@@ -1,7 +1,7 @@
 # Env merge (old clone → current repo) and a new `.env` test suite
 
 **Date:** 2026-10-07 12:57 (Europe/Budapest)
-**Related plan:** [`2026-10-07-env-merge-old-new-and-env-tests-plan.md`](2026-10-07-env-merge-old-new-and-env-tests-plan.md)
+**Related plan:** [`2026-10-07-env-merge-old-new-and-env-tests-plan.md`](../plans/2026-10-07-env-merge-old-new-and-env-tests-plan.md)
 **Related milestone:** [`../milestones/2026-10-07--12-57-00-env-merge-and-env-test-suite.milestone.md`](../milestones/2026-10-07--12-57-00-env-merge-and-env-test-suite.milestone.md)
 
 ## What was done

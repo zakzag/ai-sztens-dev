@@ -1,6 +1,6 @@
 # 2026-10-05 10:30 — Three-env separation · Step 3 (local run helper)
 
-**Plan:** [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md) — Step 3 of 5.
+**Plan:** [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — Step 3 of 5.
 **Scope:** developer-machine workflow. No code/runtime changes on the dev droplet.
 
 ## What changed
@@ -107,4 +107,4 @@ chore(dev): scripts/dev-stack.sh + rename docker-compose.local.yml
   content, just the name no longer misleads macOS / native Linux users.
 - deploy/README.md + README.md updated to reference the new helper.
 
-Step 3 of docs/history/2026-10-05--10-30-00-three-env-separation-plan.md.
+Step 3 of docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md.

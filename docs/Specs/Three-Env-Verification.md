@@ -29,7 +29,7 @@ assertions is now `Hello Beautiful World` to match
 [`docs/milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md`](../milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md)).
 Previous update: 2026-10-08 — image-based deploy: droplet pulls pre-built images
 from GHCR, never builds; `apps/{web,admin}/dist` host bind mounts removed (see
-[`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Previous note (2026-10-07): deploy identity is `deployer` for both paths and a droplet keeps exactly one runtime env file, `infra/.env` (see §1d, §3.2, §3.8, §7).
+[`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Previous note (2026-10-07): deploy identity is `deployer` for both paths and a droplet keeps exactly one runtime env file, `infra/.env` (see §1d, §3.2, §3.8, §7).
 **Audience:** anyone who wants to confirm the three-env separation actually
 works end-to-end. Use this after pulling the latest `main`, after a
 droplet reboot, or after any change to `deploy/`, `.github/workflows/`,
@@ -414,7 +414,7 @@ curl -fsS https://web.aisztens.hu/ | grep -oE 'aisztens.hu|localhost' | sort -u
 The historical `/srv/web` and `/srv/admin` paths are gone — the SPAs
 are baked into the GHCR images. If a deploy ever leaves those host
 folders behind, it is on the pre-image-based revision (see
-[`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)).
+[`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)).
 
 ### 3.7 Smoke tests
 
@@ -630,5 +630,5 @@ a real-world check:
 - [`docs/Specs/Local-Development.md`](Local-Development.md) — the developer-side workflow (per-env files, `APP_ENV` propagation, pitfalls).
 - [`docs/Specs/Production-Runbook.md`](Production-Runbook.md) — what to do once the stack is on the droplet.
 - [`deploy/README.md`](../../deploy/README.md) — the deploy-side runbook (secrets table, workflow steps, `APP_ENV` matrix).
-- [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../history/2026-10-05--10-30-00-three-env-separation-plan.md) — the plan document.
+- [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — the plan document.
 - [`docs/history/2026-10-05--10-30-00-three-env-separation-step{0..5}.md`](../history/) — per-commit history entries.

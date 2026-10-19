@@ -7,7 +7,7 @@
 ## 1. Goal
 
 Add a **container-level smoke test suite** that fits into the existing single-droplet
-runtime stack defined in [`infra/docker-compose.yml`](infra/docker-compose.yml:15).
+runtime stack defined in [`infra/docker-compose.yml`](../../infra/docker-compose.yml:15).
 The suite must, for every service declared in that compose file:
 
 1. Verify the service **starts and stays up** (process running, healthy).
@@ -21,8 +21,8 @@ deployment, so deploy-time regressions are caught early. They are written in
 **plain bash + `curl`/`psql`/docker compose** — no extra runtime dependency.
 
 This intentionally does NOT replace the existing NestJS unit/e2e tests
-([`apps/api/src/app.controller.spec.ts`](apps/api/src/app.controller.spec.ts:1),
-[`apps/api/test/app.e2e-spec.ts`](apps/api/test/app.e2e-spec.ts:1)). Those test
+([`apps/api/src/app.controller.spec.ts`](../../apps/api/src/app.controller.spec.ts:1),
+[`apps/api/test/app.e2e-spec.ts`](../../apps/api/test/app.e2e-spec.ts:1)). Those test
 business logic in isolation. This new suite tests the **container graph**.
 
 ## 2. What "Fits Into the System" Means
@@ -31,10 +31,10 @@ The runtime stack has exactly four services:
 
 | Service | Contract to verify | Source of truth |
 |---|---|---|
-| `api`      | `GET http://api:3000/api` returns 200 (Fastify/NestJS)         | [`infra/docker-compose.yml:36-43`](infra/docker-compose.yml:36) healthcheck |
-| `postgres` | `pg_isready` returns 0 inside the `postgres` container         | [`infra/docker-compose.yml:63`](infra/docker-compose.yml:63) healthcheck |
+| `api`      | `GET http://api:3000/api` returns 200 (Fastify/NestJS)         | [`infra/docker-compose.yml:36-43`](../../infra/docker-compose.yml:36) healthcheck |
+| `postgres` | `pg_isready` returns 0 inside the `postgres` container         | [`infra/docker-compose.yml:63`](../../infra/docker-compose.yml:63) healthcheck |
 | `caddy`    | admin endpoint on `:2019` is reachable inside the container    | Caddy's runtime API |
-| `monitor`  | `watch.sh` is running and has logged at least one tick          | [`infra/monitor/watch.sh`](infra/monitor/watch.sh:1) |
+| `monitor`  | `watch.sh` is running and has logged at least one tick          | [`infra/monitor/watch.sh`](../../infra/monitor/watch.sh:1) |
 
 Cross-service contracts to verify (the "see each other" requirement):
 
@@ -61,9 +61,9 @@ scripts/
 
 Plus documentation updates:
 
-- [`package.json`](package.json:8) — add three convenience scripts
+- [`package.json`](../../package.json:8) — add three convenience scripts
   (`test:stack`, `test:stack:up`, `test:stack:down`).
-- A new top-level section in [`docs/03-implementation-general.md`](docs/03-implementation-general.md:1)
+- A new top-level section in [`docs/03-implementation-general.md`](../03-implementation-general.md:1)
   referencing this plan and the entrypoint.
 
 The existing `infra/docker-compose.yml` and the per-app `package.json` files are
@@ -128,7 +128,7 @@ sequenceDiagram
 ### 5.2 Pre-flight: stack must already be up
 
 The smoke suite **assumes** the stack is running (started via
-[`deploy/deploy.sh up`](deploy/deploy.sh:64) or
+[`deploy/deploy.sh up`](../../deploy/deploy.sh:64) or
 `docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build`).
 A short preflight step in `00-prelude.sh` runs
 `docker compose ... ps --format json` and aborts with a clear message if no
@@ -249,7 +249,7 @@ infra/docker-compose.yml down`. Wired to `pnpm test:stack:down`.
 
 ## 7. `package.json` Integration
 
-Add to the root [`package.json`](package.json:8) `scripts` block:
+Add to the root [`package.json`](../../package.json:8) `scripts` block:
 
 ```json
 "test:stack": "bash scripts/test/stack-smoke.sh",
@@ -265,12 +265,12 @@ suite is additive.
 
 ## 8. Documentation Updates
 
-- Add a new entry to [`docs/03-implementation-general.md`](docs/03-implementation-general.md:1)
+- Add a new entry to [`docs/03-implementation-general.md`](../03-implementation-general.md:1)
   (section 9 — "Testing") explaining:
   - The two-layer testing model: unit/e2e in `apps/api` vs stack smoke in
     `scripts/test/`.
   - The order to run them locally.
-- Append this file to [`docs/03-implementation-general.md`](docs/03-implementation-general.md:1)
+- Append this file to [`docs/03-implementation-general.md`](../03-implementation-general.md:1)
   via a reference rather than inlining.
 
 ## 9. Out of Scope (Explicit)
@@ -280,7 +280,7 @@ separate plan:
 
 - VAPI webhook simulation tests (requires a real or stubbed VAPI server).
 - Frontend `apps/web` / `apps/admin` build smoke tests (they are not part of
-  the droplet compose stack yet — see [`infra/caddy/Caddyfile:33`](infra/caddy/Caddyfile:33)
+  the droplet compose stack yet — see [`infra/caddy/Caddyfile:33`](../../infra/caddy/Caddyfile:33)
   commented blocks).
 - Load tests, soak tests, chaos tests.
 - CI pipeline wiring (GitHub Actions). The script is CI-friendly by design

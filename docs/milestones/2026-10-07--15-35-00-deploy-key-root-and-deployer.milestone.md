@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-07
 **History:** [`../history/2026-10-07--15-35-00-deploy-key-root-and-deployer.md`](../history/2026-10-07--15-35-00-deploy-key-root-and-deployer.md)
-**Plan:** [`../history/2026-10-07-deploy-root-ssh-key-plan.md`](../history/2026-10-07-deploy-root-ssh-key-plan.md)
+**Plan:** [`../plans/2026-10-07-deploy-root-ssh-key-plan.md`](../plans/2026-10-07-deploy-root-ssh-key-plan.md)
 
 ## 1. Problem / feature
 

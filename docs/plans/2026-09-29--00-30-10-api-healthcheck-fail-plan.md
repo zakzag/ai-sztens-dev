@@ -3,7 +3,7 @@
 **Dátum:** 2026-09-28 (CEST)
 **Szerző:** Zoo (code mode)
 **Állapot:** terv, jóváhagyásra vár
-**Előzmény:** [`2026-09-28-dual-stack-port-collision-fix-plan.md`](2026-09-28-dual-stack-port-collision-fix-plan.md) – a CPU/port-probléma megoldódott, de az API konténer továbbra is `Restarting (1)` státuszban van, mert a healthcheck `ExitCode 1`-et ad.
+**Előzmény:** [`2026-09-28-dual-stack-port-collision-fix-plan.md`](2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md) – a CPU/port-probléma megoldódott, de az API konténer továbbra is `Restarting (1)` státuszban van, mert a healthcheck `ExitCode 1`-et ad.
 
 ---
 
@@ -204,7 +204,7 @@ azt hívja (mert az üzleti `/api` route-ok auth guard mögé kerülhetnek).
 
 ### 6.5 History + milestone
 
-12. **`docs/history/2026-09-28-api-healthcheck-fail-plan.md`** – ez a fájl.
+12. **`docs/plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`** – ez a fájl.
 13. **`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`** –
     döntés szintű összefoglaló, miért fontos, hogy a healthcheck
     dedikált endpointra épüljön, és ne az üzleti route-okkal osztozzon.

@@ -26,7 +26,7 @@ Rationale:
 - C2 is the whole problem statement. A port/adapter split is the only structure where "add Outlook" is a new folder plus one registry line, instead of an `if (provider === 'gmail')` spread across the codebase.
 - C3 and the existing one-container/one-database operating model rule out a separate service.
 - The repository already uses the token-provider pattern for injectable config ([`vapi-webhook-config.ts`](../../apps/api/src/vapi-webhooks/vapi-webhook-config.ts)), so the port-token style is consistent with the codebase.
-- The already approved bounded-context split in [`docs/history/2026-09-21--18-12-48-email-assistant-mvp-integration-plan.md`](2026-09-21--18-12-48-email-assistant-mvp-integration-plan.md) assumed a generic unified mail API. The MVP document now says Gmail direct, so that plan's `MailProvider` port is kept as-is conceptually but its implementation changes from Unipile/Nylas to Gmail + a future adapter set.
+- The already approved bounded-context split in [`docs/plans/2026-09-21--18-12-48-email-assistant-mvp-integration-plan.md`](../plans/2026-09-21--18-12-48-email-assistant-mvp-integration-plan.md) assumed a generic unified mail API. The MVP document now says Gmail direct, so that plan's `MailProvider` port is kept as-is conceptually but its implementation changes from Unipile/Nylas to Gmail + a future adapter set.
 
 Rejected alternatives:
 

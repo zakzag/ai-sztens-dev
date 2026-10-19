@@ -1,7 +1,7 @@
 # 2026-09-25 — Three-subdomain routing implementation
 
 Implements the plan in
-[`docs/history/2026-09-25-three-subdomain-routing-plan.md`](docs/history/2026-09-25-three-subdomain-routing-plan.md:1).
+[`docs/plans/2026-09-25--14-22-49-three-subdomain-routing-plan.md`](../plans/2026-09-25--14-22-49-three-subdomain-routing-plan.md:1).
 After this change + `./deploy/deploy.sh up`, the three subdomains serve
 distinct apps over HTTPS from the same droplet:
 

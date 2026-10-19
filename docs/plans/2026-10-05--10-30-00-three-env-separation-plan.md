@@ -12,7 +12,7 @@
 - [`infra/docker-compose.wsl.yml`](../../infra/docker-compose.wsl.yml:1) — local override
 - [`deploy/deploy.sh`](../../deploy/deploy.sh:81) — env file shipping
 - [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) — CI env rendering
-- [`docs/history/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md`](2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md) — broader secret-storage plan (F1/F2/F3); this plan is the concrete step-1 implementation of that document
+- [`docs/plans/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md`](2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md) — broader secret-storage plan (F1/F2/F3); this plan is the concrete step-1 implementation of that document
 
 ---
 

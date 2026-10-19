@@ -1,7 +1,7 @@
 # 2026-10-07 16:36 — local deploy switches to `deployer`; both deploy paths agree on `infra/.env`
 
 **Status:** implemented and verified live against the dev droplet.
-**Plan:** [`docs/history/2026-10-07-deploy-deployer-user-plan.md`](2026-10-07-deploy-deployer-user-plan.md).
+**Plan:** [`docs/plans/2026-10-07-deploy-deployer-user-plan.md`](../plans/2026-10-07-deploy-deployer-user-plan.md).
 **Milestone:** [`docs/milestones/2026-10-07--16-36-00-deploy-deployer-user.milestone.md`](../milestones/2026-10-07--16-36-00-deploy-deployer-user.milestone.md).
 
 > **Requested change.** "No, please use `deployer` not `root` for deployment." The CI already

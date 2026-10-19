@@ -4,7 +4,7 @@
 **Utolsó frissítés:** 2026-10-19 (AIS-35: per-kontext Postgres sémák — `platform`, `callback`, `email` — és a hozzájuk tartozó grantok, új `02-schemas.sh` init script; lásd §6.2)
 **Korábbi frissítés:** 2026-10-12 (deploy metadata: az `images.yml` három új build-argot ad át — `COMMIT_HASH` / `DEPLOY_DATE` az api képnek, `VITE_COMMIT_HASH` / `VITE_DEPLOY_DATE` a `web`/`admin` képnek —, így a futó image egy konkrét revízióhoz köthető; lásd §6.1)
 **Korábbi frissítés:** 2026-10-09 (image-based deploy: minden alkalmazás-komponens saját konténerben fut — `api`, `web`, `admin`, `postgres`, `caddy`, `monitor` — a droplet csak `docker compose pull && up -d`-t futtat; a forráskód és a pnpm workspace nem kerül a dropletre)
-**Kapcsolódik:** [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
+**Kapcsolódik:** [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
 
 ---
 
@@ -109,7 +109,7 @@ A szétválasztás két ponton történik:
 
 Így a „közös build hely" csak a közös forráskód (monorepo + `packages/shared`); az elkészült artifact-ok külön image-ekbe és külön konténerekbe kerülnek.
 
-> **Image-based deploy (2026-10-08 óta):** a fenti táblázat mind a hat konténert lefedi (`api`, `web`, `admin`, `postgres`, `caddy`, `monitor`), és az alkalmazás-image-ek (`api`, `web`, `admin`, `monitor`) **nem** a hoston futó build-ből, hanem a CI által GHCR-re push-olt artifact-okból származnak (lásd [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Az SPA bundle-ök az image-be vannak égetve (`/usr/share/nginx/html` a `web`/`admin` konténerben), és nincs hostoldali bind mount. A lokális fejlesztéshez az `infra/docker-compose.local.yml` override visszahozza a `build:` blokkokat.
+> **Image-based deploy (2026-10-08 óta):** a fenti táblázat mind a hat konténert lefedi (`api`, `web`, `admin`, `postgres`, `caddy`, `monitor`), és az alkalmazás-image-ek (`api`, `web`, `admin`, `monitor`) **nem** a hoston futó build-ből, hanem a CI által GHCR-re push-olt artifact-okból származnak (lásd [`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Az SPA bundle-ök az image-be vannak égetve (`/usr/share/nginx/html` a `web`/`admin` konténerben), és nincs hostoldali bind mount. A lokális fejlesztéshez az `infra/docker-compose.local.yml` override visszahozza a `build:` blokkokat.
 
 ### 6.1 Beégetett build metadata (deploy dátum + commit hash)
 

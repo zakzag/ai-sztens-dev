@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-12
 **Status:** ✅ implemented (2026-10-12 13:20) — see
-[`docs/history/2026-10-12--13-20-00-deploy-meta-version-display.md`](2026-10-12--13-20-00-deploy-meta-version-display.md)
+[`docs/history/2026-10-12--13-20-00-deploy-meta-version-display.md`](../history/2026-10-12--13-20-00-deploy-meta-version-display.md)
 for the implementation narrative and
 [`docs/milestones/2026-10-12--13-20-00-deploy-meta-version-display.milestone.md`](../milestones/2026-10-12--13-20-00-deploy-meta-version-display.milestone.md)
 for the decision-grade summary.

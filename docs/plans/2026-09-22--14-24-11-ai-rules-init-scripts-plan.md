@@ -135,7 +135,7 @@ egy "include másik fájlból" mechanizmust, a terv frissíthető.
 
 ## 4. .gitignore frissítés
 
-A workspace gyökerén lévő [`.gitignore`](.gitignore:1) kiegészül egy új
+A workspace gyökerén lévő [`.gitignore`](../../.gitignore:1) kiegészül egy új
 szekcióval, amelyet a script kezel:
 
 ```
@@ -312,7 +312,7 @@ flowchart TD
 
 ## 11. History note kötelezettség
 
-Az [`.roo/rules/instructions.md`](.roo/rules/instructions.md) szerint a
+Az [`.roo/rules/instructions.md`](../../.roo/rules/instructions.md) szerint a
 implementáció után összegzést kell írni a `docs/history/<ISO-datetime>-<short>.md`
 fájlba. A terv itt emlékezik erre, a kódolás után a Code mode-ban lesz
 elvégzve.

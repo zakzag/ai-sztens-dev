@@ -31,7 +31,7 @@ schema, ORM, or migration tooling exists. The spec
 
 ### What to build
 1. Adopt **Drizzle ORM** (`drizzle-orm` + `drizzle-kit`) as the schema-as-code layer. Prisma is excluded
-   (see [`2026-10-14-email-module-structural-design-plan.md`](../../docs/history/2026-10-14-email-module-structural-design-plan.md:454)).
+   (see [`2026-10-14-email-module-structural-design-plan.md`](../../docs/plans/2026-10-14-email-module-structural-design-plan.md:454)).
 2. Add `db:generate`, `db:migrate`, `db:check` scripts to [`apps/api/package.json`](../../apps/api/package.json:9).
 3. Create per-context Postgres schemas `platform`, `callback`, `email` in a new idempotent init script,
    and grant the `aisztens` role USAGE on them (extend [`01-roles.sh`](../../infra/postgres/init/01-roles.sh:1)).

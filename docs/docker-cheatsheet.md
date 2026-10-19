@@ -672,7 +672,7 @@ For our stack:
 The historical host bind mounts (`${WEB_DIST_PATH:-../apps/web/dist}` →
 `/srv/web`, same for `admin`) were removed when the deploy moved to
 image-based on 2026-10-08: see
-[`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md).
+[`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md).
 If you ever see a stack with those bind mounts, it is on the pre-image-based
 revision.
 

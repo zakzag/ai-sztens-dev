@@ -1,7 +1,7 @@
 # Deploy P1: bootstrap now installs keys + chowns the tree (the operator TODO at last)
 
 **Date:** 2026-10-08 01:03 (Europe/Budapest)
-**Plan:** [`2026-10-07-deploy-p1-ownership-and-key-provisioning-plan.md`](2026-10-07-deploy-p1-ownership-and-key-provisioning-plan.md)
+**Plan:** [`2026-10-07-deploy-p1-ownership-and-key-provisioning-plan.md`](../plans/2026-10-07-deploy-p1-ownership-and-key-provisioning-plan.md)
 **Milestone:** [`../milestones/2026-10-08--01-03-30-deploy-p1-ownership-and-key-provisioning.milestone.md`](../milestones/2026-10-08--01-03-30-deploy-p1-ownership-and-key-provisioning.milestone.md)
 
 ## Request

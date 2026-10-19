@@ -7,9 +7,9 @@
 [`scripts/ssh/_remove-ssh-passphrase.sh`](../../scripts/ssh/_remove-ssh-passphrase.sh), [`scripts/ssh/README.md`](../../scripts/ssh/README.md),
 [`deploy/README.md`](../../deploy/README.md), [`deploy/deploy.ps1`](../../deploy/deploy.ps1),
 [`scripts/test/_deploy-sh-env-selection-test.sh`](../../scripts/test/_deploy-sh-env-selection-test.sh) (new), four `docs/Specs/` files.
-**Related:** [plan](2026-10-06-deploy-env-selection-plan.md),
+**Related:** [plan](../plans/2026-10-06-deploy-env-selection-plan.md),
 [milestone](../milestones/2026-10-06--16-40-00-deploy-env-selection.milestone.md),
-[three-env separation plan](2026-10-05--10-30-00-three-env-separation-plan.md)
+[three-env separation plan](../plans/2026-10-05--10-30-00-three-env-separation-plan.md)
 
 ---
 
@@ -19,7 +19,7 @@
 > to deploy: `dev` or `prod` — these two acceptable. `deploy.sh` picks `.env.dev` or `.env.prod` when
 > given, otherwise `.env.dev` is the default. `.env` becomes `.env.dev`."
 
-The plan ([`docs/history/2026-10-06-deploy-env-selection-plan.md`](2026-10-06-deploy-env-selection-plan.md))
+The plan ([`docs/plans/2026-10-06-deploy-env-selection-plan.md`](../plans/2026-10-06-deploy-env-selection-plan.md))
 was written first, reviewed, and approved with all six recommendations (D1–D6) as listed.
 
 ## 2. Behaviour now

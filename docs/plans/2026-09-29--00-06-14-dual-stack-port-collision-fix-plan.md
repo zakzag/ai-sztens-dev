@@ -134,7 +134,7 @@ A jövőben ne fordulhasson elő, hogy a deploy újraéleszti a régi stacket:
 
 ### 6.4 History + milestone
 
-* `docs/history/2026-09-28-dual-stack-port-collision-fix-plan.md` (ez a fájl).
+* `docs/plans/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md` (ez a fájl).
 * `docs/milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md` – a
   milestone a döntés szintje: miért fontos, hogy csak egy Caddy legyen a dropleten,
   és hogyan kerüljük el a jövőben.

@@ -92,7 +92,7 @@ then `sudo bash deploy/bootstrap.sh` on the droplet to create the 2 GB swap.
 - The 961 MB droplet is still tight. If VAPI webhook volume grows or the
   DB grows past `shared_buffers=128MB`, upgrade to the 2 GB Basic tier
   ($12/month) per
-  [`docs/history/2026-09-26-container-mem-limits-after-oom-plan.md`](../history/2026-09-26-container-mem-limits-after-oom-plan.md) §3.
+  [`docs/plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](../plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md) §3.
 - ACME challenge for `api.aisztens.hu`/`admin.aisztens.hu` reports
   `Timeout during connect (likely firewall problem)` — likely a DigitalOcean
   Cloud Firewall rule blocking outbound TCP from the challenge endpoint.

@@ -2,10 +2,16 @@
 
 # Documentation
 
-- Every time a chat is opened and plan discussed, code implemented, 
-  the summary of the changes need to be written in a documentation file, 
-  in folder: docs/history/, 
+- Every time a chat is opened and plan discussed, code implemented,
+  the summary of the changes need to be written in a documentation file,
+  in folder: docs/history/,
   filename must be: \<YYYY-MM-DD--HH-ii-ss\>-\<short description\>.md
+
+- **Plan documents are stored separately** in `docs/plans/`
+  (`<YYYY-MM-DD--HH-ii-ss>-<short-plan-description>-plan.md`, see
+  `.roo/rules/general.coding-standards.md` → "Planning Artifacts").
+  `docs/history/` holds only post-implementation change summaries; a plan
+  never belongs there.
 
 # Milestones
 

@@ -1,6 +1,6 @@
 # 2026-10-05 10:30 — Three-env separation · Step 5 (final polish: specs + templates)
 
-**Plan:** [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md) — Step 5 of 5 (final).
+**Plan:** [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — Step 5 of 5 (final).
 **Scope:** documentation polish + the committed `infra/.env.example` template. No runtime code changes.
 
 ## What changed
@@ -52,14 +52,14 @@ grep -c '^# infra/.env' infra/.env.example
 
 ## What is intentionally NOT in this step
 
-- No CHANGELOG file — the [plan doc](2026-10-05--10-30-00-three-env-separation-plan.md) plus the five history entries (step0…step5) form the changelog.
+- No CHANGELOG file — the [plan doc](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) plus the five history entries (step0…step5) form the changelog.
 - No `apps/web/.env.example` / `apps/admin/.env.example` / `apps/api/.env.example` change — those were already rewritten in Steps 1-2.
 - No `deploy.sh` / `deploy.yml` change — those were the meat of Step 4.
 - No Caddyfile change — the `infra/.env.{dev,prod}` → `Caddyfile.rendered` pipeline is unchanged.
 
 ## The plan as a whole
 
-Five commits land the plan in [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md):
+Five commits land the plan in [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md):
 
 | Commit | Plan step | Files touched (repo-tracked only) | What it did |
 |---|---|---|---|
@@ -85,4 +85,4 @@ docs(env): per-env infra/.env.example + Local-Development spec (step 5)
 - docs/Specs/Production-Runbook.md §9.1: lists the new files (workflow,
   docker-compose.local, per-env env, three-env plan).
 
-Step 5 of docs/history/2026-10-05--10-30-00-three-env-separation-plan.md.
+Step 5 of docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md.

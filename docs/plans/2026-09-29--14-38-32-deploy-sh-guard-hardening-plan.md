@@ -81,7 +81,7 @@ flowchart LR
 
 ### Module 2 — Comment vs. code placeholder-token mismatch
 
-**What.** The comment at [`deploy.sh:105`](deploy/deploy.sh:105) and the comment at [`docker-compose.yml:120`](infra/docker-compose.yml:120) speak of `__DOMAIN__` / `__ACME_EMAIL__`. The actual code at [`deploy.sh:124`](deploy/deploy.sh:124) substitutes `<DOMAIN>` / `<ACME_EMAIL>` and the [`Caddyfile`](infra/caddy/Caddyfile:35) really does use the angle-bracket form. Choose one convention and apply it everywhere.
+**What.** The comment at [`deploy.sh:105`](../../deploy/deploy.sh:105) and the comment at [`docker-compose.yml:120`](../../infra/docker-compose.yml:120) speak of `__DOMAIN__` / `__ACME_EMAIL__`. The actual code at [`deploy.sh:124`](../../deploy/deploy.sh:124) substitutes `<DOMAIN>` / `<ACME_EMAIL>` and the [`Caddyfile`](../../infra/caddy/Caddyfile:35) really does use the angle-bracket form. Choose one convention and apply it everywhere.
 
 **Why.** A future maintainer following the comment will add a `sed` line for the wrong token; the `grep` guard will then fail the deploy (good) but the failure will be confusing. Worse, a copy-paste from the comment into the Caddyfile would break ACME silently if the grep guard is ever relaxed.
 
@@ -100,7 +100,7 @@ flowchart LR
 
 ### Module 3 — Fix the latent `infra/.env` scp bug
 
-**What.** At [`deploy.sh:161`](deploy/deploy.sh:161) the guard accepts `../infra/.env` as a sufficient signal, but the body only assigns `local_infra_env` from `$REPO_DIR/infra/.env`. If only the parent-dir copy exists, the standalone `[ -f ... ] && ...` list returns 1 and `set -e` aborts the whole deploy (otherwise it would `scp ""`). Replace with a single, correct path resolution.
+**What.** At [`deploy.sh:161`](../../deploy/deploy.sh:161) the guard accepts `../infra/.env` as a sufficient signal, but the body only assigns `local_infra_env` from `$REPO_DIR/infra/.env`. If only the parent-dir copy exists, the standalone `[ -f ... ] && ...` list returns 1 and `set -e` aborts the whole deploy (otherwise it would `scp ""`). Replace with a single, correct path resolution.
 
 **Why.** It is one of the two "the deploy died for a non-obvious reason" classes called out in the failure analysis. Fixing it is independent of every other module.
 
@@ -200,10 +200,10 @@ If any check fails, dump the last 200 lines of `docker compose logs` per service
 
 ### Module 7 — Prune foreign projects **after** the new stack is up
 
-**What.** Split [`prune_legacy_stack()`](deploy/deploy.sh:202) into two functions:
+**What.** Split [`prune_legacy_stack()`](../../deploy/deploy.sh:202) into two functions:
 
 - `prune_orphans_first_pass()` — runs **before** `up`. Only removes containers whose **project name** differs from the current one (`aisztens`). The current project's containers are not touched, so the site stays up during the upload.
-- `prune_orphans_final_pass()` — runs **after** the postup gate succeeds. Removes the leftover historical containers/networks/volumes listed in [`deploy.sh:208`](deploy/deploy.sh:208).
+- `prune_orphans_final_pass()` — runs **after** the postup gate succeeds. Removes the leftover historical containers/networks/volumes listed in [`deploy.sh:208`](../../deploy/deploy.sh:208).
 
 In `up`, the order becomes: `preflight → prune_foreign_only → upload (with reordered build) → up --wait → postup gate → prune_remaining`.
 
@@ -224,7 +224,7 @@ In `up`, the order becomes: `preflight → prune_foreign_only → upload (with r
 
 ### Module 8 — Validate the rendered `Caddyfile` before scp
 
-**What.** Add a `validate_caddyfile` step inside [`render_caddyfile()`](deploy/deploy.sh:111):
+**What.** Add a `validate_caddyfile` step inside [`render_caddyfile()`](../../deploy/deploy.sh:111):
 
 1. Run `caddy validate --adapter caddyfile --config $rendered` **locally** if `caddy` is on PATH. If absent, skip (with a warning).
 2. Add a remote-equivalent check in pre-flight (Module 4) so the same is enforced in CI.
@@ -245,7 +245,7 @@ In `up`, the order becomes: `preflight → prune_foreign_only → upload (with r
 
 ### Module 9 — SPA bundle integrity check (kill the silent "pnpm not on PATH" case)
 
-**What.** Extend [`upload_dists()`](deploy/deploy.sh:87) so that, after `pnpm` is missing or the local build fails, the **first** dist upload prints a hard error and aborts. Concretely:
+**What.** Extend [`upload_dists()`](../../deploy/deploy.sh:87) so that, after `pnpm` is missing or the local build fails, the **first** dist upload prints a hard error and aborts. Concretely:
 
 - After `build_spas()` returns, check that both `apps/web/dist/index.html` and `apps/admin/dist/index.html` exist. If not, log `FATAL: SPA bundle missing — install pnpm or run the build manually` and exit non-zero.
 - After the upload, ssh into the droplet and `ls -1 $REMOTE_DIR/apps/web/dist/assets/ | wc -l` and `.../admin/...` — if either count is 0, abort with a clear message before the compose up.
@@ -266,9 +266,9 @@ In `up`, the order becomes: `preflight → prune_foreign_only → upload (with r
 
 ### Module 10 — Don't rsync `deploy/ssh-keys/`
 
-**What.** Add `--exclude 'deploy/ssh-keys/'` to the rsync invocation in [`deploy.sh:144`](deploy/deploy.sh:144). The CI workflow already excludes it ([`.github/workflows/deploy.yml:101`](.github/workflows/deploy.yml:101)); the local script just got missed.
+**What.** Add `--exclude 'deploy/ssh-keys/'` to the rsync invocation in [`deploy.sh:144`](../../deploy/deploy.sh:144). The CI workflow already excludes it ([`.github/workflows/deploy.yml:101`](../../.github/workflows/deploy.yml:101)); the local script just got missed.
 
-**Why.** `deploy/ssh-keys/.gitignore` ([`deploy/ssh-keys/.gitignore:1`](deploy/ssh-keys/.gitignore:1)) only ignores `*.pub`. If a developer ever drops a private key (`.pem`, `.key`, a converted `.ppk`) there for testing, the rsync mirror will push it to the droplet unencrypted. Risk is low (the deploy user is non-root by default) but it is free to fix.
+**Why.** `deploy/ssh-keys/.gitignore` ([`deploy/ssh-keys/.gitignore:1`](../../deploy/ssh-keys/.gitignore:1)) only ignores `*.pub`. If a developer ever drops a private key (`.pem`, `.key`, a converted `.ppk`) there for testing, the rsync mirror will push it to the droplet unencrypted. Risk is low (the deploy user is non-root by default) but it is free to fix.
 
 **Touch list.**
 - `deploy/deploy.sh` — one new `--exclude` line.
@@ -287,8 +287,8 @@ These belong in a separate plan:
 
 - **Atomic deploys** (blue/green, traffic switching) — would require a second droplet / DNS TTL control. Today's single-droplet topology cannot give true zero-downtime.
 - **Container-image rollback** — would require a registry on the droplet and `image` tags besides `:latest`. Worth doing, but is its own project.
-- **GitHub Actions parity** — once Modules 1–10 land in `deploy.sh`, the workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml:1) can be simplified to call `./deploy.sh up`. That refactor is the natural follow-up plan, not part of this one.
-- **`down-all` data-loss footgun** at [`deploy.sh:228`](deploy/deploy.sh:228) — fix belongs in the destructive-command docs, not in `up`.
+- **GitHub Actions parity** — once Modules 1–10 land in `deploy.sh`, the workflow in [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:1) can be simplified to call `./deploy.sh up`. That refactor is the natural follow-up plan, not part of this one.
+- **`down-all` data-loss footgun** at [`deploy.sh:228`](../../deploy/deploy.sh:228) — fix belongs in the destructive-command docs, not in `up`.
 
 ## 5. Suggested PR cadence
 

@@ -7,9 +7,9 @@
 `deploy/.env` → `deploy/.env.dev`, [`.gitignore`](../../.gitignore:43),
 [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:145),
 [`scripts/ssh/_remove-ssh-passphrase.sh`](../../scripts/ssh/_remove-ssh-passphrase.sh:54), docs/specs, tests.
-**Related:** [three-env separation plan](2026-10-05--10-30-00-three-env-separation-plan.md),
+**Related:** [three-env separation plan](../plans/2026-10-05--10-30-00-three-env-separation-plan.md),
 [logging plan](2026-10-06-deploy-script-logging-plan.md),
-[logger integration history](2026-10-06--16-05-00-deploy-logger-integration-and-windows-invocation.md),
+[logger integration history](../history/2026-10-06--16-05-00-deploy-logger-integration-and-windows-invocation.md),
 [`docs/Specs/Production-Runbook.md`](../Specs/Production-Runbook.md:309)
 
 ---

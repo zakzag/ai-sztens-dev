@@ -1,6 +1,6 @@
 # 2026-10-05 10:30 — Three-env separation · Step 2 (NestJS env resolution)
 
-**Plan:** [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md) — Step 2 of 5.
+**Plan:** [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — Step 2 of 5.
 **Scope:** backend API ([`apps/api/src/`](../../apps/api/src/)) and the runtime `APP_ENV` plumbing ([`infra/docker-compose.yml`](../../infra/docker-compose.yml)).
 
 ## What changed
@@ -102,4 +102,4 @@ feat(api): per-env file selection via APP_ENV (three-env plan step 2)
   seeds (all gitignored).
 - apps/api/.env.example: rewritten as a three-env documentation template.
 
-Step 2 of docs/history/2026-10-05--10-30-00-three-env-separation-plan.md.
+Step 2 of docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md.

@@ -1,7 +1,7 @@
 # deploy.sh hardening PR #1 — implementation
 
 **Status:** Done (offline tests green)
-**Plan:** [`2026-09-29--14-38-32-deploy-sh-guard-hardening-plan.md`](2026-09-29--14-38-32-deploy-sh-guard-hardening-plan.md)
+**Plan:** [`2026-09-29--14-38-32-deploy-sh-guard-hardening-plan.md`](../plans/2026-09-29--14-38-32-deploy-sh-guard-hardening-plan.md)
 **Milestone:** [`2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.milestone.md`](../milestones/2026-09-29--15-15-00-deploy-sh-guard-hardening-pr1.milestone.md)
 **Modules:** M1, M2, M3, M10 (the "safe quartet" — smallest reviewable change, no deploy behaviour shift for the happy path)
 

@@ -2,7 +2,7 @@
 
 **Dátum:** 2026-10-19
 **Jira:** AIS-35 (Subtask) — szülő: AIS-29
-**Terv:** [`2026-10-19--21-15-00-ais-35-postgres-schemas-plan.md`](2026-10-19--21-15-00-ais-35-postgres-schemas-plan.md)
+**Terv:** [`2026-10-19--21-15-00-ais-35-postgres-schemas-plan.md`](../plans/2026-10-19--21-15-00-ais-35-postgres-schemas-plan.md)
 
 ## Mit kellett megoldani
 

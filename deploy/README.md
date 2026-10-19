@@ -9,7 +9,7 @@ live in [`infra/`](../infra) and this directory.
 > happens on the server. The repo and `pnpm` workspace are not copied to the
 > droplet at all. The deploy script ships three small files (compose,
 > `infra/.env`, rendered Caddyfile) and runs `docker compose pull && up -d`.
-> See [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md).
+> See [`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md).
 
 ## Overview
 

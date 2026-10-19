@@ -390,7 +390,7 @@ report the failure with full logs.
 |---|---|---|
 | `.github/workflows/deploy.yml` | **new** | Tasks 2 + 3 |
 | `.github/workflows/ci.yml` | **new** (optional) | PR-time lint + unit tests |
-| `docs/history/2026-09-23-github-action-deploy-with-smoke-tests-plan.md` | **new** | This file |
+| `docs/plans/2026-09-23--16-29-21-github-action-deploy-with-smoke-tests-plan.md` | **new** | This file |
 | `deploy/README.md` | edit | Add a "GitHub Actions" subsection pointing at the new workflow and secrets |
 | `deploy/.env` | edit | Switch `SSH_USER` from `root` to `deployer` after the manual bootstrap succeeds |
 
@@ -408,7 +408,7 @@ Nothing in `deploy/bootstrap.sh`, `deploy/deploy.sh`,
   notifications are GitHub's default email/webhook).
 - Multi-droplet / blue-green topology.
 - Database migrations (no DB-wired code exists yet — see
-  [`docs/history/2026-09-18-droplet-deploy-infra-plan.md`](2026-09-18-droplet-deploy-infra-plan.md:87)).
+  [`docs/plans/2026-09-21--16-46-30-droplet-deploy-infra-plan.md`](2026-09-21--16-46-30-droplet-deploy-infra-plan.md:87)).
 - Static frontend hosting (`apps/web`, `apps/admin` mounts are still
   commented out in [`infra/docker-compose.yml`](../../infra/docker-compose.yml:84)).
 

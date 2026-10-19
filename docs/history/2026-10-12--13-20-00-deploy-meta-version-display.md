@@ -1,7 +1,7 @@
 # Deploy metadata: build date + commit hash in the SPAs and `/healthz`
 
 **Date:** 2026-10-12 13:20
-**Plan:** [`docs/history/2026-10-12-deploy-meta-version-display-plan.md`](2026-10-12-deploy-meta-version-display-plan.md)
+**Plan:** [`docs/plans/2026-10-12-deploy-meta-version-display-plan.md`](../plans/2026-10-12-deploy-meta-version-display-plan.md)
 **Milestone:** [`docs/milestones/2026-10-12--13-20-00-deploy-meta-version-display.milestone.md`](../milestones/2026-10-12--13-20-00-deploy-meta-version-display.milestone.md)
 
 ## 1. Why

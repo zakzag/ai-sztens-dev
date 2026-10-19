@@ -96,7 +96,7 @@ the plan called for them, only real `.pub` files exist locally.
 ### C. Documentation drift / minor
 
 1. **C1 — `deploy/README.md` says `/opt/callback`** but [`deploy/.env.example:12`](../../deploy/.env.example:12) and the real [`deploy/.env`](../../deploy/.env) use `/opt/aisztens`. Update one to match the other.
-2. **C2 — `docs/history/2026-09-18-droplet-deploy-infra-plan.md:41`** lists `infra/postgres/init/01-roles.sql`, but the actual file is [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh) (bash wrapper around psql). Cosmetic only; fix the doc.
+2. **C2 — `docs/plans/2026-09-21--16-46-30-droplet-deploy-infra-plan.md:41`** lists `infra/postgres/init/01-roles.sql`, but the actual file is [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh) (bash wrapper around psql). Cosmetic only; fix the doc.
 3. **C3 — `deploy/ssh-keys/.pub.example` placeholders are missing.** The README says only placeholders are committed, but the directory holds real `.pub` files. For a clean audit, replace with `<user>.pub.example` (gitignored: keep the real ones out of git) — or keep current behaviour and update the README wording.
 4. **C4 — [`deploy/ssh-keys/README.md:18-22`](../../deploy/ssh-keys/README.md:18)** example uses `tkovari@callback` as comment; consistent with project. No action.
 5. **C5 — `.vscode/settings.json` is empty.** Optional: add `"files.eol": "\n"` and `"typescript.tsdk": "node_modules/typescript/lib"` for consistency. Not a bug.

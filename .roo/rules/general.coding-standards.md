@@ -15,7 +15,8 @@
 
 ## Planning Artifacts
 
-- Store every implementation plan in the repository under `docs/history/<YYYY-MM-DD>-<short-plan-description>-plan.md`.
+- Store every implementation plan in the repository under `docs/plans/<YYYY-MM-DD--HH-ii-ss>-<short-plan-description>-plan.md`.
+- Change summaries (post-implementation narratives) stay in `docs/history/` — plans must never be written there.
 - Always use English language in the filenames.
 - Prefer lowercase, ASCII, kebab-case for `<short-plan-description>`.
 - Do not store project plans only in transient VS Code Copilot memory paths.

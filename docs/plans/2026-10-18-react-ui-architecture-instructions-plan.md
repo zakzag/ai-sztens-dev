@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-18
 **Status:** Draft (awaiting approval)
-**Scope:** [`apps/web`](apps/web/package.json:1), [`apps/admin`](apps/admin/package.json:1), new `packages/ui`, new `packages/api-client`
+**Scope:** [`apps/web`](../../apps/web/package.json:1), [`apps/admin`](../../apps/admin/package.json:1), new `packages/ui`, new `packages/api-client`
 **Decisions confirmed by owner:** TanStack Query for server state + Zustand page-scoped stores (factory + provider, auto-reset) + react-hook-form for forms; shared token & primitive package `packages/ui`; both apps.
 
 ## 1. Problem
@@ -11,12 +11,12 @@ The frontend has no architecture contract:
 
 | Symptom | Evidence |
 |---|---|
-| No layer separation — pages fetch and decide | [`CallbackFormPage.tsx`](apps/web/src/pages/CallbackFormPage.tsx:20-28), [`DashboardPage.tsx`](apps/admin/src/pages/DashboardPage.tsx:21-24) |
-| Transport code duplicated per app | [`apps/web/src/lib/api.ts`](apps/web/src/lib/api.ts:10), [`apps/admin/src/lib/api.ts`](apps/admin/src/lib/api.ts:6) |
-| Only global state is an auth context | [`AuthContext.tsx`](apps/admin/src/auth/AuthContext.tsx:11) |
-| No design tokens, palette colors inline | [`App.tsx`](apps/admin/src/App.tsx:19), [`DashboardPage.tsx`](apps/admin/src/pages/DashboardPage.tsx:8-16) |
-| Flat dark theme, not dark neomorphism | [`index.css`](apps/web/src/index.css:1-6) |
-| No frontend tests, no lint gate | [`package.json`](apps/web/package.json:14-15) |
+| No layer separation — pages fetch and decide | [`CallbackFormPage.tsx`](../../apps/web/src/pages/CallbackFormPage.tsx:20-28), [`DashboardPage.tsx`](../../apps/admin/src/pages/DashboardPage.tsx:21-24) |
+| Transport code duplicated per app | [`apps/web/src/lib/api.ts`](../../apps/web/src/lib/api.ts:10), [`apps/admin/src/lib/api.ts`](../../apps/admin/src/lib/api.ts:6) |
+| Only global state is an auth context | [`AuthContext.tsx`](../../apps/admin/src/auth/AuthContext.tsx:11) |
+| No design tokens, palette colors inline | [`App.tsx`](../../apps/admin/src/App.tsx:19), [`DashboardPage.tsx`](../../apps/admin/src/pages/DashboardPage.tsx:8-16) |
+| Flat dark theme, not dark neomorphism | [`index.css`](../../apps/web/src/index.css:1-6) |
+| No frontend tests, no lint gate | [`package.json`](../../apps/web/package.json:14-15) |
 
 Goal: one AI-readable rule set plus a migrated structure that makes the rules mechanically true.
 
@@ -24,7 +24,7 @@ Goal: one AI-readable rule set plus a migrated structure that makes the rules me
 
 | File | Purpose |
 |---|---|
-| [`.roo/rules/react.coding-standards.md`](.roo/rules/react.coding-standards.md:1) | Enforced, imperative AI rules (layers, state, tokens, forbidden patterns, checklists) |
+| [`.roo/rules/react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) | Enforced, imperative AI rules (layers, state, tokens, forbidden patterns, checklists) |
 | [`docs/Specs/UI-Architecture.md`](docs/Specs/UI-Architecture.md:1) | Living spec: folder tree, layer contracts, per-page state plan, token catalogue |
 | `packages/ui/src/styles/theme.css` | Single source of Tailwind v4 `@theme` tokens |
 | `packages/ui/src/components/**` | CVA primitives — the only place token classes are combined |
@@ -92,7 +92,7 @@ Hard rules: `pages` never import another `pages` folder; `features` never import
 
 - Logic lives in pure `*.logic.ts` functions (no hooks, no JSX) — unit-testable without DOM.
 - Orchestration lives in `features/*/use-*.ts` (TanStack Query `queryFn`/`mutationFn`, cache invalidation).
-- Components receive props and emit callbacks only. Mapping/sorting/filtering/status→variant decisions move out of JSX (today: [`statusBadgeClass()`](apps/admin/src/pages/DashboardPage.tsx:6) belongs to `entities/callback-request`).
+- Components receive props and emit callbacks only. Mapping/sorting/filtering/status→variant decisions move out of JSX (today: [`statusBadgeClass()`](../../apps/admin/src/pages/DashboardPage.tsx:6) belongs to `entities/callback-request`).
 
 ## 6. State storage plan per page
 

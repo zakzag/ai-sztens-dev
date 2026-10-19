@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-08
 **Status:** Plan approved, implementation pending
-**Plan:** [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
+**Plan:** [`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
 
 ---
 

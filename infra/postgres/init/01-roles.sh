@@ -20,6 +20,17 @@
 # so `SELECT format(...) WHERE NOT EXISTS (...)` creates the role only when it
 # is missing. The following `ALTER ROLE` then keeps the password in sync on
 # every run, which makes the whole file idempotent.
+#
+# WHERE THE SCHEMA DDL LIVES
+# --------------------------
+# The per-context schemas (`platform`, `callback`, `email`) are created by
+# 02-schemas.sh, which the entrypoint runs after this file. The schema-level
+# GRANT block at the end of this file is therefore a no-op on a fresh init and
+# only takes effect when this file is re-applied to an already initialized
+# volume (see docs/Specs/Infrastructure-Docker.md §6.2). It is guarded by
+# `pg_namespace`, so the file stays idempotent and order-independent.
+#
+# Keep the GRANT matrix in sync with 02-schemas.sh.
 
 set -euo pipefail
 
@@ -53,4 +64,25 @@ ALTER ROLE krak WITH LOGIN PASSWORD :'krak_db_password';
 -- The application role owns the database; operators get access to it.
 ALTER DATABASE :"postgres_db" OWNER TO :"aisztens_db_user";
 GRANT CONNECT ON DATABASE :"postgres_db" TO tkovari, krak;
+
+-- Schema-level privileges (AIS-35). Same matrix as 02-schemas.sh:
+--
+--   schema      aisztens (app)   tkovari (owner)   krak (operator)
+--   platform    USAGE            USAGE             USAGE
+--   callback    USAGE + CREATE   USAGE             USAGE
+--   email       USAGE            USAGE             USAGE
+--
+-- The join on pg_namespace makes this a no-op when the schemas do not exist
+-- yet, i.e. on a fresh init where 02-schemas.sh has not run.
+SELECT format('GRANT USAGE ON SCHEMA %I TO %I', s.nspname, r.rolname)
+  FROM (VALUES ('platform'), ('callback'), ('email')) AS s(nspname)
+  JOIN pg_namespace n ON n.nspname = s.nspname
+  CROSS JOIN (VALUES (:'aisztens_db_user'), ('tkovari'), ('krak')) AS r(rolname)
+\gexec
+
+-- Object creation stays with the application role, and only in `callback`.
+SELECT format('GRANT CREATE ON SCHEMA %I TO %I', s.nspname, :'aisztens_db_user')
+  FROM (VALUES ('callback')) AS s(nspname)
+  JOIN pg_namespace n ON n.nspname = s.nspname
+\gexec
 EOSQL

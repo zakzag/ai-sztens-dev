@@ -1,7 +1,8 @@
 # Local Development — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-19 — local DB-only workflow: [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) plus the root `pnpm db:up` / `db:down` scripts start a Dockerized Postgres for `pnpm --filter @callback/api start:dev` (AIS-34).
+**Last updated:** 2026-10-19 — per-context Postgres schemas: the init directory now ships two idempotent scripts ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh) for roles and schema grants, [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) for the `platform` / `callback` / `email` schemas), and both run only on a fresh `pgdata` volume (AIS-35).
+**Previous update:** 2026-10-19 — local DB-only workflow: [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) plus the root `pnpm db:up` / `db:down` scripts start a Dockerized Postgres for `pnpm --filter @callback/api start:dev` (AIS-34).
 **Previous update:** 2026-10-13 — deploy-process consistency: the `dev` boot
 row no longer claims a `deploy.yml` push trigger (that workflow now reacts
 via `workflow_run` / `workflow_dispatch`), and §5 no longer references the
@@ -86,6 +87,35 @@ healthcheck. The API connects via `DATABASE_URL` in
 [`apps/api/.env.local`](../../apps/api/.env.example) (documented in its
 `local` block as
 `postgres://aisztens:<AISZTENS_DB_PASSWORD>@localhost:5432/aisztens_db`).
+
+The bind-mounted init directory holds two scripts, and the image's entrypoint
+runs them in lexicographic order **once, on an empty `pgdata_local` volume**:
+
+| Script | Creates |
+|---|---|
+| [`01-roles.sh`](../../infra/postgres/init/01-roles.sh) | roles `aisztens` / `tkovari` / `krak`, database ownership, schema grants |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | schemas `platform`, `callback`, `email` plus the grant matrix |
+
+When the volume already exists (the normal case after pulling this change) the
+schemas and the `callback` `CREATE` grant are **missing**, and `db:migrate`
+fails with `permission denied for schema callback`. Either re-apply the scripts
+by hand, or recreate the volume:
+
+```bash
+# re-apply in place (idempotent, no data loss)
+pnpm db:up
+docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml \
+  exec -T postgres bash /docker-entrypoint-initdb.d/02-schemas.sh
+
+# or start over on an empty volume (local data is lost)
+docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml down -v
+pnpm db:up
+```
+
+Both scripts are covered by
+`bash scripts/test/_postgres-init-schemas-test.sh` (throwaway container: fresh
+init plus two idempotent re-runs), so a broken grant matrix fails that test
+instead of the first `db:migrate`.
 
 Schema work uses the Drizzle toolchain wired into the API package:
 `pnpm --filter @callback/api db:generate` produces a SQL migration under

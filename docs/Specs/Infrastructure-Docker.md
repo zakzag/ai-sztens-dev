@@ -1,7 +1,8 @@
 # Infrastructure — Docker containers on the droplet
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-10-12 (deploy metadata: az `images.yml` három új build-argot ad át — `COMMIT_HASH` / `DEPLOY_DATE` az api képnek, `VITE_COMMIT_HASH` / `VITE_DEPLOY_DATE` a `web`/`admin` képnek —, így a futó image egy konkrét revízióhoz köthető; lásd §6.1)
+**Utolsó frissítés:** 2026-10-19 (AIS-35: per-kontext Postgres sémák — `platform`, `callback`, `email` — és a hozzájuk tartozó grantok, új `02-schemas.sh` init script; lásd §6.2)
+**Korábbi frissítés:** 2026-10-12 (deploy metadata: az `images.yml` három új build-argot ad át — `COMMIT_HASH` / `DEPLOY_DATE` az api képnek, `VITE_COMMIT_HASH` / `VITE_DEPLOY_DATE` a `web`/`admin` képnek —, így a futó image egy konkrét revízióhoz köthető; lásd §6.1)
 **Korábbi frissítés:** 2026-10-09 (image-based deploy: minden alkalmazás-komponens saját konténerben fut — `api`, `web`, `admin`, `postgres`, `caddy`, `monitor` — a droplet csak `docker compose pull && up -d`-t futtat; a forráskód és a pnpm workspace nem kerül a dropletre)
 **Kapcsolódik:** [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
 
@@ -67,7 +68,7 @@ flowchart LR
 | `api` | `ghcr.io/…/aisztens-api` | NestJS + Fastify alkalmazás; `node apps/api/dist/main.js`; `NODE_OPTIONS=--max-old-space-size=384` | 3000 | 400m | `postgres` healthy |
 | `web` | `ghcr.io/…/aisztens-web` | nginx:1.27-alpine a `@callback/web` Vite build-jét szolgálja ki | 80 | 32m | — |
 | `admin` | `ghcr.io/…/aisztens-admin` | nginx:1.27-alpine a `@callback/admin` Vite build-jét szolgálja ki | 80 | 32m | — |
-| `postgres` | `postgres:16-alpine` | PostgreSQL; idempotens role/db init a `./postgres/init`-ből; `shared_buffers=128MB` | 5432 | 400m | — |
+| `postgres` | `postgres:16-alpine` | PostgreSQL; idempotens role/db/séma init a `./postgres/init`-ből ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh), [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh)); `shared_buffers=128MB` | 5432 | 400m | — |
 | `monitor` | `ghcr.io/…/aisztens-monitor` | alpine:3.20 + curl + `watch.sh` polling loop | — | 32m | `api` started |
 
 ## 4. Named volume-ok
@@ -147,17 +148,45 @@ A compose a hivatalos `postgres:16-alpine` image-re hivatkozik, ezért:
   létrehozza a konténert, de az adat a `pgdata` named volume-ban marad, tehát
   túléli az újralétrehozást.
 
-Az [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh) a
-`/docker-entrypoint-initdb.d` könyvtárba van bind-mountolva
-(`./postgres/init:/docker-entrypoint-initdb.d:ro`), és a hivatalos entrypoint
-**kizárólag az üres `pgdata` volume első inicializálásakor** futtatja; a későbbi
-indítások `Skipping initialization`-t logolnak, és nem futtatják újra. A script
-idempotens, ezért kézzel bármikor újrafuttatható:
+Az `infra/postgres/init/` könyvtár a `/docker-entrypoint-initdb.d` könyvtárba van
+bind-mountolva (`./postgres/init:/docker-entrypoint-initdb.d:ro`), és a hivatalos
+entrypoint **kizárólag az üres `pgdata` volume első inicializálásakor** futtatja a
+benne lévő scripteket, lexikografikus sorrendben; a későbbi indítások `Skipping
+initialization`-t logolnak, és nem futtatják újra. Mindkét script idempotens, ezért
+kézzel bármikor újrafuttatható:
 
 ```bash
 docker compose --env-file infra/.env -f infra/docker-compose.yml \
   exec -T postgres bash /docker-entrypoint-initdb.d/01-roles.sh
+docker compose --env-file infra/.env -f infra/docker-compose.yml \
+  exec -T postgres bash /docker-entrypoint-initdb.d/02-schemas.sh
 ```
+
+| Script | Felelősség |
+|---|---|
+| [`01-roles.sh`](../../infra/postgres/init/01-roles.sh) | `aisztens` (app), `tkovari` (owner) és `krak` (operátor) role; a database tulajdonosa az `aisztens`; séma-szintű grantok `\gexec`-guarddal — friss initen no-op, mert a sémák ekkor még nem léteznek |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform`, `callback`, `email` sémákra, majd a grant-mátrix |
+
+Séma ↔ bounded context: `platform` (üzemeltetési/session jellegű adatok),
+`callback` (a visszahívási domain, ide kerül a `callback_requests` tábla),
+`email` (email engine). A sémahatár egyben modulhatár, ezért a grantok is ezt követik:
+
+| Séma | `aisztens` (app) | `tkovari` (owner) | `krak` (operátor) |
+|---|---|---|---|
+| `platform` | USAGE | USAGE | USAGE |
+| `callback` | USAGE + **CREATE** | USAGE | USAGE |
+| `email` | USAGE | USAGE | USAGE |
+
+A `CREATE` jog kizárólag az app role-é, és kizárólag a `callback` sémában: a Drizzle
+migrációs runner (AIS-36) ebben a sémában hozza létre a táblákat, enélkül a
+`db:migrate` `permission denied for schema callback`-dal állna meg. A sémák
+tulajdonosa a bootstrap superuser (`POSTGRES_USER`) marad — nincs ownership-átírás.
+
+A grant-mátrixot a [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh)
+(eldobható `postgres:16-alpine` konténer: friss init + kétszeri újrafuttatás) és a
+[`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh)
+smoke-checkei (`postgres-schemas`, `postgres-schema-usage`, `postgres-schema-create`)
+őrzik.
 
 A `infra/postgres/init` könyvtárat minden deploy elküldi a dropletre — a
 `.github/workflows/deploy.yml` `scp` forráslistája és a `deploy/deploy.sh`

@@ -113,7 +113,8 @@ scripts/test/
 │   ├── 10-services.sh  # per-service liveness checks
 │   ├── 20-cross-service.sh # cross-service "see each other" checks
 │   └── 99-teardown.sh  # optional teardown helper
-└── _deploy-sh-*.sh     # offline deploy/deploy.sh suites (no droplet needed)
+├── _deploy-sh-*.sh     # offline deploy/deploy.sh suites (no droplet needed)
+└── _postgres-init-schemas-test.sh  # throwaway-container test for the Postgres init scripts
 ```
 
 ## Offline `deploy.sh` suites (`_deploy-sh-*.sh`)
@@ -135,6 +136,24 @@ after touching the deploy script:
 # Run them all from the repo root.
 for t in scripts/test/_deploy-sh-*.sh; do bash "$t" || echo "FAILED: $t"; done
 ```
+
+## Postgres init-script suite (`_postgres-init-schemas-test.sh`)
+
+The compose init scripts ([`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh)
+and [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh)) run **only on an empty
+`pgdata` volume**, so their only honest test is a throwaway container. This suite starts
+`postgres:16-alpine` with the init directory bind-mounted (exactly like the compose
+files), asserts the fresh-init state — roles, the `platform` / `callback` / `email`
+schemas and the grant matrix — then re-runs both scripts twice to prove idempotency and
+re-asserts.
+
+```bash
+bash scripts/test/_postgres-init-schemas-test.sh
+```
+
+It needs Docker, publishes no host port and removes its container on exit. The live
+counterpart lives in [`lib/20-cross-service.sh`](lib/20-cross-service.sh)
+(`postgres-schemas`, `postgres-schema-usage`, `postgres-schema-create`).
 
 ## CI-deploy (`deploy.yml`) suites
 

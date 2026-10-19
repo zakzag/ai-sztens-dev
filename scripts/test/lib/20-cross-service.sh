@@ -102,6 +102,46 @@ run_cross_service_checks() {
       -At -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak')"
 
   # -----------------------------------------------------------------------
+  # 5b. postgres — per-context schemas exist (AIS-35).
+  # -----------------------------------------------------------------------
+  # Proves that infra/postgres/init/02-schemas.sh ran on first startup. It
+  # cannot distinguish "ran now" from "ran when the volume was created", so
+  # the idempotent re-run path is covered by
+  # scripts/test/_postgres-init-schemas-test.sh instead. Same -U/-d ordering
+  # rule as the role check above.
+  assert_service_out "postgres-schemas" \
+    "schemas platform, callback, email exist" \
+    "3" \
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','callback','email')"
+
+  # -----------------------------------------------------------------------
+  # 5c. postgres — schema privileges (AIS-35).
+  # -----------------------------------------------------------------------
+  # Expected matrix: USAGE on all three schemas for aisztens, tkovari and krak
+  # (3 schemas × 3 roles = 9 rows), and CREATE on `callback` for the app role
+  # only — the Drizzle migration runner creates callback.callback_requests
+  # there, so losing this grant would break `db:migrate`, not just the smoke
+  # suite.
+  assert_service_out "postgres-schema-usage" \
+    "USAGE on all three schemas for aisztens, tkovari and krak" \
+    "9" \
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM (VALUES ('platform'),('callback'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
+
+  assert_service_out "postgres-schema-create" \
+    "only aisztens may create objects in the callback schema" \
+    "1" \
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, 'callback', 'CREATE')"
+
+  # -----------------------------------------------------------------------
   # 6. monitor -> api — restated for symmetry with the per-service check.
   # -----------------------------------------------------------------------
   # We do not re-run the full log check here; a quick presence check on a

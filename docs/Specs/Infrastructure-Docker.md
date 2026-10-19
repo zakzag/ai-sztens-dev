@@ -1,9 +1,13 @@
 # Infrastructure — Docker containers on the droplet
 
 **Státusz:** Élő
+
 **Utolsó frissítés:** 2026-10-19 (AIS-35: per-kontext Postgres sémák — `platform`, `callback`, `email` — és a hozzájuk tartozó grantok, új `02-schemas.sh` init script; lásd §6.2)
+
 **Korábbi frissítés:** 2026-10-12 (deploy metadata: az `images.yml` három új build-argot ad át — `COMMIT_HASH` / `DEPLOY_DATE` az api képnek, `VITE_COMMIT_HASH` / `VITE_DEPLOY_DATE` a `web`/`admin` képnek —, így a futó image egy konkrét revízióhoz köthető; lásd §6.1)
+
 **Korábbi frissítés:** 2026-10-09 (image-based deploy: minden alkalmazás-komponens saját konténerben fut — `api`, `web`, `admin`, `postgres`, `caddy`, `monitor` — a droplet csak `docker compose pull && up -d`-t futtat; a forráskód és a pnpm workspace nem kerül a dropletre)
+
 **Kapcsolódik:** [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
 
 ---
@@ -187,6 +191,11 @@ A grant-mátrixot a [`scripts/test/_postgres-init-schemas-test.sh`](../../script
 [`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh)
 smoke-checkei (`postgres-schemas`, `postgres-schema-usage`, `postgres-schema-create`)
 őrzik.
+
+A **lokális** (fejlesztői gépi) Postgres bootstrapje, a verifikációs query-k, a
+reset/wipe lépések és a jelenlegi korlátok külön specben vannak:
+[`Database-Local.md`](Database-Local.md). Ez a szekció a droplet-oldali
+üzemeltetésre koncentrál.
 
 A `infra/postgres/init` könyvtárat minden deploy elküldi a dropletre — a
 `.github/workflows/deploy.yml` `scp` forráslistája és a `deploy/deploy.sh`

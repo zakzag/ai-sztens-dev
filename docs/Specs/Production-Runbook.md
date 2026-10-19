@@ -5,7 +5,8 @@
 `commitHash` mezőkkel bővült, és a `web` / `admin` SPA front-oldalán megjelenik
 egy build-info sor (telepítés dátuma + commit hash). Lásd §4.2 és
 [`docs/history/2026-10-12--13-20-00-deploy-meta-version-display.md`](../history/2026-10-12--13-20-00-deploy-meta-version-display.md).
-**Utolsó frissítés:** 2026-10-13 (deploy-process konzisztencia takarítás: a §9.1 `deploy.yml` leírás a 2-elemű `matrix` helyett a **`plan` job** modellt írja le — `.github/scripts/deploy-plan.sh`, `needs.plan.outputs.*`, `workflow_run` / `workflow_dispatch` trigger, nincs `push` trigger és nincs `matrix`; a §6 pnpm-native OOM sora már nem javasol `--build`-et a dropleten, hanem CI-oldali image-újrabuildet; a §6.1 banner-minta `[stage=upload_rsync]` → `[stage=upload_files]`, és az rsync-mirror bekezdés helyett a 3 fájlos `scp` leírás szerepel. Az image-based deploy (2026-10-08) óta a droplet nem buildel és nem kap forráskódot.)
+**Utolsó frissítés:** 2026-10-19 (AIS-35 pontosítás: a §7 lifecycle smoke leírás már nem állítja, hogy a suite `callback_requests` sort hoz létre — a suite csak megfigyel, a tábla pedig AIS-36/AIS-38-cal érkezik; a lokális DB bootstrapje a [`Database-Local.md`](Database-Local.md) specben van.)
+**Korábbi frissítés:** 2026-10-13 (deploy-process konzisztencia takarítás: a §9.1 `deploy.yml` leírás a 2-elemű `matrix` helyett a **`plan` job** modellt írja le — `.github/scripts/deploy-plan.sh`, `needs.plan.outputs.*`, `workflow_run` / `workflow_dispatch` trigger, nincs `push` trigger és nincs `matrix`; a §6 pnpm-native OOM sora már nem javasol `--build`-et a dropleten, hanem CI-oldali image-újrabuildet; a §6.1 banner-minta `[stage=upload_rsync]` → `[stage=upload_files]`, és az rsync-mirror bekezdés helyett a 3 fájlos `scp` leírás szerepel. Az image-based deploy (2026-10-08) óta a droplet nem buildel és nem kap forráskódot.)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
 ---
@@ -240,7 +241,6 @@ curl -i -X POST "https://api.aisztens.hu/api/vapi/webhooks/end-of-call-report" \
 > curl-ek `404`-et adnak, amíg a módosított API image és a renderelt Caddyfile ki nincs
 > telepítve. Ez nem regresszió, hanem a deploy hiánya — részletek:
 > [`docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md`](../history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md).
-```
 
 **Elvárt:**
 
@@ -425,14 +425,14 @@ További, a PR #1 során bevezetett kisebb védelmek:
 
 ## 7. Opcionális: teljes lifecycle smoke
 
-A repo-ban van egy kézzel futtatható smoke-szkript, amely a teljes callback-flow-t végigjátssza (form → API → DB → webhook):
+A repo-ban van egy kézzel futtatható smoke-szkript, amely az élő stacket méri fel kívülről (Caddy → api → postgres, valamint a VAPI webhook védelmi vonalak):
 
 ```bash
 # Lokálisan, az éles rendszerrel szemben
 bash scripts/test/stack-smoke.sh https://<DOMAIN> https://api.<DOMAIN>
 ```
 
-**Éles környezetben csak saját, nem ügyfél telefonszámmal futtasd** — a szkript valódi `callback_requests` sort hoz létre az adatbázisban. A szkript és a teljes check-lista dokumentációja: [`scripts/README.md`](../../scripts/README.md).
+A suite **csak megfigyel** (lásd [`scripts/test/README.md`](../../scripts/test/README.md)): nem ír az adatbázisba, és nem hoz létre `callback_requests` sort. Ez utóbbi jelenleg nem is lehetséges: a tábla az AIS-36/AIS-38 story-kkal érkezik, a `POST /api/callback-requests` pedig a memóriabeli store-ba ír. A szkript és a teljes check-lista dokumentációja: [`scripts/README.md`](../../scripts/README.md).
 
 ---
 

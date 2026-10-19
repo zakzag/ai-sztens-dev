@@ -1,7 +1,7 @@
 # Local Development — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-19 — per-context Postgres schemas: the init directory now ships two idempotent scripts ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh) for roles and schema grants, [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) for the `platform` / `callback` / `email` schemas), and both run only on a fresh `pgdata` volume (AIS-35).
+**Last updated:** 2026-10-19 — per-context Postgres schemas: the init directory now ships two idempotent scripts ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh) for roles and schema grants, [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) for the `platform` / `callback` / `email` schemas), and both run only on a fresh `pgdata` volume (AIS-35). §2b now carries the mandatory env keys, the verification queries, the stop/wipe semantics and the 5432 port collision; the DB topic has its own spec, [`Database-Local.md`](Database-Local.md).
 **Previous update:** 2026-10-19 — local DB-only workflow: [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) plus the root `pnpm db:up` / `db:down` scripts start a Dockerized Postgres for `pnpm --filter @callback/api start:dev` (AIS-34).
 **Previous update:** 2026-10-13 — deploy-process consistency: the `dev` boot
 row no longer claims a `deploy.yml` push trigger (that workflow now reacts
@@ -75,7 +75,7 @@ stack — start just Postgres:
 cp infra/.env.example infra/.env.local   # first time only; then edit the DB passwords
 pnpm db:up                                # starts Postgres on localhost:5432
 pnpm --filter @callback/api start:dev     # in a second terminal
-pnpm db:down                              # stop it when done
+pnpm db:down                              # stop it when done (volume is kept)
 ```
 
 [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) is a
@@ -87,6 +87,78 @@ healthcheck. The API connects via `DATABASE_URL` in
 [`apps/api/.env.local`](../../apps/api/.env.example) (documented in its
 `local` block as
 `postgres://aisztens:<AISZTENS_DB_PASSWORD>@localhost:5432/aisztens_db`).
+
+The full detail of this topic lives in [`Database-Local.md`](Database-Local.md);
+the sections below are the minimum you need to run the API.
+
+### 2b.1 Mandatory keys in `infra/.env.local`
+
+`pnpm db:up` passes `--env-file infra/.env.local`, so the file must exist
+**before** the first start (`scripts/dev-stack.sh up` seeds it automatically,
+`pnpm db:up` does not). The bootstrap reads exactly these keys:
+
+| Key | Default if missing | Used by |
+|---|---|---|
+| `POSTGRES_DB` | `aisztens_db` | compose + both init scripts |
+| `POSTGRES_USER` | `postgres` | compose + both init scripts (superuser that runs the init) |
+| `POSTGRES_PASSWORD` | — (**required**) | compose |
+| `AISZTENS_DB_USER` | `aisztens` | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh), [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) |
+| `AISZTENS_DB_PASSWORD` | — (**required**) | `01-roles.sh` |
+| `TKOVARI_DB_PASSWORD` | — (**required**) | `01-roles.sh` |
+| `KRAK_DB_PASSWORD` | — (**required**) | `01-roles.sh` |
+
+Placeholder passwords are enough to boot the container, but the init script then
+creates the roles with them — replace them before you post real data.
+
+### 2b.2 The two local Postgres stacks cannot run at the same time
+
+Both [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) and the
+local override [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml)
+publish host port `5432`, and they use **different volumes** (`pgdata_local` vs
+`pgdata`). So:
+
+- a running full stack makes `pnpm db:up` fail with
+  `Bind for 0.0.0.0:5432 failed: port is already allocated` — stop the other one
+  first (`scripts/dev-stack.sh down` / `pnpm db:down`);
+- data created in the DB-only stack is **not** visible in the full stack, and
+  vice versa.
+
+### 2b.3 Verifying the bootstrap
+
+```bash
+DC="docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml"
+
+$DC exec -T postgres psql -U postgres -d aisztens_db -c '\dn'
+# Expect: platform, callback, email (plus public / information_schema / pg_catalog / pg_toast)
+
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT rolname FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak') ORDER BY 1"
+# Expect: aisztens, krak, tkovari
+
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT count(*) FROM (VALUES ('platform'),('callback'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
+# Expect: 9   (3 schemas x 3 roles)
+
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT has_schema_privilege('aisztens','callback','CREATE')"
+# Expect: t
+```
+
+The same matrix is asserted by
+`bash scripts/test/_postgres-init-schemas-test.sh` (throwaway container: fresh
+init plus two idempotent re-runs — expect `PASS: 23  FAIL: 0`), and by the
+`postgres-schemas` / `postgres-schema-usage` / `postgres-schema-create` checks of
+`pnpm test:stack` on a running stack.
+
+How the init actually went:
+
+```bash
+$DC logs postgres
+# "PostgreSQL init process complete" = the init scripts ran
+# "Skipping initialization"          = the volume was already initialized (not an error)
+```
+
+### 2b.4 The init runs once per volume
 
 The bind-mounted init directory holds two scripts, and the image's entrypoint
 runs them in lexicographic order **once, on an empty `pgdata_local` volume**:
@@ -112,10 +184,23 @@ docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml down -
 pnpm db:up
 ```
 
-Both scripts are covered by
-`bash scripts/test/_postgres-init-schemas-test.sh` (throwaway container: fresh
-init plus two idempotent re-runs), so a broken grant matrix fails that test
-instead of the first `db:migrate`.
+### 2b.5 Stopping vs. wiping
+
+```bash
+pnpm db:down     # container stops, pgdata_local volume is KEPT
+docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml down -v
+                 # container + volume removed: next `pnpm db:up` re-runs the init
+```
+
+`scripts/dev-stack.sh down` behaves the same way for the full stack (`pgdata` is kept).
+The **actual** Docker volume names differ per compose project — `infra_pgdata_local`
+(DB-only stack, project `infra`) and `aisztens_pgdata` (full stack, `name: aisztens`);
+see [`Database-Local.md`](Database-Local.md) §1.
+
+> What the local DB does **not** contain yet: the `callback_requests` table and the
+> `__drizzle_migrations` bookkeeping still land in AIS-36/AIS-38, and `db:migrate`
+> is a placeholder — the current limitations table is in
+> [`Database-Local.md`](Database-Local.md) §9.
 
 Schema work uses the Drizzle toolchain wired into the API package:
 `pnpm --filter @callback/api db:generate` produces a SQL migration under
@@ -224,6 +309,7 @@ one place, the others propagate.
 ## 6. See also
 
 - [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md) — **the end-to-end manual test plan** that proves the three-env separation actually works. Read this before you trust a fresh deployment.
+- [`docs/Specs/Database-Local.md`](Database-Local.md) — the local Postgres spec: bootstrap, grant matrix, verification queries, reset/wipe semantics and the list of things that do not exist in the DB yet.
 - [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — the full plan that produced this layout.
 - [`deploy/README.md`](../../deploy/README.md) — the droplet-side deploy runbook (steps 8.1 / 8.2 / 9 cover the per-environment secrets and the local override).
 - [`docs/Specs/Production-Runbook.md`](Production-Runbook.md) — what to do once the stack is on the droplet.

@@ -1,11 +1,25 @@
 # Three-Environment Verification — AIsztens
 
 **Status:** living spec
+**Database note (2026-10-19, AIS-35):** §2.7 no longer asserts a
+`callback_requests` table — that table does not exist yet (the store is still the
+in-memory `Map`; it lands with AIS-36/AIS-38). The check now verifies the role and
+schema bootstrap instead. Details: [`Database-Local.md`](Database-Local.md).
 **Deploy-process consistency (2026-10-13):** §4 no longer describes a
 `deploy.yml` `matrix` (it uses the `plan` job now), and §6/§7 no longer
 assume `pnpm install` / `pnpm build` / droplet-side `apps/*/.env.dev` run
 on the host — the application images are baked in CI.
-**Last updated:** 2026-10-13 — image-based deploy consistency cleanup: §3.1
+**Last updated:** 2026-10-19 — three-env leftover defaults cleanup: the
+default for `scripts/test/stack-up.sh`, `scripts/test/stack-down.sh` and
+[`scripts/test/lib/00-prelude.sh`](../../scripts/test/lib/00-prelude.sh:60)
+is now `infra/.env.local` (developer-machine default), and
+[`deploy/deploy.sh:upload()`](../../deploy/deploy.sh:441) hard-rejects
+the legacy bare `infra/.env` with a migration hint instead of
+silently falling back to it. Locked in by the new
+`scripts/test/_stack-env-default-test.sh` regression (18 offline
+assertions); see the §1f3 verification step. History:
+[`docs/history/2026-10-19--22-30-00-three-env-leftover-defaults-impl.md`](../history/2026-10-19--22-30-00-three-env-leftover-defaults-impl.md).
+Previous update: 2026-10-13 — image-based deploy consistency cleanup: §3.1
 local pre-deploy check now sources `infra/.env.dev` (per-env, not legacy
 `infra/.env`); §3.2 expected deploy log switched from
 `Building & starting the stack ... up -d --build` to
@@ -121,6 +135,13 @@ for t in scripts/test/_deploy-sh-*.sh; do bash "$t" || echo "FAILED: $t"; done
 # Expect: no FAILED lines, apart from the two known pre-existing ones in §7
 #   (`_deploy-sh-m3-test.sh` needs the legacy local infra/.env, and
 #    `_deploy-sh-env-selection-test.sh` scenario 6 is flaky).
+
+# 1f3. The three-env leftover-defaults regression (offline; no droplet, no network)
+bash scripts/test/_stack-env-default-test.sh
+# Expect: "Pass: 18   Fail: 0" (12 static greps + 6 sandbox assertions
+# that prove the per-env local default is wired in and the legacy
+# `infra/.env` is hard-rejected in deploy.sh:upload()). See
+# docs/history/2026-10-19--22-30-00-three-env-leftover-defaults-impl.md.
 
 # 1g. The deploy workflow parses as valid YAML
 python -c "import yaml; yaml.safe_load(open('.github/workflows/deploy.yml').read()); print('YAML_OK')"
@@ -255,23 +276,44 @@ cat apps/web/.env.dev
 # Expect: VITE_API_BASE_URL=https://api.aisztens.hu/api
 ```
 
-### 2.7 Postgres is reachable
+### 2.7 Postgres is reachable and bootstrapped
+
+> **Updated 2026-10-19 (AIS-35).** This section used to query `callback_requests`
+> directly. That table does **not** exist yet: the callback store is still the
+> in-memory `Map` in
+> [`callback-requests.service.ts:12`](../../apps/api/src/callback-requests/callback-requests.service.ts:12),
+> and the table arrives with AIS-36/AIS-38. What exists today is the role +
+> schema bootstrap; the row-level check is deferred.
 
 ```bash
-# 2.7.1 Connect with psql (or use docker compose exec if psql not installed)
+# 2.7.1 Connect as the application role — this is the connection the API uses.
 docker compose --env-file infra/.env.local \
   -f infra/docker-compose.yml \
   -f infra/docker-compose.local.yml \
-  exec postgres psql -U aisztens -d aisztens_db -c "SELECT count(*) FROM callback_requests;"
-# Expect: a positive integer (the row inserted by §2.4.3). If you see 0,
-#   that is also fine — it means the test row didn't make it in. Either
-#   way, the connection works.
+  exec postgres psql -U aisztens -d aisztens_db -c "SELECT current_user, current_database();"
+# Expect: aisztens | aisztens_db   (proves the role exists and can log in)
 
-# 2.7.2 The callback_requests table actually has the row from §2.4.3
-docker compose ... exec postgres psql -U aisztens -d aisztens_db \
-  -c "SELECT email FROM callback_requests ORDER BY created_at DESC LIMIT 1;"
-# Expect: verify@example.com (the email from §2.4.3)
+# 2.7.2 The per-context schemas created by the init scripts exist.
+docker compose --env-file infra/.env.local \
+  -f infra/docker-compose.yml \
+  -f infra/docker-compose.local.yml \
+  exec postgres psql -U postgres -d aisztens_db -c '\dn'
+# Expect: platform, callback, email
+#   (plus public / information_schema / pg_catalog / pg_toast).
+#   If they are missing, the volume was initialized before AIS-35 — see
+#   docs/Specs/Database-Local.md §8 (re-apply 02-schemas.sh or `down -v`).
+
+# 2.7.3 The app role may create objects in `callback` (needed by the Drizzle runner).
+docker compose --env-file infra/.env.local \
+  -f infra/docker-compose.yml \
+  -f infra/docker-compose.local.yml \
+  exec postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT has_schema_privilege('aisztens','callback','CREATE');"
+# Expect: t
 ```
+
+The full local-DB procedure (env keys, grant matrix, reset/wipe) is in
+[`Database-Local.md`](Database-Local.md).
 
 ### 2.8 Stop the stack and clean up
 
@@ -595,7 +637,8 @@ env + secrets), §3 takes ~2 min.
 | §1b: any per-env file is committed | The gitignore patterns are missing | Re-run `git check-ignore -v infra/.env.local` to see which pattern matches; if none, the Step 0 commit was lost — re-apply. |
 | §2.3: banner reports `dev` or unset instead of `local` | `APP_ENV` is leaking from the shell | `unset APP_ENV` then re-run `scripts/dev-stack.sh up`. |
 | §2.5.1: CORS preflight returns 200 instead of 204 | Wrong FastifyAdapter CORS setup | The `main.ts:34` block uses `credentials: true` with an explicit allow-list — should be fine; check `apps/api/.env.local`. |
-| §2.7.2: the inserted row is missing | The Postgres volume was wiped between runs | Re-run §2.4.3 and §2.7.1. |
+| §2.7.1: `role "aisztens" does not exist` | The init scripts never ran on this volume (it was created before `01-roles.sh` was shipped/fixed) | Re-apply the init scripts or recreate the volume — [`Database-Local.md`](Database-Local.md) §8. |
+| §2.7.2: `platform` / `callback` / `email` missing | Same cause as above, specifically the `02-schemas.sh` half (AIS-35) | `exec -T postgres bash /docker-entrypoint-initdb.d/02-schemas.sh` or `down -v` — [`Database-Local.md`](Database-Local.md) §8. |
 | §3.3: banner reports `local` or unset on the dev droplet | deploy.yml didn't pass APP_ENV, or a local shell exported `APP_ENV=local`. Since 2026-10-06 the target comes from the argument (default `dev`) and an invalid `APP_ENV` is rejected with exit 2 | Check the run's `config:` log line (`DEPLOY_ENV=… env_file=… APP_ENV=…`) in `deploy/log/latest.log`, and the `local_infra_env` block. Re-run `deploy.sh up dev`. |
 | §3.5.3: CORS DOES allow `https://api.aisztens.hu` | The CORS list in `infra/.env.dev` was edited incorrectly | Verify with `ssh deployer@aisztens.hu "grep ^CORS_ORIGINS /opt/aisztens/infra/.env"` — must NOT have `api.aisztens.hu`. |
 | §3.6.3: SPA also references `localhost` | The image was built with the wrong `VITE_API_BASE_URL` (the `web`/`admin` bundles are baked at CI build time; there is no droplet-side `apps/*/.env.dev`) | Verify in `images.yml` that `VITE_API_BASE_URL=https://api.<DOMAIN>/api` is passed, then rebuild + push the `web`/`admin` images and re-pull on the droplet. |

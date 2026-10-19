@@ -93,3 +93,6 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /docs/Specs/Email-triazs mikroszolgaltatas - technikai terv.md
 .aider*
+
+# Local MCP config contains personal API tokens (e.g. Jira) - never commit.
+.roo/mcp.json

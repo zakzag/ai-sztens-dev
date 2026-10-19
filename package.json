@@ -6,6 +6,8 @@
   "scripts": {
     "predev": "pnpm --filter @callback/shared build",
     "dev": "concurrently -k -n shared,api,web,admin -c yellow,blue,green,magenta \"pnpm --filter @callback/shared dev\" \"pnpm --filter @callback/api start:dev\" \"pnpm --filter @callback/web dev\" \"pnpm --filter @callback/admin dev\"",
+    "db:up": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml up -d",
+    "db:down": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml down",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",

@@ -1,15 +1,12 @@
 # Local Development — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-13 — deploy-process consistency: the `dev` boot
+**Last updated:** 2026-10-19 — local DB-only workflow: [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) plus the root `pnpm db:up` / `db:down` scripts start a Dockerized Postgres for `pnpm --filter @callback/api start:dev` (AIS-34).
+**Previous update:** 2026-10-13 — deploy-process consistency: the `dev` boot
 row no longer claims a `deploy.yml` push trigger (that workflow now reacts
 via `workflow_run` / `workflow_dispatch`), and §5 no longer references the
 removed `deploy.sh:ensure_spa_env()` helper — the SPA API URL is the
 `VITE_API_BASE_URL` build arg of `.github/workflows/images.yml`.
-**Previous update:** 2026-10-08 — image-based deploy: the local override now
-carries `build:` blocks for every application service so a fresh checkout
-can still build the stack from source without a registry
-([`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)).
 **Audience:** anyone setting up a local dev machine, or onboarding a new
 contributor.
 
@@ -64,6 +61,36 @@ plan), which:
   developer machine;
 - disables `caddy` via `profiles: [never]` — no public DNS, no Let's Encrypt,
   no TLS.
+
+---
+
+## 2b. Local Postgres only (API developed via `pnpm start:dev`)
+
+When you only work on the API and run it on the host with
+`pnpm --filter @callback/api start:dev`, you do not need the whole local
+stack — start just Postgres:
+
+```bash
+cp infra/.env.example infra/.env.local   # first time only; then edit the DB passwords
+pnpm db:up                                # starts Postgres on localhost:5432
+pnpm --filter @callback/api start:dev     # in a second terminal
+pnpm db:down                              # stop it when done
+```
+
+[`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) is a
+standalone compose file containing **only** the `postgres` service:
+`postgres:16-alpine`, host port `5432`, a dedicated `pgdata_local` volume
+(so it does not share data with the full local stack), the
+[`infra/postgres/init`](../../infra/postgres/init) init scripts and a
+healthcheck. The API connects via `DATABASE_URL` in
+[`apps/api/.env.local`](../../apps/api/.env.example) (documented in its
+`local` block as
+`postgres://aisztens:<AISZTENS_DB_PASSWORD>@localhost:5432/aisztens_db`).
+
+Schema work uses the Drizzle toolchain wired into the API package:
+`pnpm --filter @callback/api db:generate` produces a SQL migration under
+[`apps/api/drizzle/`](../../apps/api/drizzle), `db:check` runs the drift
+check, and `db:migrate` is a placeholder runner until Story 3.
 
 ---
 

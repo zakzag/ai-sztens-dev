@@ -1,9 +1,10 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
+import { jest } from '@jest/globals';
 import { createHmac } from 'node:crypto';
 import { VAPI_WEBHOOK_CONFIG } from '../src/vapi-webhooks/vapi-webhook-config.js';
 import { VapiSignatureGuard } from '../src/vapi-webhooks/vapi-signature.guard.js';
@@ -128,7 +129,24 @@ function signedRequest(
 describe('VapiWebhooks (e2e)', () => {
   let app: NestFastifyApplication;
 
+  // Suppress the guard's intentional failure-path log noise so the
+  // `pnpm test:e2e` output stays clean. These tests exercise the real
+  // `VapiSignatureGuard.canActivate()` through `app.inject()`, so the
+  // guard still runs every check and returns the expected status code
+  // — we only mute the log line that would otherwise be printed.
+  // Production telemetry is unaffected: the spies live entirely inside
+  // the Jest worker and are torn down in `afterEach`.
+  let errorSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+  beforeEach(() => {
+    errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+  });
   afterEach(async () => {
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
     await app.close();
   });
 

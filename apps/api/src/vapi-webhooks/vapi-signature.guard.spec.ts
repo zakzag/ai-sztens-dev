@@ -1,9 +1,11 @@
 import {
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import { createHmac } from 'node:crypto';
+import { jest } from '@jest/globals';
 import { VapiSignatureGuard } from './vapi-signature.guard.js';
 import type { VapiWebhookConfig } from './vapi-webhook-config.js';
 
@@ -63,6 +65,21 @@ function makeContext(opts: {
 
 describe('VapiSignatureGuard', () => {
   const nowSeconds = () => Math.floor(Date.now() / 1000);
+
+  // Suppress the guard's intentional failure-path log noise so the `pnpm test`
+  // output stays clean. Every negative test case below exercises a branch that
+  // calls `this.logger.error(...)` / `this.logger.warn(...)` BEFORE throwing;
+  // the assertions still verify the throw — only the log emission is muted.
+  let errorSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+  beforeEach(() => {
+    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
 
   it('returns true for a correctly signed request', () => {
     const ts = String(nowSeconds());

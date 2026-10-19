@@ -67,10 +67,10 @@ GRANT CONNECT ON DATABASE :"postgres_db" TO tkovari, krak;
 
 -- Schema-level privileges (AIS-35). Same matrix as 02-schemas.sh:
 --
---   schema      aisztens (app)   tkovari (owner)   krak (operator)
---   platform    USAGE            USAGE             USAGE
---   callback    USAGE + CREATE   USAGE             USAGE
---   email       USAGE            USAGE             USAGE
+--   schema      aisztens (app)        tkovari (owner)   krak (operator)
+--   platform    USAGE + CREATE        USAGE             USAGE
+--   callback    USAGE + CREATE        USAGE             USAGE
+--   email       USAGE                 USAGE             USAGE
 --
 -- The join on pg_namespace makes this a no-op when the schemas do not exist
 -- yet, i.e. on a fresh init where 02-schemas.sh has not run.
@@ -80,9 +80,10 @@ SELECT format('GRANT USAGE ON SCHEMA %I TO %I', s.nspname, r.rolname)
   CROSS JOIN (VALUES (:'aisztens_db_user'), ('tkovari'), ('krak')) AS r(rolname)
 \gexec
 
--- Object creation stays with the application role, and only in `callback`.
+-- Object creation stays with the application role: `callback` for the domain
+-- tables, `platform` for the Drizzle bookkeeping table.
 SELECT format('GRANT CREATE ON SCHEMA %I TO %I', s.nspname, :'aisztens_db_user')
-  FROM (VALUES ('callback')) AS s(nspname)
+  FROM (VALUES ('callback'), ('platform')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
 \gexec
 EOSQL

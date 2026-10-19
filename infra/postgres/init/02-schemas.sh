@@ -23,15 +23,19 @@
 # GRANT MATRIX (kept in sync with 01-roles.sh and
 # docs/Specs/Infrastructure-Docker.md §6.2):
 #
-#   schema      aisztens (app)   tkovari (owner)   krak (operator)
-#   platform    USAGE            USAGE             USAGE
-#   callback    USAGE + CREATE   USAGE             USAGE
-#   email       USAGE            USAGE             USAGE
+#   schema      aisztens (app)        tkovari (owner)   krak (operator)
+#   platform    USAGE + CREATE        USAGE             USAGE
+#   callback    USAGE + CREATE        USAGE             USAGE
+#   email       USAGE                 USAGE             USAGE
 #
-# Only the application role may create objects, and only in `callback` —
-# that is where the Drizzle migration runner (AIS-36) creates
-# `callback.callback_requests`. The two human operator roles keep USAGE so
-# they can inspect data (`\dt`, `SELECT`) without being able to alter schemas.
+# Only the application role may create objects, and only in `callback` and
+# `platform`:
+#   - `callback` — the Drizzle migration runner (AIS-36) creates
+#     `callback.callback_requests` there;
+#   - `platform` — the same runner keeps its bookkeeping table there
+#     (`platform.__drizzle_migrations`, configured in drizzle.config.ts).
+# The two human operator roles keep USAGE so they can inspect data
+# (`\dt`, `SELECT`) without being able to alter schemas.
 #
 # `tkovari` and `krak` are literal role names here, exactly as in
 # 01-roles.sh. Renaming an operator role therefore means editing both files.
@@ -60,11 +64,12 @@ SELECT format('GRANT USAGE ON SCHEMA %I TO %I', s.nspname, r.rolname)
   CROSS JOIN (VALUES (:'aisztens_db_user'), ('tkovari'), ('krak')) AS r(rolname)
 \gexec
 
--- Object creation stays with the application role, and only in `callback`.
--- Without this the Drizzle migrator fails with
--- `permission denied for schema callback` on the very first `db:migrate`.
+-- Object creation stays with the application role: `callback` holds the
+-- domain tables, `platform` holds the Drizzle bookkeeping table
+-- (`platform.__drizzle_migrations`). Without these the migrator fails with
+-- `permission denied for schema callback|platform` on the first `db:migrate`.
 SELECT format('GRANT CREATE ON SCHEMA %I TO %I', s.nspname, :'aisztens_db_user')
-  FROM (VALUES ('callback')) AS s(nspname)
+  FROM (VALUES ('callback'), ('platform')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
 \gexec
 

@@ -177,14 +177,16 @@ Séma ↔ bounded context: `platform` (üzemeltetési/session jellegű adatok),
 
 | Séma | `aisztens` (app) | `tkovari` (owner) | `krak` (operátor) |
 |---|---|---|---|
-| `platform` | USAGE | USAGE | USAGE |
+| `platform` | USAGE + **CREATE** | USAGE | USAGE |
 | `callback` | USAGE + **CREATE** | USAGE | USAGE |
 | `email` | USAGE | USAGE | USAGE |
 
-A `CREATE` jog kizárólag az app role-é, és kizárólag a `callback` sémában: a Drizzle
-migrációs runner (AIS-36) ebben a sémában hozza létre a táblákat, enélkül a
-`db:migrate` `permission denied for schema callback`-dal állna meg. A sémák
-tulajdonosa a bootstrap superuser (`POSTGRES_USER`) marad — nincs ownership-átírás.
+A `CREATE` jog kizárólag az app role-é, és kizárólag a `callback` és a `platform`
+sémában: a Drizzle migrációs runner (AIS-36) a `callback`-ben hozza létre a
+`callback_requests` táblát, a `platform`-ban pedig a saját könyvelő tábláját
+(`platform.__drizzle_migrations`). Enélkül a `db:migrate` `permission denied for
+schema callback|platform`-dal állna meg. A sémák tulajdonosa a bootstrap superuser
+(`POSTGRES_USER`) marad — nincs ownership-átírás.
 
 A grant-mátrixot a [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh)
 (eldobható `postgres:16-alpine` konténer: friss init + kétszeri újrafuttatás) és a

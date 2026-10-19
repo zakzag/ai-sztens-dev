@@ -133,17 +133,21 @@ assert_usage() {
   done
 }
 
+# Expected: CREATE only for the app role, and only in the two schemas it
+# writes to — `callback` (domain tables) and `platform` (the Drizzle
+# bookkeeping table `platform.__drizzle_migrations`, see the AIS-36 plan).
 assert_create_privileges() {
-  local label="$1" got
-  got="$(psql_q "SELECT has_schema_privilege('aisztens','callback','CREATE')")"
-  [ "$got" = "t" ] && ok "$label: aisztens may CREATE objects in callback" \
-    || bad "$label: aisztens may CREATE objects in callback" "got=$got (expected t)"
+  local label="$1" got schema role
+  for schema in callback platform; do
+    got="$(psql_q "SELECT has_schema_privilege('aisztens','$schema','CREATE')")"
+    [ "$got" = "t" ] && ok "$label: aisztens may CREATE objects in $schema" \
+      || bad "$label: aisztens may CREATE objects in $schema" "got=$got (expected t)"
 
-  local role
-  for role in tkovari krak; do
-    got="$(psql_q "SELECT has_schema_privilege('$role','callback','CREATE')")"
-    [ "$got" = "f" ] && ok "$label: $role must NOT have CREATE on callback" \
-      || bad "$label: $role must NOT have CREATE on callback" "got=$got (expected f)"
+    for role in tkovari krak; do
+      got="$(psql_q "SELECT has_schema_privilege('$role','$schema','CREATE')")"
+      [ "$got" = "f" ] && ok "$label: $role must NOT have CREATE on $schema" \
+        || bad "$label: $role must NOT have CREATE on $schema" "got=$got (expected f)"
+    done
   done
 }
 
@@ -164,9 +168,9 @@ assert_smoke_queries() {
   [ "$got" = "9" ] && ok "$label: smoke USAGE query returns 9" \
     || bad "$label: smoke USAGE query returns 9" "count=$got (expected 9)"
 
-  got="$(psql_q "SELECT count(*) FROM (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, 'callback', 'CREATE')")"
-  [ "$got" = "1" ] && ok "$label: smoke CREATE query returns 1" \
-    || bad "$label: smoke CREATE query returns 1" "count=$got (expected 1)"
+  got="$(psql_q "SELECT count(*) FROM (VALUES ('callback'),('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')")"
+  [ "$got" = "2" ] && ok "$label: smoke CREATE query returns 2" \
+    || bad "$label: smoke CREATE query returns 2" "count=$got (expected 2)"
 }
 
 echo "--- fresh init (entrypoint) ---"

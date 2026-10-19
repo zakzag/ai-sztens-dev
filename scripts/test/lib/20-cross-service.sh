@@ -121,10 +121,10 @@ run_cross_service_checks() {
   # 5c. postgres — schema privileges (AIS-35).
   # -----------------------------------------------------------------------
   # Expected matrix: USAGE on all three schemas for aisztens, tkovari and krak
-  # (3 schemas × 3 roles = 9 rows), and CREATE on `callback` for the app role
-  # only — the Drizzle migration runner creates callback.callback_requests
-  # there, so losing this grant would break `db:migrate`, not just the smoke
-  # suite.
+  # (3 schemas × 3 roles = 9 rows), and CREATE for the app role only, in
+  # `callback` (it creates callback.callback_requests there) and in `platform`
+  # (the Drizzle bookkeeping table platform.__drizzle_migrations). Losing
+  # either grant breaks `db:migrate`, not just the smoke suite.
   assert_service_out "postgres-schema-usage" \
     "USAGE on all three schemas for aisztens, tkovari and krak" \
     "9" \
@@ -134,12 +134,12 @@ run_cross_service_checks() {
       -At -c "SELECT count(*) FROM (VALUES ('platform'),('callback'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
 
   assert_service_out "postgres-schema-create" \
-    "only aisztens may create objects in the callback schema" \
-    "1" \
+    "only aisztens may create objects, in callback and platform" \
+    "2" \
     dc_exec postgres psql \
       -U "$(resolve_env_value POSTGRES_USER postgres)" \
       -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
-      -At -c "SELECT count(*) FROM (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, 'callback', 'CREATE')"
+      -At -c "SELECT count(*) FROM (VALUES ('callback'),('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
 
   # -----------------------------------------------------------------------
   # 6. monitor -> api — restated for symmetry with the per-service check.

@@ -140,13 +140,13 @@ $DC exec -T postgres psql -U postgres -d aisztens_db -At \
 # Expect: 9   (3 schemas x 3 roles)
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
-  -c "SELECT has_schema_privilege('aisztens','callback','CREATE')"
-# Expect: t
+  -c "SELECT count(*) FROM (VALUES ('callback'),('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
+# Expect: 2   (CREATE only for aisztens: callback + platform)
 ```
 
 The same matrix is asserted by
 `bash scripts/test/_postgres-init-schemas-test.sh` (throwaway container: fresh
-init plus two idempotent re-runs — expect `PASS: 23  FAIL: 0`), and by the
+init plus two idempotent re-runs — expect `PASS: 29  FAIL: 0`), and by the
 `postgres-schemas` / `postgres-schema-usage` / `postgres-schema-create` checks of
 `pnpm test:stack` on a running stack.
 
@@ -197,9 +197,10 @@ The **actual** Docker volume names differ per compose project — `infra_pgdata_
 (DB-only stack, project `infra`) and `aisztens_pgdata` (full stack, `name: aisztens`);
 see [`Database-Local.md`](Database-Local.md) §1.
 
-> What the local DB does **not** contain yet: the `callback_requests` table and the
-> `__drizzle_migrations` bookkeeping still land in AIS-36/AIS-38, and `db:migrate`
-> is a placeholder — the current limitations table is in
+> `CallbackRequests` persistence is not wired up yet: the store is still the in-memory
+> `Map` (AIS-38), even though `db:migrate` already creates
+> `callback.callback_requests` and the `platform.__drizzle_migrations` bookkeeping
+> table (AIS-36). The current "what exists / what does not" table is in
 > [`Database-Local.md`](Database-Local.md) §9.
 
 Schema work uses the Drizzle toolchain wired into the API package:

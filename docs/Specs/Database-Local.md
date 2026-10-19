@@ -1,7 +1,9 @@
 # Database — Local Postgres (AIsztens)
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-10-19 (AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült — `02-schemas.sh`; a dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
+
+**Utolsó frissítés:** 2026-10-19 (AIS-36: a `db:migrate` már létrehozza a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát, ehhez a `platform` séma `CREATE` jogot kapott; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült — `02-schemas.sh`. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
+
 **Kapcsolódik:** [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2, [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml), [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml), [`infra/postgres/init/`](../../infra/postgres/init/), [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh), [`scripts/README.md`](../../scripts/README.md)
 
 > **Hatókör.** Ez a doksi a **fejlesztői gépen** futó PostgreSQL-ről szól: hogyan
@@ -101,12 +103,13 @@ ugyanezt írja le):
 
 | Séma | `aisztens` (app) | `tkovari` (owner) | `krak` (operátor) |
 |---|---|---|---|
-| `platform` | USAGE | USAGE | USAGE |
+| `platform` | USAGE + **CREATE** | USAGE | USAGE |
 | `callback` | USAGE + **CREATE** | USAGE | USAGE |
 | `email` | USAGE | USAGE | USAGE |
 
 - A `CREATE` jog azért kell, mert a Drizzle migrációs runner (`aisztens` kapcsolattal)
-  a `callback` sémában fogja létrehozni a `callback_requests` táblát (AIS-36).
+  a `callback` sémában hozza létre a `callback_requests` táblát, a `platform` sémában
+  pedig a saját könyvelő tábláját (`platform.__drizzle_migrations`) — AIS-36.
 - Az operátorok szándékosan **nem** kapnak `CREATE`-ot: olvasásra (`\dt`, `SELECT`)
   elég a `USAGE`.
 - A sémák tulajdonosa a bootstrap superuser (`POSTGRES_USER`) marad; nincs ownership-átírás.
@@ -175,14 +178,20 @@ $DC exec -T postgres psql -U postgres -d aisztens_db -At \
 # Elvárt: 9  (3 séma × 3 role)
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
-  -c "SELECT has_schema_privilege('aisztens','callback','CREATE')"
-# Elvárt: t
+  -c "SELECT count(*) FROM (VALUES ('callback'),('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
+# Elvárt: 2   (CREATE csak az aisztens role-nak: callback + platform)
+
+# A migráció után: a tábla és a könyvelő tábla
+$DC exec -T postgres psql -U postgres -d aisztens_db -c '\d callback.callback_requests'
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT count(*) FROM platform.__drizzle_migrations"
+# Elvárt: 1  (a 0000 migráció; újrafuttatás után sem nő)
 ```
 
 Automatizált ellenőrzés (nem kell hozzá futó stack, saját eldobható konténert indít):
 
 ```bash
-bash scripts/test/_postgres-init-schemas-test.sh     # elvárt: PASS: 23  FAIL: 0
+bash scripts/test/_postgres-init-schemas-test.sh     # elvárt: PASS: 29  FAIL: 0
 ```
 
 Ugyanezt a mátrixot ellenőrzi a `pnpm test:stack` is a `postgres-schemas`,
@@ -227,20 +236,29 @@ A teljes stacknél ugyanez a `pgdata` volume-ra igaz (a scriptek ugyanazok).
 
 ---
 
-## 9. Ami MÉG NINCS a lokális DB-ben (2026-10-19)
+## 9. Mi van, és mi még nincs a lokális DB-ben (2026-10-19)
 
-Ezeket ne keresd, és ne higgy olyan doksinak, ami feltételezi őket:
+**AIS-36 óta megvan** — a `pnpm --filter @callback/api db:migrate` után:
+
+| Dolog | Hol / hogyan |
+|---|---|
+| `callback.callback_requests` tábla (7 oszlop) | [`drizzle/0000_pretty_bromley.sql`](../../apps/api/drizzle/0000_pretty_bromley.sql), alkalmazva `db:migrate`-tel |
+| `callback.call_status` enum (a `CallStatus` 10 értéke) | ugyanaz a migráció |
+| `platform.__drizzle_migrations` könyvelő tábla | `drizzle.config.ts` `migrations` beállítás + a runner |
+| működő `db:migrate` | [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) (lock nélkül) |
+| generált SQL + snapshot | `apps/api/drizzle/0000_*.sql` + `apps/api/drizzle/meta/` |
+
+**Még nincs** — ezeket ne keresd:
 
 | Hiányzó dolog | Miért | Mikor jön |
 |---|---|---|
-| `callback_requests` tábla | a store még mindig in-memory `Map` ([`callback-requests.service.ts:12`](../../apps/api/src/callback-requests/callback-requests.service.ts:12)), a séma pedig placeholder ([`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts)) | AIS-36 (séma + első migráció), AIS-38 (Postgres repository + e2e) |
-| `__drizzle_migrations` könyvelő tábla | még nincs generált migráció (`apps/api/drizzle/` csak `meta/_journal.json`) | AIS-36 |
-| működő `pnpm --filter @callback/api db:migrate` | [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) placeholder, csak egy figyelmeztetést ír ki és exit 0 | Story 3 (advisory-locked runner) |
-| tábla-szintű grantok (`SELECT`/`INSERT`) | erre még nincs story; a sémák jelenleg üresek | későbbi read-only operátori hozzáférés |
-| adat a DB-ben az API-tesztelés után | a `POST /api/callback-requests` a memóriában tárol, a konténer újraindításakor elveszik | AIS-38 |
+| adat a `callback_requests`-ben az API-tesztelés után | a store még in-memory `Map` ([`callback-requests.service.ts:12`](../../apps/api/src/callback-requests/callback-requests.service.ts:12)) | AIS-38 (Postgres repository + e2e) |
+| tábla-szintű grantok (`SELECT`/`INSERT`) az operátoroknak | a táblát az `aisztens` hozta létre, tehát ő a tulajdonos; a `tkovari`/`krak` csak séma-szintű `USAGE`-ot kapott | későbbi read-only operátori hozzáférés |
+| indexek a `callback_requests`-en | a valós query-k (státusz, időrend) még nem ismertek | AIS-38 / status-machine |
+| migrációs lock, `lock_timeout`, `statement_timeout` | a runner egyelőre lock nélkül fut | Story 3 |
 
-Ebből következik, hogy a lokális DB-ben **ma** a *séma-szintű* eredmény az, amit
-ellenőrizni érdemes (§6) — a sorok létezését nem.
+Ebből következik, hogy a lokális DB-ben **ma** a séma- és tábla-szintű eredmény az, amit
+ellenőrizni érdemes (§6) — az API által írt sorokat nem.
 
 ---
 
@@ -254,7 +272,8 @@ ellenőrizni érdemes (§6) — a sorok létezését nem.
 | `Skipping initialization` a logban | a volume már inicializált | ez nem hiba; új scripthez lásd §8 |
 | `permission denied for schema callback` | hiányzik a `CREATE` grant (AIS-35 előtt inicializált volume) | §8 a) vagy b) |
 | `FATAL: the database system is shutting down` | az entrypoint **ideiglenes** init-szervere áll le, miközben te már kérdezel | várj a `PostgreSQL init process complete` markerre, utána kérdezz |
-| a `db:migrate` „lefut”, de semmi nem történik | ez a placeholder runner (lásd §9) | nem hiba; AIS-36/Story 3 hozza a valódit |
+| a `db:migrate` „lefut”, de a tábla nem jelenik meg | a runner a `drizzle/` mappát a **cwd**-hez képest keresi, tehát `pnpm --filter @callback/api db:migrate`-tel (cwd = `apps/api`) kell futtatni; közvetlen `node dist/migrate.js` máshonnan a repó gyökeréből nézve nem találja | futtasd `pnpm --filter @callback/api db:migrate`-tel |
+| `password authentication failed for user "aisztens"` a `db:migrate`-nél | a `DATABASE_URL` nem oldható fel, és a config az `infra/.env.local`-ból komponál — de az `AISZTENS_DB_PASSWORD` más, mint amivel a volume inicializálódott | lásd a fenti sort: `01-roles.sh` újrafuttatás vagy `down -v` |
 
 ---
 
@@ -266,8 +285,10 @@ Ez a dokumentum **élő**. Frissíteni kell, ha változik:
   service bármely mezője (port, volume, init mount, env kulcsok),
 - az [`infra/postgres/init/`](../../infra/postgres/init/) bármely scriptje (role-ok,
   sémák, grantok),
-- a lokális DB-t érintő `package.json` script (`db:up` / `db:down`),
-- vagy amikor a §9 „még nincs” tábla egy sora megvalósul (AIS-36 / AIS-38 / Story 3).
+- a lokális DB-t érintő `package.json` script (`db:up` / `db:down` / `db:migrate`),
+- az [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts) vagy a generált
+  `apps/api/drizzle/` tartalma (új tábla/oszlop → új szakasz a §9 „megvan” táblájában),
+- vagy amikor a §9 „még nincs” tábla egy sora megvalósul (AIS-38 / Story 3).
 
 A frissítési kötelezettséget a [`.roo/rules/instructions.md`](../../.roo/rules/instructions.md)
 „Specs doksik karbantartása” szekciója rögzíti.

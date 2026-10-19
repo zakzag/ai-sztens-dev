@@ -69,7 +69,8 @@ The init now produces the three schemas with the matrix above, on a fresh volume
 re-run. Verification:
 
 ```bash
-bash scripts/test/_postgres-init-schemas-test.sh     # expect PASS: 23  FAIL: 0
+bash scripts/test/_postgres-init-schemas-test.sh     # expect PASS: 29  FAIL: 0
+                                                     # (29 since AIS-36 added the platform CREATE assertions)
 
 # against the local DB stack
 pnpm db:up

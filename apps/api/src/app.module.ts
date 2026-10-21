@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { join } from 'node:path';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { DatabaseModule } from './db/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { VapiWebhooksModule } from './vapi-webhooks/vapi-webhooks.module.js';
 import { APP_ENV } from './config/app-env.js';
@@ -41,6 +42,7 @@ const envFilePaths: string[] =
       // secrets into prod.
       ignoreEnvFile: APP_ENV === 'prod',
     }),
+    DatabaseModule,
     HealthModule,
     VapiWebhooksModule,
   ],

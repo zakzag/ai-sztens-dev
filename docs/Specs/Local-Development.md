@@ -205,6 +205,13 @@ see [`Database-Local.md`](Database-Local.md) §1.
 > bookkeeping table stays. The current "what exists / what does not" table is in
 > [`Database-Local.md`](Database-Local.md) §9.
 
+> **AIS-56 (2026-10-21): `DATABASE_URL` is mandatory for the API.**
+> `DatabaseModule` validates it at boot and aborts with
+> `DatabaseConfigurationError` when it is missing or blank, so start the local
+> Postgres first (`pnpm db:up`) and keep the value in `apps/api/.env.local`.
+> The connection itself is lazy — boot only checks the configuration, it does not
+> open a socket. Pool size override: `DATABASE_POOL_MAX` (default 10).
+
 Schema work uses the Drizzle toolchain wired into the API package:
 `pnpm --filter @callback/api db:generate` produces a SQL migration under
 [`apps/api/drizzle/`](../../apps/api/drizzle), `db:check` runs the drift

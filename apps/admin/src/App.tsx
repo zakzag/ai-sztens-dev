@@ -1,5 +1,6 @@
 import { Link, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext.js';
+import { ApiKeysPage } from './pages/api-keys/ApiKeysPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { PlaceholderPage } from './pages/PlaceholderPage.js';
 
@@ -22,6 +23,12 @@ function ProtectedLayout() {
             AIsztens — Admin
           </Link>
           <span className="text-sm text-text-secondary">
+            <Link
+              className="mr-4 transition-colors duration-fast hover:text-text-primary"
+              to="/api-keys"
+            >
+              API kulcsok
+            </Link>
             <Link className="mr-4 transition-colors duration-fast hover:text-text-primary" to="/calls">
               Hívások
             </Link>
@@ -32,6 +39,7 @@ function ProtectedLayout() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <Routes>
           <Route path="/" element={<PlaceholderPage />} />
+          <Route path="/api-keys" element={<ApiKeysPage />} />
           <Route path="/calls" element={<p className="text-text-secondary">Hívások — hamarosan</p>} />
           <Route path="*" element={<p className="text-text-secondary">Nem található</p>} />
         </Routes>

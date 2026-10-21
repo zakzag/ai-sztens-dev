@@ -15,6 +15,11 @@ export { inputVariants } from './components/input/input.variants.js';
 export type { InputProps } from './components/input/input.interface.js';
 export type { InputVariants } from './components/input/input.variants.js';
 
+export { Textarea } from './components/textarea/Textarea.js';
+export { textareaVariants } from './components/textarea/textarea.variants.js';
+export type { TextareaProps } from './components/textarea/textarea.interface.js';
+export type { TextareaVariants } from './components/textarea/textarea.variants.js';
+
 export { Card } from './components/card/Card.js';
 export type { CardProps } from './components/card/card.interface.js';
 

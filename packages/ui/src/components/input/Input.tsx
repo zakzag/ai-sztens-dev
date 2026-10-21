@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { InputProps } from './input.interface.js';
 import { inputVariants } from './input.variants.js';
 import { cn } from '../../lib/cn.js';
@@ -9,9 +10,15 @@ import { cn } from '../../lib/cn.js';
  * `aria-invalid` when invalid, and `aria-describedby` points at whichever
  * message is actually rendered.
  *
+ * The ref is forwarded because react-hook-form needs it to focus the first
+ * invalid field on a failed submit.
+ *
  * @param props - see {@link InputProps}.
  */
-export function Input({ id, label, error, hint, invalid, className, ...rest }: InputProps) {
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { id, label, error, hint, invalid, className, ...rest },
+  ref,
+) {
   const hasError = Boolean(error);
   const messageId = hasError ? `${id}-error` : hint ? `${id}-hint` : undefined;
 
@@ -22,6 +29,7 @@ export function Input({ id, label, error, hint, invalid, className, ...rest }: I
       </label>
       <input
         {...rest}
+        ref={ref}
         id={id}
         className={cn(inputVariants({ invalid: hasError || Boolean(invalid) }), className)}
         aria-invalid={hasError || undefined}
@@ -38,4 +46,4 @@ export function Input({ id, label, error, hint, invalid, className, ...rest }: I
       ) : null}
     </div>
   );
-}
+});

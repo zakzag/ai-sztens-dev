@@ -1,7 +1,8 @@
 # Local Development — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-21 — Windows install recovery: an IDE language service (or any other process) holding a handle inside `node_modules` makes `pnpm install` abort with `Failed to create symlink … os error 32`; §5 now documents the diagnosis, the kill-then-rerun recovery and why `--force` makes it worse.
+**Last updated:** 2026-10-21 — host-run API boot: `pnpm dev` leaves `APP_ENV` unset, so NestJS falls back to `dev`, reads `apps/api/.env.dev` **first**, and therefore needs (a) `DATABASE_URL` in `apps/api/.env.local` and (b) an explicit `APP_ENV=local` to serve the localhost CORS list — otherwise the admin SPA on `http://localhost:5174` is rejected by CORS. §3 and §5 document the trap and the verification commands.
+**Previous update:** 2026-10-21 — Windows install recovery: an IDE language service (or any other process) holding a handle inside `node_modules` makes `pnpm install` abort with `Failed to create symlink … os error 32`; §5 documents the diagnosis, the kill-then-rerun recovery and why `--force` makes it worse.
 **Previous update:** 2026-10-19 — per-context Postgres schemas: the init directory now ships two idempotent scripts ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh) for roles and schema grants, [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) for the `platform` / `callback` / `email` schemas), and both run only on a fresh `pgdata` volume (AIS-35). §2b now carries the mandatory env keys, the verification queries, the stop/wipe semantics and the 5432 port collision; the DB topic has its own spec, [`Database-Local.md`](Database-Local.md).
 **Previous update:** 2026-10-19 — local DB-only workflow: [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) plus the root `pnpm db:up` / `db:down` scripts start a Dockerized Postgres for `pnpm --filter @callback/api start:dev` (AIS-34).
 **Previous update:** 2026-10-13 — deploy-process consistency: the `dev` boot
@@ -229,7 +230,7 @@ NestJS's `@nestjs/config` uses the same priority order. We use:
 | File | Loaded when |
 |---|---|
 | `.env.example` | **Documentation only** — never loaded, always tracked. Documents what each per-env file should contain. |
-| `.env.local` | Local developer machine (`APP_ENV=local`, or `pnpm dev` with no flag). Gitignored. |
+| `.env.local` | Local developer machine. It is the `.env.${APP_ENV}` candidate when `APP_ENV=local`, **and always the second candidate** in the NestJS `envFilePath` array — so it is also read when `APP_ENV` is unset (which falls back to `dev`). Values from `.env.dev` win over it, because `@nestjs/config` does not let a later file override an earlier one. Gitignored. |
 | `.env.dev` | The dev droplet (`APP_ENV=dev` via the compose `environment:` block and the `api.environment.APP_ENV` value). Gitignored. |
 | `.env.prod` | Future prod droplet (`APP_ENV=prod`). Dormant template; gitignored. |
 | `.env` | Fallback only — never written by anyone, exists only on the dev droplet pre-cutover (and on the developer machine pre-cutover). Gitignored. |
@@ -280,6 +281,34 @@ one place, the others propagate.
 ---
 
 ## 5. Common pitfalls
+
+- **`pnpm dev` does not set `APP_ENV`, so the API runs in `dev` mode.** Two
+  consequences on a developer machine:
+
+  1. `envFilePath` becomes `['apps/api/.env.dev', 'apps/api/.env.local']`, so the
+     droplet seed file is read **first** — including its
+     `CORS_ORIGINS=https://web.aisztens.hu,https://admin.aisztens.hu`. A browser
+     on `http://localhost:5174` then gets a preflight **without**
+     `access-control-allow-origin` and the SPA reports a network error.
+  2. `DATABASE_URL` must live in `apps/api/.env.local` (the `.env.dev` seed does
+     not define it). Without it the API aborts with
+     `DatabaseConfigurationError: DATABASE_URL is not set or blank` — by design
+     (AIS-56), there is no silent fallback.
+
+  Start the local flow as `set "APP_ENV=local" && pnpm dev` (cmd) or
+  `$env:APP_ENV='local'; pnpm dev` (PowerShell); the boot banner must then say
+  `APP_ENV=local … CORS origins: http://localhost:5173,…`. Verify with:
+
+  ```bash
+  curl -s -D - -o NUL -X OPTIONS http://localhost:3000/api/api-keys \
+    -H "Origin: http://localhost:5174" -H "Access-Control-Request-Method: GET" \
+    | grep -i access-control-allow-origin   # must print the localhost origin
+  curl -s -w '\n%{http_code}\n' http://localhost:3000/healthz        # 200 {"status":"oks",…}
+  curl -s -w '\n%{http_code}\n' http://localhost:3000/api/api-keys   # 200 [] or rows
+  ```
+
+  The banner is the fastest diagnosis: a `dev` label on a developer machine means
+  the CORS list belongs to the droplet, not to your machine.
 
 - **The SPA API URL is baked into the image at build time, not read from a
   droplet-side file.** The image-based deploy (2026-10-08) retired the

@@ -84,6 +84,36 @@ A hoston futó API ugyanezt a jelszót várja a
 DATABASE_URL=postgres://aisztens:<AISZTENS_DB_PASSWORD>@localhost:5432/aisztens_db
 ```
 
+### 3.1 Ha az API `DATABASE_URL is not set or blank` hibával áll meg
+
+Ez **konfigurációs** hiba, nem kapcsolódási hiba: a `DatabaseModule` boot közben,
+még socketnyitás előtt elszáll (AIS-56 D5 — nincs csendes fallback). Diagnózis
+sorrendben:
+
+```bash
+# 1. A kulcs benne van-e a fájlban, amit az API olvas?
+findstr /I "^DATABASE_URL" apps\api\.env.local
+
+# 2. Fut-e a Postgres, és él-e a role / a tábla?
+docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml ps
+docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml \
+  exec -T postgres psql -U aisztens -d aisztens_db \
+  -c "select current_user, current_database();" \
+  -c "\dt platform.*"
+
+# 3. A boot banner melyik APP_ENV-ot és melyik CORS listát használja?
+#    (APP_ENV nélkül a NestJS 'dev'-re esik, és az apps/api/.env.dev-et olvassa előbb)
+```
+
+Gyakori okok:
+
+| Tünet | Ok | Megoldás |
+|---|---|---|
+| `DATABASE_URL is not set or blank`, a kulcs **hiányzik** az `apps/api/.env.local`-ból | a fájlt csak `PORT` / `CORS_ORIGINS` sorokkal hozták létre | írd be a §3 szerinti sort, a jelszót az `infra/.env.local` `AISZTENS_DB_PASSWORD` értékéből |
+| Ugyanez, a kulcs **ott van** | üres érték (`DATABASE_URL=`) vagy `.env`-be írt, nem process env-be tett `APP_ENV` | töltsd ki az értéket; az `APP_ENV`-et a shell exportálja (a `app-env.ts` importkor olvassa, a `.env` fájl már későn töltődne) |
+| Bootol, de a böngésző CORS-hibát kap | `APP_ENV` nélkül `dev` módban fut, a `CORS_ORIGINS` a dropletről jön | `set "APP_ENV=local"` (cmd) / `$env:APP_ENV='local'` (PowerShell) — lásd [`Local-Development.md`](Local-Development.md) §5 |
+| Bootol, de `ECONNREFUSED` / `password authentication failed` | konténer áll, vagy a jelszó nem egyezik az `infra/.env.local`-lal | `pnpm db:up`, illetve a két jelszó szinkronizálása |
+
 ---
 
 ## 4. Bootstrap — mi történik az első indításkor

@@ -2,7 +2,7 @@
 
 **Jira:** AIS-57 (Story) + AIS-58, AIS-59, AIS-60, AIS-61, AIS-62, AIS-63 (subtaskok) + AIS-41 (subtask, AIS-30 alatt)
 **Dátum:** 2026-10-21
-**Státusz:** részben implementálva (2026-10-21 21:30) — Fázis 0, 1, 2, 3, 4 kész és zöld; Fázis 5–6 nyitott. Lásd §10.
+**Státusz:** **implementálva** — Fázis 0–6 kész és zöld (2026-10-21 22:08); Fázis 6 (AIS-41) részletes terve: [AIS-41 implementációs terv](2026-10-21--21-55-00-ais-41-admin-api-keys-page-implementation-plan.md:1). Lásd §10.
 **Kapcsolódó:** [AIS-40 backend terv](2026-10-21--18-25-00-ais-40-api-keys-backend-plan.md), [admin/API/DB ticket restructure](2026-10-21--14-13-00-admin-api-db-foundation-tickets-plan.md)
 
 ## 1. Kiinduló állapot
@@ -263,7 +263,7 @@ Manuális (lokális stack, `pnpm dev` + admin `localhost:5174`):
 | 3 — AIS-61 | **kész** (2026-10-21 21:22) | `packages/ui` (theme + `cn` + 6 primitív), `pnpm --filter @callback/ui test` → 47 teszt zöld; admin build/lint/test zöld; `apps/admin/src` paletta-check → 0 találat. Részletek: [history](../history/2026-10-21--21-22-00-ais-61-ui-token-primitives.md) |
 | 4 — AIS-60 | **kész** (2026-10-21 21:30) | `auth/session-token.ts`, `services/api-client.ts` (+`api-client.const.ts`), `lib/date.ts`+`date.const.ts`, `lib/error-message.ts`+`error-message.const.ts`, `features/api-keys/*` (const/interface/logic/hook), `src/test/mocks/{api-keys,api-error,query-client}.mock.*`. `pnpm --filter @callback/admin test` → 46 teszt zöld; `lint` és `build` zöld; paletta-check → 0 találat. Részletek: [history](../history/2026-10-21--21-30-00-ais-60-admin-api-keys-feature-hook.md) |
 | 5 — AIS-63 | **kész** (2026-10-21 21:42) | [`UI-Architecture.md`](../Specs/UI-Architecture.md:1): rétegtérkép cél vs mai állapot, 4 soros state-tábla (`api-keys`, `/login`, `/`, `/calls`), új page-recept szekció, függőség-tábla (jest/vitest + planned deps), verify szekció, fejléc-link. A React szabály 5. sora relatív linkkel mutat a doksira. Részletek: [history](../history/2026-10-21--21-42-00-ais-63-ui-architecture-doc.md) |
-| 6 — AIS-41 | nyitott | az oldal |
+| 6 — AIS-41 | **kész** (2026-10-21 22:08) | `entities/api-key/*`, `pages/api-keys/*` (page + const/interface/logic + `ui/ApiKeysTable`, `ui/ApiKeyForm`), `App.tsx` `/api-keys` route + nav link, új `Textarea` primitív. `pnpm --filter @callback/admin test` → **87 teszt zöld** (46 → 87), `pnpm --filter @callback/ui test` → **55 teszt zöld** (47 → 55), `lint` és `build` zöld, paletta-check → 0 találat. Döntések: D29–D44, részletek: [AIS-41 terv](2026-10-21--21-55-00-ais-41-admin-api-keys-page-implementation-plan.md:1), [history](../history/2026-10-21--22-08-00-ais-41-admin-api-keys-page.md), [milestone](../milestones/2026-10-21--22-08-00-admin-api-keys-page.milestone.md) |
 
 **Eltérések / új döntések a tervhez képest**
 

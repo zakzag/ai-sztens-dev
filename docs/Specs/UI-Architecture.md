@@ -35,9 +35,9 @@ what exists in `apps/admin` today, so nobody mistakes a planned folder for an ex
 | Layer | Target contents | State in `apps/admin/src` (2026-10-21) |
 |---|---|---|
 | `app` | providers, router, layout shell, session store | **not created**: `App.tsx` (router + `ProtectedLayout`) and `main.tsx` (`QueryClientProvider`) still sit at the `src` root; the session lives in `auth/AuthContext.tsx` + `auth/session-token.ts`, there is no Zustand session store |
-| `pages/<page>` | route composition, optional page store, page-only parts in `ui/` | only flat `pages/LoginPage.tsx` and `pages/PlaceholderPage.tsx`; the first real page folder arrives with `pages/api-keys/` (AIS-41) |
+| `pages/<page>` | route composition, optional page store, page-only parts in `ui/` | **exists**: `pages/api-keys/` (`ApiKeysPage.tsx`, `api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `ui/ApiKeysTable.tsx`, `ui/ApiKeyForm.tsx`) — the first page folder; plus the flat `pages/LoginPage.tsx` and `pages/PlaceholderPage.tsx` |
 | `features/<use-case>` | query/mutation hooks, pure `*.logic.ts` | **exists**: `features/api-keys/` (`api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `use-api-keys.ts`) |
-| `entities/<entity>` | domain types, pure mappers, display components | **not created**; `entities/api-key/` arrives with AIS-41 |
+| `entities/<entity>` | domain types, pure mappers, display components | **exists**: `entities/api-key/` (`api-key.interface.ts`, `api-key.mapper.ts`, `api-key.const.ts`) — mappers only, no display components yet |
 | `services` | composition root (client instance + token supplier) | **exists**: `services/api-client.ts` + `services/api-client.const.ts` |
 | `lib` | pure helpers and formatters | **exists**: `lib/date.ts`, `lib/error-message.ts` (+ their `*.const.ts`) |
 | `test/mocks` | all fixtures, doubles, wrappers | **exists**: `test/mocks/api-keys.mock.ts`, `api-error.mock.ts`, `query-client.mock.tsx` |
@@ -109,7 +109,8 @@ Get-ChildItem -Path 'apps/admin/src' -Recurse -File |
 | Primitive | Variants / props | Notes |
 |---|---|---|
 | `Button` | `variant`: `primary` \| `secondary` \| `ghost` \| `danger`; `size`: `sm` \| `md` \| `lg`; `isLoading` | `type` defaults to `button` (**D17**); submitting requires an explicit `type="submit"`. Loading sets `disabled` + `aria-busy`. |
-| `Input` | `label`, `id`, `error`, `hint`, `invalid` | `id` is required so the label association is deterministic. Error wins over hint; `aria-invalid` + `aria-describedby` are wired. |
+| `Input` | `label`, `id`, `error`, `hint`, `invalid` | `id` is required so the label association is deterministic. Error wins over hint; `aria-invalid` + `aria-describedby` are wired. Forwards its ref so react-hook-form can focus the first invalid field. |
+| `Textarea` | same props as `Input` + `rows` (default `4`) | Multi-line twin of `Input` — same sunken recipe, `resize-y`, ref forwarded. Added by AIS-41 so a 2000-character description does not live in a one-line field. |
 | `Card` | `title`, `description` | Raised surface; title renders as an `h2`. |
 | `Table` + `TableHead` / `TableBody` / `TableRow` / `TableHeaderCell` / `TableCell` | native attributes | `Table` owns the scroll container; header cells default to `scope="col"`. |
 | `Badge` | `variant`: `neutral` \| `info` \| `success` \| `warning` \| `danger` | Variant names are the shared vocabulary for domain mappers. |
@@ -127,7 +128,7 @@ an omission (compare **D9**).
 
 | Page | Server state | Page UI state | Form state | Notes |
 |---|---|---|---|---|
-| `pages/api-keys` (AIS-41) | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`) | **none** — no Zustand store, no filters/sort/tabs yet (D9) | react-hook-form + zod resolver; `identifier` field carries the 409 via `setError` (D8) | The table never renders `apiKey` (D5); `expiresAt` goes through `lib/date.ts` (D6). The page folder lands with AIS-41 |
+| `pages/api-keys` (AIS-41, `/api-keys` route) | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`) | **none** — no Zustand store, no filters/sort/tabs (D9); the only local state is the form's page-level error in `ApiKeyForm` | react-hook-form + `zodResolver(apiKeyFormSchema)` (`pages/api-keys/api-keys.logic.ts`); `identifier` field carries the 409 via `setError` (D8/D36) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32) |
 | `pages/LoginPage` (`/login` route) | none | none | `AuthContext` + `auth/session-token.ts` over `sessionStorage`; no RHF yet | The token storage key lives in one module only (D19). API-side auth guard is out of scope |
 | `pages/PlaceholderPage` (`/` route) | none | none | none | Static shell for the authenticated landing route; replaced when a real dashboard lands |
 | `/calls` route (inline in `App.tsx`) | none | none | none | Inline placeholder markup; becomes a page folder when the calls feature starts |
@@ -170,9 +171,10 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 | `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` | `packages/ui`, `apps/admin` | component + hook tests | installed |
 | `jest`, `ts-jest`, `@types/jest` | `packages/shared`, `packages/api-client` | framework-free package tests (D13) | installed |
 | `eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`, `@eslint/js` | `apps/admin` | lint harness | installed |
-| `react-hook-form` | `apps/admin` | form-state bucket | **planned — added by AIS-41** |
-| `zod` (direct dependency) | `apps/admin` | form schema validation via the shared schemas | **planned — added by AIS-41** |
-| `zustand` | `apps/admin` | page-local stores, global session store | **planned — added with the first page that needs UI state** |
+| `react-hook-form` | `apps/admin` | form-state bucket (`ApiKeyForm`) | installed (`^7.54.2`, resolved 7.90.0) |
+| `zod` (direct dependency) | `apps/admin` | form schema validation | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30) |
+| `@hookform/resolvers` | `apps/admin` | `zodResolver` for react-hook-form | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3 |
+| `zustand` | `apps/admin` | page-local stores, global session store | **planned — added with the first page that needs UI state** (`/api-keys` has none, D9) |
 
 Adding a dependency requires updating this table in the same change. Rows marked
 *planned* must not be read as available.

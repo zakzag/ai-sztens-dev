@@ -2,7 +2,9 @@
 
 **Jira:** AIS-37 (Subtask) — szülő: AIS-29
 **Dátum:** 2026-10-21
-**Státusz:** terv, jóváhagyásra vár
+**Státusz:** megvalósítva (2026-10-21) — lásd
+[`2026-10-21--13-05-00-ais-37-repository-unit-tests.md`](../history/2026-10-21--13-05-00-ais-37-repository-unit-tests.md)
+és [`2026-10-21--13-05-00-callback-requests-repository-contract.milestone.md`](../milestones/2026-10-21--13-05-00-callback-requests-repository-contract.milestone.md)
 
 ## Kiinduló állapot
 
@@ -47,9 +49,16 @@ Repository létrehozása (`create`, `findAll`, `findOne`) + teljes unit teszt le
 | `apps/api/src/db/callback-requests.repository.spec.ts` | új | a lenti tesztmátrix |
 | `apps/api/src/db/uuid.spec.ts` | új | határesetek (nil uuid, rossz hossz, nem-hex, üres, SQL-szerű input) |
 | `apps/api/src/db/test/mocks/callback-requests.mock.ts` | új | `buildCallbackRequestRow()` fixture-ök + `buildCreateInput()` |
-| `apps/api/src/db/test/mocks/database.mock.ts` | új | `createDatabaseMock()` — láncolható `insert/values/returning`, `select/from/where/limit/orderBy` jest mockok, típusosan |
+| `apps/api/src/db/test/mocks/database.mock.ts` | új | `createCallbackRequestsQueryMock()` — láncolható `insert/values/returning`, `select/from/where/limit/orderBy` mockok, típusosan, `mockCreateResult` / `mockCreateFailure` / `mockInsertFailure` / `mockSelectResult` / `mockSelectFailure` scriptelőkkel |
 
-Nem változik: `schema.ts`, `schema.spec.ts`, `callback-requests.service.ts`, `app.module.ts`, `package.json`.
+Nem változik: `schema.ts`, `schema.spec.ts`, `callback-requests.service.ts`, `app.module.ts`, a generált migráció.
+
+**Terven felül szükségessé vált** (a megvalósítás során derült ki, lásd „As-built” lentebb):
+
+| Fájl | Változás | Miért |
+|---|---|---|
+| [`apps/api/package.json`](../../apps/api/package.json) | `@jest/globals` devDependency | ESM Jest-ben nincs globális `jest`, a mock factory csak importtal éri el |
+| [`apps/api/tsconfig.build.json`](../../apps/api/tsconfig.build.json) | `**/test/**` kizárva | a teszt-mockok ne kerüljenek a produkciós `dist`-be |
 
 ## Tesztmátrix — `callback-requests.repository.spec.ts`
 
@@ -66,14 +75,14 @@ Nem változik: `schema.ts`, `schema.spec.ts`, `callback-requests.service.ts`, `a
 | `findOne` | érvénytelen uuid | `InvalidCallbackRequestIdError`, `select` **nem** hívódik (D3) |
 | `findOne` | DB hiba | továbbterjed |
 
-Minden teszt a `createDatabaseMock()`-ot használja; nincs `fetch`, nincs socket, nincs `DATABASE_URL`.
+Minden teszt a `createCallbackRequestsQueryMock()`-ot használja; nincs `fetch`, nincs socket, nincs `DATABASE_URL`.
 
 ## Verifikáció
 
 ```bash
-pnpm --filter @callback/api test        # minden suite zöld (jelenleg 10 suite / 75 teszt + az újak)
+pnpm --filter @callback/api test        # 12 suite / 107 teszt zöld (kiindulás: 10 / 93)
 pnpm --filter @callback/api build       # TS strict, ESM importok .js kiterjesztéssel
-npx eslint src/db                       # cwd: apps/api — 0 hiba az új fájlokon
+pnpm --dir apps/api exec eslint src/db  # 0 hiba az új fájlokon
 ```
 
 Megjegyzés: a `pnpm --filter @callback/api lint` a `vapi-signature.guard.spec.ts` /
@@ -89,6 +98,16 @@ ezek nem részei ennek a tasknak.
 | `docs/history/2026-10-21--<óó-pp-ss>-ais-37-repository-unit-tests.md` | megvalósítás narratívája + verifikációs kimenet |
 | `docs/milestones/2026-10-21--<óó-pp-ss>-callback-requests-repository-contract.milestone.md` | a repository szerződés és a hiba-szemantika döntései (AIS-38 ezekre épít) |
 | [`docs/Specs/Database-Local.md`](../Specs/Database-Local.md) | §9: repository réteg megvan (unit tesztelt), de az API még a `Map`-et használja; `Utolsó frissítés` bump |
+
+## As-built eltérések és tanulságok
+
+| # | Téma | Mi történt / mit kell tudni |
+|---|---|---|
+| A1 | Mock factory neve | `createDatabaseMock()` → `createCallbackRequestsQueryMock()` (a név azt tükrözi, hogy a `callback_requests` query-láncait modellezi) |
+| A2 | `jest` globális | ESM Jest-ben nincs `jest` globális: `import { jest } from '@jest/globals'` kell, ezért lett új devDependency. A repo többi, `jest`-et használó spec-je emiatt mutat pre-existing lint hibát |
+| A3 | Hibaszimuláció a mockban | A `.values()`-nél elutasított promise **nem** érvényes hibaalak: a repository builder-t vár, a lánc elszakad és a rejection gazdátlanul marad (a Jest worker elhal). Ezért a transzport-hibát az `insert()` szinkron dobása, a query-hibát a terminális lépések (`returning` / `orderBy` / `limit`) `mockImplementation`-nel létrehozott rejectionje modellezi |
+| A4 | Tesztek száma | 14 repository + 18 uuid teszt; a mátrix minden sora lefedve, plusz extra esetek (üres id, „nincs `where` a findAll-ban”, DB-assigned mezők) |
+| A5 | `ORDER BY` irány | Strukturálisan assertálva (az `orderBy` lépés meghívódik a `callback_requests` táblán); a SQL szöveget az AIS-38 integrációs/e2e futás igazolja |
 
 ## Kockázatok
 

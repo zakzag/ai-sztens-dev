@@ -1,7 +1,8 @@
 # Local Development — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-19 — per-context Postgres schemas: the init directory now ships two idempotent scripts ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh) for roles and schema grants, [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) for the `platform` / `callback` / `email` schemas), and both run only on a fresh `pgdata` volume (AIS-35). §2b now carries the mandatory env keys, the verification queries, the stop/wipe semantics and the 5432 port collision; the DB topic has its own spec, [`Database-Local.md`](Database-Local.md).
+**Last updated:** 2026-10-21 — Windows install recovery: an IDE language service (or any other process) holding a handle inside `node_modules` makes `pnpm install` abort with `Failed to create symlink … os error 32`; §5 now documents the diagnosis, the kill-then-rerun recovery and why `--force` makes it worse.
+**Previous update:** 2026-10-19 — per-context Postgres schemas: the init directory now ships two idempotent scripts ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh) for roles and schema grants, [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) for the `platform` / `callback` / `email` schemas), and both run only on a fresh `pgdata` volume (AIS-35). §2b now carries the mandatory env keys, the verification queries, the stop/wipe semantics and the 5432 port collision; the DB topic has its own spec, [`Database-Local.md`](Database-Local.md).
 **Previous update:** 2026-10-19 — local DB-only workflow: [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) plus the root `pnpm db:up` / `db:down` scripts start a Dockerized Postgres for `pnpm --filter @callback/api start:dev` (AIS-34).
 **Previous update:** 2026-10-13 — deploy-process consistency: the `dev` boot
 row no longer claims a `deploy.yml` push trigger (that workflow now reacts
@@ -304,6 +305,34 @@ one place, the others propagate.
 
 - **The `local` env is NOT shipped to the droplet.** `scripts/dev-stack.sh`
   does not scp anything; the API container is your local machine.
+
+- **Windows: `pnpm install` aborts with `Failed to create symlink … os error 32`**
+  (`the process cannot access the file because it is being used by another
+  process`). pnpm's `node_modules/.pnpm` layout is a tree of symlinks, so any
+  process holding a handle inside `node_modules` makes link creation fail —
+  typically an IDE TypeScript language service (`js-language-service.js`,
+  `typingsInstaller.js`), a Tailwind language server, a running
+  `start:dev` / `vite` watcher, or a real-time antivirus scan. The install then
+  stops half-way: the pnpm store is intact but `.pnpm` and the per-package
+  links stay incomplete. Recovery:
+
+  ```powershell
+  # 1. which node processes touch this workspace?
+  Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+    Where-Object { $_.CommandLine -like '*ai-sztens-dev*' } |
+    Select-Object ProcessId,CommandLine
+  # 2. stop those IDE helpers (the IDE restarts them on demand;
+  #    leave the MCP servers coming from another project alone)
+  Stop-Process -Id <pid>,<pid> -Force
+  # 3. finish the install — a plain run, no --force needed
+  pnpm install
+  # 4. sanity check
+  pnpm test
+  ```
+
+  Do not reach for `pnpm install --force` first: it deletes and recreates the
+  whole `node_modules` tree, which maximises the window in which a locked file
+  can abort the run.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Státusz:** Élő
 
-**Utolsó frissítés:** 2026-10-21 (AIS-56: elkészült a `DatabaseModule` — `DATABASE` provider a Drizzle handle-hez, `DATABASE_URL` a `ConfigService`-ből, hangos boot-hiba hiányzó URL-re, `client.end()` leállításkor. AIS-64: a teljes callback kontextus törölve — `callback.callback_requests`, `callback.call_status` **és** a `callback` Postgres séma; a `0001` migráció a táblát és az enumot dobja el, a sémát meglevő volume-on egyszeri superuser lépés viszi el. AIS-37: a repository szerződés + unit tesztek elkészültek, de a repository az AIS-64-gyel törlődött. AIS-36: a `db:migrate` létrehozta a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
+**Utolsó frissítés:** 2026-10-21 (AIS-39: elkészült az első valódi domain tábla, a `platform.api_keys` — `0002` migráció, uuid PK, `api_keys_identifier_key` egyedi constraint az `identifier`-en, `timestamptz` időbélyegek, `getTableConfig()`-alapú egységtesztek. AIS-56: elkészült a `DatabaseModule` — `DATABASE` provider a Drizzle handle-hez, `DATABASE_URL` a `ConfigService`-ből, hangos boot-hiba hiányzó URL-re, `client.end()` leállításkor. AIS-64: a teljes callback kontextus törölve — `callback.callback_requests`, `callback.call_status` **és** a `callback` Postgres séma; a `0001` migráció a táblát és az enumot dobja el, a sémát meglevő volume-on egyszeri superuser lépés viszi el. AIS-37: a repository szerződés + unit tesztek elkészültek, de a repository az AIS-64-gyel törlődött. AIS-36: a `db:migrate` létrehozta a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
 
 **Kapcsolódik:** [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2, [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml), [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml), [`infra/postgres/init/`](../../infra/postgres/init/), [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh), [`scripts/README.md`](../../scripts/README.md)
 
@@ -187,10 +187,18 @@ $DC exec -T postgres psql -U postgres -d aisztens_db -At \
 # A migrációk után: a könyvelő tábla, a callback tábla pedig már nem létezik
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
   -c "SELECT count(*) FROM platform.__drizzle_migrations"
-# Elvárt: 2  (0000 + 0001; újrafuttatás után sem nő)
+# Elvárt: 3  (0000 + 0001 + 0002; újrafuttatás után sem nő)
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
   -c "SELECT to_regclass('callback.callback_requests') IS NULL"
 # Elvárt: t  (a tábla az AIS-64-gyel törlődött)
+
+# AIS-39: az első valódi domain tábla és az egyedi constraint neve
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT to_regclass('platform.api_keys') IS NOT NULL"
+# Elvárt: t
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT conname FROM pg_constraint WHERE conrelid = 'platform.api_keys'::regclass AND contype = 'u'"
+# Elvárt: api_keys_identifier_key
 ```
 
 Automatizált ellenőrzés (nem kell hozzá futó stack, saját eldobható konténert indít):
@@ -257,11 +265,13 @@ admin oldal, a publikus web űrlap, a `callback.callback_requests` tábla, a
 | `platform.__drizzle_migrations` könyvelő tábla | `drizzle.config.ts` `migrations` beállítás + a runner |
 | `0000` migráció (callback tábla — történeti) | [`drizzle/0000_pretty_bromley.sql`](../../apps/api/drizzle/0000_pretty_bromley.sql) |
 | `0001` migráció (drop table + drop enum) | [`drizzle/0001_square_kat_farrell.sql`](../../apps/api/drizzle/0001_square_kat_farrell.sql) |
+| `0002` migráció (`platform.api_keys` tábla + `api_keys_identifier_key`) | [`drizzle/0002_minor_domino.sql`](../../apps/api/drizzle/0002_minor_domino.sql) |
 | működő `db:migrate` | [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) (lock nélkül) |
 | `DATABASE` / `DATABASE_CLIENT` token + `Database` típus | [`database.const.ts`](../../apps/api/src/db/database.const.ts), [`database.interface.ts`](../../apps/api/src/db/database.interface.ts) |
 | **`DatabaseModule`** — Drizzle handle a `DATABASE` tokenhez, `DATABASE_URL` a `ConfigService`-ből (AIS-56) | [`database.module.ts`](../../apps/api/src/db/database.module.ts), factory-k: [`database.factory.ts`](../../apps/api/src/db/database.factory.ts), providerek: [`database.providers.ts`](../../apps/api/src/db/database.providers.ts) |
 | Kliens-lezárás leállításkor (`client.end({ timeout: 5 })`) | [`database-lifecycle.service.ts`](../../apps/api/src/db/database-lifecycle.service.ts) |
 | `isUuid()` guard (az `api-keys` fogja használni) | [`uuid.ts`](../../apps/api/src/db/uuid.ts) + [`uuid.spec.ts`](../../apps/api/src/db/uuid.spec.ts) |
+| **`platform.api_keys`** tábla + `api_keys_identifier_key` egyedi constraint (AIS-39) | [`schema.ts`](../../apps/api/src/db/schema.ts), [`schema.spec.ts`](../../apps/api/src/db/schema.spec.ts) |
 
 > **AIS-56 (2026-10-21):** az API **nem indul el** `DATABASE_URL` nélkül — a
 > `DatabaseModule` provider-factory-ja `DatabaseConfigurationError`-t dob
@@ -290,12 +300,13 @@ Friss volume-on erre nincs szükség: a `02-schemas.sh` már csak `platform`-ot 
 
 | Hiányzó dolog | Miért | Mikor jön |
 |---|---|---|
-| `platform.api_keys` tábla | a callback tábla helyére lépő első valódi domain tábla | AIS-39 |
 | tábla-szintű grantok (`SELECT`/`INSERT`) az operátoroknak | a táblákat az `aisztens` hozza létre, tehát ő a tulajdonos; a `tkovari`/`krak` csak séma-szintű `USAGE`-ot kapott | későbbi read-only operátori hozzáférés |
 | migrációs lock, `lock_timeout`, `statement_timeout` | a runner egyelőre lock nélkül fut | Story 3 |
 
-Ebből következik, hogy a lokális DB-ben **ma** a séma-szintű eredmény az, amit
-ellenőrizni érdemes (§6) — alkalmazás-tábla egyelőre nincs.
+Ebből következik, hogy a lokális DB-ben **ma** a `platform.api_keys` tábla (és a
+vele járó egyedi constraint) az, amit érdemes ellenőrizni a séma-szintű eredmények
+mellett (§6). A táblát egyelőre **semmi nem használja**: a repository és a HTTP
+végpontok az AIS-40-ben jönnek, addig csak a migráció hozza létre.
 
 ---
 

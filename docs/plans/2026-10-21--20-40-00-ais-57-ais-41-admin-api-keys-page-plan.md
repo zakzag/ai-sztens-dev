@@ -2,7 +2,7 @@
 
 **Jira:** AIS-57 (Story) + AIS-58, AIS-59, AIS-60, AIS-61, AIS-62, AIS-63 (subtaskok) + AIS-41 (subtask, AIS-30 alatt)
 **Dátum:** 2026-10-21
-**Státusz:** jóváhagyásra vár
+**Státusz:** részben implementálva (2026-10-21 20:54) — Fázis 0, 1, 2 kész és zöld; Fázis 3–6 nyitott. Lásd §10.
 **Kapcsolódó:** [AIS-40 backend terv](2026-10-21--18-25-00-ais-40-api-keys-backend-plan.md), [admin/API/DB ticket restructure](2026-10-21--14-13-00-admin-api-db-foundation-tickets-plan.md)
 
 ## 1. Kiinduló állapot
@@ -252,3 +252,26 @@ Manuális (lokális stack, `pnpm dev` + admin `localhost:5174`):
 | Az `apiKey` plaintext megjelenik a UI-ban | D5: a táblázat mezőlistája fix, a mapper nem is viszi át a view modelbe |
 | A `packages/ui` / `api-client` build lánc elfelejtődik a `predev`/`test` scriptekből | Fázis 2 root `package.json` módosítás + a Fázis 7 parancsok mindhárom csomagot futtatják |
 | A backend `api-keys.const.ts` és a shared limitek szétcsúsznak | most tudatosan duplikált (D2 csak a sémát egységesíti); follow-up ticket |
+
+## 10. Implementációs napló (2026-10-21 20:54)
+
+| Fázis | Állapot | Bizonyíték |
+|---|---|---|
+| 0 — AIS-58 | **kész** | `packages/shared/src/schemas/*`, `pnpm --filter @callback/shared test` → 34 teszt zöld |
+| 1 — AIS-59 | **kész** | `packages/api-client/**`, `pnpm --filter @callback/api-client test` → 29 teszt zöld |
+| 2 — AIS-62 | **kész** | admin vitest+RTL+eslint, `src/test/setup.ts`, `test`/`lint` script → mindkettő zöld |
+| 3 — AIS-61 | nyitott | `packages/ui` még nem létezik |
+| 4 — AIS-60 | nyitott | hook + `lib/date.ts` + `lib/error-message.ts` |
+| 5 — AIS-63 | nyitott | `docs/Specs/UI-Architecture.md` |
+| 6 — AIS-41 | nyitott | az oldal |
+
+**Eltérések / új döntések a tervhez képest**
+
+* **D13:** az `api-client` tesztjei **jest + ts-jest**-tel futnak (mint a `packages/shared`), nem vitest-tel.
+  Indok: a csomag framework-mentes, node-szemantikájú, és a `@callback/shared` forrására `moduleNameMapper`-rel
+  közvetlenül hivatkozik — így a tesztjei nem függnek a shared build lépésétől. A vitest a React-oldalon
+  (`packages/ui`, `apps/admin`) marad.
+* **D14:** a `packages/ui` **forrás-only** csomag lesz (`exports` → `src/index.ts`, nincs `dist`), mert a
+  fogyasztója kizárólag Vite-bundle; így nincs plusz build lépés és a Tailwind `@source` egy helyen elég.
+  A `packages/shared` és az `api-client` marad `dist`-alapú (azokat Node-ból is fogyasztjuk).
+* **Fájlnév:** a feature hook mappája `apps/admin/src/features/api-keys/` (a terv `api-keys` slugja), a page `pages/api-keys/`.

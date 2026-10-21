@@ -1,7 +1,8 @@
 # Local Development — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-21 — host-run API boot: `pnpm dev` leaves `APP_ENV` unset, so NestJS falls back to `dev`, reads `apps/api/.env.dev` **first**, and therefore needs (a) `DATABASE_URL` in `apps/api/.env.local` and (b) an explicit `APP_ENV=local` to serve the localhost CORS list — otherwise the admin SPA on `http://localhost:5174` is rejected by CORS. §3 and §5 document the trap and the verification commands.
+**Last updated:** 2026-10-21 — AIS-42: új **§6 end-to-end how-to** (séma módosítás → `db:generate` → `db:migrate` → API + admin indítás → API-kulcs felvétele az oldalon), lépésenként lefuttatott parancsokkal és a tényleges kimenetekkel.
+**Previous update:** 2026-10-21 — host-run API boot: `pnpm dev` leaves `APP_ENV` unset, so NestJS falls back to `dev`, reads `apps/api/.env.dev` **first**, and therefore needs (a) `DATABASE_URL` in `apps/api/.env.local` and (b) an explicit `APP_ENV=local` to serve the localhost CORS list — otherwise the admin SPA on `http://localhost:5174` is rejected by CORS. §3 and §5 document the trap and the verification commands.
 **Previous update:** 2026-10-21 — Windows install recovery: an IDE language service (or any other process) holding a handle inside `node_modules` makes `pnpm install` abort with `Failed to create symlink … os error 32`; §5 documents the diagnosis, the kill-then-rerun recovery and why `--force` makes it worse.
 **Previous update:** 2026-10-19 — per-context Postgres schemas: the init directory now ships two idempotent scripts ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh) for roles and schema grants, [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) for the `platform` / `callback` / `email` schemas), and both run only on a fresh `pgdata` volume (AIS-35). §2b now carries the mandatory env keys, the verification queries, the stop/wipe semantics and the 5432 port collision; the DB topic has its own spec, [`Database-Local.md`](Database-Local.md).
 **Previous update:** 2026-10-19 — local DB-only workflow: [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) plus the root `pnpm db:up` / `db:down` scripts start a Dockerized Postgres for `pnpm --filter @callback/api start:dev` (AIS-34).
@@ -383,7 +384,182 @@ one place, the others propagate.
 
 ---
 
-## 6. See also
+## 6. End-to-end how-to: séma → migráció → API → admin API-kulcs oldal
+
+Ez a fejezet a teljes fejlesztői ciklust írja le, ahogy 2026-10-21-én lefuttatva működött.
+Minden parancsot a **repo gyökeréből** kell futtatni (kivéve ahol jelölve van), és minden lépésnél
+ott van a várt kimenet — ha a tiéd eltér, ott állj meg.
+
+### 6.1 Előfeltételek (gépenként egyszer)
+
+```bash
+node -v            # 20.x vagy újabb
+pnpm -v
+docker compose version   # v2 plugin kell
+
+pnpm install
+cp infra/.env.example infra/.env.local        # majd írd át a jelszavakat
+cp apps/api/.env.example apps/api/.env.local  # kötelező: DATABASE_URL sor (lásd §3)
+```
+
+Az `apps/api/.env.local`-ban **muszáj** lennie ennek a sornak (a jelszó az `infra/.env.local`
+`AISZTENS_DB_PASSWORD` értéke):
+
+```dotenv
+DATABASE_URL=postgres://aisztens:<AISZTENS_DB_PASSWORD>@localhost:5432/aisztens_db
+```
+
+### 6.2 Adatbázis indítása és ellenőrzése
+
+```bash
+pnpm db:up      # csak a Postgres (infra/docker-compose.db.yml) — a hoston futó API-nak
+docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml ps
+```
+
+Várt: `infra-postgres-1 … Up (healthy)`, `0.0.0.0:5432->5432/tcp`. A séma-ellenőrzés:
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml \
+  exec -T postgres psql -U aisztens -d aisztens_db -c "\dt platform.*"
+```
+
+Várt kimenet (2026-10-21):
+
+```text
+ Schema  |         Name         | Type  |  Owner
+---------+----------------------+-------+----------
+ platform | __drizzle_migrations | table | aisztens
+ platform | api_keys             | table | aisztens
+```
+
+Ha a `platform` séma vagy az `api_keys` hiányzik, a volume régi: lásd
+[`Database-Local.md`](Database-Local.md) §8 (reset/wipe).
+
+### 6.3 Séma módosítás
+
+A séma **kódként** az [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts:1)-ben él, a
+migrációk pedig az [`apps/api/drizzle/`](../../apps/api/drizzle) alatt. Egy új oszlop/tábla
+hozzáadása: a `schema.ts`-t módosítod, majd generálod a SQL-t — kézzel nem írunk migrációt.
+
+### 6.4 `db:generate`
+
+```bash
+pnpm --filter @callback/api db:generate
+```
+
+Változás nélküli futtatás várt kimenete:
+
+```text
+1 tables
+api_keys 8 columns 0 indexes 0 fks
+
+No schema changes, nothing to migrate 😴
+```
+
+Sémamódosítás esetén létrejön egy új `apps/api/drizzle/NNNN_*.sql` **és** frissül a
+`drizzle/meta/NNNN_snapshot.json` — **mindkettőt commitolni kell**, különben a következő generálás
+más diffet ad, és a deploy más migrációt futtat, mint amit láttál.
+
+### 6.5 `db:migrate`
+
+A `db:migrate` a lefordított `dist/migrate.js`-t futtatja, ezért **előbb build kell**:
+
+```bash
+pnpm --filter @callback/api build          # nest build — csendben lefut
+pnpm --filter @callback/api db:migrate
+```
+
+Várt kimenet:
+
+```text
+[db:migrate] migrations applied (bookkeeping: platform.__drizzle_migrations)
+```
+
+Újbóli futtatás ugyanezt írja ki, de nem csinál semmit (a könyvelő tábla alapján kihagyja a már
+alkalmazott migrációkat). A `db:push` **tilos**: az megkerüli a verziózott migrációkat, amikre a
+deploy épül.
+
+### 6.6 API + admin indítása
+
+```bash
+# cmd
+set "APP_ENV=local" && pnpm dev
+# PowerShell
+$env:APP_ENV='local'; pnpm dev
+```
+
+Az `APP_ENV=local` nem elhagyható: enélkül a NestJS `dev`-re esik vissza, a `.env.dev`-et olvassa
+előbb, és a **droplet** CORS-listáját szolgálja ki — a böngészőből érkező kérés így elhasal
+(részletek a §5-ben).
+
+Várt sorok a kimenetben:
+
+```text
+[api] [Bootstrap] API up — APP_ENV=local (raw=local), listening on 0.0.0.0:3000,
+      CORS origins: http://localhost:5173,http://localhost:5174,...
+```
+
+Portok: API `3000`, admin SPA `5174`, publikus web `5173`.
+
+### 6.7 Az oldal megnyitása — egy kulcs felvétele
+
+1. Böngésző: **`http://localhost:5174/api-keys`** (a login oldal helyőrző: bármilyen nem üres
+   jelszó beléptet).
+2. Az űrlapon öt mező: **Név, Azonosító, Leírás, API kulcs értéke, Lejárat**.
+   * `Azonosító`: egyedi, URL-biztos (`betű/szám/._-`), pl. `vapi-prod`.
+   * `API kulcs értéke`: a szolgáltatótól kapott token, pl. `sk-live-abc123`.
+   * `Lejárat`: üresen hagyható → a sorban „nincs lejárat” jelenik meg.
+3. **Kulcs mentése** → zöld siker-`Alert`, az űrlap kiürül, és a lista **újratöltés nélkül**
+   megkapja az új sort.
+4. Ugyanazzal az azonosítóval újra mentve a hiba az **Azonosító mezőn** jelenik meg
+   (409), nem az oldal tetején.
+5. A táblázat **soha nem jeleníti meg a kulcs értékét** — csak nevet, azonosítót, leírást, lejáratot.
+
+> **Figyelem (AIS-72):** az API útvonal ma `/api/api-keys`. Amikor az AIS-72 elkészül, ez
+> `/api/admin/api-keys` lesz — akkor **ebben a fejezetben** (6.7/6.8) és a
+> [`packages/api-client`](../../packages/api-client/src/api-keys/api-keys.const.ts:10)
+> konstansban kell átírni, másutt nem.
+
+### 6.8 Ellenőrzés kívülről (curl)
+
+```bash
+# lista
+curl -s -w "\nstatus=%{http_code}\n" http://localhost:3000/api/api-keys   # status=200, JSON tömb
+
+# felvétel (201), majd ugyanaz még egyszer (409)
+curl -s -o NUL -w "status=%{http_code}\n" -X POST http://localhost:3000/api/api-keys \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"HowTo demo\",\"identifier\":\"howto-demo\",\"apiKey\":\"sk-demo\"}"
+
+# az SPA deep linkje (nem az API válasza!):
+curl -s -o NUL -w "status=%{http_code} type=%{content_type}\n" http://localhost:5174/api-keys
+```
+
+Várt: `201` az első POST-ra, `409` a másodikra
+(`An API key with identifier "howto-demo" already exists …`), `200`, illetve
+`200 text/html`. PowerShell 5.1 alatt a `Invoke-WebRequest` a HTML-válaszokon elhasalhat — ott is
+`curl`-t használj (vagy `-UseBasicParsing`-et).
+
+Kitakarítás (a demó sor törlése):
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml \
+  exec -T postgres psql -U aisztens -d aisztens_db \
+  -c "delete from platform.api_keys where identifier = 'howto-demo';"
+```
+
+### 6.9 Mi történik a felvett kulccsal
+
+Az itt tárolt kulcsok **nem a böngészőnek** szólnak: a későbbi **AI feldolgozási folyamat**
+(hangasszisztens / LLM hívások) olvassa őket a `platform.api_keys` táblából az `identifier` alapján,
+ezért a kulcs értéke soha nem kerül a frontend bundle-be, és nem is jelenik meg a listában. A
+publikus API gépi hitelesítése ezekre a kulcsokra fog épülni (AIS-76), a token tárolása pedig
+hash-re vált (AIS-75) — addig a `GET` válasz még tartalmazza a plaintext értéket, ezt ne tekintsd
+végleges contractnak.
+
+---
+
+## 7. See also
 
 - [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md) — **the end-to-end manual test plan** that proves the three-env separation actually works. Read this before you trust a fresh deployment.
 - [`docs/Specs/Database-Local.md`](Database-Local.md) — the local Postgres spec: bootstrap, grant matrix, verification queries, reset/wipe semantics and the list of things that do not exist in the DB yet.

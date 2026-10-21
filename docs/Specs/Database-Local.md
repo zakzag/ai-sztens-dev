@@ -114,6 +114,12 @@ Gyakori okok:
 | Bootol, de a böngésző CORS-hibát kap | `APP_ENV` nélkül `dev` módban fut, a `CORS_ORIGINS` a dropletről jön | `set "APP_ENV=local"` (cmd) / `$env:APP_ENV='local'` (PowerShell) — lásd [`Local-Development.md`](Local-Development.md) §5 |
 | Bootol, de `ECONNREFUSED` / `password authentication failed` | konténer áll, vagy a jelszó nem egyezik az `infra/.env.local`-lal | `pnpm db:up`, illetve a két jelszó szinkronizálása |
 
+A teljes fejlesztői ciklus — séma módosítás → `db:generate` → `db:migrate` → API + admin indítás →
+API-kulcs felvétele az admin oldalon — a [`Local-Development.md`](Local-Development.md) **§6**-ában
+van leírva, a tényleges kimenetekkel együtt (AIS-42). Két pont, amit ott is kiemelünk: a `db:migrate`
+a `dist/migrate.js`-t futtatja, tehát **előbb `pnpm --filter @callback/api build` kell**, és a
+`drizzle-kit push` használata tilos (a verziózott migrációkra épül a deploy).
+
 ---
 
 ## 4. Bootstrap — mi történik az első indításkor

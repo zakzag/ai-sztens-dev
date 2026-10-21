@@ -1,7 +1,7 @@
 # Docker Debugging Cheatsheet
 
 A swiss-army-knife reference for debugging Docker containers, with a focus on the
-**AIsztens** stack ([`infra/docker-compose.yml`](../infra/docker-compose.yml)):
+**AIsztens** stack ([`infra/docker-compose.yml`](../../infra/docker-compose.yml)):
 `api` (NestJS + Fastify), `web` (nginx serving the public SPA), `admin`
 (nginx serving the dashboard SPA), `postgres` (16-alpine), `caddy`
 (2-alpine reverse proxy), and `monitor` (curl-based watchdog). The stack
@@ -196,7 +196,7 @@ sudo du -sh /var/lib/docker/containers/*/*-json.log | sort -h | tail
 sudo truncate -s 0 /var/lib/docker/containers/<id>/<id>-json.log
 ```
 
-Tame runaway logs in [`infra/docker-compose.yml`](../infra/docker-compose.yml)
+Tame runaway logs in [`infra/docker-compose.yml`](../../infra/docker-compose.yml)
 under each service:
 
 ```yaml
@@ -342,7 +342,7 @@ docker run --rm -it --network aisztens_internal nicolaka/netshoot
 ```
 
 The container name for the stack's user-defined network is
-`aisztens_internal` (because `name: aisztens` in [`infra/docker-compose.yml`](../infra/docker-compose.yml)
+`aisztens_internal` (because `name: aisztens` in [`infra/docker-compose.yml`](../../infra/docker-compose.yml)
 prefixes networks). Replace `_` with `-` when Docker complains.
 
 ---
@@ -421,7 +421,7 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml exec caddy cadd
 
 ## 8. Node / API-specific debugging
 
-The api is built from [`infra/app/Dockerfile`](../infra/app/Dockerfile) and runs
+The api is built from [`infra/app/Dockerfile`](../../infra/app/Dockerfile) and runs
 NestJS + Fastify on port 3000.
 
 ### Inspect the running process
@@ -476,7 +476,7 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml exec api node -
 
 ### Inspector (live debugger / breakpoints)
 
-In [`infra/docker-compose.yml`](../infra/docker-compose.yml) for the `api`
+In [`infra/docker-compose.yml`](../../infra/docker-compose.yml) for the `api`
 service, **temporarily** add:
 
 ```yaml
@@ -672,7 +672,7 @@ For our stack:
 The historical host bind mounts (`${WEB_DIST_PATH:-../apps/web/dist}` →
 `/srv/web`, same for `admin`) were removed when the deploy moved to
 image-based on 2026-10-08: see
-[`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md).
+[`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md).
 If you ever see a stack with those bind mounts, it is on the pre-image-based
 revision.
 
@@ -917,10 +917,10 @@ of the back-and-forth.
 
 ## See also
 
-- [Production Runbook](Specs/Production-Runbook.md)
-- [Caddy Reverse Proxy spec](Specs/Caddy-Reverse-Proxy.md)
-- [`infra/docker-compose.yml`](../infra/docker-compose.yml) — the source of
+- [Production Runbook](Production-Runbook.md)
+- [Caddy Reverse Proxy spec](Caddy-Reverse-Proxy.md)
+- [`infra/docker-compose.yml`](../../infra/docker-compose.yml) — the source of
   truth for memory limits, healthchecks and the user-defined `internal` network
-- [`infra/app/Dockerfile`](../infra/app/Dockerfile) — Node heap limits
-- [`apps/api/src/health/health.controller.ts`](../apps/api/src/health/health.controller.ts) —
+- [`infra/app/Dockerfile`](../../infra/app/Dockerfile) — Node heap limits
+- [`apps/api/src/health/health.controller.ts`](../../apps/api/src/health/health.controller.ts) —
   what `/healthz` actually checks

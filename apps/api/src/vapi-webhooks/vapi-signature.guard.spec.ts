@@ -73,7 +73,9 @@ describe('VapiSignatureGuard', () => {
   let errorSpy: jest.SpyInstance;
   let warnSpy: jest.SpyInstance;
   beforeEach(() => {
-    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
     warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
   });
   afterEach(() => {

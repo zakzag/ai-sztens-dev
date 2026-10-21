@@ -27,18 +27,21 @@ runner `permission denied for schema callback`-dal állt volna meg.
 - **Séma DDL külön scriptben (`02-schemas.sh`)** — alfabetikusan a `01-roles.sh`
   után fut, és önállóan újrafuttatható meglévő volume-on.
 - **Grant-mátrix**: `USAGE` mindhárom sémára az `aisztens`, `tkovari` és `krak`
-  role-nak; `CREATE` a `callback`-re **kizárólag** az `aisztens` role-nak.
-  Az operátorok jogosultsága olvasási célú, object-létrehozáshoz nem elég.
+  role-nak; `CREATE` **csak** az `aisztens` role-nak, és csak a `callback` és a
+  `platform` sémában. A `platform` `CREATE` jog az AIS-36 delta: a Drizzle
+  könyvelő táblája (`platform.__drizzle_migrations`) ott jön létre. Az operátorok
+  jogosultsága olvasási célú, object-létrehozáshoz nem elég.
 - **A grantok a `01-roles.sh`-ban is szerepelnek**, `pg_namespace`-re guardolva:
   a ticket ott kéri őket, a guard miatt a fájl sorrend-független és idempotens
   marad (friss initen no-op).
 - **Séma-tulajdonos a bootstrap superuser** marad, nincs `ALTER SCHEMA ... OWNER`.
-- **A `drizzle` bookkeeping séma nem része ennek a tasknak**: az `aisztens` a
-  database tulajdonosa, így a migrátor létre tudja hozni (AIS-36/38 igazolja).
+- **A `drizzle` könyvelő semát az AIS-36 helyezte a `platform`-ba**
+  (`platform.__drizzle_migrations`), ezért ott is kell a `CREATE` jog az
+  `aisztens` role-nak — ez az itt rögzített mátrix AIS-36 delta módosítása.
 
 ## Bizonyíték / verifikáció
 
-`bash scripts/test/_postgres-init-schemas-test.sh` → **PASS: 23  FAIL: 0**
+`bash scripts/test/_postgres-init-schemas-test.sh` → **PASS: 23  FAIL: 0** (AIS-36 után, a `platform` CREATE assertekkel együtt: **PASS: 32  FAIL: 0**)
 
 - friss init (entrypoint futtatta a `01`-et és `02`-t): 3 séma, `aisztens`
   USAGE ×3 + CREATE a `callback`-re, `tkovari`/`krak` USAGE ×3 és CREATE nélkül;

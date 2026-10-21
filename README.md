@@ -4,7 +4,7 @@ Automated call-back system: a website visitor requests a call-back through a for
 backend stores and validates the request, then a call worker initiates an AI-driven phone
 call, processes the results and executes configurable follow-up actions.
 
-> Full architecture, flows and decisions: [`docs/01-aisztens.md`](docs/01-aisztens.md)
+> Full architecture, flows and decisions: [`docs/01-aisztens.md`](docs/Specs/outdated/01-aisztens.md)
 > and the other files under [`docs/`](docs).
 
 ## Monorepo Layout

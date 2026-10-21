@@ -439,10 +439,23 @@ upload() {
   if [ -f "$REPO_DIR/infra/.env.${APP_ENV}" ]; then
     local_infra_env="$REPO_DIR/infra/.env.${APP_ENV}"
   elif [ -f "$REPO_DIR/infra/.env" ]; then
-    log "Note: using legacy infra/.env (no infra/.env.${APP_ENV} found); switch to the per-env name to silence it."
-    local_infra_env="$REPO_DIR/infra/.env"
+    # Legacy reject (2026-10-19): the cutover to per-env files was 2026-10-05,
+    # and `deploy.sh` should never silently deploy from a stale `infra/.env`
+    # — that file belongs to a pre-cutover checkout and may not match the
+    # selected target. The `deploy/.env` reject is at deploy.sh:255-265; this
+    # is its `infra/.env` mirror.
+    log_error "source env file not found: infra/.env.${APP_ENV}"
+    log_error "Found the legacy infra/.env instead — it has been replaced by per-env files."
+    log_error "Migration:"
+    log_error "  mv infra/.env infra/.env.${APP_ENV}"
+    log_error "  # verify with: git check-ignore -v infra/.env.${APP_ENV}"
+    log_error "  # (it must stay gitignored — it contains DB secrets and VAPI_WEBHOOK_SECRET)"
+    log_error "Or, if you really meant to deploy from a different target, pick it with 'deploy.sh up <target>'."
+    log_error "Aborted before any file was shipped to the droplet."
+    return 1
   else
-    log "ERROR: no infra/.env.${APP_ENV} or infra/.env found (APP_ENV=${APP_ENV}). Copy infra/.env.example to infra/.env.${APP_ENV} and fill it in before deploying."
+    log_error "source env file not found: infra/.env.${APP_ENV}"
+    log_error "Fix: cp infra/.env.example infra/.env.${APP_ENV}  then fill in the DB passwords and VAPI_WEBHOOK_SECRET before deploying."
     return 1
   fi
   # Stage the rendered env in a temp DIRECTORY whose only entry is a

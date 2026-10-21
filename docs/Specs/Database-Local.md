@@ -2,7 +2,7 @@
 
 **Státusz:** Élő
 
-**Utolsó frissítés:** 2026-10-19 (AIS-36: a `db:migrate` már létrehozza a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát, ehhez a `platform` séma `CREATE` jogot kapott; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült — `02-schemas.sh`. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
+**Utolsó frissítés:** 2026-10-21 (AIS-37: elkészült a `CallbackRequestsRepository` szerződés és a Drizzle implementáció DB nélkül futó unit tesztekkel; a repository-t az `AppModule` még **nem** köti be, az API továbbra is a memóriabeli `Map`-et használja. AIS-36: a `db:migrate` már létrehozza a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát, ehhez a `platform` séma `CREATE` jogot kapott; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült — `02-schemas.sh`. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
 
 **Kapcsolódik:** [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2, [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml), [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml), [`infra/postgres/init/`](../../infra/postgres/init/), [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh), [`scripts/README.md`](../../scripts/README.md)
 
@@ -236,7 +236,7 @@ A teljes stacknél ugyanez a `pgdata` volume-ra igaz (a scriptek ugyanazok).
 
 ---
 
-## 9. Mi van, és mi még nincs a lokális DB-ben (2026-10-19)
+## 9. Mi van, és mi még nincs a lokális DB-ben (2026-10-21)
 
 **AIS-36 óta megvan** — a `pnpm --filter @callback/api db:migrate` után:
 
@@ -248,11 +248,21 @@ A teljes stacknél ugyanez a `pgdata` volume-ra igaz (a scriptek ugyanazok).
 | működő `db:migrate` | [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) (lock nélkül) |
 | generált SQL + snapshot | `apps/api/drizzle/0000_*.sql` + `apps/api/drizzle/meta/` |
 
+**AIS-37 óta megvan** — kód- és tesztszinten, futó DB **nélkül**:
+
+| Dolog | Hol / hogyan |
+|---|---|
+| `CallbackRequestsRepository` szerződés (`create`, `findAll`, `findOne`) | [`callback-requests.repository.interface.ts`](../../apps/api/src/db/callback-requests.repository.interface.ts) |
+| Drizzle implementáció (`findAll` → `created_at DESC`, `findOne` → uuid-guard + limit 1) | [`callback-requests.repository.ts`](../../apps/api/src/db/callback-requests.repository.ts) |
+| Saját hibák (`NotFound` / `InvalidId` / `NotPersisted`) | [`callback-requests.errors.ts`](../../apps/api/src/db/callback-requests.errors.ts) |
+| `DATABASE` injekciós token + `Database` típus (a Nest provider AIS-38-ban jön) | [`database.const.ts`](../../apps/api/src/db/database.const.ts), [`database.interface.ts`](../../apps/api/src/db/database.interface.ts) |
+| Unit tesztek mockolt Drizzle handle-lel (nincs `DATABASE_URL`, nincs socket) | [`callback-requests.repository.spec.ts`](../../apps/api/src/db/callback-requests.repository.spec.ts), [`uuid.spec.ts`](../../apps/api/src/db/uuid.spec.ts), mockok: `src/db/test/mocks/` |
+
 **Még nincs** — ezeket ne keresd:
 
 | Hiányzó dolog | Miért | Mikor jön |
 |---|---|---|
-| adat a `callback_requests`-ben az API-tesztelés után | a store még in-memory `Map` ([`callback-requests.service.ts:12`](../../apps/api/src/callback-requests/callback-requests.service.ts:12)) | AIS-38 (Postgres repository + e2e) |
+| adat a `callback_requests`-ben az API-tesztelés után | a repository már létezik és tesztelt, de az `AppModule` még nem köti be; a store továbbra is in-memory `Map` ([`callback-requests.service.ts:12`](../../apps/api/src/callback-requests/callback-requests.service.ts:12)) | AIS-38 (DI modul + service csere + e2e) |
 | tábla-szintű grantok (`SELECT`/`INSERT`) az operátoroknak | a táblát az `aisztens` hozta létre, tehát ő a tulajdonos; a `tkovari`/`krak` csak séma-szintű `USAGE`-ot kapott | későbbi read-only operátori hozzáférés |
 | indexek a `callback_requests`-en | a valós query-k (státusz, időrend) még nem ismertek | AIS-38 / status-machine |
 | migrációs lock, `lock_timeout`, `statement_timeout` | a runner egyelőre lock nélkül fut | Story 3 |

@@ -38,7 +38,7 @@ them would falsify the record, not fix drift.
 | Changed file | Change |
 |---|---|
 | [`scripts/README.md`](../../scripts/README.md) | **New.** Layout tree, per-script sections (`dev-stack.sh/.ps1`, `init.sh/.ps1`, `test-syntax.ps1`), a table linking the `test/`, `env-test/` and `ssh/` sub-folder READMEs, the conventions and the documentation rule. |
-| [`docs/03-implementation-general.md`](../../docs/03-implementation-general.md) | §9 Testing links the index. |
+| [`docs/03-implementation-general.md`](../Specs/outdated/03-implementation-general.md) | §9 Testing links the index. |
 | [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md) | §2 duplication replaced by a pointer; §6 see-also extended. |
 | [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md) | Smoke internals and the §9.1 file list point at the index. |
 | [`docs/Specs/Three-Env-Verification.md`](../../docs/Specs/Three-Env-Verification.md) | §1i / §3.7 / §9 point at the index (operational commands kept). |

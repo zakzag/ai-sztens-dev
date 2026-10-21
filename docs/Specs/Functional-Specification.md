@@ -45,4 +45,4 @@
 ## 6. Hivatkozások
 
 - [`01-Brainstorming.md`](01-Brainstorming.md)
-- Műszaki tervek: [`../01-aisztens.md`](../01-aisztens.md), [`../02-flowchart.md`](../02-flowchart.md), [`../03-implementation-general.md`](../03-implementation-general.md)
+- Műszaki tervek: [`../01-aisztens.md`](outdated/01-aisztens.md), [`../02-flowchart.md`](outdated/02-flowchart.md), [`../03-implementation-general.md`](outdated/03-implementation-general.md)

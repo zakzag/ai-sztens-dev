@@ -12,12 +12,12 @@ any of its functional units yet.
 
 ## 2. Context (from `docs/`)
 
-- [`README.md`](../../README.md) and [`docs/01-aisztens.md`](../../docs/01-aisztens.md)
+- [`README.md`](../../README.md) and [`docs/01-aisztens.md`](../Specs/outdated/01-aisztens.md)
   define a call-back system: form submission, validation, persistence, two queues
   (call + action), a call dispatcher, a webhook receiver, and an extensible action engine.
 - [`docs/Plans/04-Laravel_vs_NestJS.md`](../Specs/outdated/04-Laravel_vs_NestJS.md) concludes that
   **NestJS** (TypeScript / Node.js) is the chosen backend framework.
-- [`docs/03-implementation-general.md`](../../docs/03-implementation-general.md) defines the
+- [`docs/03-implementation-general.md`](../Specs/outdated/03-implementation-general.md) defines the
   framework-agnostic functional units and the ports (`CallProvider`, `Action`,
   `NotificationPort`, `CalendarPort`, `RequestStore`, `CallDetailStore`).
 - The repository currently contains only documentation, no `package.json` and no source code.

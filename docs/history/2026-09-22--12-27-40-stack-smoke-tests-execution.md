@@ -27,7 +27,7 @@ both individual service health and cross-service reachability.
 | Path | Change |
 |---|---|
 | [`package.json`](../../package.json) | Added `test:stack`, `test:stack:up`, `test:stack:down` scripts |
-| [`docs/03-implementation-general.md`](../../docs/03-implementation-general.md) | Added §9 "Testing" describing the two-layer test model |
+| [`docs/03-implementation-general.md`](../Specs/outdated/03-implementation-general.md) | Added §9 "Testing" describing the two-layer test model |
 
 ## What it checks
 

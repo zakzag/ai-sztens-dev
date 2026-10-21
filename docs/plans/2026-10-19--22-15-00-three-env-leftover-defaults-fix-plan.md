@@ -1,0 +1,99 @@
+# Three-env leftovers — drop the legacy `infra/.env` default from the local up/down/smoke plumbing, and harden `deploy.sh:upload()` against the same path
+
+**Dátum:** 2026-10-19
+**Trigger:** operator reported that `scripts/test/stack-up.sh` (and by extension the smoke prelude) still defaults to `infra/.env`, which no longer exists in any local checkout post-cutover (the three-env separation shipped in 2026-10-05). The composer's local env file is `infra/.env.local` (seeded by `scripts/dev-stack.sh`), the droplet's runtime env is still `infra/.env` (image-based deploy renders `infra/.env.${APP_ENV}` → `infra/.env` on the droplet — [`docs/Specs/Three-Env-Verification.md`](../Specs/Three-Env-Verification.md) §1d / §3.8).
+**Hatás:** `scripts/test/`, `deploy/deploy.sh:upload()`, `scripts/test/README.md`. A `docs/plans/`-beli terv, a `docs/history/`-beli implementációs bejegyzés és a `docs/Specs/Three-Env-Verification.md` frissítése a roll-outtal együtt.
+**Állapot:** implementálva.
+
+---
+
+## 1. Kontextus — mi változott, és mit nem követett a kód
+
+A három-környezetes felosztás (local / dev / prod) — [`2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md) — eltüntette a `repo/infra/.env` és a `repo/deploy/.env` plain-text fájlokat, és a per-env neveket (`infra/.env.local`, `infra/.env.dev`, `infra/.env.prod`) hozta be. A droplet oldali path **szándékosan maradt** `infra/.env` (a droplet egyetlen environmentet hostol; a CI / `deploy.sh` oda rendereli a per-env forrást).
+
+A vágás két lépcsőben hibásan implementálódott:
+
+1. A `scripts/test/{stack-up.sh, stack-down.sh, lib/00-prelude.sh}` a mai napig a legacy `infra/.env`-et tekinti defaultnak. Egy lokális checkoutban ez a fájl sosem létezik (`gitignore:42-60` minták); `pnpm test:stack:up` emiatt a hibaüzenettel áll le, hogy `Missing env file: …/infra/.env`. A smoke suite viszont ennek ellenére lefuthat, ha a felhasználó manuálisan adja meg az `--env-file infra/.env.local` flaget — csak a default romlott el, és a default-hint üzenet is a régi `Copy infra/.env.example to infra/.env` szöveget írja.
+2. A `deploy/deploy.sh:upload()` `local_infra_env` lookupjában (`deploy.sh:439-447`) a per-env `infra/.env.${APP_ENV}` megléte *opcionális* fallbackkel puhán ráfut a legacy `infra/.env`-re. A `deploy/.env` esetében ezt a puhaságot a 2026-10-06-os deploy-env-selection PR már kivégezte (`deploy.sh:255-265`: hibás, kilép, migration hint). Az `infra/.env` ága ezt a logikát soha nem kapta meg — egy 2026-os laptopon porosodó `infra/.env` csendben a prod dropletre kerülhet, ha a `infra/.env.${APP_ENV}` valamilyen okból hiányzik.
+
+A terv célja: a lokális oldali defaultot átállítani `infra/.env.local`-ra (ahogy a [`scripts/dev-stack.sh:43`](../../scripts/dev-stack.sh:43) és a Three-Env-Verification spec javasolja), a `deploy.sh:upload()` legacy fallbackját a `deploy/.env`-ével azonos szigorúságú hibakezelésre cserélni, és a kettőt együtt regression-teszttel lefedni.
+
+## 2. Kiinduló állapot (mért tények)
+
+| Tény | Bizonyíték |
+|---|---|
+| `scripts/test/stack-up.sh:15` defaultja `infra/.env`; a `Missing env file` üzenet ugyanott | [`scripts/test/stack-up.sh:15`](../../scripts/test/stack-up.sh:15), `:20` |
+| `scripts/test/stack-down.sh:15` defaultja ugyanaz | [`scripts/test/stack-down.sh:15`](../../scripts/test/stack-down.sh:15) |
+| `scripts/test/lib/00-prelude.sh:54` exportja `ENV_FILE=…/infra/.env` — minden check, ami kiírja a fájlnevet (pl. `Skipping Caddy HTTPS probe (no DOMAIN in ${ENV_FILE:-infra/.env} …)`), ezt a fájlnevet mutatja, függetlenül a felhasználó `--env-file` override-jától | [`scripts/test/lib/00-prelude.sh:54`](../../scripts/test/lib/00-prelude.sh:54), [`scripts/test/lib/10-services.sh:138`](../../scripts/test/lib/10-services.sh:138), [`scripts/test/lib/20-cross-service.sh:92`](../../scripts/test/lib/20-cross-service.sh:92) |
+| `scripts/test/README.md` quick-start a régi `cp infra/.env.example infra/.env` sort írja, és a `--env-file` override-ot "non-default útnak" tünteti fel | [`scripts/test/README.md:19`](../../scripts/test/README.md:19), `:100` |
+| `deploy/deploy.sh:441-443` a hiányzó `infra/.env.${APP_ENV}`-t a legacy `infra/.env`-szel pótolja, csak egy `Note:` sort ír | [`deploy/deploy.sh:441`](../../deploy/deploy.sh:441) |
+| A `deploy.sh:255-265` `deploy/.env` elutasítás a referencia minta | [`deploy/deploy.sh:255`](../../deploy/deploy.sh:255) |
+| `scripts/dev-stack.sh:43` már a per-env lokális utat használja (`infra/.env.local`), és `infra/.env.example`-ből seedeli, ha hiányzik | [`scripts/dev-stack.sh:43`](../../scripts/dev-stack.sh:43), `:83` |
+| A droplet path `infra/.env` canonikus marad (per-env forrás → droplet-side `infra/.env` render + scp) | [`docs/Specs/Three-Env-Verification.md`](../Specs/Three-Env-Verification.md) §1d, §3.8 |
+| Nincs meglévő offline teszt, ami a `scripts/test/`-beli defaultot vagy a `deploy.sh:upload()` legacy-elágazását őrizné | `ls scripts/test/_*.sh` |
+| A Three-Env-Verification §7 már most is dokumentálja, hogy `_deploy-sh-m3-test.sh` a régi `infra/.env` lookup miatt stale | [`docs/Specs/Three-Env-Verification.md`](../Specs/Three-Env-Verification.md) §7 |
+
+## 3. Döntések
+
+| # | Döntés | Indok |
+|---|---|---|
+| D1 | A `scripts/test/{stack-up.sh, stack-down.sh, lib/00-prelude.sh}` defaultja **`infra/.env.local`** legyen, és a `Missing env file` üzenet `pnpm dev-stack.sh up` (vagy `cp infra/.env.example infra/.env.local`) receptre mutasson | Ugyanaz a stratégia, amit `scripts/dev-stack.sh:43` és a Three-Env-Verification spec §2.2.1 megkövetel; a default egy valós, a developernél garantáltan létező fájl |
+| D2 | A `Missing env file` üzenet a `pnpm db:up` / `pnpm dev-stack.sh up` indítást javasolja első lépésként, mert az seedeli a fájlt a `infra/.env.example`-ból | A jelenlegi hibaüzenet (`Copy infra/.env.example to infra/.env first`) már a cutover előtti korszakból való |
+| D3 | Az `ENV_FILE` env-var vagy `--env-file` cli flag továbbra is felülír (a `00-prelude.sh` továbbra is exportálja, a `10-services.sh` és `20-cross-service.sh` továbbra is `Skipping … (no DOMAIN in ${ENV_FILE})` formában naplóz) — így a CI vagy a fejlesztő ugyanúgy megadhatja az `infra/.env.dev`-t, ha a teljes stacket akarja füstölni | Nem törünk el semmilyen meglévő futtatási formát; csak a hibás defaultot javítjuk |
+| D4 | `scripts/test/README.md` quick-start átkerül a per-env formára (cutover utáni) | A doksi a kóddal együtt vándorol — szinkronban a D1-gyel |
+| D5 | `deploy/deploy.sh:upload()` `local_infra_env` lookupjában a legacy `infra/.env` fallback **abortál + migration hint** lesz (ugyanaz a minta, mint `deploy.sh:255-265`), nem csendes Note | A puhaság az `infra/.env` → `infra/.env.*` cutover (2026-10-05) óta dokumentálatlan repedés; egy 2026-os laptopon maradt legacy `infra/.env` csendben a prod dropletre kerülhet |
+| D6 | A migration hint a `deploy/.env` mintát követi: `mv infra/.env infra/.env.dev` (vagy `.local` / `.prod`), és nem csak a `mv`-t, hanem a `git check-ignore -v` ellenőrzést is megemlíti | Reprodukálható, auditálható, a `gitignore` mintákkal konzisztens |
+| D7 | A védelmet egy új offline teszt őrzi (`scripts/test/_test-stack-env-default-test.sh`): sanity-check, hogy a 4 érintett fájl defaultja a per-env név legyen, valamint egy sandbox-deploy reprodukálja a legacy-`infra/.env`-es `upload()` abortot | A deploy-flow teszt a `_deploy-sh-env-selection-test.sh` mintára épül (sandbox, `deploy.sh` + `lib/`, throwaway env) |
+| D8 | Nem nyúlunk hozzá: a `deploy/deploy.sh:438-447` per-env-first feloldás logikája (D1-gyel analóg); a CI workflow `docker compose --env-file infra/.env` távoli parancsai ([`docs/Specs/Three-Env-Verification.md`](../Specs/Three-Env-Verification.md) §3.8); a `scripts/env-test/check-env-live.sh:187` távoli `docker compose … --env-file infra/.env` hívása | Ezek a távoli droplet pathot nézik, ami a három-környezetes tervben canonically `infra/.env` |
+
+## 4. Lépések
+
+1. **`scripts/test/stack-up.sh`** — default `infra/.env.local`; `Missing env file` üzenet a `pnpm dev-stack.sh up` (vagy `cp infra/.env.example infra/.env.local`) receptet adja; ENV_FILE override felülír.
+2. **`scripts/test/stack-down.sh`** — default `infra/.env.local`; ENV_FILE override felülír.
+3. **`scripts/test/lib/00-prelude.sh`** — default `infra/.env.local`; az ENV_FILE export megmarad, így a downstream check-ek a tényleges fájlnevet naplózzák.
+4. **`scripts/test/README.md`** — quick-start és a `--env-file` override megjegyzés a per-env formára frissül.
+5. **`deploy/deploy.sh:upload()`** — a legacy `infra/.env` fallback lecserélése abort + migration hint blokkra (deploy.sh:255-265 mintája); a per-env `infra/.env.${APP_ENV}` elsőbbsége megmarad.
+6. **`scripts/test/_test-stack-env-default-test.sh`** — új offline regression teszt:
+   - (a) a négy default-fájlban (`stack-up.sh`, `stack-down.sh`, `lib/00-prelude.sh`, plusz a `deploy/deploy.sh` legacy-ágában) a per-env név a default és a legacy `infra/.env` NEM csendes fallback;
+   - (b) sandbox-deploy.sh futtatás `infra/.env.dev` nélkül, csak `infra/.env` legacyvel → nem indulhat el, migration hintet ír.
+7. **Verifikáció** — `bash scripts/test/_test-stack-env-default-test.sh`, a meglévő `_deploy-sh-env-selection-test.sh` + `_deploy-sh-m1-test.sh` + `_deploy-sh-m3-test.sh` futtatása zöldre; egy smoke száraz-futtatás (`bash scripts/test/stack-smoke.sh --env-file infra/.env.local`).
+8. **Docs** — `docs/history/2026-10-19--22-30-00-stack-env-defaults-impl.md` (implementációs bejegyzés), `docs/Specs/Three-Env-Verification.md` §1b + §1d frissítése az új defaulttal (ha a §6-os "Útmutató" vagy a §3-as "Operátori teendők" szakasz hivatkozik), és a `scripts/README.md` rövid megjegyzése.
+
+## 5. Fájlok
+
+| Fájl | Változás |
+|---|---|
+| `scripts/test/stack-up.sh` | default: `infra/.env.local`; hibaüzenet: per-env recept |
+| `scripts/test/stack-down.sh` | default: `infra/.env.local` |
+| `scripts/test/lib/00-prelude.sh` | `ENV_FILE` default: `infra/.env.local` (env-var felülírja) |
+| `scripts/test/README.md` | quick-start + `--env-file` szöveg per-env-re frissítve |
+| `deploy/deploy.sh` | `upload()` legacy-`infra/.env` fallback → abort + migration hint (`deploy.sh:441-447`) |
+| `scripts/test/_test-stack-env-default-test.sh` | új offline regression teszt |
+| `docs/Specs/Three-Env-Verification.md` | §1d / §3.8 opcionális finomhangolás, ha kell (a default-váltás dokumentálva) |
+| `docs/plans/2026-10-19--22-15-00-three-env-leftover-defaults-fix-plan.md` | ez a terv |
+| `docs/history/2026-10-19--22-30-00-stack-env-defaults-impl.md` | implementációs bejegyzés (a PR végén) |
+
+## 6. Elfogadási kritériumok
+
+- `pnpm test:stack:up` (default args) a `infra/.env.local` fájlt használja; hiba esetén a `pnpm dev-stack.sh up` receptet írja ki.
+- `bash scripts/test/stack-smoke.sh --env-file infra/.env.dev` változatlanul működik (env-var / flag override sértetlen).
+- A `_test-stack-env-default-test.sh` új suite zöld; a meglévő offline deploy-suite-ok zöldek maradnak.
+- `deploy.sh upload dev` `infra/.env.dev` jelenlétében sikeres (per-env ág érintetlen).
+- `deploy.sh upload dev` kizárólag legacy `infra/.env` jelenlétében: `migration`-hintet ír, exit 1, NEM scp-zik semmit a dropletre.
+
+## 7. Kockázatok
+
+| Kockázat | Kezelés |
+|---|---|
+| Egy CI runner, ami korábban `infra/.env` symlinket vagy másolatot tartott a default-hoz, most elromlik | Az új default a `local` checkoutra van szabva; ha egy CI runner a teljes compose stacket futtatja, az továbbra is `--env-file infra/.env.dev` vagy `infra/.env` droplet-pathot használ — ez a deployment, nem a smoke-default |
+| A deploy.sh legacy-elágazás eltávolítása egy operátort megállít, akinek a laptopján még mindig `infra/.env` van | A migration hint explicit `mv infra/.env infra/.env.dev` + figyelmeztetés, hogy a fájl a `gitignore` miatt nem kerül a repoba |
+| A smoke suite alapértelmezett viselkedése megváltozik a dev számára (mostantól `infra/.env.local`-t olvas, nem `infra/.env`-et) | Pontosan ez a cél — a `local` checkoutban csak `infra/.env.local` létezik; a `dev`/`prod` a saját `--env-file` flagjükkel továbbra is elérhető |
+
+## 8. Döntési napló
+
+| Kérdés | Döntés |
+|---|---|
+| A `scripts/test/` defaultja `infra/.env.local` legyen (developer gép), vagy `infra/.env.dev` (teljes dev stack)? | **`infra/.env.local`** — a teljes dev stackhez a `pnpm test:stack:up` explicit `--env-file`-t ad a Three-Env-Verification §2.2 alapján; a default a leggyakoribb (csak postgres + api + monitor) esetre van szabva |
+| A `deploy.sh:upload()` legacy fallbackját hagyjuk-e Note: szinten, vagy D5 szigorítása? | **D5 szigorítása** — a Note-szintű puhaság a 2026-os laptopon maradt `infra/.env`-et csendben deployolhatná; a deploy/.env minta ezt már megoldotta, alkalmazzuk itt is |
+| Új offline teszt kell, vagy elég a deploy-env-selection meglévő mintája? | **Új dedikált teszt** — a két terület (scripts/test default + deploy.sh legacy fallback) más fájlt érint, mint az env-selection, és a future contributor számára a dedikált fájlnév (`_test-stack-env-default-test.sh`) egyértelműsíti a hatókört |
+| A `_test-stack-env-default-test.sh` a deploy.sh-t futtatja sandboxban (lassabb), vagy csak statikusan ellenőrzi a defaultot (grep)? | **Mindkettő** — statikus grep a négy defaultra + egy sandbox-deploy reprodukció a legacy-elágazás hitelesítésére |

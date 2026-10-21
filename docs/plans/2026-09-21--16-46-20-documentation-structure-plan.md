@@ -37,9 +37,9 @@ Implementation plan            (docs/plans/<date>-...-plan.md)
 - [`02-Functional-Specification.md`](../Specs/02-Functional-Specification.md) — **single source of
   truth for functions**: user-visible functions (F1, F2, …), operator-visible functions
   (O1, O2, …), each tagged with `MVP?` and priority. MVP scope = all rows where `MVP? = Igen`.
-- Technical docs — [`01-aisztens.md`](../01-aisztens.md),
-  [`02-flowchart.md`](../02-flowchart.md),
-  [`03-implementation-general.md`](../03-implementation-general.md) describe the HOW.
+- Technical docs — [`01-aisztens.md`](../Specs/outdated/01-aisztens.md),
+  [`02-flowchart.md`](../Specs/outdated/02-flowchart.md),
+  [`03-implementation-general.md`](../Specs/outdated/03-implementation-general.md) describe the HOW.
 
 ## 4. Key Insight: Functional Spec Is the Starting Point
 

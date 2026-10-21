@@ -21,17 +21,19 @@ cp infra/.env.example infra/.env.local
 # 2. Bring the stack up.
 pnpm test:stack:up
 
-# 3. Run the smoke suite against the local per-env file.
-#    (The suite defaults to infra/.env; pass --env-file for the new layout.)
-bash scripts/test/stack-smoke.sh --env-file infra/.env.local
+# 3. Run the smoke suite. The default is infra/.env.local (set in
+#    scripts/test/lib/00-prelude.sh), so no --env-file is needed locally.
+bash scripts/test/stack-smoke.sh
+#    For a different environment (droplet / CI), point it at the matching file:
+#      bash scripts/test/stack-smoke.sh --env-file infra/.env.dev
 
 # 4. (Optional) Tear the stack down when you're done.
 pnpm test:stack:down
 ```
 
 If the stack is already up (e.g. started via `deploy/deploy.sh up`), step 2
-is not needed — just run the suite, adding `--env-file infra/.env.local` for
-the local three-env layout.
+is not needed — just run the suite, adding `--env-file infra/.env.dev` when
+the stack was started against the dev droplet's env file.
 
 ## What it checks
 
@@ -97,8 +99,8 @@ stack-smoke.sh [--up] [--down] [--yes]
   (asks for confirmation unless `--yes` is also given).
 - `--yes` / `-y` — skip the teardown confirmation prompt.
 - `--compose-file <path>` — override `infra/docker-compose.yml`.
-- `--env-file <path>` — override the default `infra/.env` (use
-  `infra/.env.local` for the local three-env layout).
+- `--env-file <path>` — override the default `infra/.env.local` (use
+  `infra/.env.dev` for the dev-droplet layout).
 
 ## Layout
 
@@ -114,7 +116,8 @@ scripts/test/
 │   ├── 20-cross-service.sh # cross-service "see each other" checks
 │   └── 99-teardown.sh  # optional teardown helper
 ├── _deploy-sh-*.sh     # offline deploy/deploy.sh suites (no droplet needed)
-└── _postgres-init-schemas-test.sh  # throwaway-container test for the Postgres init scripts
+├── _postgres-init-schemas-test.sh  # throwaway-container test for the Postgres init scripts
+└── _stack-env-default-test.sh  # three-env leftover defaults: per-env local + deploy.sh hard-reject
 ```
 
 ## Offline `deploy.sh` suites (`_deploy-sh-*.sh`)
@@ -149,6 +152,25 @@ re-asserts.
 
 ```bash
 bash scripts/test/_postgres-init-schemas-test.sh
+```
+
+## Three-env leftover defaults suite (`_stack-env-default-test.sh`)
+
+The 2026-10-05 cutover renamed `infra/.env` and `deploy/.env` into per-env files
+(`infra/.env.{local,dev,prod}`, `deploy/.env.{dev,prod}`). A handful of default values
+and soft fallbacks were left intact by mistake and now point at a file that does not
+exist. This suite locks down the per-env default in
+[`scripts/test/stack-up.sh`](../../scripts/test/stack-up.sh:23),
+[`scripts/test/stack-down.sh`](../../scripts/test/stack-down.sh:21),
+[`scripts/test/lib/00-prelude.sh`](../../scripts/test/lib/00-prelude.sh:60) and the
+hard-reject of the legacy `infra/.env` in
+[`deploy/deploy.sh:upload()`](../../deploy/deploy.sh:441). Static grep checks plus a
+sandboxed `deploy.sh upload dev` run (ssh/scp/rsync/pnpm stubbed on `PATH`) prove that
+a pre-cutover laptop with only the legacy `infra/.env` no longer ships that file to the
+droplet silently.
+
+```bash
+bash scripts/test/_stack-env-default-test.sh
 ```
 
 It needs Docker, publishes no host port and removes its container on exit. The live

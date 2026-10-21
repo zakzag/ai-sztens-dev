@@ -36,10 +36,12 @@ inside the init scripts that the official Postgres image runs.
   `01-roles.sh`. Because schemas do not exist at that point on a fresh init, the block
   is filtered through `pg_namespace`; it is a no-op on first init and effective when
   `01` is re-applied later. This keeps the file order-independent and idempotent.
-- **`CREATE` only for the app role, only in `callback`.** Drizzle creates its tables
-  (and its own `__drizzle_migrations` bookkeeping) as the connection role. That role is
+- **`CREATE` only for the app role, only in `callback` and `platform`.** Drizzle creates
+  its tables as the connection role: the domain tables in `callback` and its own
+  bookkeeping table `platform.__drizzle_migrations` (the AIS-36 delta). That role is
   `aisztens`, which also owns the database, so it may create schemas as well. Operators
-  get `USAGE` for inspection only — deliberately no write capability.
+  get `USAGE` for inspection only — deliberately no write capability. `email` gets
+  `USAGE` only, because no migration runner writes there yet.
 - **No ownership transfer.** Schemas stay owned by the bootstrap superuser
   (`POSTGRES_USER`); privileges are granted instead of transferred, which keeps the
   bootstrap script the only place that decides ownership.
@@ -48,9 +50,12 @@ Grant matrix:
 
 | Schema | `aisztens` (app) | `tkovari` (owner) | `krak` (operator) |
 |---|---|---|---|
-| `platform` | USAGE | USAGE | USAGE |
+| `platform` | USAGE + **CREATE** | USAGE | USAGE |
 | `callback` | USAGE + **CREATE** | USAGE | USAGE |
 | `email` | USAGE | USAGE | USAGE |
+
+(`platform` carries the `CREATE` grant since AIS-36: the Drizzle bookkeeping table lives
+there. See `docs/Specs/Infrastructure-Docker.md` §6.2 for the authoritative matrix.)
 
 ## 4. Solution / implementation
 
@@ -58,8 +63,8 @@ Grant matrix:
 |---|---|
 | [`infra/postgres/init/02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | new idempotent script: `CREATE SCHEMA IF NOT EXISTS` for `platform`, `callback`, `email`, then `\gexec`-driven `GRANT USAGE` (3 schemas × 3 roles) and `GRANT CREATE ON SCHEMA callback` for `aisztens` |
 | [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh) | same grants as a `pg_namespace`-guarded `\gexec` block, plus a header explaining why it is a no-op on first init |
-| [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh) | throwaway `postgres:16-alpine` container with the init dir bind-mounted: asserts the fresh-init matrix, then re-runs both scripts twice and re-asserts |
-| [`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh) | three new smoke checks: `postgres-schemas`, `postgres-schema-usage` (expects 9), `postgres-schema-create` (expects 1) |
+| [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh) | throwaway `postgres:16-alpine` container with the init dir bind-mounted: asserts the fresh-init matrix, then re-runs both scripts twice and re-asserts. Updated in AIS-36 with the `platform` CREATE assertions |
+| [`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh) | three new smoke checks: `postgres-schemas` (3), `postgres-schema-usage` (9), `postgres-schema-create` (2, updated in AIS-36 when `platform` gained CREATE) |
 | [`docs/Specs/Infrastructure-Docker.md`](../../docs/Specs/Infrastructure-Docker.md) | §6.2 documents both scripts, the schema→context mapping, the grant matrix and the manual re-apply command |
 | [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md) | §2b documents the fresh-volume requirement and the re-apply / `down -v` recipes |
 
@@ -69,8 +74,11 @@ The init now produces the three schemas with the matrix above, on a fresh volume
 re-run. Verification:
 
 ```bash
-bash scripts/test/_postgres-init-schemas-test.sh     # expect PASS: 29  FAIL: 0
-                                                     # (29 since AIS-36 added the platform CREATE assertions)
+bash scripts/test/_postgres-init-schemas-test.sh     # expect PASS: 32  FAIL: 0
+                                                     # (32 since AIS-36 added the
+                                                     # platform CREATE assertions:
+                                                     #  13 fresh + 8 re-run rounds
+                                                     #  + 11 post-re-run assertions)
 
 # against the local DB stack
 pnpm db:up

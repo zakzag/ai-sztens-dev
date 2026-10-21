@@ -49,9 +49,15 @@ unset _ENTRYPOINT_DIR
 
 # Defaults can be overridden via flags on stack-smoke.sh. We export them so
 # the helper scripts in 10/20/99 can read them without re-parsing $@.
+#
+# Three-env note (2026-10-05): the local checkout ships `infra/.env.local`
+# (seeded by `scripts/dev-stack.sh` from `infra/.env.example`). Picking that
+# as the default keeps `bash scripts/test/stack-smoke.sh` working out of the
+# box after a `pnpm dev-stack.sh up`; for a different environment, the
+# caller passes `--env-file infra/.env.dev` (or exports `ENV_FILE=…`).
 export REPO_ROOT
 export COMPOSE_FILE="${COMPOSE_FILE:-$REPO_ROOT/infra/docker-compose.yml}"
-export ENV_FILE="${ENV_FILE:-$REPO_ROOT/infra/.env}"
+export ENV_FILE="${ENV_FILE:-$REPO_ROOT/infra/.env.local}"
 
 # resolve_env_value <KEY> [default]
 #

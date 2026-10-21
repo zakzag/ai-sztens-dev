@@ -2,7 +2,7 @@
 
 **Jira:** AIS-57 (Story) + AIS-58, AIS-59, AIS-60, AIS-61, AIS-62, AIS-63 (subtaskok) + AIS-41 (subtask, AIS-30 alatt)
 **Dátum:** 2026-10-21
-**Státusz:** részben implementálva (2026-10-21 20:54) — Fázis 0, 1, 2 kész és zöld; Fázis 3–6 nyitott. Lásd §10.
+**Státusz:** részben implementálva (2026-10-21 21:30) — Fázis 0, 1, 2, 3, 4 kész és zöld; Fázis 5–6 nyitott. Lásd §10.
 **Kapcsolódó:** [AIS-40 backend terv](2026-10-21--18-25-00-ais-40-api-keys-backend-plan.md), [admin/API/DB ticket restructure](2026-10-21--14-13-00-admin-api-db-foundation-tickets-plan.md)
 
 ## 1. Kiinduló állapot
@@ -260,9 +260,9 @@ Manuális (lokális stack, `pnpm dev` + admin `localhost:5174`):
 | 0 — AIS-58 | **kész** | `packages/shared/src/schemas/*`, `pnpm --filter @callback/shared test` → 34 teszt zöld |
 | 1 — AIS-59 | **kész** | `packages/api-client/**`, `pnpm --filter @callback/api-client test` → 29 teszt zöld |
 | 2 — AIS-62 | **kész** | admin vitest+RTL+eslint, `src/test/setup.ts`, `test`/`lint` script → mindkettő zöld |
-| 3 — AIS-61 | nyitott | `packages/ui` még nem létezik |
-| 4 — AIS-60 | nyitott | hook + `lib/date.ts` + `lib/error-message.ts` |
-| 5 — AIS-63 | nyitott | `docs/Specs/UI-Architecture.md` |
+| 3 — AIS-61 | **kész** (2026-10-21 21:22) | `packages/ui` (theme + `cn` + 6 primitív), `pnpm --filter @callback/ui test` → 47 teszt zöld; admin build/lint/test zöld; `apps/admin/src` paletta-check → 0 találat. Részletek: [history](../history/2026-10-21--21-22-00-ais-61-ui-token-primitives.md) |
+| 4 — AIS-60 | **kész** (2026-10-21 21:30) | `auth/session-token.ts`, `services/api-client.ts` (+`api-client.const.ts`), `lib/date.ts`+`date.const.ts`, `lib/error-message.ts`+`error-message.const.ts`, `features/api-keys/*` (const/interface/logic/hook), `src/test/mocks/{api-keys,api-error,query-client}.mock.*`. `pnpm --filter @callback/admin test` → 46 teszt zöld; `lint` és `build` zöld; paletta-check → 0 találat. Részletek: [history](../history/2026-10-21--21-30-00-ais-60-admin-api-keys-feature-hook.md) |
+| 5 — AIS-63 | **kész** (2026-10-21 21:42) | [`UI-Architecture.md`](../Specs/UI-Architecture.md:1): rétegtérkép cél vs mai állapot, 4 soros state-tábla (`api-keys`, `/login`, `/`, `/calls`), új page-recept szekció, függőség-tábla (jest/vitest + planned deps), verify szekció, fejléc-link. A React szabály 5. sora relatív linkkel mutat a doksira. Részletek: [history](../history/2026-10-21--21-42-00-ais-63-ui-architecture-doc.md) |
 | 6 — AIS-41 | nyitott | az oldal |
 
 **Eltérések / új döntések a tervhez képest**
@@ -275,3 +275,37 @@ Manuális (lokális stack, `pnpm dev` + admin `localhost:5174`):
   fogyasztója kizárólag Vite-bundle; így nincs plusz build lépés és a Tailwind `@source` egy helyen elég.
   A `packages/shared` és az `api-client` marad `dist`-alapú (azokat Node-ból is fogyasztjuk).
 * **Fájlnév:** a feature hook mappája `apps/admin/src/features/api-keys/` (a terv `api-keys` slugja), a page `pages/api-keys/`.
+* **D15:** `border-hairline`, `border-strong`, `duration-fast`, `duration-base` nem `@theme` namespace-en keresztül jönnek,
+  hanem plain custom property + `@utility` (a Tailwind v4-nek nincs `--border-width-*` / `--duration-*` namespace-e).
+* **D16:** a `docs/Specs/UI-Architecture.md` a Fázis 3-ban jött létre (a token-réteg változása miatt a React szabály
+  „same change” kötelezettsége miatt), a Fázis 5 (AIS-63) csak az `api-keys` state-sort és a page-receptet egészíti ki.
+* **D17:** a `Button` `type` defaultja `button` (nem `submit`); az űrlap-gombok explicit `type="submit"`-ot adnak.
+* **D18:** a root `test` script a `@callback/api-client`, `@callback/ui`, `@callback/admin` csomagokat is futtatja
+  (Fázis 2 kötelezettség, eddig kimaradt).
+* **D19:** a `session-token.ts` nem csak `readSessionToken()`-t ad, hanem `storeSessionToken()` /
+  `clearSessionToken()`-t is — így a storage-kulcs **egy** fájlban él, az `AuthContext` nem duplikálja.
+* **D20:** a create mutation `onCreated` callbacket fogad (`UseCreateApiKeyMutationOptions`), és az
+  `invalidateQueries` **await**-elése után hívja — az űrlap reset itt történik majd (Fázis 6), nem a hookban.
+  A hook visszatérési típusai szűk interface-ek (`UseApiKeysQueryResult`, `UseCreateApiKeyMutationResult`),
+  nem TanStack típusok, hogy az oldal ne függjön a query-réteg belső mezőitől.
+* **D21:** a `toErrorMessage` a `status`-ra dönt (network → 401 → 403 → 404 → 409 → 400/422 → 5xx → fallback),
+  és csak a `details[0]`-at használja felülírásként. Nem-`ApiError` érték mindig a generikus szöveget kapja, tehát
+  technikai `Error.message` soha nem kerül a UI-ba. Az `isValidationError` type-predicate a `switch` utáni
+  `never`-ré szűkítés miatt került ki: a döntés lokális `status` változón megy.
+* **D22:** a `toExpiryIso` érvénytelen (nem létező) dátumra `RangeError`-t dob, üres inputra `undefined`-ot ad —
+  a „nincs lejárat” így az űrlaprétegben marad eldönthető, a hibás dátum pedig nem tűnik el csendben.
+* **D23:** a hook tesztek a service-t a **modulhatáron** mockolják (`vi.mock('services/api-client.js')`), és a
+  double a `src/test/mocks/api-keys.mock.ts`-ben **singleton** (`API_KEYS_SERVICE_MOCK` +
+  `resetApiKeysServiceMock()`), mert a `vi.mock` factory hoistolva fut, tehát top-level bindingre nem hivatkozhat.
+  A query kontextust a `src/test/mocks/query-client.mock.tsx` adja (`retry: false`, `gcTime: 0`).
+* **D24 (AIS-63):** a state-tábla a **valós** oldalakat sorolja fel (`api-keys`, `/login`, `/`, `/calls`); a ticketben
+  szereplő `dashboard` sor **kimarad**, mert nincs ilyen oldal — egy nem létező oldal sora hamis állapotot
+  dokumentálna. A dashboard sor a valós dashboard page-ticketjével együtt kerül be.
+* **D25 (AIS-63):** a rétegtérkép kétoszlopos: „cél struktúra” vs „mai állapot” — a `src/app/` és `src/entities/`
+  csak az AIS-41-gyel jön létre, a szabály viszont már most rájuk hivatkozik.
+* **D26 (AIS-63):** a függőség-tábla külön jelöli a `zustand`, `react-hook-form`, `zod` sorokat mint
+  *planned — added by AIS-41* (ma még nincsenek az admin deps között).
+* **D27 (AIS-63):** a verify szekció szétválasztja a `jest`-et (`shared`, `api-client`) és a `vitest`-et
+  (`ui`, `admin`) — D13 óta két test runner él egymás mellett.
+* **D28 (AIS-63):** nincs milestone doksi ehhez a fázishoz: nincs kód- vagy konfigváltozás, a döntés-magot
+  maga a specs doksi hordozza.

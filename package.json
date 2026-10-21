@@ -11,7 +11,7 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
-    "test": "pnpm --filter @callback/shared test && pnpm --filter @callback/api test",
+    "test": "pnpm --filter @callback/shared test && pnpm --filter @callback/api-client test && pnpm --filter @callback/ui test && pnpm --filter @callback/admin test && pnpm --filter @callback/api test",
     "test:e2e": "pnpm --filter @callback/api test:e2e",
     "test:stack": "bash scripts/test/stack-smoke.sh",
     "test:stack:up": "bash scripts/test/stack-up.sh",

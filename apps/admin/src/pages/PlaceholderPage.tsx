@@ -11,8 +11,8 @@ import { BuildInfoFooter } from '../components/BuildInfoFooter.js';
 export function PlaceholderPage() {
   return (
     <section>
-      <h1 className="text-2xl font-bold text-white">AIsztens — Admin</h1>
-      <p className="mt-3 text-slate-400">
+      <h1 className="text-2xl font-bold text-text-primary">AIsztens — Admin</h1>
+      <p className="mt-3 text-text-secondary">
         Az admin felület fejlesztés alatt áll. Az első elérhető oldal az API kulcsok kezelése lesz.
       </p>
 

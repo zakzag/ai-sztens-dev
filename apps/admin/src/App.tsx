@@ -16,31 +16,24 @@ function ProtectedLayout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-800 bg-slate-900">
+      <header className="border-b border-border-hairline bg-surface-raised">
         <nav className="flex items-center justify-between px-6 py-3">
-          <Link to="/" className="text-lg font-semibold text-white">
+          <Link to="/" className="text-lg font-semibold text-text-primary">
             AIsztens — Admin
           </Link>
-          <Routes>
-            <Route
-              path="*"
-              element={
-                <span className="text-sm text-slate-400">
-                  <Link className="mr-4 hover:text-white" to="/calls">
-                    Hívások
-                  </Link>
-                </span>
-              }
-            />
-          </Routes>
+          <span className="text-sm text-text-secondary">
+            <Link className="mr-4 transition-colors duration-fast hover:text-text-primary" to="/calls">
+              Hívások
+            </Link>
+          </span>
         </nav>
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <Routes>
           <Route path="/" element={<PlaceholderPage />} />
-          <Route path="/calls" element={<div className="text-slate-400">Hívások — hamarosan</div>} />
-          <Route path="*" element={<div className="text-slate-400">Nem található</div>} />
+          <Route path="/calls" element={<p className="text-text-secondary">Hívások — hamarosan</p>} />
+          <Route path="*" element={<p className="text-text-secondary">Nem található</p>} />
         </Routes>
       </main>
     </div>

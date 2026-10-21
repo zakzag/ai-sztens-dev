@@ -2,7 +2,7 @@
 
 **Applies to:** [`apps/web`](../../apps/web/package.json:1), [`apps/admin`](../../apps/admin/package.json:1), `packages/ui`, `packages/api-client`.
 **Stack:** React 18, TypeScript strict, Vite, Tailwind CSS v4 (`@theme` tokens), TanStack Query v5, Zustand, react-hook-form + Zod, React Router 6.
-**Authority:** this file wins over generic advice, habit or personal preference. Architecture reference: `docs/Specs/UI-Architecture.md`.
+**Authority:** this file wins over generic advice, habit or personal preference. Architecture reference: [`docs/Specs/UI-Architecture.md`](../../docs/Specs/UI-Architecture.md:1) — it documents how this repo implements the rules below (layer map, tokens, primitives, per-page state plan, new-page recipe, dependency list).
 
 ---
 

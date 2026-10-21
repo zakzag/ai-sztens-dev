@@ -1,7 +1,18 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
+import {
+  clearSessionToken,
+  readSessionToken,
+  storeSessionToken,
+} from './session-token.js';
 
-const TOKEN_KEY = 'aisztens-admin-token';
-
+/**
+ * Session state of the admin SPA.
+ *
+ * The token itself is owned by [`session-token.ts`](./session-token.ts): this
+ * provider only mirrors it into React state so a login/logout re-renders the
+ * tree. The storage key must not be repeated here — the composition root reads
+ * the same token through `readSessionToken()` for the `Authorization` header.
+ */
 interface AuthContextValue {
   isAuthenticated: boolean;
   login: (token: string) => void;
@@ -11,17 +22,15 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() =>
-    typeof window === 'undefined' ? null : window.sessionStorage.getItem(TOKEN_KEY),
-  );
+  const [token, setToken] = useState<string | null>(() => readSessionToken());
 
   function login(nextToken: string) {
-    window.sessionStorage.setItem(TOKEN_KEY, nextToken);
+    storeSessionToken(nextToken);
     setToken(nextToken);
   }
 
   function logout() {
-    window.sessionStorage.removeItem(TOKEN_KEY);
+    clearSessionToken();
     setToken(null);
   }
 

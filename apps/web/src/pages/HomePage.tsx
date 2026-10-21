@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { BuildInfoFooter } from '../components/BuildInfoFooter.js';
 
 export function HomePage() {
@@ -12,12 +11,6 @@ export function HomePage() {
           Adja meg elérhetőségeit, és szakértő kollégánk a lehető leghamarabb visszahívja.
           Az ügyintézés telefonon történik, így nem kell várakoznia a vonalban.
         </p>
-        <Link
-          to="/callback"
-          className="mt-6 inline-block rounded-md bg-indigo-600 px-5 py-2.5 font-medium text-white hover:bg-indigo-500"
-        >
-          Visszahívást kérek
-        </Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

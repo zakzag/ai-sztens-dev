@@ -109,37 +109,39 @@ run_cross_service_checks() {
   # the idempotent re-run path is covered by
   # scripts/test/_postgres-init-schemas-test.sh instead. Same -U/-d ordering
   # rule as the role check above.
+  # AIS-64 removed the `callback` context, so two schemas remain.
   assert_service_out "postgres-schemas" \
-    "schemas platform, callback, email exist" \
-    "3" \
-    dc_exec postgres psql \
-      -U "$(resolve_env_value POSTGRES_USER postgres)" \
-      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
-      -At -c "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','callback','email')"
-
-  # -----------------------------------------------------------------------
-  # 5c. postgres — schema privileges (AIS-35).
-  # -----------------------------------------------------------------------
-  # Expected matrix: USAGE on all three schemas for aisztens, tkovari and krak
-  # (3 schemas × 3 roles = 9 rows), and CREATE for the app role only, in
-  # `callback` (it creates callback.callback_requests there) and in `platform`
-  # (the Drizzle bookkeeping table platform.__drizzle_migrations). Losing
-  # either grant breaks `db:migrate`, not just the smoke suite.
-  assert_service_out "postgres-schema-usage" \
-    "USAGE on all three schemas for aisztens, tkovari and krak" \
-    "9" \
-    dc_exec postgres psql \
-      -U "$(resolve_env_value POSTGRES_USER postgres)" \
-      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
-      -At -c "SELECT count(*) FROM (VALUES ('platform'),('callback'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
-
-  assert_service_out "postgres-schema-create" \
-    "only aisztens may create objects, in callback and platform" \
+    "schemas platform and email exist" \
     "2" \
     dc_exec postgres psql \
       -U "$(resolve_env_value POSTGRES_USER postgres)" \
       -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
-      -At -c "SELECT count(*) FROM (VALUES ('callback'),('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
+      -At -c "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','email')"
+
+  # -----------------------------------------------------------------------
+  # 5c. postgres — schema privileges (AIS-35).
+  # -----------------------------------------------------------------------
+  # Expected matrix (AIS-64: `callback` removed): USAGE on both remaining
+  # schemas for aisztens, tkovari and krak (2 schemas × 3 roles = 6 rows), and
+  # CREATE for the app role only, in `platform` (the Drizzle bookkeeping table
+  # platform.__drizzle_migrations plus the migration-created tables such as
+  # platform.api_keys). Losing that grant breaks `db:migrate`, not just the
+  # smoke suite.
+  assert_service_out "postgres-schema-usage" \
+    "USAGE on both schemas for aisztens, tkovari and krak" \
+    "6" \
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM (VALUES ('platform'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
+
+  assert_service_out "postgres-schema-create" \
+    "only aisztens may create objects, in platform" \
+    "1" \
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM (VALUES ('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
 
   # -----------------------------------------------------------------------
   # 6. monitor -> api — restated for symmetry with the per-service check.

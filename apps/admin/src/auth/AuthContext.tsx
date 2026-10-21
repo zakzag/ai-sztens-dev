@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
-const TOKEN_KEY = 'callback-admin-token';
+const TOKEN_KEY = 'aisztens-admin-token';
 
 interface AuthContextValue {
   isAuthenticated: boolean;

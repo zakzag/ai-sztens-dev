@@ -20,9 +20,10 @@ export interface StoredVapiEvent {
  * added on top of this store in the next milestone, once the webhook
  * contract is finalised.
  *
- * The store is process-local and NOT persistent across restarts. It
- * mirrors `CallbackRequestsService` — both will be replaced by a
- * Postgres-backed store at the same time.
+ * The store is process-local and NOT persistent across restarts. It is
+ * the last in-memory store in the API (the call-back request store that
+ * used to be its sibling was removed in AIS-64) and will be replaced by
+ * a Postgres-backed store once the webhook contract is finalised.
  */
 @Injectable()
 export class VapiWebhooksService {

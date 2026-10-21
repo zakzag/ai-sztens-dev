@@ -169,23 +169,25 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml \
 | Script | Felelősség |
 |---|---|
 | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh) | `aisztens` (app), `tkovari` (owner) és `krak` (operátor) role; a database tulajdonosa az `aisztens`; séma-szintű grantok `\gexec`-guarddal — friss initen no-op, mert a sémák ekkor még nem léteznek |
-| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform`, `callback`, `email` sémákra, majd a grant-mátrix |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform` és `email` sémákra, majd a grant-mátrix |
 
-Séma ↔ bounded context: `platform` (üzemeltetési/session jellegű adatok),
-`callback` (a visszahívási domain, ide kerül a `callback_requests` tábla),
-`email` (email engine). A sémahatár egyben modulhatár, ezért a grantok is ezt követik:
+Séma ↔ bounded context: `platform` (üzemeltetési adatok + az alkalmazás táblái,
+pl. `platform.api_keys`), `email` (email engine). A sémahatár egyben modulhatár,
+ezért a grantok is ezt követik:
 
 | Séma | `aisztens` (app) | `tkovari` (owner) | `krak` (operátor) |
 |---|---|---|---|
 | `platform` | USAGE + **CREATE** | USAGE | USAGE |
-| `callback` | USAGE + **CREATE** | USAGE | USAGE |
 | `email` | USAGE | USAGE | USAGE |
 
-A `CREATE` jog kizárólag az app role-é, és kizárólag a `callback` és a `platform`
-sémában: a Drizzle migrációs runner (AIS-36) a `callback`-ben hozza létre a
-`callback_requests` táblát, a `platform`-ban pedig a saját könyvelő tábláját
-(`platform.__drizzle_migrations`). Enélkül a `db:migrate` `permission denied for
-schema callback|platform`-dal állna meg. A sémák tulajdonosa a bootstrap superuser
+> **AIS-64 (2026-10-21):** a `callback` séma megszűnt (a teljes visszahívás-funkció
+> törlése). A korábbi mátrixban szereplő `callback | USAGE + CREATE` sor eltűnt;
+> a smoke-checkek várt értékei ennek megfelelően 2 séma / 6 USAGE / 1 CREATE.
+
+A `CREATE` jog kizárólag az app role-é, és kizárólag a `platform` sémában: a Drizzle
+migrációs runner ott tartja a könyvelő tábláját (`platform.__drizzle_migrations`)
+és ott hozza létre az alkalmazás tábláit. Enélkül a `db:migrate` `permission denied
+for schema platform` hibával állna meg. A sémák tulajdonosa a bootstrap superuser
 (`POSTGRES_USER`) marad — nincs ownership-átírás.
 
 A grant-mátrixot a [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh)

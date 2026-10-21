@@ -1,8 +1,6 @@
 import { Link, Route, Routes } from 'react-router-dom';
-import { CallbackFormPage } from './pages/CallbackFormPage.js';
 import { HomePage } from './pages/HomePage.js';
 import { LegalPage } from './pages/LegalPage.js';
-import { ThankYouPage } from './pages/ThankYouPage.js';
 
 export function App() {
   return (
@@ -16,12 +14,6 @@ export function App() {
             <Link to="/" className="text-slate-400 hover:text-white">
               Kezdőlap
             </Link>
-            <Link
-              to="/callback"
-              className="rounded-md bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-500"
-            >
-              Visszahívást kérek
-            </Link>
           </div>
         </nav>
       </header>
@@ -29,8 +21,6 @@ export function App() {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/callback" element={<CallbackFormPage />} />
-          <Route path="/thank-you" element={<ThankYouPage />} />
           <Route path="/legal" element={<LegalPage />} />
         </Routes>
       </main>

@@ -1,10 +1,12 @@
 # Three-Environment Verification — AIsztens
 
 **Status:** living spec
-**Database note (2026-10-19, AIS-35):** §2.7 no longer asserts a
-`callback_requests` table — that table does not exist yet (the store is still the
-in-memory `Map`; it lands with AIS-36/AIS-38). The check now verifies the role and
-schema bootstrap instead. Details: [`Database-Local.md`](Database-Local.md).
+**Database note (2026-10-21, AIS-64):** the call-back feature was removed
+entirely — API module, admin page, public web form, `callback.callback_requests`,
+`callback.call_status` **and** the `callback` Postgres schema. Only the
+`platform` and `email` schemas remain. The smoke endpoint for the curl checks
+below is now `/healthz`; `/api/callback-requests` no longer exists. Details:
+[`Database-Local.md`](Database-Local.md).
 **Deploy-process consistency (2026-10-13):** §4 no longer describes a
 `deploy.yml` `matrix` (it uses the `plan` job now), and §6/§7 no longer
 assume `pnpm install` / `pnpm build` / droplet-side `apps/*/.env.dev` run
@@ -229,11 +231,11 @@ curl -i http://localhost:3000/api 2>&1 | head -1
 # Expect: HTTP/1.1 404 Not Found   (or a similar non-200 — there is no
 #   root handler; this confirms the global prefix is applied)
 
-# 2.4.3 POST /api/callback-requests (the real public endpoint)
-curl -fsS -X POST -H "Content-Type: application/json" \
-  -d '{"name":"verify","email":"verify@example.com","phone":"+36300000001","reason":"end-to-end verification"}' \
-  http://localhost:3000/api/callback-requests
-# Expect: 201 + {"id":"<some-uuid>"}
+# 2.4.3 There is no public write endpoint any more: AIS-64 removed the
+#   call-back feature (and with it POST /api/callback-requests). The
+#   unprefixed health probe is the stable, dependency-free check.
+curl -fsS http://localhost:3000/healthz
+# Expect: 200 + the build metadata JSON (see health.controller.ts)
 ```
 
 ### 2.5 CORS allows the local SPA origins
@@ -242,15 +244,15 @@ curl -fsS -X POST -H "Content-Type: application/json" \
 # 2.5.1 From the Vite dev origin (5173) — preflight + actual
 curl -i -H "Origin: http://localhost:5173" \
   -H "Access-Control-Request-Method: GET" \
-  -X OPTIONS http://localhost:3000/api/callback-requests | head -20
+  -X OPTIONS http://localhost:3000/healthz | head -20
 # Expect: 204 No Content + access-control-allow-origin: http://localhost:5173
 
 # 2.5.2 From the 127.0.0.1 variant (also listed in apps/api/.env.local)
-curl -i -H "Origin: http://127.0.0.1:5173" http://localhost:3000/api/callback-requests | head -10
+curl -i -H "Origin: http://127.0.0.1:5173" http://localhost:3000/healthz | head -10
 # Expect: 200 + access-control-allow-origin: http://127.0.0.1:5173
 
 # 2.5.3 From a random other origin (should be rejected)
-curl -i -H "Origin: https://evil.example.com" http://localhost:3000/api/callback-requests | head -10
+curl -i -H "Origin: https://evil.example.com" http://localhost:3000/healthz | head -10
 # Expect: 200 + NO access-control-allow-origin header (CORS denied in the browser)
 ```
 
@@ -278,12 +280,11 @@ cat apps/web/.env.dev
 
 ### 2.7 Postgres is reachable and bootstrapped
 
-> **Updated 2026-10-19 (AIS-35).** This section used to query `callback_requests`
-> directly. That table does **not** exist yet: the callback store is still the
-> in-memory `Map` in
-> [`callback-requests.service.ts:12`](../../apps/api/src/callback-requests/callback-requests.service.ts:12),
-> and the table arrives with AIS-36/AIS-38. What exists today is the role +
-> schema bootstrap; the row-level check is deferred.
+> **Updated 2026-10-21 (AIS-64).** The whole call-back feature is gone: its
+> API module, the `callback.callback_requests` table, the `callback.call_status`
+> enum **and** the `callback` Postgres schema were removed. What remains is the
+> role bootstrap plus the `platform` and `email` schemas. Check those two, not
+> the old callback table.
 
 ```bash
 # 2.7.1 Connect as the application role — this is the connection the API uses.
@@ -414,18 +415,18 @@ this is the "still works on the legacy droplet" guarantee.
 ```bash
 # 3.5.1 From the web SPA origin (should pass)
 curl -i -H "Origin: https://web.aisztens.hu" \
-  https://api.aisztens.hu/api/callback-requests | head -10
+  https://api.aisztens.hu/healthz | head -10
 # Expect: 200 + access-control-allow-origin: https://web.aisztens.hu
 
 # 3.5.2 From the admin SPA origin (should pass)
 curl -i -H "Origin: https://admin.aisztens.hu" \
-  https://api.aisztens.hu/api/callback-requests | head -10
+  https://api.aisztens.hu/healthz | head -10
 # Expect: 200 + access-control-allow-origin: https://admin.aisztens.hu
 
 # 3.5.3 From the api origin itself (should NOT get CORS headers)
 curl -i -H "Origin: https://api.aisztens.hu" \
-  https://api.aisztens.hu/api/callback-requests | head -10
-# Expect: 200) + NO access-control-allow-origin header (the dev CORS list
+  https://api.aisztens.hu/healthz | head -10
+# Expect: 200 + NO access-control-allow-origin header (the dev CORS list
 #   does not include api.aisztens.hu by design — see VAPI prompt history)
 ```
 
@@ -556,12 +557,12 @@ ssh deployer@<staging-host> "cd /opt/aisztens && \
 ```bash
 # 4.2.1 CORS allows the prod web origin
 curl -i -H "Origin: https://web.<prod-domain>" \
-  https://api.<prod-domain>/api/callback-requests | head -10
+  https://api.<prod-domain>/healthz | head -10
 # Expect: 200 + access-control-allow-origin: https://web.<prod-domain>
 
 # 4.2.2 CORS rejects (or empty) a dev origin — the two CORS lists MUST differ
 curl -i -H "Origin: https://web.aisztens.hu" \
-  https://api.<prod-domain>/api/callback-requests | head -10
+  https://api.<prod-domain>/healthz | head -10
 # Expect: 200 + NO access-control-allow-origin header (dev origin NOT in
 #   prod CORS list; a browser would block the request).
 ```

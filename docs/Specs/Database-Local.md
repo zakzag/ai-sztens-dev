@@ -2,7 +2,7 @@
 
 **Státusz:** Élő
 
-**Utolsó frissítés:** 2026-10-21 (AIS-37: elkészült a `CallbackRequestsRepository` szerződés és a Drizzle implementáció DB nélkül futó unit tesztekkel; a repository-t az `AppModule` még **nem** köti be, az API továbbra is a memóriabeli `Map`-et használja. AIS-36: a `db:migrate` már létrehozza a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát, ehhez a `platform` séma `CREATE` jogot kapott; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült — `02-schemas.sh`. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
+**Utolsó frissítés:** 2026-10-21 (AIS-64: a teljes callback kontextus törölve — `callback.callback_requests`, `callback.call_status` **és** a `callback` Postgres séma; a `0001` migráció a táblát és az enumot dobja el, a sémát meglevő volume-on egyszeri superuser lépés viszi el. AIS-37: a repository szerződés + unit tesztek elkészültek, de a repository az AIS-64-gyel törlődött, mert a perzisztálás célja megszűnt. AIS-36: a `db:migrate` létrehozta a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült — `02-schemas.sh`. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
 
 **Kapcsolódik:** [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2, [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml), [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml), [`infra/postgres/init/`](../../infra/postgres/init/), [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh), [`scripts/README.md`](../../scripts/README.md)
 
@@ -104,12 +104,13 @@ ugyanezt írja le):
 | Séma | `aisztens` (app) | `tkovari` (owner) | `krak` (operátor) |
 |---|---|---|---|
 | `platform` | USAGE + **CREATE** | USAGE | USAGE |
-| `callback` | USAGE + **CREATE** | USAGE | USAGE |
 | `email` | USAGE | USAGE | USAGE |
 
 - A `CREATE` jog azért kell, mert a Drizzle migrációs runner (`aisztens` kapcsolattal)
-  a `callback` sémában hozza létre a `callback_requests` táblát, a `platform` sémában
-  pedig a saját könyvelő tábláját (`platform.__drizzle_migrations`) — AIS-36.
+  a `platform` sémában tartja a könyvelő tábláját (`platform.__drizzle_migrations`) és
+  ott hozza létre az alkalmazás tábláit (AIS-39: `platform.api_keys`).
+- **AIS-64:** a `callback` séma megszűnt (a korábbi `callback | USAGE + CREATE` sor ezért
+  tűnt el), a séma a migrációval nem dobható el — a tulajdonos a bootstrap superuser.
 - Az operátorok szándékosan **nem** kapnak `CREATE`-ot: olvasásra (`\dt`, `SELECT`)
   elég a `USAGE`.
 - A sémák tulajdonosa a bootstrap superuser (`POSTGRES_USER`) marad; nincs ownership-átírás.
@@ -167,31 +168,37 @@ Psql a konténeren belül (host `psql` nem kell):
 DC="docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml"
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -c '\dn'
-# Elvárt: public, platform, callback, email  (+ information_schema, pg_catalog, pg_toast)
+# Elvárt: public, platform, email  (+ information_schema, pg_catalog, pg_toast)
+#   A `callback` séma az AIS-64-gyel megszűnt. Meglévő volume-on egyszeri lépés kell:
+#   psql -U postgres -d aisztens_db -c "DROP SCHEMA IF EXISTS callback"
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
   -c "SELECT rolname FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak') ORDER BY 1"
 # Elvárt: aisztens, krak, tkovari
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
-  -c "SELECT count(*) FROM (VALUES ('platform'),('callback'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
-# Elvárt: 9  (3 séma × 3 role)
+  -c "SELECT count(*) FROM (VALUES ('platform'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
+# Elvárt: 6  (2 séma × 3 role)
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
-  -c "SELECT count(*) FROM (VALUES ('callback'),('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
-# Elvárt: 2   (CREATE csak az aisztens role-nak: callback + platform)
+  -c "SELECT count(*) FROM (VALUES ('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
+# Elvárt: 1   (CREATE csak az aisztens role-nak, csak a platform sémában)
 
-# A migráció után: a tábla és a könyvelő tábla
-$DC exec -T postgres psql -U postgres -d aisztens_db -c '\d callback.callback_requests'
+# A migrációk után: a könyvelő tábla, a callback tábla pedig már nem létezik
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
   -c "SELECT count(*) FROM platform.__drizzle_migrations"
-# Elvárt: 1  (a 0000 migráció; újrafuttatás után sem nő)
+# Elvárt: 2  (0000 + 0001; újrafuttatás után sem nő)
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT to_regclass('callback.callback_requests') IS NULL"
+# Elvárt: t  (a tábla az AIS-64-gyel törlődött)
 ```
 
 Automatizált ellenőrzés (nem kell hozzá futó stack, saját eldobható konténert indít):
 
 ```bash
-bash scripts/test/_postgres-init-schemas-test.sh     # elvárt: PASS: 29  FAIL: 0
+bash scripts/test/_postgres-init-schemas-test.sh     # elvárt: PASS: 23  FAIL: 0
+#   (kevesebb, mint a korábbi 32: a `callback` séma kivételével kevesebb
+#    séma/USAGE/CREATE assertion fut — AIS-64)
 ```
 
 Ugyanezt a mátrixot ellenőrzi a `pnpm test:stack` is a `postgres-schemas`,
@@ -238,37 +245,50 @@ A teljes stacknél ugyanez a `pgdata` volume-ra igaz (a scriptek ugyanazok).
 
 ## 9. Mi van, és mi még nincs a lokális DB-ben (2026-10-21)
 
-**AIS-36 óta megvan** — a `pnpm --filter @callback/api db:migrate` után:
+**AIS-64 (2026-10-21): a callback kontextus teljesen megszűnt.** Az API modul, az
+admin oldal, a publikus web űrlap, a `callback.callback_requests` tábla, a
+`callback.call_status` enum és maga a `callback` Postgres séma is törlődött.
+
+**Megvan** — a `pnpm --filter @callback/api db:migrate` után:
 
 | Dolog | Hol / hogyan |
 |---|---|
-| `callback.callback_requests` tábla (7 oszlop) | [`drizzle/0000_pretty_bromley.sql`](../../apps/api/drizzle/0000_pretty_bromley.sql), alkalmazva `db:migrate`-tel |
-| `callback.call_status` enum (a `CallStatus` 10 értéke) | ugyanaz a migráció |
+| `platform` és `email` séma | [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh), első initkor |
 | `platform.__drizzle_migrations` könyvelő tábla | `drizzle.config.ts` `migrations` beállítás + a runner |
+| `0000` migráció (callback tábla — történeti) | [`drizzle/0000_pretty_bromley.sql`](../../apps/api/drizzle/0000_pretty_bromley.sql) |
+| `0001` migráció (drop table + drop enum) | [`drizzle/0001_square_kat_farrell.sql`](../../apps/api/drizzle/0001_square_kat_farrell.sql) |
 | működő `db:migrate` | [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) (lock nélkül) |
-| generált SQL + snapshot | `apps/api/drizzle/0000_*.sql` + `apps/api/drizzle/meta/` |
+| `DATABASE` injekciós token + `Database` típus | [`database.const.ts`](../../apps/api/src/db/database.const.ts), [`database.interface.ts`](../../apps/api/src/db/database.interface.ts) |
+| `isUuid()` guard (az `api-keys` fogja használni) | [`uuid.ts`](../../apps/api/src/db/uuid.ts) + [`uuid.spec.ts`](../../apps/api/src/db/uuid.spec.ts) |
 
-**AIS-37 óta megvan** — kód- és tesztszinten, futó DB **nélkül**:
+**Eltűnt (AIS-64):** `callback.callback_requests`, `callback.call_status`,
+`callback` séma, `CallbackRequestsRepository` + interfész + hibák + unit tesztek,
+a mockok (`src/db/test/mocks/callback-requests.mock.ts`, `database.mock.ts`), a
+`CallbackRequestsService/Module/Controller/DTO`, valamint a `schema.spec.ts`.
 
-| Dolog | Hol / hogyan |
-|---|---|
-| `CallbackRequestsRepository` szerződés (`create`, `findAll`, `findOne`) | [`callback-requests.repository.interface.ts`](../../apps/api/src/db/callback-requests.repository.interface.ts) |
-| Drizzle implementáció (`findAll` → `created_at DESC`, `findOne` → uuid-guard + limit 1) | [`callback-requests.repository.ts`](../../apps/api/src/db/callback-requests.repository.ts) |
-| Saját hibák (`NotFound` / `InvalidId` / `NotPersisted`) | [`callback-requests.errors.ts`](../../apps/api/src/db/callback-requests.errors.ts) |
-| `DATABASE` injekciós token + `Database` típus (a Nest provider AIS-38-ban jön) | [`database.const.ts`](../../apps/api/src/db/database.const.ts), [`database.interface.ts`](../../apps/api/src/db/database.interface.ts) |
-| Unit tesztek mockolt Drizzle handle-lel (nincs `DATABASE_URL`, nincs socket) | [`callback-requests.repository.spec.ts`](../../apps/api/src/db/callback-requests.repository.spec.ts), [`uuid.spec.ts`](../../apps/api/src/db/uuid.spec.ts), mockok: `src/db/test/mocks/` |
+**Meglévő volume-on egyszeri operátori lépés kell.** A séma tulajdonosa a
+bootstrap superuser, az `aisztens` app role ezért nem tudja eldobni — a `0001`
+migráció csak a táblát és az enumot viszi el. A maradék (üres) séma eltávolítása:
+
+```bash
+docker exec infra-postgres-1 psql -U postgres -d aisztens_db \
+  -c "DROP SCHEMA IF EXISTS callback"
+```
+
+Friss volume-on erre nincs szükség: a `02-schemas.sh` már csak `platform`-ot és
+`email`-t hoz létre.
 
 **Még nincs** — ezeket ne keresd:
 
 | Hiányzó dolog | Miért | Mikor jön |
 |---|---|---|
-| adat a `callback_requests`-ben az API-tesztelés után | a repository már létezik és tesztelt, de az `AppModule` még nem köti be; a store továbbra is in-memory `Map` ([`callback-requests.service.ts:12`](../../apps/api/src/callback-requests/callback-requests.service.ts:12)) | AIS-38 (DI modul + service csere + e2e) |
-| tábla-szintű grantok (`SELECT`/`INSERT`) az operátoroknak | a táblát az `aisztens` hozta létre, tehát ő a tulajdonos; a `tkovari`/`krak` csak séma-szintű `USAGE`-ot kapott | későbbi read-only operátori hozzáférés |
-| indexek a `callback_requests`-en | a valós query-k (státusz, időrend) még nem ismertek | AIS-38 / status-machine |
+| `DatabaseModule` (Nest provider a `DATABASE` tokenhez) | AIS-38 cancelled, a provider önálló subtaskba került | AIS-56 |
+| `platform.api_keys` tábla | a callback tábla helyére lépő első valódi domain tábla | AIS-39 |
+| tábla-szintű grantok (`SELECT`/`INSERT`) az operátoroknak | a táblákat az `aisztens` hozza létre, tehát ő a tulajdonos; a `tkovari`/`krak` csak séma-szintű `USAGE`-ot kapott | későbbi read-only operátori hozzáférés |
 | migrációs lock, `lock_timeout`, `statement_timeout` | a runner egyelőre lock nélkül fut | Story 3 |
 
-Ebből következik, hogy a lokális DB-ben **ma** a séma- és tábla-szintű eredmény az, amit
-ellenőrizni érdemes (§6) — az API által írt sorokat nem.
+Ebből következik, hogy a lokális DB-ben **ma** a séma-szintű eredmény az, amit
+ellenőrizni érdemes (§6) — alkalmazás-tábla egyelőre nincs.
 
 ---
 

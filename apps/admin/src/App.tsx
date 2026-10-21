@@ -1,7 +1,7 @@
 import { Link, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext.js';
-import { DashboardPage } from './pages/DashboardPage.js';
 import { LoginPage } from './pages/LoginPage.js';
+import { PlaceholderPage } from './pages/PlaceholderPage.js';
 
 function ProtectedLayout() {
   const { isAuthenticated } = useAuth();
@@ -26,9 +26,6 @@ function ProtectedLayout() {
               path="*"
               element={
                 <span className="text-sm text-slate-400">
-                  <Link className="mr-4 hover:text-white" to="/">
-                    Kérések
-                  </Link>
                   <Link className="mr-4 hover:text-white" to="/calls">
                     Hívások
                   </Link>
@@ -41,7 +38,7 @@ function ProtectedLayout() {
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
+          <Route path="/" element={<PlaceholderPage />} />
           <Route path="/calls" element={<div className="text-slate-400">Hívások — hamarosan</div>} />
           <Route path="*" element={<div className="text-slate-400">Nem található</div>} />
         </Routes>

@@ -5,7 +5,7 @@
 `commitHash` mezőkkel bővült, és a `web` / `admin` SPA front-oldalán megjelenik
 egy build-info sor (telepítés dátuma + commit hash). Lásd §4.2 és
 [`docs/history/2026-10-12--13-20-00-deploy-meta-version-display.md`](../history/2026-10-12--13-20-00-deploy-meta-version-display.md).
-**Utolsó frissítés:** 2026-10-19 (AIS-35 pontosítás: a §7 lifecycle smoke leírás már nem állítja, hogy a suite `callback_requests` sort hoz létre — a suite csak megfigyel, a tábla pedig AIS-36/AIS-38-cal érkezik; a lokális DB bootstrapje a [`Database-Local.md`](Database-Local.md) specben van.)
+**Utolsó frissítés:** 2026-10-21 (AIS-64: a teljes callback funkció törlése — a `POST /api/callback-requests` végpont, a `callback` séma és a hozzá tartozó oldalak megszűntek; a §7 lifecycle smoke szövege ennek megfelelően frissült. Korábban 2026-10-19 (AIS-35): a §7 nem állítja, hogy a suite `callback_requests` sort hoz létre — a suite csak megfigyel; a lokális DB bootstrapje a [`Database-Local.md`](Database-Local.md) specben van.)
 **Korábbi frissítés:** 2026-10-13 (deploy-process konzisztencia takarítás: a §9.1 `deploy.yml` leírás a 2-elemű `matrix` helyett a **`plan` job** modellt írja le — `.github/scripts/deploy-plan.sh`, `needs.plan.outputs.*`, `workflow_run` / `workflow_dispatch` trigger, nincs `push` trigger és nincs `matrix`; a §6 pnpm-native OOM sora már nem javasol `--build`-et a dropleten, hanem CI-oldali image-újrabuildet; a §6.1 banner-minta `[stage=upload_rsync]` → `[stage=upload_files]`, és az rsync-mirror bekezdés helyett a 3 fájlos `scp` leírás szerepel. Az image-based deploy (2026-10-08) óta a droplet nem buildel és nem kap forráskódot.)
 **Kapcsolódik:** [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md), [`docs/milestones/2026-09-28-api-healthcheck-fail.milestone.md`](../milestones/2026-09-28-api-healthcheck-fail.milestone.md)
 
@@ -432,7 +432,7 @@ A repo-ban van egy kézzel futtatható smoke-szkript, amely az élő stacket mé
 bash scripts/test/stack-smoke.sh https://<DOMAIN> https://api.<DOMAIN>
 ```
 
-A suite **csak megfigyel** (lásd [`scripts/test/README.md`](../../scripts/test/README.md)): nem ír az adatbázisba, és nem hoz létre `callback_requests` sort. Ez utóbbi jelenleg nem is lehetséges: a tábla az AIS-36/AIS-38 story-kkal érkezik, a `POST /api/callback-requests` pedig a memóriabeli store-ba ír. A szkript és a teljes check-lista dokumentációja: [`scripts/README.md`](../../scripts/README.md).
+A suite **csak megfigyel** (lásd [`scripts/test/README.md`](../../scripts/test/README.md)): nem ír az adatbázisba, és nem hoz létre sort egyetlen alkalmazás-táblában sem. A `POST /api/callback-requests` végpont az AIS-64-gyel megszűnt (a teljes visszahívás-funkcióval együtt), a `callback` Postgres séma sem létezik többé — a smoke a `/healthz`-t és a maradék két séma (`platform`, `email`) grant-mátrixát ellenőrzi. A szkript és a teljes check-lista dokumentációja: [`scripts/README.md`](../../scripts/README.md).
 
 ---
 

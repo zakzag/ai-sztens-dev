@@ -25,17 +25,19 @@
 #
 #   schema      aisztens (app)        tkovari (owner)   krak (operator)
 #   platform    USAGE + CREATE        USAGE             USAGE
-#   callback    USAGE + CREATE        USAGE             USAGE
 #   email       USAGE                 USAGE             USAGE
 #
-# Only the application role may create objects, and only in `callback` and
-# `platform`:
-#   - `callback` — the Drizzle migration runner (AIS-36) creates
-#     `callback.callback_requests` there;
-#   - `platform` — the same runner keeps its bookkeeping table there
-#     (`platform.__drizzle_migrations`, configured in drizzle.config.ts).
+# Only the application role may create objects, and only in `platform`:
+#   - `platform` — the Drizzle migration runner keeps its bookkeeping table
+#     there (`platform.__drizzle_migrations`, configured in drizzle.config.ts)
+#     and hosts the application tables created by migrations (AIS-39:
+#     `platform.api_keys`).
 # The two human operator roles keep USAGE so they can inspect data
 # (`\dt`, `SELECT`) without being able to alter schemas.
+#
+# AIS-64 removed the `callback` context entirely (table, enum, schema), so the
+# `callback` row that used to be here is gone. See
+# docs/history/2026-10-21--15-45-00-ais-64-callback-removal.md.
 #
 # `tkovari` and `krak` are literal role names here, exactly as in
 # 01-roles.sh. Renaming an operator role therefore means editing both files.
@@ -52,26 +54,25 @@ psql -v ON_ERROR_STOP=1 \
 -- One schema per bounded context. The module boundary is also a DB boundary,
 -- which is what lets the grants below stay coarse and stable.
 CREATE SCHEMA IF NOT EXISTS platform;
-CREATE SCHEMA IF NOT EXISTS callback;
 CREATE SCHEMA IF NOT EXISTS email;
 
 -- USAGE for the app role and both operator roles on every context schema.
 -- The join on pg_namespace keeps the statement a no-op if a schema is missing
 -- (e.g. when a single CREATE above is removed), so the file stays idempotent.
 SELECT format('GRANT USAGE ON SCHEMA %I TO %I', s.nspname, r.rolname)
-  FROM (VALUES ('platform'), ('callback'), ('email')) AS s(nspname)
+  FROM (VALUES ('platform'), ('email')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
   CROSS JOIN (VALUES (:'aisztens_db_user'), ('tkovari'), ('krak')) AS r(rolname)
 \gexec
 
--- Object creation stays with the application role: `callback` holds the
--- domain tables, `platform` holds the Drizzle bookkeeping table
--- (`platform.__drizzle_migrations`). Without these the migrator fails with
--- `permission denied for schema callback|platform` on the first `db:migrate`.
+-- Object creation stays with the application role: `platform` holds the
+-- Drizzle bookkeeping table (`platform.__drizzle_migrations`) and the
+-- application tables created by migrations. Without this the migrator fails
+-- with `permission denied for schema platform` on the first `db:migrate`.
 SELECT format('GRANT CREATE ON SCHEMA %I TO %I', s.nspname, :'aisztens_db_user')
-  FROM (VALUES ('callback'), ('platform')) AS s(nspname)
+  FROM (VALUES ('platform')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
 \gexec
 
-\echo '[02-schemas] platform, callback, email schemas and grants are in place.'
+\echo '[02-schemas] platform and email schemas and grants are in place.'
 EOSQL

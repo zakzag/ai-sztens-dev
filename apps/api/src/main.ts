@@ -30,7 +30,7 @@ async function bootstrap() {
     { rawBody: true },
   );
 
-  // All HTTP endpoints live under /api (e.g. POST /api/callback-requests).
+  // All HTTP endpoints live under /api (e.g. GET /api/api-keys).
   // `healthz` is excluded so the Docker healthcheck and the monitor watchdog
   // can hit a stable, unprefixed path that never drifts with the business
   // routing. Keep this list in sync with the controllers that must stay

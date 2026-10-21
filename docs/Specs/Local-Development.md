@@ -198,10 +198,11 @@ The **actual** Docker volume names differ per compose project — `infra_pgdata_
 (DB-only stack, project `infra`) and `aisztens_pgdata` (full stack, `name: aisztens`);
 see [`Database-Local.md`](Database-Local.md) §1.
 
-> `CallbackRequests` persistence is not wired up yet: the store is still the in-memory
-> `Map` (AIS-38), even though `db:migrate` already creates
-> `callback.callback_requests` and the `platform.__drizzle_migrations` bookkeeping
-> table (AIS-36). The current "what exists / what does not" table is in
+> **AIS-64 (2026-10-21):** the call-back feature was removed end to end — API
+> module, admin page, public web form, shared schemas, and the
+> `callback.callback_requests` table plus the `callback` Postgres schema. The
+> remaining schemas are `platform` and `email`; the `platform.__drizzle_migrations`
+> bookkeeping table stays. The current "what exists / what does not" table is in
 > [`Database-Local.md`](Database-Local.md) §9.
 
 Schema work uses the Drizzle toolchain wired into the API package:

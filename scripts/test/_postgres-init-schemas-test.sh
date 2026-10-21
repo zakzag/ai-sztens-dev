@@ -118,27 +118,28 @@ psql_q() {
 
 assert_schemas_present() {
   local label="$1" got
-  got="$(psql_q "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','callback','email')")"
-  [ "$got" = "3" ] && ok "$label: platform, callback, email schemas exist" \
-    || bad "$label: three schemas exist" "count=$got (expected 3)"
+  # AIS-64 removed the `callback` context, so two schemas remain.
+  got="$(psql_q "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','email')")"
+  [ "$got" = "2" ] && ok "$label: platform and email schemas exist" \
+    || bad "$label: two schemas exist" "count=$got (expected 2)"
 }
 
 assert_usage() {
   local label="$1"
   local role got
   for role in aisztens tkovari krak; do
-    got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('callback'),('email')) AS s(nspname) WHERE has_schema_privilege('$role', s.nspname, 'USAGE')")"
-    [ "$got" = "3" ] && ok "$label: $role has USAGE on all three schemas" \
-      || bad "$label: $role has USAGE on all three schemas" "count=$got (expected 3)"
+    got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('email')) AS s(nspname) WHERE has_schema_privilege('$role', s.nspname, 'USAGE')")"
+    [ "$got" = "2" ] && ok "$label: $role has USAGE on both schemas" \
+      || bad "$label: $role has USAGE on both schemas" "count=$got (expected 2)"
   done
 }
 
-# Expected: CREATE only for the app role, and only in the two schemas it
-# writes to — `callback` (domain tables) and `platform` (the Drizzle
-# bookkeeping table `platform.__drizzle_migrations`, see the AIS-36 plan).
+# Expected: CREATE only for the app role, and only in `platform` (the Drizzle
+# bookkeeping table `platform.__drizzle_migrations` plus the tables created by
+# migrations, e.g. `platform.api_keys`). AIS-64 removed the `callback` schema.
 assert_create_privileges() {
   local label="$1" got schema role
-  for schema in callback platform; do
+  for schema in platform; do
     got="$(psql_q "SELECT has_schema_privilege('aisztens','$schema','CREATE')")"
     [ "$got" = "t" ] && ok "$label: aisztens may CREATE objects in $schema" \
       || bad "$label: aisztens may CREATE objects in $schema" "got=$got (expected t)"
@@ -164,13 +165,13 @@ assert_roles_present() {
 # a live `pnpm test:stack` run.
 assert_smoke_queries() {
   local label="$1" got
-  got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('callback'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')")"
-  [ "$got" = "9" ] && ok "$label: smoke USAGE query returns 9" \
-    || bad "$label: smoke USAGE query returns 9" "count=$got (expected 9)"
+  got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')")"
+  [ "$got" = "6" ] && ok "$label: smoke USAGE query returns 6" \
+    || bad "$label: smoke USAGE query returns 6" "count=$got (expected 6)"
 
-  got="$(psql_q "SELECT count(*) FROM (VALUES ('callback'),('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')")"
-  [ "$got" = "2" ] && ok "$label: smoke CREATE query returns 2" \
-    || bad "$label: smoke CREATE query returns 2" "count=$got (expected 2)"
+  got="$(psql_q "SELECT count(*) FROM (VALUES ('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')")"
+  [ "$got" = "1" ] && ok "$label: smoke CREATE query returns 1" \
+    || bad "$label: smoke CREATE query returns 1" "count=$got (expected 1)"
 }
 
 echo "--- fresh init (entrypoint) ---"

@@ -23,7 +23,7 @@
 #
 # WHERE THE SCHEMA DDL LIVES
 # --------------------------
-# The per-context schemas (`platform`, `callback`, `email`) are created by
+# The per-context schemas (`platform`, `email`) are created by
 # 02-schemas.sh, which the entrypoint runs after this file. The schema-level
 # GRANT block at the end of this file is therefore a no-op on a fresh init and
 # only takes effect when this file is re-applied to an already initialized
@@ -65,25 +65,29 @@ ALTER ROLE krak WITH LOGIN PASSWORD :'krak_db_password';
 ALTER DATABASE :"postgres_db" OWNER TO :"aisztens_db_user";
 GRANT CONNECT ON DATABASE :"postgres_db" TO tkovari, krak;
 
--- Schema-level privileges (AIS-35). Same matrix as 02-schemas.sh:
+-- Schema-level privileges (AIS-35, narrowed by AIS-64). Same matrix as
+-- 02-schemas.sh:
 --
 --   schema      aisztens (app)        tkovari (owner)   krak (operator)
 --   platform    USAGE + CREATE        USAGE             USAGE
---   callback    USAGE + CREATE        USAGE             USAGE
 --   email       USAGE                 USAGE             USAGE
+--
+-- The `callback` schema is gone (AIS-64): the whole call-back feature, its
+-- tables and its admin/web pages were removed. New domain tables live in
+-- `platform` (see `platform.api_keys`, AIS-39) and `email`.
 --
 -- The join on pg_namespace makes this a no-op when the schemas do not exist
 -- yet, i.e. on a fresh init where 02-schemas.sh has not run.
 SELECT format('GRANT USAGE ON SCHEMA %I TO %I', s.nspname, r.rolname)
-  FROM (VALUES ('platform'), ('callback'), ('email')) AS s(nspname)
+  FROM (VALUES ('platform'), ('email')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
   CROSS JOIN (VALUES (:'aisztens_db_user'), ('tkovari'), ('krak')) AS r(rolname)
 \gexec
 
--- Object creation stays with the application role: `callback` for the domain
--- tables, `platform` for the Drizzle bookkeeping table.
+-- Object creation stays with the application role: `platform` holds both the
+-- Drizzle bookkeeping table and the application tables created by migrations.
 SELECT format('GRANT CREATE ON SCHEMA %I TO %I', s.nspname, :'aisztens_db_user')
-  FROM (VALUES ('callback'), ('platform')) AS s(nspname)
+  FROM (VALUES ('platform')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
 \gexec
 EOSQL

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { join } from 'node:path';
+import { ApiKeysModule } from './api-keys/api-keys.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DatabaseModule } from './db/database.module.js';
@@ -44,6 +45,7 @@ const envFilePaths: string[] =
     }),
     DatabaseModule,
     HealthModule,
+    ApiKeysModule,
     VapiWebhooksModule,
   ],
   controllers: [AppController],

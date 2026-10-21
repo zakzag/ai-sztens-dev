@@ -2,7 +2,7 @@
 
 **Státusz:** Élő
 
-**Utolsó frissítés:** 2026-10-21 (AIS-39: elkészült az első valódi domain tábla, a `platform.api_keys` — `0002` migráció, uuid PK, `api_keys_identifier_key` egyedi constraint az `identifier`-en, `timestamptz` időbélyegek, `getTableConfig()`-alapú egységtesztek. AIS-56: elkészült a `DatabaseModule` — `DATABASE` provider a Drizzle handle-hez, `DATABASE_URL` a `ConfigService`-ből, hangos boot-hiba hiányzó URL-re, `client.end()` leállításkor. AIS-64: a teljes callback kontextus törölve — `callback.callback_requests`, `callback.call_status` **és** a `callback` Postgres séma; a `0001` migráció a táblát és az enumot dobja el, a sémát meglevő volume-on egyszeri superuser lépés viszi el. AIS-37: a repository szerződés + unit tesztek elkészültek, de a repository az AIS-64-gyel törlődött. AIS-36: a `db:migrate` létrehozta a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
+**Utolsó frissítés:** 2026-10-21 (AIS-40: a `platform.api_keys` tábla **első fogyasztója** elkészült — `api-keys` modul (`DrizzleApiKeysRepository` a `API_KEYS_REPOSITORY` tokenen, service, controller, DTO), `GET /api/api-keys`, `GET /api/api-keys/:identifier`, `POST /api/api-keys`; duplikált `identifier` → `409`, ismeretlen azonosító → `404`, érvénytelen payload → `400`. A duplikátum-detektálás a `23505` + `api_keys_identifier_key` párost használja a Drizzle `cause`-láncában. AIS-39: elkészült az első valódi domain tábla, a `platform.api_keys` — `0002` migráció, uuid PK, `api_keys_identifier_key` egyedi constraint az `identifier`-en, `timestamptz` időbélyegek, `getTableConfig()`-alapú egységtesztek. AIS-56: elkészült a `DatabaseModule` — `DATABASE` provider a Drizzle handle-hez, `DATABASE_URL` a `ConfigService`-ből, hangos boot-hiba hiányzó URL-re, `client.end()` leállításkor. AIS-64: a teljes callback kontextus törölve — `callback.callback_requests`, `callback.call_status` **és** a `callback` Postgres séma; a `0001` migráció a táblát és az enumot dobja el, a sémát meglevő volume-on egyszeri superuser lépés viszi el. AIS-37: a repository szerződés + unit tesztek elkészültek, de a repository az AIS-64-gyel törlődött. AIS-36: a `db:migrate` létrehozta a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
 
 **Kapcsolódik:** [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2, [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml), [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml), [`infra/postgres/init/`](../../infra/postgres/init/), [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh), [`scripts/README.md`](../../scripts/README.md)
 
@@ -305,8 +305,20 @@ Friss volume-on erre nincs szükség: a `02-schemas.sh` már csak `platform`-ot 
 
 Ebből következik, hogy a lokális DB-ben **ma** a `platform.api_keys` tábla (és a
 vele járó egyedi constraint) az, amit érdemes ellenőrizni a séma-szintű eredmények
-mellett (§6). A táblát egyelőre **semmi nem használja**: a repository és a HTTP
-végpontok az AIS-40-ben jönnek, addig csak a migráció hozza létre.
+mellett (§6).
+
+A táblát az **AIS-40** óta az API használja: írás/olvasás a
+[`api-keys` modulon](../../apps/api/src/api-keys/api-keys.module.ts) keresztül
+(`GET /api/api-keys`, `GET /api/api-keys/:identifier`, `POST /api/api-keys`). A
+`23505` + `api_keys_identifier_key` páros a `409 Conflict` forrása, tehát a named
+constraint nem esztétikai döntés: a HTTP-viselkedés függ tőle.
+
+Két ismert korlát tartozik ide:
+
+| Korlát | Következmény |
+|---|---|
+| a végpontok **autentikáció nélkül** futnak | az `api_key` érték a válaszban szerepel; éles forgalom előtt az auth story-nak meg kell jelennie |
+| a tábla egyelőre **nagyon kevés** sort tartalmaz, ezért nincs lapozás | a lista `created_at DESC` sorrendben, teljes egészében jön vissza |
 
 ---
 

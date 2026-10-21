@@ -310,6 +310,16 @@ one place, the others propagate.
   The banner is the fastest diagnosis: a `dev` label on a developer machine means
   the CORS list belongs to the droplet, not to your machine.
 
+- **A SPA deep link can be swallowed by the `/api` dev proxy.** Opening
+  `http://localhost:5174/api-keys` directly returned the API's
+  `{"message":"Cannot GET /api-keys","statusCode":404}`, because a plain `'/api'`
+  proxy key is a *prefix* match. Fixed by using the regex `'^/api/'` in
+  [`apps/admin/vite.config.ts`](../../apps/admin/vite.config.ts:16) and
+  [`apps/web/vite.config.ts`](../../apps/web/vite.config.ts:16); check with
+  `curl -s -o NUL -w "%{http_code} %{content_type}\n" http://localhost:5174/api-keys`
+  → `200 text/html`, while `/api/api-keys` must stay `200 application/json`.
+  Vite restarts itself when the config file changes, no manual restart needed.
+
 - **The SPA API URL is baked into the image at build time, not read from a
   droplet-side file.** The image-based deploy (2026-10-08) retired the
   host-side `apps/{web,admin}/.env.dev` files and the

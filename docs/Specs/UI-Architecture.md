@@ -200,4 +200,27 @@ pnpm test
 `pnpm --filter @callback/admin build` is also the check that the Tailwind
 `@source` registration works: the emitted `dist/assets/*.css` must contain the
 token utilities (`shadow-neu-raised`, `bg-primary`, `rounded-control`, …).
+
+### 8.1 SPA deep link through the dev proxy
+
+Every client-side route must survive a **direct load**, because a user can paste or reload
+`http://localhost:5174/<route>`. The trap is the dev proxy: a plain `'/api'` key in
+`apps/admin/vite.config.ts` is a *prefix* match, so it also captures SPA routes that merely
+start with `/api` — `/api-keys` was forwarded to the NestJS API, which answered
+`{"message":"Cannot GET /api-keys","statusCode":404}`. The proxy key is therefore the regex
+**`'^/api/'`** (see the comment in the config); the same applies to `apps/web`.
+
+```bash
+# deep link must be the SPA shell, not JSON
+curl -s -o NUL -w "%{http_code} %{content_type}\n" http://localhost:5174/api-keys
+#   expect: 200 text/html
+
+# the actual API call must still be proxied
+curl -s -o NUL -w "%{http_code} %{content_type}\n" http://localhost:5174/api/api-keys
+#   expect: 200 application/json
+```
+
+Invariant: **no SPA route may collide with the API base path prefix.** Production is safe by
+construction (Caddy `handle /api/*`, nginx `try_files … /index.html`), only the Vite dev server
+needs the regex.
 The palette check in §3.3 is part of the definition of done as well.

@@ -106,3 +106,15 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Source of truth: .roo/rules/
 .cursor/rules/project.mdc
 .cursor/rules/project.mdc.bak
+.github/copilot-instructions.md
+.github/copilot-instructions.md.bak
+.github/chatmodes/jira-ticket-writer.chatmode.md
+.github/chatmodes/jira-ticket-writer.chatmode.md.bak
+CLAUDE.md
+CLAUDE.md.bak
+.claude/agents/jira-ticket-writer.md
+.claude/agents/jira-ticket-writer.md.bak
+.cursor/commands/jira-ticket-writer.md
+.cursor/commands/jira-ticket-writer.md.bak
+.cursor/rules/jira-ticket-writer.mdc
+.cursor/rules/jira-ticket-writer.mdc.bak

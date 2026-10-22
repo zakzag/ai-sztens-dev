@@ -1,0 +1,7 @@
+{
+  "jira-ticket-writer": {
+    "emit": ["copilot-chatmode", "claude-agent", "cursor-command", "cursor-rule"],
+    "copilotTools": ["codebase", "search", "usages", "problems", "editFiles", "runCommands", "mcpServers"],
+    "claudeTools": ["Read", "Grep", "Glob", "Edit", "Write", "Bash", "WebFetch", "mcp__atlassian"]
+  }
+}

@@ -15,9 +15,14 @@
     "test:e2e": "pnpm --filter @callback/api test:e2e",
     "test:stack": "bash scripts/test/stack-smoke.sh",
     "test:stack:up": "bash scripts/test/stack-up.sh",
-    "test:stack:down": "bash scripts/test/stack-down.sh"
+    "test:stack:down": "bash scripts/test/stack-down.sh",
+    "sonar": "pnpm sonar:coverage && pnpm sonar:scan",
+    "sonar:scan": "node scripts/sonar/scan.mjs",
+    "sonar:coverage": "pnpm --filter @callback/shared test:cov && pnpm --filter @callback/api-client test:cov && pnpm --filter @callback/ui test:cov && pnpm --filter @callback/admin test:cov && pnpm --filter @callback/api test:cov && node scripts/sonar/lcov-merge.mjs",
+    "sonar:test": "node --test scripts/sonar/lcov-merge.test.mjs scripts/sonar/scan-config.test.mjs scripts/sonar/scan.test.mjs"
   },
   "devDependencies": {
+    "@sonar/scan": "^4.4.0",
     "concurrently": "^9.2.4",
     "prettier": "^3.9.9"
   }

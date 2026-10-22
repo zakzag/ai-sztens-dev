@@ -25,6 +25,11 @@ lerna-debug.log*
 # Tests
 .nyc_output/
 
+# SonarQube local analysis (scanner cache + git-ignored credentials).
+# `sonar.env` holds SONAR_TOKEN; the documented template is `sonar.env.example`.
+.scannerwork/
+sonar.env
+
 # IDEs and editors
 .idea/
 .vscode/*

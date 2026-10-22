@@ -17,5 +17,14 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     restoreMocks: true,
     clearMocks: true,
+    // `pnpm sonar:coverage` consumes this report; scripts/sonar/lcov-merge.mjs
+    // rewrites its paths to be repo-root relative for SonarQube.
+    coverage: {
+      provider: 'v8',
+      reporter: ['lcov'],
+      reportsDirectory: '../../coverage/admin',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/vite-env.d.ts'],
+    },
   },
 });

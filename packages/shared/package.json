@@ -14,7 +14,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --coverageReporters=lcov --coverageDirectory=../../coverage/shared"
   },
   "dependencies": {
     "zod": "^3.24.1"
@@ -28,13 +29,19 @@
   },
   "jest": {
     "preset": "ts-jest/presets/default-esm",
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "rootDir": ".",
     "testRegex": "test/.*\\.test\\.ts$",
-    "extensionsToTreatAsEsm": [".ts"],
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
     "transform": {
       "^.+\\.(t|j)s$": [
         "ts-jest",
@@ -43,7 +50,9 @@
         }
       ]
     },
-    "collectCoverageFrom": ["src/**/*.(t|j)s"],
+    "collectCoverageFrom": [
+      "src/**/*.(t|j)s"
+    ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }

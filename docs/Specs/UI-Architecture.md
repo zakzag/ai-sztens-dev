@@ -1,6 +1,6 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-10-21
+**Utolsó frissítés:** 2026-10-22
 **Status:** living document — describes the *current* state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -169,6 +169,7 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 | `react-router-dom` | `apps/admin` | routing | installed |
 | `@callback/shared`, `@callback/ui`, `@callback/api-client` | `apps/admin` | workspace packages | installed |
 | `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` | `packages/ui`, `apps/admin` | component + hook tests | installed |
+| `@vitest/coverage-v8` | `packages/ui`, `apps/admin` | LCOV coverage for the SonarQube report (`test:cov` → `pnpm sonar:coverage`, see [`SonarQube.md`](SonarQube.md)) | installed (`^3.2.4`) |
 | `jest`, `ts-jest`, `@types/jest` | `packages/shared`, `packages/api-client` | framework-free package tests (D13) | installed |
 | `eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`, `@eslint/js` | `apps/admin` | lint harness | installed |
 | `react-hook-form` | `apps/admin` | form-state bucket (`ApiKeyForm`) | installed (`^7.54.2`, resolved 7.90.0) |
@@ -192,6 +193,10 @@ pnpm --filter @callback/ui build      # tsc type check only
 pnpm --filter @callback/admin test
 pnpm --filter @callback/admin lint
 pnpm --filter @callback/admin build
+
+# coverage for SonarQube (writes coverage/ui|admin/lcov.info)
+pnpm --filter @callback/ui test:cov
+pnpm --filter @callback/admin test:cov
 
 # everything, from the repo root
 pnpm test

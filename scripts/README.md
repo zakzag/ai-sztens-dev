@@ -17,6 +17,7 @@ scripts/
 ├── test-syntax.ps1      # PowerShell syntax guard for init.ps1
 ├── env-test/            # .env validation suite        → env-test/README.md
 ├── ssh/                 # local SSH key tooling        → ssh/README.md
+├── sonar/               # local SonarQube analysis     → sonar/README.md
 └── test/                # container stack smoke suite  → test/README.md
 ```
 
@@ -77,13 +78,36 @@ error. A cheap pre-flight check after editing the init scripts.
 powershell -File scripts/test-syntax.ps1
 ```
 
+### `sonar/` — local SonarQube analysis
+
+Runs a SonarQube analysis of the whole monorepo against an already running server, using the
+`@sonar/scan` dev dependency (no separate scanner CLI install). Driven by the root scripts
+`pnpm sonar`, `pnpm sonar:coverage`, `pnpm sonar:scan` and `pnpm sonar:test`; configuration
+lives in [`sonar-project.properties`](../sonar-project.properties) and the credentials in
+`SONAR_TOKEN` / `SONAR_HOST_URL` (or the git-ignored `sonar.env`).
+
+```bash
+cp sonar.env.example sonar.env   # then fill in SONAR_TOKEN
+pnpm sonar
+```
+
+- **Pre-flight:** `/api/system/status` must answer `UP`, otherwise the script stops before
+  downloading anything.
+- **Exit codes:** `0` success, `1` missing token / unreachable server / scanner failure.
+- **Coverage:** `lcov-merge.mjs` rewrites the per-package LCOV paths to repo-root relative and
+  writes `coverage/lcov.info` (consumed via `sonar.javascript.lcov.reportPaths`).
+
+See [`sonar/README.md`](sonar/README.md) for the file-level breakdown and
+[`docs/Specs/SonarQube.md`](../docs/Specs/SonarQube.md) for prerequisites and troubleshooting.
+
 ## Folders
 
-| Folder | What it is | Documentation |
-|---|---|---|
-| [`test/`](test/README.md) | Container-level smoke suite for the `infra/docker-compose.yml` stack (api / postgres / caddy / monitor), wired to `pnpm test:stack`, **plus** the offline `_deploy-sh-*.sh` suites that exercise `deploy/deploy.sh` without a droplet (argument/target handling, the logger, the env-file paths, the remote identity), `_postgres-init-schemas-test.sh` (throwaway Postgres with the real init scripts mounted), and `_stack-env-default-test.sh` (three-env leftover defaults + the legacy `infra/.env` deploy.sh hard-reject). | [`test/README.md`](test/README.md) |
-| [`env-test/`](env-test/README.md) | `.env` validation: an offline syntax/consistency checker plus an explicit live-access checker. | [`env-test/README.md`](env-test/README.md) |
-| [`ssh/`](ssh/README.md) | Local SSH key tooling (PPK → OpenSSH conversion, key inspection, passphrase removal). | [`ssh/README.md`](ssh/README.md) |
+| Folder                            | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Documentation                              |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| [`test/`](test/README.md)         | Container-level smoke suite for the `infra/docker-compose.yml` stack (api / postgres / caddy / monitor), wired to `pnpm test:stack`, **plus** the offline `_deploy-sh-*.sh` suites that exercise `deploy/deploy.sh` without a droplet (argument/target handling, the logger, the env-file paths, the remote identity), `_postgres-init-schemas-test.sh` (throwaway Postgres with the real init scripts mounted), and `_stack-env-default-test.sh` (three-env leftover defaults + the legacy `infra/.env` deploy.sh hard-reject). | [`test/README.md`](test/README.md)         |
+| [`env-test/`](env-test/README.md) | `.env` validation: an offline syntax/consistency checker plus an explicit live-access checker.                                                                                                                                                                                                                                                                                                                                                                                                                                   | [`env-test/README.md`](env-test/README.md) |
+| [`ssh/`](ssh/README.md)           | Local SSH key tooling (PPK → OpenSSH conversion, key inspection, passphrase removal).                                                                                                                                                                                                                                                                                                                                                                                                                                            | [`ssh/README.md`](ssh/README.md)           |
+| [`sonar/`](sonar/README.md)       | Local SonarQube analysis: config validation + server pre-flight, then `@sonar/scan`; plus the LCOV merge that makes monorepo coverage readable by SonarQube.                                                                                                                                                                                                                                                                                                                                                                     | [`sonar/README.md`](sonar/README.md)       |
 
 ## Conventions
 

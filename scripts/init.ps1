@@ -204,7 +204,8 @@ function Write-Target {
     # NOTE: Split-Path has no -LiteralPath in Windows PowerShell 5.1.
     $dir = Split-Path -Path $Path -Parent
     if ($dir -and -not (Test-Path -LiteralPath $dir)) {
-        New-Item -ItemType Directory -LiteralPath $dir -Force | Out-Null
+        # NOTE: New-Item has no -LiteralPath in Windows PowerShell 5.1 either.
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
 
     if (Test-File $Path) {

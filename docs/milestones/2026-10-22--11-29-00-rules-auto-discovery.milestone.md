@@ -26,9 +26,10 @@ Additionally, `powershell -File scripts/init.ps1` aborted at the write step on W
 ## Root cause
 
 1. The source set was a literal array instead of a directory listing — a maintenance liability.
-2. Windows PowerShell 5.1 has **no `-LiteralPath`** on `Split-Path`, so `Write-Target` threw
-   `ParameterBindingException` on every run (the script had therefore never produced a file on
-   this workstation).
+2. Windows PowerShell 5.1 has **no `-LiteralPath`** on `Split-Path` or `New-Item`, so `Write-Target`
+   threw `ParameterBindingException` on every run (the script had therefore never produced a file
+   on this workstation, and the Cursor run additionally failed on `New-Item` because the
+   `.cursor/rules/` directory did not exist yet).
 3. Independently, the two scripts disagreed byte-wise: bash emitted the literal text
    `\xe2\x80\x94` instead of an em dash, dropped trailing blank lines, wrote no final newline,
    while PowerShell added a UTF-8 **BOM** and CRLF — the BOM breaks the Cursor `.mdc` frontmatter.
@@ -50,7 +51,7 @@ Additionally, `powershell -File scripts/init.ps1` aborted at the write step on W
 
 | File | Change |
 |---|---|
-| `scripts/init.ps1` | `$SourcePattern`/`$PrimarySourceName` constants; `Get-RuleSourceNames()` discovery + ordering; warning on missing `instructions.md`, fatal on empty dir; LF/no-BOM writes; `Split-Path -Path` fix; diagnostics in `catch` |
+| `scripts/init.ps1` | `$SourcePattern`/`$PrimarySourceName` constants; `Get-RuleSourceNames()` discovery + ordering; warning on missing `instructions.md`, fatal on empty dir; LF/no-BOM writes; `Split-Path -Path` + `New-Item -Path` fixes; diagnostics in `catch` |
 | `scripts/init.sh` | `SOURCE_PATTERN`/`PRIMARY_SOURCE_NAME` + `discover_source_files()`; sentinel read preserving trailing blank lines; `${EM_DASH}` via ANSI-C quoting; CRLF-tolerant `.gitignore` match |
 | `scripts/README.md` | Documents the discovery + ordering contract |
 

@@ -28,4 +28,10 @@ describe('Badge', () => {
 
     expect(screen.getByText('Aktív').className).toContain('ml-2');
   });
+
+  it('paints its outline with the dark hairline token', () => {
+    render(<Badge>Semleges</Badge>);
+
+    expect(screen.getByText('Semleges').className).toContain('border-border-hairline');
+  });
 });

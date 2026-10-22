@@ -12,51 +12,56 @@
  * Colour literals are allowed *only* here. Everywhere under `apps/*\/src` the
  * tokens below are the exclusive source of colour
  * (see `.roo/rules/react.coding-standards.md` §7).
+ *
+ * Theme identity (2026-10-22, admin retheme): graphite / ash surfaces with a
+ * teal-cyan accent. Every border colour is a *dark* token — the theme never
+ * relies on `currentColor` for borders, so no component can pick up the
+ * near-white text colour as its outline.
  */
 
 @theme {
   /* Brand ------------------------------------------------------------- */
-  --color-primary: oklch(0.63 0.19 274);
-  --color-primary-hover: oklch(0.69 0.17 274);
-  --color-primary-foreground: oklch(0.99 0.004 274);
-  --color-secondary: oklch(0.6 0.13 210);
-  --color-secondary-foreground: oklch(0.99 0.004 210);
-  --color-tertiary: oklch(0.68 0.15 322);
-  --color-quaternary: oklch(0.72 0.12 168);
+  --color-primary: oklch(0.66 0.14 195);
+  --color-primary-hover: oklch(0.72 0.13 195);
+  --color-primary-foreground: oklch(0.16 0.02 195);
+  --color-secondary: oklch(0.62 0.12 250);
+  --color-secondary-foreground: oklch(0.15 0.015 250);
+  --color-tertiary: oklch(0.7 0.13 320);
+  --color-quaternary: oklch(0.74 0.11 150);
 
   /* Surfaces ---------------------------------------------------------- */
-  --color-surface-base: oklch(0.22 0.012 265);
-  --color-surface-raised: oklch(0.26 0.014 265);
-  --color-surface-sunken: oklch(0.19 0.012 265);
-  --color-surface-overlay: oklch(0.3 0.016 265);
+  --color-surface-base: oklch(0.17 0.008 250);
+  --color-surface-raised: oklch(0.215 0.009 250);
+  --color-surface-sunken: oklch(0.135 0.008 250);
+  --color-surface-overlay: oklch(0.255 0.01 250);
 
   /* Borders ----------------------------------------------------------- */
-  --color-border-hairline: oklch(0.33 0.014 265);
-  --color-border-default: oklch(0.4 0.016 265);
-  --color-border-strong: oklch(0.5 0.02 265);
-  --color-border-focus: oklch(0.7 0.16 274);
+  --color-border-hairline: oklch(0.3 0.01 250);
+  --color-border-default: oklch(0.36 0.012 250);
+  --color-border-strong: oklch(0.45 0.015 250);
+  --color-border-focus: oklch(0.72 0.14 195);
 
   /* Text -------------------------------------------------------------- */
-  --color-text-primary: oklch(0.97 0.004 265);
-  --color-text-secondary: oklch(0.82 0.01 265);
-  --color-text-muted: oklch(0.68 0.012 265);
-  --color-text-inverse: oklch(0.22 0.012 265);
+  --color-text-primary: oklch(0.95 0.004 250);
+  --color-text-secondary: oklch(0.8 0.008 250);
+  --color-text-muted: oklch(0.65 0.01 250);
+  --color-text-inverse: oklch(0.17 0.008 250);
 
   /* State ------------------------------------------------------------- */
-  --color-success: oklch(0.64 0.15 156);
-  --color-success-foreground: oklch(0.99 0.01 156);
-  --color-warning: oklch(0.78 0.15 82);
-  --color-warning-foreground: oklch(0.24 0.03 82);
-  --color-danger: oklch(0.62 0.2 22);
-  --color-danger-foreground: oklch(0.99 0.01 22);
-  --color-info: oklch(0.68 0.13 236);
-  --color-info-foreground: oklch(0.99 0.01 236);
+  --color-success: oklch(0.66 0.14 158);
+  --color-success-foreground: oklch(0.15 0.02 158);
+  --color-warning: oklch(0.8 0.14 80);
+  --color-warning-foreground: oklch(0.2 0.03 80);
+  --color-danger: oklch(0.63 0.19 25);
+  --color-danger-foreground: oklch(0.99 0.01 25);
+  --color-info: oklch(0.68 0.11 240);
+  --color-info-foreground: oklch(0.15 0.02 240);
 
   /* Depth ------------------------------------------------------------- */
-  --shadow-neu-raised: 4px 4px 10px oklch(0.14 0.01 265 / 0.7), -3px -3px 9px oklch(1 0 0 / 0.05);
-  --shadow-neu-inset: inset 3px 3px 7px oklch(0.14 0.01 265 / 0.75), inset -2px -2px 6px oklch(1 0 0 / 0.04);
-  --shadow-neu-pressed: inset 2px 2px 5px oklch(0.14 0.01 265 / 0.8), inset -1px -1px 4px oklch(1 0 0 / 0.03);
-  --shadow-focus-ring: 0 0 0 3px oklch(0.7 0.16 274 / 0.35);
+  --shadow-neu-raised: 4px 4px 10px oklch(0.1 0.008 250 / 0.8), -3px -3px 9px oklch(0.45 0.012 250 / 0.22);
+  --shadow-neu-inset: inset 3px 3px 7px oklch(0.1 0.008 250 / 0.85), inset -2px -2px 6px oklch(0.45 0.012 250 / 0.16);
+  --shadow-neu-pressed: inset 2px 2px 5px oklch(0.1 0.008 250 / 0.9), inset -1px -1px 4px oklch(0.45 0.012 250 / 0.12);
+  --shadow-focus-ring: 0 0 0 3px oklch(0.72 0.14 195 / 0.35);
 
   /* Shape ------------------------------------------------------------- */
   --radius-control: 0.625rem;
@@ -98,11 +103,40 @@
 }
 
 @layer base {
+  /**
+   * Tailwind v4 preflight leaves `border-color` at `currentColor`, which made
+   * every `border`/`border-b`/`border-t` that only sets a *width* inherit the
+   * near-white text colour (the "whitish outlines" defect). Resetting the
+   * default to the dark hairline token means a border is dark unless a
+   * component explicitly asks for another colour token.
+   *
+   * Declared in the `base` layer on purpose: the `utilities` layer comes after
+   * it, so `border-danger`, `border-info`, `border-border-focus` and friends
+   * still win.
+   */
+  *,
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border-hairline);
+  }
+
   body {
     background-color: var(--color-surface-base);
     color: var(--color-text-primary);
     color-scheme: dark;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Native widget accents (caret, selection) follow the brand accent. */
+  ::selection {
+    background-color: oklch(0.66 0.14 195 / 0.35);
+    color: var(--color-text-primary);
+  }
+
+  :focus-visible {
+    outline-color: var(--color-border-focus);
   }
 }

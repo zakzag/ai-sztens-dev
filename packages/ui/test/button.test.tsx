@@ -25,6 +25,15 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Alap' }).className).toContain('bg-primary');
   });
 
+  it('paints its outline with the dark hairline token instead of currentColor', () => {
+    render(<Button>Alap</Button>);
+
+    const className = screen.getByRole('button', { name: 'Alap' }).className;
+
+    expect(className).toContain('border-border-hairline');
+    expect(className).not.toContain('border-current');
+  });
+
   it('applies the danger variant classes', () => {
     render(<Button variant="danger">Törlés</Button>);
 

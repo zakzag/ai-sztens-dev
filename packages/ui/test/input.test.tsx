@@ -48,6 +48,15 @@ describe('Input', () => {
     expect(input).not.toHaveAttribute('aria-describedby');
   });
 
+  it('paints the resting border with the dark hairline token', () => {
+    render(<Input id="name" label="Név" />);
+
+    const className = screen.getByLabelText('Név').className;
+
+    expect(className).toContain('border-border-hairline');
+    expect(className).not.toContain('border-current');
+  });
+
   it('renders the invalid recipe when invalid is set without a message', () => {
     render(<Input id="name" label="Név" invalid />);
 

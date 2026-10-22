@@ -58,13 +58,17 @@ sources for class scanning:
 
 ### 3.1 Colour tokens
 
-| Group | Tokens | Typical utility |
-|---|---|---|
-| Brand | `--color-primary`, `--color-primary-hover`, `--color-primary-foreground`, `--color-secondary(-foreground)`, `--color-tertiary`, `--color-quaternary` | `bg-primary`, `text-primary-foreground` |
-| Surface | `--color-surface-base/-raised/-sunken/-overlay` | `bg-surface-raised` |
-| Border | `--color-border-hairline/-default/-strong/-focus` | `border-border-hairline` |
-| Text | `--color-text-primary/-secondary/-muted/-inverse` | `text-text-secondary` |
-| State | `--color-success/-warning/-danger/-info` (+ `-foreground`) | `bg-danger text-danger-foreground` |
+**Theme identity (admin retheme, 2026-10-22):** graphite / ash surfaces (low-chroma
+cool neutrals) with a **teal-cyan accent**. The previous violet palette is gone; token
+*names* are unchanged, so no component had to be touched to pick up the new look.
+
+| Group | Tokens | Typical utility | Role |
+|---|---|---|---|
+| Brand | `--color-primary`, `--color-primary-hover`, `--color-primary-foreground`, `--color-secondary(-foreground)`, `--color-tertiary`, `--color-quaternary` | `bg-primary`, `text-primary-foreground` | teal accent (`195°`), dark ink on the accent |
+| Surface | `--color-surface-base/-raised/-sunken/-overlay` | `bg-surface-raised` | graphite ladder, base darkest at `L≈0.17` |
+| Border | `--color-border-hairline/-default/-strong/-focus` | `border-border-hairline` | **dark** greys (`L≈0.30 / 0.36 / 0.45`) + teal focus |
+| Text | `--color-text-primary/-secondary/-muted/-inverse` | `text-text-secondary` | light greys for the dark surfaces |
+| State | `--color-success/-warning/-danger/-info` (+ `-foreground`) | `bg-danger text-danger-foreground` | saturated fills with dark or white ink respectively |
 
 ### 3.2 Depth, shape, motion, thickness
 
@@ -79,6 +83,25 @@ sources for class scanning:
 custom `@utility` declarations: Tailwind v4 has no theme namespace for border
 widths or transition durations, so the tokens are plain custom properties
 exposed through those utilities (decision **D15**).
+
+### 3.2.1 Default border colour (**D40**)
+
+Tailwind v4 preflight ships `border-style: solid` with **no border colour**, so
+`border-color` resolves to `currentColor`. Every primitive that set only a
+*width* (`border border-hairline`) therefore painted its outline with the
+near-white text token — the "whitish outlines" defect. Two layers of defence:
+
+1. `theme.css` `@layer base` sets `border-color: var(--color-border-hairline)`
+   for `*, ::before, ::after, ::backdrop, ::file-selector-button`. The
+   `utilities` layer is emitted after `base`, so `border-danger`,
+   `border-info`, `border-border-focus` and friends still win.
+2. Every primitive states its resting outline explicitly
+   (`border border-hairline border-border-hairline`) so the colour survives even
+   if the base reset is ever removed.
+
+Rule of thumb: a `border`/`border-b`/`border-t` utility **without** a colour
+token now renders dark grey by default — never light. If a component needs a
+non-default outline, it must name a border/state token.
 
 ### 3.3 Non-negotiable styling rules
 

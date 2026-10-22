@@ -8,7 +8,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
  * grow it without being able to break the layout horizontally.
  */
 export const textareaVariants = cva(
-  'block w-full resize-y rounded-control border border-hairline bg-surface-sunken px-3 py-2 text-sm text-text-primary shadow-neu-inset transition-shadow duration-fast placeholder:text-text-muted focus-visible:outline-none focus-visible:border-border-focus focus-visible:shadow-focus-ring disabled:cursor-not-allowed disabled:opacity-60',
+  'block w-full resize-y rounded-control border border-hairline border-border-hairline bg-surface-sunken px-3 py-2 text-sm text-text-primary shadow-neu-inset transition-shadow duration-fast placeholder:text-text-muted focus-visible:outline-none focus-visible:border-border-focus focus-visible:shadow-focus-ring disabled:cursor-not-allowed disabled:opacity-60',
   {
     variants: {
       invalid: {

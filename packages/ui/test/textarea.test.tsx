@@ -48,6 +48,15 @@ describe('Textarea', () => {
     expect(field).not.toHaveAttribute('aria-describedby');
   });
 
+  it('paints the resting border with the dark hairline token', () => {
+    render(<Textarea id="description" label="Leírás" />);
+
+    const className = screen.getByLabelText('Leírás').className;
+
+    expect(className).toContain('border-border-hairline');
+    expect(className).not.toContain('border-current');
+  });
+
   it('renders the invalid recipe when invalid is set without a message', () => {
     render(<Textarea id="description" label="Leírás" invalid />);
 

@@ -34,4 +34,13 @@ describe('Card', () => {
     expect(container.firstElementChild).toBeInTheDocument();
     expect(container.firstElementChild).toBeEmptyDOMElement();
   });
+
+  it('paints its outline with the dark hairline token instead of currentColor', () => {
+    const { container } = render(<Card>Tartalom</Card>);
+
+    const className = container.firstElementChild?.className ?? '';
+
+    expect(className).toContain('border-border-hairline');
+    expect(className).not.toContain('border-current');
+  });
 });

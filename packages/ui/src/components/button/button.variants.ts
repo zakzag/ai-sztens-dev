@@ -2,10 +2,15 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 /**
  * Visual recipes for {@link Button}. The base string carries layout, shape,
- * border width, motion and focus tokens; the variants only swap surfaces.
+ * border width **and border colour**, motion and focus tokens; the variants
+ * only swap surfaces.
+ *
+ * `border-border-hairline` is explicit on purpose: Tailwind v4 leaves
+ * `border-color` at `currentColor`, which painted the outline with the
+ * near-white text token. Borders are dark tokens only.
  */
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-control border border-hairline font-medium transition-shadow duration-fast focus-visible:outline-none focus-visible:border-border-focus focus-visible:shadow-focus-ring disabled:cursor-not-allowed disabled:opacity-60',
+  'inline-flex items-center justify-center gap-2 rounded-control border border-hairline border-border-hairline font-medium transition-shadow duration-fast focus-visible:outline-none focus-visible:border-border-focus focus-visible:shadow-focus-ring disabled:cursor-not-allowed disabled:opacity-60',
   {
     variants: {
       variant: {

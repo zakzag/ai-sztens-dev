@@ -70,6 +70,12 @@ describe('Table', () => {
     expect(container.firstElementChild?.className).toContain('overflow-x-auto');
   });
 
+  it('paints the container outline with the dark hairline token', () => {
+    const { container } = renderSampleTable();
+
+    expect(container.firstElementChild?.className).toContain('border-border-hairline');
+  });
+
   it('merges caller class names on the table element', () => {
     render(
       <Table className="text-base">

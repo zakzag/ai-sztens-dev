@@ -61,6 +61,13 @@ agent's instruction file — Copilot → `.github/copilot-instructions.md`, Curs
 `.cursor/rules/project.mdc`, Claude Code → `CLAUDE.md` — keeps a single `.bak` when the content
 changes, and appends the generated path to `.gitignore`.
 
+**Source discovery (both scripts implement the same contract):** every `*.md` file directly
+under `.roo/rules/` is included automatically — adding or removing a rule file needs **no script
+edit**. Output order is `instructions.md` first (when present), then all remaining files
+alphabetically (`LC_ALL=C` in bash, case-insensitive in PowerShell), so both scripts emit
+identical content. Non-`.md` files, zero-byte files and `~$*` temp files are skipped; a missing
+`instructions.md` only produces a warning.
+
 The source of truth is `.roo/rules/`; never edit a generated file by hand. Exit codes: `0`
 success or user quit, `1` fatal error.
 

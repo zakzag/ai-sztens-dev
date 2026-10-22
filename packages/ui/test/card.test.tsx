@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { Card } from '../src/components/card/Card.js';
+import { Card } from '../src';
 
 describe('Card', () => {
   it('renders children as a raised surface', () => {

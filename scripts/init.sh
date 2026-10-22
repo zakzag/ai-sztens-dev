@@ -10,6 +10,13 @@
 #   2) Cursor          -> .cursor/rules/project.mdc
 #   3) Claude Code     -> CLAUDE.md
 #
+# Source discovery:
+#   - Every *.md file directly under .roo/rules/ is included automatically,
+#     so adding or removing a rule file needs no script edit.
+#   - Output order: instructions.md first (when present), then all remaining
+#     files alphabetically (LC_ALL=C, so the order never depends on the locale).
+#     The same contract is implemented in scripts/init.ps1 — keep them in sync.
+#
 # Behaviour:
 #   - Interactive only (no CLI flags) — picks one agent per run.
 #   - Idempotent: if the target file is identical, nothing is written.
@@ -32,12 +39,16 @@ set -euo pipefail
 readonly SCRIPT_NAME="init.sh"
 readonly RULES_DIR=".roo/rules"
 
-# These are the 3 single-source-of-truth files. Order is the output order.
-readonly -a SOURCE_FILES=(
-  "instructions.md"
-  "general.coding-standards.md"
-  "project-context.md"
-)
+# Source discovery contract (mirrored in scripts/init.ps1):
+#   - everything matching SOURCE_PATTERN directly under RULES_DIR is a source;
+#   - PRIMARY_SOURCE_NAME is emitted first when present,
+#   - every other file follows in alphabetical order (LC_ALL=C sort).
+readonly SOURCE_PATTERN="*.md"
+readonly PRIMARY_SOURCE_NAME="instructions.md"
+
+# Em dash (U+2014). ANSI-C quoting is required: a backslash escape inside a
+# plain double-quoted string would end up as the literal text "\xe2\x80\x94".
+readonly EM_DASH=$'\xe2\x80\x94'
 
 # Maps "agent key" -> relative target path + format.
 # "format" = "md" (raw markdown) or "mdc" (frontmatter prepended).
@@ -63,15 +74,6 @@ log_error() { printf '\033[31m[x]\033[0m %s\n' "$*" >&2; }
 # who may source this file).
 has_file() { test -f "$1"; }
 
-# Read file into a variable without losing trailing newlines.
-read_file() {
-  local f="$1"
-  # `cat` followed by `$()` strips trailing newlines; compensate by adding one.
-  # That's safe because the source files already end with a newline anyway.
-  cat "$f"
-  # Ensure trailing newline.
-  printf '\n'
-}
 
 # ---------------------------------------------------------------------------
 # Pre-flight: workspace + source files
@@ -94,29 +96,71 @@ cd_to_repo_root() {
   done
 }
 
-check_source_files() {
-  local missing=()
-  local present=()
-  for f in "${SOURCE_FILES[@]}"; do
-    if has_file "${RULES_DIR}/${f}"; then
-      present+=("${RULES_DIR}/${f}")
-    else
-      missing+=("${RULES_DIR}/${f}")
+# Echo the discovered rule sources (one relative path per line, STDOUT) in
+# output order: PRIMARY_SOURCE_NAME first (when present), then alphabetical.
+discover_source_files() {
+  local names=()
+  local entry name
+
+  # SOURCE_PATTERN stays UNQUOTED on purpose: quoting would suppress pathname
+  # expansion and leave the literal "*.md" string. An unmatched glob expands to
+  # the literal pattern, which `has_file` filters out.
+  # shellcheck disable=SC2086
+  for entry in ${RULES_DIR}/${SOURCE_PATTERN}; do
+    has_file "${entry}" || continue
+    [ -s "${entry}" ] || continue   # skip zero-byte files
+    name="$(basename "${entry}")"
+    case "${name}" in
+      '~$'*) continue ;;            # skip Office/temp lock files
+    esac
+    names+=("${name}")
+  done
+
+  if [[ ${#names[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  local sorted=()
+  while IFS= read -r name; do
+    [[ -n "${name}" ]] && sorted+=("${name}")
+  done < <(printf '%s\n' "${names[@]}" | LC_ALL=C sort)
+
+  for name in "${sorted[@]}"; do
+    if [[ "${name}" == "${PRIMARY_SOURCE_NAME}" ]]; then
+      printf '%s\n' "${RULES_DIR}/${name}"
+      break
     fi
   done
+  for name in "${sorted[@]}"; do
+    [[ "${name}" == "${PRIMARY_SOURCE_NAME}" ]] && continue
+    printf '%s\n' "${RULES_DIR}/${name}"
+  done
+}
+
+check_source_files() {
+  local present=()
+  local f
+  local has_primary=0
+
+  while IFS= read -r f; do
+    [[ -n "${f}" ]] && present+=("${f}")
+  done < <(discover_source_files)
+
+  if [[ ${#present[@]} -eq 0 ]]; then
+    log_error "Egyetlen forrásfájl sem olvasható a ${RULES_DIR}/ alatt." >&2
+    return 1
+  fi
 
   # Logging must go to STDERR — the caller captures this function's stdout
   # via $(...) to read the file list, so any stdout noise would corrupt it.
   for f in "${present[@]}"; do
     log_info "Forrás: ${f}" >&2
+    if [[ "${f}" == "${RULES_DIR}/${PRIMARY_SOURCE_NAME}" ]]; then
+      has_primary=1
+    fi
   done
-  for f in "${missing[@]}"; do
-    log_warn "Hiányzó forrás (kihagyva): ${f}" >&2
-  done
-
-  if [[ ${#present[@]} -eq 0 ]]; then
-    log_error "Egyetlen forrásfájl sem olvasható a ${RULES_DIR}/ alatt." >&2
-    return 1
+  if [[ ${has_primary} -eq 0 ]]; then
+    log_warn "Hiányzó elsődleges forrás (kihagyva): ${RULES_DIR}/${PRIMARY_SOURCE_NAME}" >&2
   fi
 
   # Echo present files, one per line, on STDOUT for the caller to consume.
@@ -133,26 +177,36 @@ build_content() {
   local present_files=("$@")
 
   local body=""
+  local content
   for src in "${present_files[@]}"; do
     body+=$'\n---\n\n'
     body+="## Source: ${src}"$'\n\n'
-    body+="$(read_file "${src}")"
+
+    # Read verbatim, preserving EVERY trailing newline like `Get-Content -Raw`
+    # in scripts/init.ps1. The "x" sentinel survives the command substitution,
+    # which would otherwise strip the source's trailing blank lines.
+    content="$(cat "${src}"; printf 'x')" || return 1
+    body+="${content%x}"
+    if [[ "${body}" != *$'\n' ]]; then
+      body+=$'\n'
+    fi
   done
 
   # Trim leading newline from the first separator for cleanliness.
   body="${body#$'\n'}"
 
   local header
-  header="# AI Agent Instructions \xe2\x80\x94 autogenerated from .roo/rules/"$'\n\n'
+  header="# AI Agent Instructions ${EM_DASH} autogenerated from .roo/rules/"$'\n\n'
   header+="<!-- DO NOT EDIT THIS FILE MANUALLY. -->"$'\n'
-  header+="<!-- Source of truth: .roo/rules/ \xe2\x80\x94 edit those files instead. -->"$'\n'
-  header+="<!-- Regenerate by running: scripts/${SCRIPT_NAME} (or scripts/init.ps1 on Windows) -->"$'\n'
+  header+="<!-- Source of truth: .roo/rules/ ${EM_DASH} edit those files instead. -->"$'\n'
+  # Identical text in scripts/init.ps1 so both scripts produce the same bytes.
+  header+="<!-- Regenerate by running: scripts/init.ps1 or scripts/init.sh -->"$'\n'
 
   local out=""
   if [[ "${format}" == "mdc" ]]; then
     # Cursor MDC frontmatter.
     out+="---"$'\n'
-    out+="description: AIsztens \xe2\x80\x94 project + coding rules (autogenerated from .roo/rules/)"$'\n'
+    out+="description: AIsztens ${EM_DASH} project + coding rules (autogenerated from .roo/rules/)"$'\n'
     out+="globs:"$'\n'
     out+="alwaysApply: true"$'\n'
     out+="---"$'\n\n'
@@ -191,7 +245,8 @@ write_target() {
     log_warn "Régi tartalom elmentve: ${bak}"
   fi
 
-  printf '%s' "${content}" > "${target}"
+  # Exactly one trailing newline, same as scripts/init.ps1.
+  printf '%s\n' "${content}" > "${target}"
   log_ok "Célfájl írva: ${target}"
 }
 
@@ -203,17 +258,18 @@ ensure_gitignore_entry() {
   local path="$1"
 
   if [[ ! -f "${GITIGNORE_FILE}" ]]; then
-    log_warn "${GITIGNORE_FILE} nem létezik \xe2\x80\x94 kézzel add hozzá: ${path}"
+    log_warn "${GITIGNORE_FILE} nem létezik ${EM_DASH} kézzel add hozzá: ${path}"
     return 0
   fi
 
-  # Check whether the path is already listed.
-  if grep -qxF "${path}" "${GITIGNORE_FILE}"; then
+  # Check whether the path is already listed. `tr -d '\r'` keeps the match
+  # working against entries that a Windows editor / init.ps1 wrote with CRLF.
+  if tr -d '\r' < "${GITIGNORE_FILE}" | grep -qxF "${path}"; then
     return 0
   fi
 
   # Append the marker + the path (only first time creates the section).
-  if ! grep -qxF "${GITIGNORE_MARKER}" "${GITIGNORE_FILE}"; then
+  if ! tr -d '\r' < "${GITIGNORE_FILE}" | grep -qxF "${GITIGNORE_MARKER}"; then
     printf '\n%s\n' "${GITIGNORE_MARKER}" >> "${GITIGNORE_FILE}"
     printf '# Source of truth: .roo/rules/\n' >> "${GITIGNORE_FILE}"
   fi
@@ -320,7 +376,7 @@ main() {
 
   printf '\n'
   log_ok "Kész."
-  log_info "Ne feledd: a forrás a ${RULES_DIR}/ \xe2\x80\x94 ne szerkeszd a generált fájlt."
+  log_info "Ne feledd: a forrás a ${RULES_DIR}/ ${EM_DASH} ne szerkeszd a generált fájlt."
   log_info "Újrafuttatás: scripts/${SCRIPT_NAME} (vagy scripts/init.ps1 Windows-on)."
 }
 

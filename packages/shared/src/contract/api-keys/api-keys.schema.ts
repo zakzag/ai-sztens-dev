@@ -7,7 +7,7 @@
  * the edge instead of leaking `undefined` into the React tree.
  *
  * The wire contract is described in
- * [`apps/api/src/api-keys/api-keys.interface.ts`](../../../../apps/api/src/api-keys/api-keys.interface.ts):
+ * [`apps/api/src/api-keys/api-keys.interface.ts`](../../../../../apps/api/src/api-keys/api-keys.interface.ts):
  *
  * - timestamps are ISO 8601 strings (`Date.prototype.toISOString`, always `Z`),
  *   parsed with `offset: true` so an offset form is accepted as well;
@@ -21,21 +21,13 @@
  */
 
 import { z } from 'zod';
+import { isoDateTimeSchema } from '../datetime.schema.js';
 import {
   API_KEY_DESCRIPTION_MAX_LENGTH,
   API_KEY_IDENTIFIER_PATTERN,
   API_KEY_NAME_MAX_LENGTH,
   API_KEY_VALUE_MAX_LENGTH,
-} from './api-key.const.js';
-
-/**
- * ISO 8601 date-time with an explicit offset (`Z` or `+02:00`).
- *
- * A naked local timestamp (`2026-11-01T00:00:00`) is rejected on purpose: it
- * would be interpreted in the *browser's* timezone, which silently shifts the
- * stored moment.
- */
-export const isoDateTimeSchema = z.string().datetime({ offset: true });
+} from './api-keys.const.js';
 
 /** Message shown when the identifier violates the URL-safe pattern. */
 export const API_KEY_IDENTIFIER_MESSAGE =

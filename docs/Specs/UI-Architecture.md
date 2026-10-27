@@ -1,6 +1,6 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-10-22
+**Utolsó frissítés:** 2026-10-27 (AIS-88: a shared wire séma helye `packages/shared/src/contract`)
 **Status:** living document — describes the *current* state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -168,7 +168,9 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
    `<page>.interface.ts`, `<page>.const.ts`; add `<page>.store.ts` **only** if the page owns UI
    state (page-local `createStore` factory + provider/hook, never exported outside the folder).
 2. Add the server need to `packages/api-client`: interface + implementation + the Zod schema in
-   `packages/shared/src/schemas`, then parse at the HTTP boundary. No `fetch` outside this package.
+   `packages/shared/src/contract/<resource>/` (the envelope lives in
+   `packages/shared/src/contract/envelope.schema.ts`), then parse at the HTTP boundary. No `fetch`
+   outside this package.
 3. Add `apps/admin/src/features/<use-case>/` — `use-<use-case>.ts` (query/mutation), pure rules in
    `<use-case>.logic.ts`, query keys in `<use-case>.const.ts`, narrow result interfaces in
    `<use-case>.interface.ts`.

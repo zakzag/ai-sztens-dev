@@ -2,20 +2,16 @@
  * Constants of the transport layer.
  *
  * The statuses are named instead of written as literals at the call sites, so a
- * future change (e.g. treating 422 like 400) touches one place. The messages are
- * the technical fallbacks used when the response carries no usable body; the UI
- * never shows them verbatim, it maps the error through `toErrorMessage`.
+ * future change (e.g. treating 422 like 400) touches one place. They come from
+ * `@callback/shared` — the client and the server must not keep two copies of the
+ * same table (D5 of the API convention plan). The messages are the technical
+ * fallbacks used when the response carries no usable body; the UI never shows
+ * them verbatim, it maps the error through `toErrorMessage`.
  */
 
-/** HTTP statuses the client reacts to explicitly. */
-export const HTTP_STATUS = {
-  BAD_REQUEST: 400,
-  UNAUTHORIZED: 401,
-  FORBIDDEN: 403,
-  NOT_FOUND: 404,
-  CONFLICT: 409,
-  UNPROCESSABLE_ENTITY: 422,
-} as const;
+import { HTTP_STATUS } from '@callback/shared';
+
+export { HTTP_STATUS };
 
 /** `name` of every error raised by this package. */
 export const API_ERROR_NAME = 'ApiError';

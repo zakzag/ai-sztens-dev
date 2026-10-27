@@ -7,7 +7,7 @@
  */
 
 import type { z } from 'zod';
-import type { apiKeySchema, createApiKeySchema } from './api-key.schema.js';
+import type { apiKeySchema, createApiKeySchema } from './api-keys.schema.js';
 
 /** A single stored API key as returned by the API. */
 export type ApiKey = z.infer<typeof apiKeySchema>;

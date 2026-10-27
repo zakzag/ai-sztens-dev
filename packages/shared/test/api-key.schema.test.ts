@@ -1,19 +1,19 @@
 import {
   API_KEY_DESCRIPTION_MAX_LENGTH,
   API_KEY_NAME_MAX_LENGTH,
-} from '../src/schemas/api-key.const.js';
+} from '../src/contract/api-keys/api-keys.const.js';
 import type {
   ApiKey,
   CreateApiKeyInput,
-} from '../src/schemas/api-key.interface.js';
+} from '../src/contract/api-keys/api-keys.interface.js';
 import {
   apiKeyListSchema,
   apiKeySchema,
   createApiKeySchema,
-} from '../src/schemas/api-key.schema.js';
+} from '../src/contract/api-keys/api-keys.schema.js';
 
 /**
- * Unit tests for `src/schemas/api-key.schema.ts`.
+ * Unit tests for `src/contract/api-keys/api-keys.schema.ts`.
  *
  * The fixtures are shaped exactly like the AIS-40 wire contract: ISO 8601
  * timestamps with a `Z` suffix and explicit `null`s for the optional columns.

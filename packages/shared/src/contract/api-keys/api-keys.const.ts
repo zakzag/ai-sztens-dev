@@ -2,7 +2,7 @@
  * Contract limits of the `api-keys` resource, mirrored from the backend.
  *
  * The API validates `POST /api/api-keys` with class-validator
- * ([`apps/api/src/api-keys/api-keys.const.ts`](../../../../apps/api/src/api-keys/api-keys.const.ts));
+ * ([`apps/api/src/api-keys/api-keys.const.ts`](../../../../../apps/api/src/api-keys/api-keys.const.ts));
  * the browser has to enforce the *same* numbers, otherwise the user gets a 400
  * only after a submit that the UI could have caught locally.
  *

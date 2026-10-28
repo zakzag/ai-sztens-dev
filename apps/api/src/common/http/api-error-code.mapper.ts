@@ -10,9 +10,10 @@
  */
 
 import { API_ERROR_CODE, HTTP_STATUS } from '@callback/shared';
+import type { ApiErrorCode } from '@callback/shared';
 
 /** The statuses Nest itself can produce, mapped onto the catalogue. */
-const STATUS_TO_CODE: Readonly<Record<number, string>> = {
+const STATUS_TO_CODE: Readonly<Record<number, ApiErrorCode>> = {
   [HTTP_STATUS.BAD_REQUEST]: API_ERROR_CODE.VALIDATION_FAILED,
   [HTTP_STATUS.UNAUTHORIZED]: API_ERROR_CODE.UNAUTHENTICATED,
   [HTTP_STATUS.FORBIDDEN]: API_ERROR_CODE.FORBIDDEN,
@@ -28,7 +29,7 @@ const STATUS_TO_CODE: Readonly<Record<number, string>> = {
  * @returns the catalogue code, or `INTERNAL_ERROR` when the status is not part
  *   of the contract (the envelope then reports `500`, which is the honest answer).
  */
-export function toApiErrorCode(status: number): string {
+export function toApiErrorCode(status: number): ApiErrorCode {
   return Object.hasOwn(STATUS_TO_CODE, status)
     ? STATUS_TO_CODE[status]
     : API_ERROR_CODE.INTERNAL_ERROR;

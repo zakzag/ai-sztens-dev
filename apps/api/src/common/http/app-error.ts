@@ -12,14 +12,14 @@
  */
 
 import { API_ERROR_CODE, resolveApiErrorStatus } from '@callback/shared';
-import type { ApiErrorDetail } from '@callback/shared';
+import type { ApiErrorCode, ApiErrorDetail } from '@callback/shared';
 import type { AppErrorInit } from './app-error.interface.js';
 import { NOT_FOUND_MESSAGE } from './api-messages.const.js';
 
 /** Base class of every failure the application raises on purpose. */
 export class AppError extends Error {
   /** Machine-readable, locale-independent decision key. */
-  public readonly code: string;
+  public readonly code: ApiErrorCode;
   /** Field-level issues (`[]` when no field is at fault). */
   public readonly details: readonly ApiErrorDetail[];
 
@@ -72,7 +72,7 @@ export class ConflictAppError extends AppError {
    */
   constructor(
     message: string,
-    code: string = API_ERROR_CODE.CONFLICT,
+    code: ApiErrorCode = API_ERROR_CODE.CONFLICT,
     details: readonly ApiErrorDetail[] = [],
   ) {
     super({ code, message, details });

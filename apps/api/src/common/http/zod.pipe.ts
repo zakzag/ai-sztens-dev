@@ -9,6 +9,12 @@
  * `ZodBodyPipe` receives the parsed JSON body; `ZodQueryPipe` receives the raw
  * query object, so its schema is expected to coerce (`z.coerce.number()`), which
  * is why the two exist as separate names instead of one anonymous class.
+ *
+ * Strictness is a **schema** property, not a pipe flag: a request schema declares
+ * `.strict()` (`createApiKeySchema` does), which keeps the old
+ * `forbidNonWhitelisted` semantics — an undeclared key is a `400`, never a silent
+ * strip — while response schemas stay tolerant of additive backend fields.
+ * Rewriting the schema inside the pipe would make that decision invisible.
  */
 
 import type { PipeTransform } from '@nestjs/common';

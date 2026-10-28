@@ -135,18 +135,14 @@ describe('VapiWebhooks (e2e)', () => {
   // guard still runs every check and returns the expected status code
   // — we only mute the log line that would otherwise be printed.
   // Production telemetry is unaffected: the spies live entirely inside
-  // the Jest worker and are torn down in `afterEach`.
-  let errorSpy: jest.SpyInstance;
-  let warnSpy: jest.SpyInstance;
+  // the Jest worker and are torn down in `afterEach` via
+  // `jest.restoreAllMocks()` (no untyped `jest.SpyInstance` binding).
   beforeEach(() => {
-    errorSpy = jest
-      .spyOn(Logger.prototype, 'error')
-      .mockImplementation(() => {});
-    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
   });
   afterEach(async () => {
-    errorSpy.mockRestore();
-    warnSpy.mockRestore();
+    jest.restoreAllMocks();
     await app.close();
   });
 

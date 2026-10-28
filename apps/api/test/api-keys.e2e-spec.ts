@@ -12,23 +12,24 @@ import { apiKeys } from '../src/db/schema.js';
 import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
 
 /**
- * End-to-end coverage of the API-key endpoints.
+ * End-to-end coverage of the API-key endpoints **and of the envelope**.
  *
- * The story's DoD is “the row is persisted”, which a mocked suite cannot prove,
- * so this file runs against the **real** `AppModule` and the **real** local
- * Postgres (`DATABASE_URL` from `apps/api/.env.local` / the dev stack). Each run
- * uses a unique `e2e-<uuid>` identifier and removes its own rows in `afterAll`,
- * leaving the table exactly as it was.
+ * The story's DoD is “the row is persisted *and* the response follows the
+ * contract”, which a mocked suite cannot prove, so this file runs against the
+ * **real** `AppModule` and the **real** local Postgres (`DATABASE_URL` from
+ * `apps/api/.env.local` / the dev stack). Each run uses a unique
+ * `e2e-<uuid>` identifier and removes its own rows in `afterAll`, leaving the
+ * table exactly as it was.
  *
  * Two environment caveats, both loud instead of silent:
  *
  * - `AppModule` pulls in the CommonJS-only `@nestjs/config`; Jest's ESM runner
  *   can only `require()` it on Node >= 24.9, so on older runtimes the suite
- *   self-skips with a warning (see `test/lib/app-module-gate.ts`). The same
- *   behaviour is then verified manually with `pnpm start` + curl.
- * - `main.ts` applies the `api` prefix and the `ValidationPipe` itself, so both
- *   are re-applied here. Without them the validation cases would pass while
- *   production behaved differently (plan D11).
+ *   self-skips with a warning (see `test/lib/app-module-gate.ts`).
+ * - `main.ts` applies the `api` prefix and the global `ValidationPipe` itself,
+ *   so both are re-applied here. The envelope filter comes from the real
+ *   `HttpModule` inside `AppModule`, so nothing has to be re-registered for it —
+ *   which is exactly what this suite verifies.
  */
 
 interface ApiKeyBody {
@@ -40,6 +41,33 @@ interface ApiKeyBody {
   readonly expiresAt: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+interface ResponseMetaBody {
+  readonly requestId: string;
+  readonly timestamp: string;
+}
+
+interface SuccessEnvelopeBody<T> {
+  readonly data: T;
+  readonly meta: ResponseMetaBody;
+}
+
+interface ErrorDetailBody {
+  readonly path: string;
+  readonly message: string;
+}
+
+interface ErrorEnvelopeBody {
+  readonly error: {
+    readonly code: string;
+    readonly status: number;
+    readonly message: string;
+    readonly details: readonly ErrorDetailBody[];
+    readonly requestId: string;
+    readonly timestamp: string;
+    readonly path: string;
+  };
 }
 
 function isNullableString(value: unknown): value is string | null {
@@ -65,6 +93,16 @@ function isApiKeyList(value: unknown): value is ApiKeyBody[] {
   return Array.isArray(value) && value.every(isApiKeyBody);
 }
 
+/** Reads a success body as the envelope (the assertions below prove the shape). */
+function readEnvelope<T>(body: unknown): SuccessEnvelopeBody<T> {
+  return body as SuccessEnvelopeBody<T>;
+}
+
+/** Reads an error body as the error envelope. */
+function readError(body: unknown): ErrorEnvelopeBody {
+  return body as ErrorEnvelopeBody;
+}
+
 async function bootApp(): Promise<NestFastifyApplication | null> {
   const AppModule = await loadAppModuleOrSkip();
   if (AppModule === null) return null;
@@ -76,7 +114,7 @@ async function bootApp(): Promise<NestFastifyApplication | null> {
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(
     new FastifyAdapter(),
   );
-  // Mirror src/main.ts — see the file docblock (plan D11).
+  // Mirror src/main.ts — see the file docblock.
   app.setGlobalPrefix('api', { exclude: ['healthz'] });
   app.useGlobalPipes(
     new ValidationPipe({
@@ -110,7 +148,7 @@ describe('ApiKeysController (e2e)', () => {
     }
   });
 
-  it('POST /api/api-keys creates the row and answers 201 with ISO timestamps', async () => {
+  it('POST /api/api-keys creates the row and answers 201 with the envelope', async () => {
     if (app === null) return;
 
     const response = await app.inject({
@@ -128,15 +166,16 @@ describe('ApiKeysController (e2e)', () => {
 
     expect(response.statusCode).toBe(201);
 
-    const body: unknown = response.json();
-    expect(isApiKeyBody(body)).toBe(true);
-    if (!isApiKeyBody(body)) return;
+    const envelope = readEnvelope<unknown>(response.json());
+    expect(envelope.meta.requestId.length).toBeGreaterThan(0);
+    expect(Number.isNaN(Date.parse(envelope.meta.timestamp))).toBe(false);
+    expect(isApiKeyBody(envelope.data)).toBe(true);
+    if (!isApiKeyBody(envelope.data)) return;
 
-    expect(body.identifier).toBe(identifier);
-    expect(body.name).toBe('E2E Vapi');
-    expect(body.apiKey).toBe('tok_e2e_123');
-    expect(body.expiresAt).toBe('2027-01-01T00:00:00.000Z');
-    expect(Number.isNaN(Date.parse(body.createdAt))).toBe(false);
+    expect(envelope.data.identifier).toBe(identifier);
+    expect(envelope.data.name).toBe('E2E Vapi');
+    expect(envelope.data.apiKey).toBe('tok_e2e_123');
+    expect(envelope.data.expiresAt).toBe('2027-01-01T00:00:00.000Z');
 
     // The DoD is “the row is persisted”: read it back through the DB handle,
     // not through the API, so a cache cannot fake the success.
@@ -164,31 +203,31 @@ describe('ApiKeysController (e2e)', () => {
 
     expect(response.statusCode).toBe(201);
 
-    const body: unknown = response.json();
-    expect(isApiKeyBody(body)).toBe(true);
-    if (!isApiKeyBody(body)) return;
+    const envelope = readEnvelope<unknown>(response.json());
+    expect(isApiKeyBody(envelope.data)).toBe(true);
+    if (!isApiKeyBody(envelope.data)) return;
 
-    expect(body.description).toBeNull();
-    expect(body.expiresAt).toBeNull();
+    expect(envelope.data.description).toBeNull();
+    expect(envelope.data.expiresAt).toBeNull();
   });
 
-  it('GET /api/api-keys lists the created keys', async () => {
+  it('GET /api/api-keys lists the created keys inside `data`', async () => {
     if (app === null) return;
 
     const response = await app.inject({ method: 'GET', url: '/api/api-keys' });
 
     expect(response.statusCode).toBe(200);
 
-    const body: unknown = response.json();
-    expect(isApiKeyList(body)).toBe(true);
-    if (!isApiKeyList(body)) return;
+    const envelope = readEnvelope<unknown>(response.json());
+    expect(isApiKeyList(envelope.data)).toBe(true);
+    if (!isApiKeyList(envelope.data)) return;
 
-    const identifiers = body.map((item) => item.identifier);
+    const identifiers = envelope.data.map((item) => item.identifier);
     expect(identifiers).toContain(identifier);
     expect(identifiers).toContain(otherIdentifier);
   });
 
-  it('GET /api/api-keys/:identifier returns the key', async () => {
+  it('GET /api/api-keys/:identifier returns the key inside `data`', async () => {
     if (app === null) return;
 
     const response = await app.inject({
@@ -198,15 +237,15 @@ describe('ApiKeysController (e2e)', () => {
 
     expect(response.statusCode).toBe(200);
 
-    const body: unknown = response.json();
-    expect(isApiKeyBody(body)).toBe(true);
-    if (!isApiKeyBody(body)) return;
+    const envelope = readEnvelope<unknown>(response.json());
+    expect(isApiKeyBody(envelope.data)).toBe(true);
+    if (!isApiKeyBody(envelope.data)) return;
 
-    expect(body.identifier).toBe(identifier);
-    expect(body.name).toBe('E2E Vapi');
+    expect(envelope.data.identifier).toBe(identifier);
+    expect(envelope.data.name).toBe('E2E Vapi');
   });
 
-  it('GET /api/api-keys/:identifier answers 404 for an unknown identifier', async () => {
+  it('GET /api/api-keys/:identifier answers 404 with a NOT_FOUND envelope', async () => {
     if (app === null) return;
 
     const response = await app.inject({
@@ -215,9 +254,15 @@ describe('ApiKeysController (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(404);
+
+    const body = readError(response.json());
+    expect(body.error.code).toBe('NOT_FOUND');
+    expect(body.error.status).toBe(404);
+    expect(body.error.requestId.length).toBeGreaterThan(0);
+    expect(body.error.path).toContain('/api/api-keys/');
   });
 
-  it('POST /api/api-keys rejects a duplicate identifier with 409', async () => {
+  it('POST /api/api-keys rejects a duplicate identifier with a coded 409', async () => {
     if (app === null) return;
 
     const response = await app.inject({
@@ -232,9 +277,13 @@ describe('ApiKeysController (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(409);
+
+    const body = readError(response.json());
+    expect(body.error.code).toBe('API_KEY_IDENTIFIER_CONFLICT');
+    expect(body.error.details[0]?.path).toBe('identifier');
   });
 
-  it('POST /api/api-keys rejects a payload without apiKey with 400', async () => {
+  it('POST /api/api-keys rejects a payload without apiKey with 400 + details', async () => {
     if (app === null) return;
 
     const response = await app.inject({
@@ -248,6 +297,11 @@ describe('ApiKeysController (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(400);
+
+    const body = readError(response.json());
+    expect(body.error.code).toBe('VALIDATION_FAILED');
+    expect(body.error.details.length).toBeGreaterThan(0);
+    expect(body.error.details.map((detail) => detail.path)).toContain('apiKey');
   });
 
   it('POST /api/api-keys rejects server-managed fields with 400', async () => {
@@ -266,6 +320,7 @@ describe('ApiKeysController (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(400);
+    expect(readError(response.json()).error.code).toBe('VALIDATION_FAILED');
   });
 
   it('POST /api/api-keys rejects an identifier with a slash with 400', async () => {
@@ -283,5 +338,6 @@ describe('ApiKeysController (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(400);
+    expect(readError(response.json()).error.code).toBe('VALIDATION_FAILED');
   });
 });

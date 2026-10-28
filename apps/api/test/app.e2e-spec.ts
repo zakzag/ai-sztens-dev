@@ -13,6 +13,11 @@ import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
  * `test/lib/app-module-gate.ts` for the full explanation and the self-skip
  * contract.
  */
+interface RootEnvelopeBody {
+  readonly data: string;
+  readonly meta: { readonly requestId: string; readonly timestamp: string };
+}
+
 describe('AppController (e2e)', () => {
   let app: NestFastifyApplication | undefined;
 
@@ -21,7 +26,7 @@ describe('AppController (e2e)', () => {
     app = undefined;
   });
 
-  it('/ (GET) answers 200 with the greeting from AppService', async () => {
+  it('/ (GET) answers 200 with the greeting inside the success envelope', async () => {
     const AppModule = await loadAppModuleOrSkip();
     if (AppModule === null) return; // runtime limitation, warning already logged
 
@@ -40,6 +45,11 @@ describe('AppController (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.payload).toBe('Hello World!');
+
+    const body = response.json<RootEnvelopeBody>();
+
+    expect(body.data).toBe('Hello World!');
+    expect(body.meta.requestId.length).toBeGreaterThan(0);
+    expect(Number.isNaN(Date.parse(body.meta.timestamp))).toBe(false);
   });
 });

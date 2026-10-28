@@ -1,6 +1,6 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-10-27 (AIS-88: a shared wire séma helye `packages/shared/src/contract`)
+**Utolsó frissítés:** 2026-10-28 (AIS-96: `Banner` primitive, error-surface classifier, page/app error tiers)
 **Status:** living document — describes the *current* state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -36,11 +36,12 @@ what exists in `apps/admin` today, so nobody mistakes a planned folder for an ex
 |---|---|---|
 | `app` | providers, router, layout shell, session store | **not created**: `App.tsx` (router + `ProtectedLayout`) and `main.tsx` (`QueryClientProvider`) still sit at the `src` root; the session lives in `auth/AuthContext.tsx` + `auth/session-token.ts`, there is no Zustand session store |
 | `pages/<page>` | route composition, optional page store, page-only parts in `ui/` | **exists**: `pages/api-keys/` (`ApiKeysPage.tsx`, `api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `ui/ApiKeysTable.tsx`, `ui/ApiKeyForm.tsx`) — the first page folder; plus the flat `pages/LoginPage.tsx` and `pages/PlaceholderPage.tsx` |
-| `features/<use-case>` | query/mutation hooks, pure `*.logic.ts` | **exists**: `features/api-keys/` (`api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `use-api-keys.ts`) |
+| `features/<use-case>` | query/mutation hooks, pure `*.logic.ts` | **exists**: `features/api-keys/` (`api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `use-api-keys.ts`) and `features/error-surface/` (`use-online-status.ts`, `use-app-error-banner.ts`, `query-error.store.ts`) |
 | `entities/<entity>` | domain types, pure mappers, display components | **exists**: `entities/api-key/` (`api-key.interface.ts`, `api-key.mapper.ts`, `api-key.const.ts`) — mappers only, no display components yet |
 | `services` | composition root (client instance + token supplier) | **exists**: `services/api-client.ts` + `services/api-client.const.ts` |
-| `lib` | pure helpers and formatters | **exists**: `lib/date.ts`, `lib/error-message.ts` (+ their `*.const.ts`) |
-| `test/mocks` | all fixtures, doubles, wrappers | **exists**: `test/mocks/api-keys.mock.ts`, `api-error.mock.ts`, `query-client.mock.tsx` |
+| `lib` | pure helpers and formatters | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts` (+ their `*.const.ts` / `.interface.ts`) |
+| `components` | generic presentational shells (no data access) | **exists**: `components/BuildInfoFooter.tsx`, `components/error/PageErrorState.tsx`, `components/error/AppErrorBanner.tsx` (the latter is a thin container: all decisions live in `features/error-surface` + `lib/error-surface.*`) |
+| `test/mocks` | all fixtures, doubles, wrappers | **exists**: `test/mocks/api-keys.mock.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts` |
 
 `apps/web` is out of scope for this document's layer map: it has no features/entities
 folders yet and is not migrated to `packages/ui` tokens.
@@ -138,9 +139,33 @@ Get-ChildItem -Path 'apps/admin/src' -Recurse -File |
 | `Table` + `TableHead` / `TableBody` / `TableRow` / `TableHeaderCell` / `TableCell` | native attributes | `Table` owns the scroll container; header cells default to `scope="col"`. |
 | `Badge` | `variant`: `neutral` \| `info` \| `success` \| `warning` \| `danger` | Variant names are the shared vocabulary for domain mappers. |
 | `Alert` | `variant`: `info` \| `success` \| `warning` \| `danger`, `title` | `danger` is announced as `role="alert"`, the others as `role="status"`. |
+| `Banner` | `variant`: `info` \| `warning` \| `danger`, `title`, `action`, `onDismiss` + `dismissLabel` | App-level, full-width strip for a *persistent condition* (offline / expired session / 503). `danger` → `role="alert"`, the others → `role="status"`. The props type makes `dismissLabel` mandatory whenever `onDismiss` is given, so the close control always has an accessible name. No timer: the banner disappears only when the condition ends or the user closes it (AIS-96). |
 
 Exports are explicit from `packages/ui/src/index.ts` (no `export *`). `cn()` is
 exported too so pages can merge caller classes with the recipe classes.
+
+### 4.1 Error surfaces (AIS-96)
+
+A failure becomes visible in exactly one of four places. The decision is made by
+`toErrorSurface(error)` in `apps/admin/src/lib/error-surface.logic.ts` — pure, no React,
+no I/O — so no component inspects `status`, `code` or the server `message`.
+
+| First matching condition | Surface | Rendered by |
+|---|---|---|
+| `AbortError` / `CancelledError` | `silent` | nothing |
+| not an `ApiError` | `page` | `PageErrorState` |
+| `status === null` (offline, DNS, CORS) | `banner` | `AppErrorBanner` |
+| `401` | `banner` (login CTA) | `AppErrorBanner` |
+| `503` | `banner` | `AppErrorBanner` |
+| field code with `issues[]` | `field` | RHF `setError` (AIS-95) |
+| everything else (`400`, `403`, `404`, `409`, `5xx`) | `page` | `PageErrorState` |
+
+Banner state is derived, never stored: `useOnlineStatus()` mirrors `navigator.onLine`
+(`useSyncExternalStore` over the `online`/`offline` events) and
+`useAppErrorBanner()` reads the TanStack Query cache through `query-error.store.ts`
+(a stable snapshot, so React does not loop). Precedence: offline → `401` → `503`; only one
+condition is ever rendered. The only local state is the dismissal flag, reset when the set
+of cached errors changes. Copy: `lib/error-surface.const.ts`; messages: `toErrorMessage`.
 
 ## 5. State plan per page
 
@@ -151,7 +176,7 @@ an omission (compare **D9**).
 
 | Page | Server state | Page UI state | Form state | Notes |
 |---|---|---|---|---|
-| `pages/api-keys` (AIS-41, `/api-keys` route) | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`) | **none** — no Zustand store, no filters/sort/tabs (D9); the only local state is the form's page-level error in `ApiKeyForm` | react-hook-form + `zodResolver(apiKeyFormSchema)` (`pages/api-keys/api-keys.logic.ts`); `identifier` field carries the 409 via `setError` (D8/D36) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32) |
+| `pages/api-keys` (AIS-41, `/api-keys` route) | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`). The query hook exposes the raw `error` (keeps `requestId`), `errorMessage` and `errorSurface` | **none** — no Zustand store, no filters/sort/tabs (D9); the only local state is the form's page-level error in `ApiKeyForm`. The app banner keeps only a dismissal flag (`useState`), never server data | react-hook-form + `zodResolver(apiKeyFormSchema)` (`pages/api-keys/api-keys.logic.ts`); `identifier` field carries the 409 via `setError` (D8/D36) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32). Failure routing: `errorSurface === 'page'` → `PageErrorState` + retry; `banner` → only `AppErrorBanner` speaks, the page renders nothing extra (AIS-96) |
 | `pages/LoginPage` (`/login` route) | none | none | `AuthContext` + `auth/session-token.ts` over `sessionStorage`; no RHF yet | The token storage key lives in one module only (D19). API-side auth guard is out of scope |
 | `pages/PlaceholderPage` (`/` route) | none | none | none | Static shell for the authenticated landing route; replaced when a real dashboard lands |
 | `/calls` route (inline in `App.tsx`) | none | none | none | Inline placeholder markup; becomes a page folder when the calls feature starts |

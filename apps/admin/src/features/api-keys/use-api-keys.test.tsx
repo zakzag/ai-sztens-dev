@@ -14,6 +14,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createConflictError,
   createNetworkError,
+  createServerError,
+  createServerErrorWithRequestId,
 } from '../../test/mocks/api-error.mock.js';
 import {
   API_KEYS_SERVICE_MOCK,
@@ -29,9 +31,13 @@ import {
 import {
   IDENTIFIER_CONFLICT_MESSAGE,
   NETWORK_ERROR_USER_MESSAGE,
+  SERVER_ERROR_MESSAGE,
 } from '../../lib/error-message.const.js';
-import { API_KEYS_QUERY_KEYS } from './api-keys.const.js';
-import { toIdentifierFieldError } from './api-keys.logic.js';
+import {
+  API_KEYS_QUERY_KEYS,
+  API_KEY_IDENTIFIER_CONFLICT_MESSAGE,
+} from './api-keys.const.js';
+import { toFieldErrors } from './api-keys.logic.js';
 import {
   useApiKeysQuery,
   useCreateApiKeyMutation,
@@ -76,8 +82,11 @@ describe('useApiKeysQuery', () => {
     });
 
     expect(result.current.isLoading).toBe(true);
+    expect(result.current.isFetching).toBe(true);
     expect(result.current.apiKeys).toEqual([]);
     expect(result.current.error).toBeNull();
+    expect(result.current.errorMessage).toBeNull();
+    expect(result.current.errorSurface).toBeNull();
   });
 
   it('exposes the keys after a successful read', async () => {
@@ -90,11 +99,14 @@ describe('useApiKeysQuery', () => {
     });
 
     expect(result.current.apiKeys).toEqual(API_KEY_FIXTURES);
+    expect(result.current.isFetching).toBe(false);
     expect(result.current.error).toBeNull();
+    expect(result.current.errorMessage).toBeNull();
+    expect(result.current.errorSurface).toBeNull();
     expect(API_KEYS_SERVICE_MOCK.listMock).toHaveBeenCalledTimes(1);
   });
 
-  it('maps a failed read to a user-facing message and an empty list', async () => {
+  it('routes a request without a response to the banner and keeps the raw error', async () => {
     API_KEYS_SERVICE_MOCK.listMock.mockRejectedValueOnce(createNetworkError());
 
     const { result } = renderHook(() => useApiKeysQuery(), {
@@ -102,22 +114,42 @@ describe('useApiKeysQuery', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.error).toBe(NETWORK_ERROR_USER_MESSAGE);
+      expect(result.current.errorSurface).toBe('banner');
     });
 
+    expect(result.current.errorMessage).toBe(NETWORK_ERROR_USER_MESSAGE);
+    expect(result.current.error).not.toBeNull();
+    expect(result.current.error?.status).toBeNull();
     expect(result.current.isLoading).toBe(false);
     expect(result.current.apiKeys).toEqual([]);
   });
 
-  it('re-reads the list on refetch, including after a failure', async () => {
-    API_KEYS_SERVICE_MOCK.listMock.mockRejectedValueOnce(createNetworkError());
+  it('routes a 500 to the page tier and keeps the requestId for the log tier', async () => {
+    API_KEYS_SERVICE_MOCK.listMock.mockRejectedValueOnce(
+      createServerErrorWithRequestId(),
+    );
 
     const { result } = renderHook(() => useApiKeysQuery(), {
       wrapper: createWrapper(client),
     });
 
     await waitFor(() => {
-      expect(result.current.error).toBe(NETWORK_ERROR_USER_MESSAGE);
+      expect(result.current.errorSurface).toBe('page');
+    });
+
+    expect(result.current.errorMessage).toBe(SERVER_ERROR_MESSAGE);
+    expect(result.current.error?.requestId).toBe('req-server');
+  });
+
+  it('re-reads the list on refetch, including after a failure', async () => {
+    API_KEYS_SERVICE_MOCK.listMock.mockRejectedValueOnce(createServerError());
+
+    const { result } = renderHook(() => useApiKeysQuery(), {
+      wrapper: createWrapper(client),
+    });
+
+    await waitFor(() => {
+      expect(result.current.errorSurface).toBe('page');
     });
 
     act(() => {
@@ -128,6 +160,7 @@ describe('useApiKeysQuery', () => {
       expect(result.current.error).toBeNull();
     });
 
+    expect(result.current.errorSurface).toBeNull();
     expect(result.current.apiKeys).toEqual(API_KEY_FIXTURES);
     expect(API_KEYS_SERVICE_MOCK.listMock).toHaveBeenCalledTimes(2);
   });
@@ -188,9 +221,10 @@ describe('useCreateApiKeyMutation', () => {
       }
     });
 
-    expect(toIdentifierFieldError(caught)).toBe(
-      'Ez az identifier már foglalt. Adj meg egyedit.',
-    );
+    expect(toFieldErrors(caught)).toEqual({
+      fields: { identifier: API_KEY_IDENTIFIER_CONFLICT_MESSAGE },
+      form: null,
+    });
     await waitFor(() => {
       // Code-first copy: the 409 carries `API_KEY_IDENTIFIER_CONFLICT`, so the
       // page-level message is the domain sentence, never the server's English one.
@@ -218,7 +252,10 @@ describe('useCreateApiKeyMutation', () => {
     });
 
     expect(caught).toBeInstanceOf(Error);
-    expect(toIdentifierFieldError(caught)).toBeNull();
+    expect(toFieldErrors(caught)).toEqual({
+      fields: {},
+      form: NETWORK_ERROR_USER_MESSAGE,
+    });
     await waitFor(() => {
       expect(result.current.error).toBe(NETWORK_ERROR_USER_MESSAGE);
     });

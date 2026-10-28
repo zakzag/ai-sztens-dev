@@ -13,6 +13,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiKey, CreateApiKeyInput } from '@callback/shared';
 import { toErrorMessage } from '../../lib/error-message.js';
+import { toApiError, toErrorSurface } from '../../lib/error-surface.logic.js';
 import { apiKeysService } from '../../services/api-client.js';
 import { API_KEYS_QUERY_KEYS, EMPTY_API_KEY_LIST } from './api-keys.const.js';
 import type {
@@ -24,9 +25,9 @@ import type {
 /**
  * Reads the stored API keys.
  *
- * @returns the list plus explicit `isLoading` / `error` / `refetch` fields, so
- *   the table can render all four states (loading / empty / error / success)
- *   without knowing anything about query objects.
+ * @returns the list plus explicit `isLoading` / `isFetching` / error fields and
+ *   `refetch`, so the page can render all four states (loading / empty /
+ *   error / success) without knowing anything about query objects.
  */
 export function useApiKeysQuery(): UseApiKeysQueryResult {
   const query = useQuery({
@@ -34,10 +35,15 @@ export function useApiKeysQuery(): UseApiKeysQueryResult {
     queryFn: () => apiKeysService.list(),
   });
 
+  const { error } = query;
+
   return {
     apiKeys: query.data ?? EMPTY_API_KEY_LIST,
     isLoading: query.isPending,
-    error: query.error === null ? null : toErrorMessage(query.error),
+    isFetching: query.isFetching,
+    error: toApiError(error),
+    errorMessage: error === null ? null : toErrorMessage(error),
+    errorSurface: error === null ? null : toErrorSurface(error),
     refetch: () => {
       void query.refetch();
     },

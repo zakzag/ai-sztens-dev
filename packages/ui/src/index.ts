@@ -46,3 +46,13 @@ export { Alert } from './components/alert/Alert.js';
 export { alertVariants } from './components/alert/alert.variants.js';
 export type { AlertProps } from './components/alert/alert.interface.js';
 export type { AlertVariants } from './components/alert/alert.variants.js';
+
+export { Banner } from './components/banner/Banner.js';
+export { bannerVariants } from './components/banner/banner.variants.js';
+export type {
+  BannerProps,
+  BannerBaseProps,
+  BannerDismissibleProps,
+  BannerStaticProps,
+} from './components/banner/banner.interface.js';
+export type { BannerVariants } from './components/banner/banner.variants.js';

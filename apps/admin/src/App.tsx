@@ -1,11 +1,12 @@
 import { Link, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext.js';
+import { AppErrorBanner } from './components/error/AppErrorBanner.js';
 import { ApiKeysPage } from './pages/api-keys/ApiKeysPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { PlaceholderPage } from './pages/PlaceholderPage.js';
 
 function ProtectedLayout() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
 
   if (!isAuthenticated) {
     return (
@@ -17,6 +18,13 @@ function ProtectedLayout() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/*
+        Tier 3 of plan `D11`: one banner for a condition that outlives the page.
+        The login CTA clears the token, which makes this very component render
+        the login form — the banner itself never navigates.
+      */}
+      <AppErrorBanner onLogin={logout} />
+
       <header className="border-b border-border-hairline bg-surface-raised">
         <nav className="flex items-center justify-between px-6 py-3">
           <Link to="/" className="text-lg font-semibold text-text-primary">

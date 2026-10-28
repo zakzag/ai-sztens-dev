@@ -45,10 +45,15 @@ export const responseMetaSchema = z.object({
  * keeps the published type — `ApiEnvelope<TPayload>` with a required `data` —
  * exactly equal to what the schema accepts, without a type assertion.
  *
+ * `TPayload` is deliberately **unconstrained**: the client transport wraps
+ * whatever schema a service passes (`apiKeyListSchema`, `apiKeySchema`, a
+ * `z.null()` for a delete), so restricting it to objects would force a cast at
+ * the one place that must not need one.
+ *
  * @param dataSchema - schema of the payload this endpoint returns.
  * @returns schema of the whole response body.
  */
-export function successEnvelopeSchema<TPayload extends object>(
+export function successEnvelopeSchema<TPayload>(
   dataSchema: z.ZodType<TPayload, z.ZodTypeDef, unknown>,
 ): z.ZodType<ApiEnvelope<TPayload>, z.ZodTypeDef, unknown> {
   return z

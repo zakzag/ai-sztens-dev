@@ -57,13 +57,22 @@ export const apiKeyListSchema = z.array(apiKeySchema);
  * Body of `POST /api/api-keys`.
  *
  * `description` and `expiresAt` are optional: an empty form field must be
- * omitted, not sent as `''` (the backend would answer 400) and not as `null`
- * (the DTO declares them `string`, not `string | null`).
+ * omitted, not sent as `''` (that would be stored as an empty string) and not as
+ * `null` (the column is `text`, and `null` is the “absent” value the mapper
+ * produces).
+ *
+ * `.strict()` is deliberate: the response schemas strip unknown keys (an
+ * additive backend field must not break a deployed bundle), but a **request**
+ * must reject them. Without it, `{ …payload, id: '…' }` would be silently
+ * accepted and the client would believe it set a server-managed field — the old
+ * `forbidNonWhitelisted` behaviour, kept in the contract.
  */
-export const createApiKeySchema = z.object({
-  name: z.string().min(1).max(API_KEY_NAME_MAX_LENGTH),
-  identifier: apiKeyIdentifierSchema,
-  description: z.string().max(API_KEY_DESCRIPTION_MAX_LENGTH).optional(),
-  apiKey: z.string().min(1).max(API_KEY_VALUE_MAX_LENGTH),
-  expiresAt: isoDateTimeSchema.optional(),
-});
+export const createApiKeySchema = z
+  .object({
+    name: z.string().min(1).max(API_KEY_NAME_MAX_LENGTH),
+    identifier: apiKeyIdentifierSchema,
+    description: z.string().max(API_KEY_DESCRIPTION_MAX_LENGTH).optional(),
+    apiKey: z.string().min(1).max(API_KEY_VALUE_MAX_LENGTH),
+    expiresAt: isoDateTimeSchema.optional(),
+  })
+  .strict();

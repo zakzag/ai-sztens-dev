@@ -192,12 +192,13 @@ describe('createApiKeySchema', () => {
     ).toThrow();
   });
 
-  it('rejects an unknown top-level field shape only via the object contract', () => {
-    // Unknown keys are stripped: the client must never be the component that
-    // rejects a server-side additive change, and the API validates the rest.
-    const result = createApiKeySchema.parse({ ...MINIMAL_INPUT, id: 'x' });
-
-    expect(Object.keys(result)).not.toContain('id');
+  it('rejects an unknown top-level field (server-managed keys are not injectable)', () => {
+    // Requests are `.strict()`: a client must not be able to “set” `id` and
+    // believe the server accepted it. Response schemas stay tolerant instead —
+    // that is where an additive backend field must not break a bundle.
+    expect(() =>
+      createApiKeySchema.parse({ ...MINIMAL_INPUT, id: 'x' }),
+    ).toThrow();
   });
 
   it('rejects an identifier with a slash', () => {

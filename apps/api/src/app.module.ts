@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { ApiKeysModule } from './api-keys/api-keys.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { HttpModule } from './common/http/http.module.js';
 import { DatabaseModule } from './db/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { VapiWebhooksModule } from './vapi-webhooks/vapi-webhooks.module.js';
@@ -43,6 +44,9 @@ const envFilePaths: string[] =
       // secrets into prod.
       ignoreEnvFile: APP_ENV === 'prod',
     }),
+    // Global HTTP edge: the error filter (envelope for every throwable) and the
+    // request-id interceptor. Imported first so every feature below gets them.
+    HttpModule,
     DatabaseModule,
     HealthModule,
     ApiKeysModule,

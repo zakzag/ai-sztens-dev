@@ -7,6 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { SkipEnvelope } from '../common/http/skip-envelope.decorator.js';
 import { VapiSignatureGuard } from './vapi-signature.guard.js';
 import { VapiWebhooksService } from './vapi-webhooks.service.js';
 import type {
@@ -29,7 +30,13 @@ import type {
  * real business logic (tool execution, status updates, follow-up
  * actions) will be added on top of `VapiWebhooksService` in the next
  * milestone once the VAPI payload contract is finalised.
+ *
+ * `@SkipEnvelope()` is deliberate: the body here is a **provider-owned**
+ * contract, VAPI reads it, not our admin. It is written down in
+ * `ENVELOPE_EXEMPTIONS` (`@callback/shared`) and the e2e suite asserts the
+ * response did not change.
  */
+@SkipEnvelope()
 @Controller('vapi/webhooks')
 @UseGuards(VapiSignatureGuard)
 export class VapiWebhooksController {

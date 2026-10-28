@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { SkipEnvelope } from '../common/http/skip-envelope.decorator.js';
 
 /**
  * Liveness probe used by Docker and the monitor watchdog.
@@ -8,6 +9,12 @@ import { Controller, Get } from '@nestjs/common';
  * stay free of any global guards, pipes, or middleware (no auth, no
  * validation, no rate limiting) so that a degraded dependency can never
  * make the healthcheck itself fail.
+ *
+ * `@SkipEnvelope()` keeps the body a bare `{status, …}` object: the Docker
+ * healthcheck and the monitor watchdog parse exactly that, and the exemption is
+ * written down in `ENVELOPE_EXEMPTIONS` (`@callback/shared`). Errors thrown here
+ * also stay in Nest's raw shape, so a broken probe cannot start answering with a
+ * body its consumers do not understand.
  */
 /** Shape of the `/healthz` payload (also asserted by the e2e tests). */
 export interface HealthStatus {
@@ -18,6 +25,7 @@ export interface HealthStatus {
   timestamp: string;
 }
 
+@SkipEnvelope()
 @Controller('healthz')
 export class HealthController {
   /**

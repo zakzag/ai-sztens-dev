@@ -70,17 +70,16 @@ describe('VapiSignatureGuard', () => {
   // output stays clean. Every negative test case below exercises a branch that
   // calls `this.logger.error(...)` / `this.logger.warn(...)` BEFORE throwing;
   // the assertions still verify the throw — only the log emission is muted.
-  let errorSpy: jest.SpyInstance;
-  let warnSpy: jest.SpyInstance;
+  //
+  // The spies are not stored in variables: a `jest.SpyInstance` binding pulls in
+  // an untyped mock shape, and `jest.restoreAllMocks()` in `afterEach` tears them
+  // down just as well.
   beforeEach(() => {
-    errorSpy = jest
-      .spyOn(Logger.prototype, 'error')
-      .mockImplementation(() => {});
-    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
   });
   afterEach(() => {
-    errorSpy.mockRestore();
-    warnSpy.mockRestore();
+    jest.restoreAllMocks();
   });
 
   it('returns true for a correctly signed request', () => {

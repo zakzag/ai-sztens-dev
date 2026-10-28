@@ -15,6 +15,7 @@
 import { API_KEYS_PATH, API_KEYS_IDENTIFIER_PARAM } from './api-keys.const.js';
 import type { ApiEndpointContract } from '../endpoint.interface.js';
 import { API_ERROR_CODE } from '../error-code.const.js';
+import { VALID_API_KEY, VALID_API_KEY_LIST } from './api-keys.fixture.js';
 import {
   apiKeyListSchema,
   apiKeySchema,
@@ -40,6 +41,7 @@ export const API_KEYS_ENDPOINTS: readonly ApiEndpointContract[] = [
     tag: 'api-keys',
     successStatus: 200,
     dataSchema: apiKeyListSchema,
+    example: VALID_API_KEY_LIST,
     errors: [...COMMON_ERRORS],
     envelope: true,
   },
@@ -51,6 +53,7 @@ export const API_KEYS_ENDPOINTS: readonly ApiEndpointContract[] = [
     tag: 'api-keys',
     successStatus: 200,
     dataSchema: apiKeySchema,
+    example: VALID_API_KEY,
     errors: [API_ERROR_CODE.NOT_FOUND, ...COMMON_ERRORS],
     envelope: true,
   },
@@ -63,6 +66,7 @@ export const API_KEYS_ENDPOINTS: readonly ApiEndpointContract[] = [
     successStatus: 201,
     dataSchema: apiKeySchema,
     requestSchema: createApiKeySchema,
+    example: VALID_API_KEY,
     errors: [
       API_ERROR_CODE.VALIDATION_FAILED,
       API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT,

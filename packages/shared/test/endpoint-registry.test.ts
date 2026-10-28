@@ -5,6 +5,8 @@ import {
   API_KEYS_PATH,
   API_PATH_PREFIX,
   ENVELOPE_EXEMPTIONS,
+  VALID_API_KEY,
+  VALID_API_KEY_LIST,
   apiKeySchema,
   findEndpoint,
   successEnvelopeSchema,
@@ -29,17 +31,14 @@ import {
 /** `operationId` is `<namespace>.<action>`, both camelCase. */
 const OPERATION_ID_PATTERN = /^[a-z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*$/;
 
-/** A payload that every `api-keys` response schema must accept. */
-const VALID_KEY = {
-  id: '5d0f8f0e-9a2b-4c7e-8f3a-1b2c3d4e5f60',
-  name: 'Vapi prod',
-  identifier: 'vapi-prod',
-  description: null,
-  apiKey: 'sk-live-abcdef123456',
-  expiresAt: null,
-  createdAt: '2026-10-21T15:00:00.000Z',
-  updatedAt: '2026-10-21T15:00:00.000Z',
-} as const;
+/**
+ * A payload that every `api-keys` response schema must accept.
+ *
+ * Imported from the contract's own fixture (AIS-98): the same value is published
+ * as the OpenAPI `example`, so the documented sample and the parsed sample can
+ * never be two different objects.
+ */
+const VALID_KEY = VALID_API_KEY;
 
 /**
  * One realistic payload per registered endpoint.
@@ -49,7 +48,7 @@ const VALID_KEY = {
  * than discovering a broken `dataSchema` in the generated spec.
  */
 const SAMPLE_PAYLOADS: Readonly<Record<string, unknown>> = {
-  'apiKeys.list': [VALID_KEY],
+  'apiKeys.list': VALID_API_KEY_LIST,
   'apiKeys.findByIdentifier': VALID_KEY,
   'apiKeys.create': VALID_KEY,
 };

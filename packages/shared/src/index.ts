@@ -87,6 +87,11 @@ export {
 } from './contract/api-keys/api-keys.const.js';
 
 export {
+  VALID_API_KEY,
+  VALID_API_KEY_LIST,
+} from './contract/api-keys/api-keys.fixture.js';
+
+export {
   API_KEY_IDENTIFIER_MESSAGE,
   apiKeyIdentifierSchema,
   apiKeyListSchema,

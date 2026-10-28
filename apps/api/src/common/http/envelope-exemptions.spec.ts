@@ -3,6 +3,7 @@ import { ApiKeysController } from '../../api-keys/api-keys.controller.js';
 import { AppController } from '../../app.controller.js';
 import { HealthController } from '../../health/health.controller.js';
 import { VapiWebhooksController } from '../../vapi-webhooks/vapi-webhooks.controller.js';
+import { OpenApiController } from '../openapi/openapi.controller.js';
 import {
   findUnregisteredRoutes,
   sortUnique,
@@ -31,6 +32,7 @@ const ROUTE_CONTROLLERS = [
   HealthController,
   ApiKeysController,
   VapiWebhooksController,
+  OpenApiController,
 ];
 
 /** The registry's exempt paths, normalised the same way the routes are. */
@@ -55,6 +57,10 @@ describe('envelope exemption coverage', () => {
 
   it('keeps the health probe raw', () => {
     expect(routes.exempt).toContain('/healthz');
+  });
+
+  it('keeps the generated OpenAPI document raw', () => {
+    expect(routes.exempt).toContain('/api/openapi.json');
   });
 
   it('keeps both VAPI webhooks raw', () => {

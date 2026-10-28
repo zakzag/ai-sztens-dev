@@ -84,6 +84,11 @@ export {
   createApiKeySchema,
 } from './api-keys/api-keys.schema.js';
 
+export {
+  VALID_API_KEY,
+  VALID_API_KEY_LIST,
+} from './api-keys/api-keys.fixture.js';
+
 export type {
   ApiKey,
   CreateApiKeyInput,

@@ -1,7 +1,7 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-10-28
-**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95
+**Utolsó frissítés:** 2026-10-29
+**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98
 **Status:** living document — this file describes the *current* state of the API, not a snapshot.
 
 ---
@@ -128,6 +128,7 @@ One `ApiEndpointContract` per operation, typed so a missing or misspelled field 
 | `GET /healthz` | Docker healthcheck + monitor watchdog parse a bare `{status, …}` | `@SkipEnvelope()` on the controller |
 | `POST /api/vapi/webhooks/tool-calls` | provider-owned contract | `@SkipEnvelope()` + e2e |
 | `POST /api/vapi/webhooks/end-of-call-report` | provider-owned contract | `@SkipEnvelope()` + e2e |
+| `GET /api/openapi.json` | machine-readable contract artefact (a generator consumes it, it is not a resource) | `@SkipEnvelope()` on `OpenApiController` |
 
 The list is mirrored in `ENVELOPE_EXEMPTIONS` (`@callback/shared`), each entry with a mandatory `reason`. Errors thrown on an exempt route are re-emitted in **Nest's raw shape**, so an exempt consumer never sees a body it does not understand.
 
@@ -135,7 +136,7 @@ The list is mirrored in `ENVELOPE_EXEMPTIONS` (`@callback/shared`), each entry w
 
 The decorator and the registry are held in **exact two-way agreement** by tests: `apps/api/src/common/http/envelope-exemptions.spec.ts` (controller inventory, runs on every Node version) and `apps/api/test/envelope-exemptions.e2e-spec.ts` (discovers the controllers of the booted `AppModule`). A decorated-but-unlisted route and a listed-but-undecorated route both fail.
 
-> **TODO (AIS-98):** when `/api/openapi.json` and `/api/docs` are mounted they must carry `@SkipEnvelope()` **and** an `ENVELOPE_EXEMPTIONS` entry, otherwise the agreement test fails by design. They are deliberately absent from both lists until they exist.
+> **`/api/docs` is deliberately *not* on the list.** The Swagger UI is served by the `@fastify/swagger-ui` plugin straight on the Fastify instance, so it never passes through a Nest handler and never reaches `ApiExceptionFilter` — an exemption entry would exist for a route the filter cannot see, and the two-way agreement test would fail.
 
 ---
 
@@ -253,7 +254,12 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 | Code-first user copy | `apps/admin/src/lib/error-message.test.ts` |
 | Field mapping rules (code gate, path mapping, defaults, duplicates, no server text) | `apps/admin/src/features/api-keys/api-keys.logic.test.ts` |
 | Field mapping in the UI (multi-field 400, unmapped path, legacy 409, no server text) | `apps/admin/src/pages/api-keys/ui/ApiKeyForm.test.tsx` |
-| No bare body outside the allow-list, OpenAPI baseline, breaking-change gate | **not built yet** — AIS-97 / AIS-98 / AIS-99 |
+| Document generation from the registry (paths, `operationId`, `$ref` envelope, examples, determinism) | `apps/api/src/common/openapi/openapi.registry.spec.ts` |
+| Envelope/error components registered once, `envelopeOf`, error statuses | `apps/api/src/common/openapi/zod-openapi.spec.ts` |
+| Prod never exposes the UI / validator (`isOpenApiDocsEnabled`, `isResponseAssertEnabled`) | `apps/api/src/common/openapi/openapi.config.spec.ts` |
+| Dev response validator (bare body, dropped field, additive field, exempt route) | `apps/api/src/common/openapi/{response-assert.logic,response-assert.interceptor,route-match.logic}.spec.ts` |
+| `/api/openapi.json` 200 + `openapi: 3.1.0`, `/api/docs` 200, `healthz` still raw | `apps/api/test/openapi.e2e-spec.ts` |
+| No bare body outside the allow-list, OpenAPI baseline, breaking-change gate | **not built yet** — AIS-97 / AIS-99 |
 
 ---
 
@@ -262,6 +268,7 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 * `422` has no dedicated code yet; a semantic-validation failure reports `VALIDATION_FAILED` / `400`.
 * API-key value masking (**show-once**) is a separate security task (AIS-75); these endpoints still return the token.
 * The `api-keys` routes are unauthenticated until AIS-73/74; the `401` code and banner behaviour are prepared but the login flow is not.
-* `/api/openapi.json` and Swagger UI (`/api/docs`) are not implemented; the registry is the committed seed for them.
+* `/api/openapi.json` is generated from the registry (AIS-98) and served in every env; the Swagger UI at `/api/docs` is mounted only when `isOpenApiDocsEnabled()` (never in prod). The committed baseline + CI drift gate is AIS-99.
+* The dev response validator (`ResponseAssertInterceptor`) only runs outside prod, and only for routes present in `API_ENDPOINTS`; an exempt route or a plugin-served asset is passed through untouched.
 * e2e suites self-skip on Node < 24.9 (CommonJS `@nestjs/config` + Jest ESM); run `pnpm start` + curl for a manual verification in that case.
 * `apps/api/test/api-keys.e2e-spec.ts` needs a live Postgres and probes it with `select 1` (`test/lib/database-gate.ts`). Without a reachable database it warns with `[database-gate]` and self-skips instead of reporting six failed assertions — start it with `pnpm db:up` (and `DATABASE_URL`) to run the persistence half of the envelope contract.

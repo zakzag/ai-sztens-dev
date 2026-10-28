@@ -42,6 +42,11 @@ export const ENVELOPE_EXEMPTIONS: readonly EnvelopeExemption[] = [
     path: '/api/vapi/webhooks/end-of-call-report',
     reason: 'Provider-owned contract: VAPI expects its own response body.',
   },
+  {
+    path: '/api/openapi.json',
+    reason:
+      'Machine-readable contract artefact (AIS-98): a generator consumes it, so it is not an enveloped resource.',
+  },
 ];
 
 /**

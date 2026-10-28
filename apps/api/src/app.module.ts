@@ -5,6 +5,7 @@ import { ApiKeysModule } from './api-keys/api-keys.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { HttpModule } from './common/http/http.module.js';
+import { OpenApiModule } from './common/openapi/openapi.module.js';
 import { DatabaseModule } from './db/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { VapiWebhooksModule } from './vapi-webhooks/vapi-webhooks.module.js';
@@ -47,6 +48,10 @@ const envFilePaths: string[] =
     // Global HTTP edge: the error filter (envelope for every throwable) and the
     // request-id interceptor. Imported first so every feature below gets them.
     HttpModule,
+    // Generated OpenAPI document (`/api/openapi.json`), the dev-only Swagger UI
+    // and the dev-only response validator (AIS-98). After `HttpModule` because
+    // the validator is an interceptor for the same routes.
+    OpenApiModule,
     DatabaseModule,
     HealthModule,
     ApiKeysModule,

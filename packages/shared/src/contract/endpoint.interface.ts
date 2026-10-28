@@ -43,6 +43,15 @@ export interface ApiEndpointContract {
   readonly successStatus: number;
   /** Schema of the payload (`data` when enveloped, the whole body when not). */
   readonly dataSchema: z.ZodTypeAny;
+  /**
+   * Sample payload, published as the OpenAPI `example` of the success response.
+   *
+   * Optional, and typed `unknown` on purpose: the value is opaque to the
+   * registry (the document generator publishes it verbatim) and the compiler
+   * must not pretend it can prove the sample matches `dataSchema`. The shared
+   * registry test proves that instead, by parsing it.
+   */
+  readonly example?: unknown;
   /** Schema of the request body; absent for bodyless endpoints. */
   readonly requestSchema?: z.ZodTypeAny;
   /**

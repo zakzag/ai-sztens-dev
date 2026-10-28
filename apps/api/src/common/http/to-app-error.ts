@@ -70,8 +70,10 @@ function readExceptionMessage(response: unknown, fallback: string): string {
 /**
  * Reads the validator messages of a Nest exception into the contract's shape.
  *
- * Nest's `ValidationPipe` produces `message: string[]` without field paths, so
- * every entry becomes a whole-payload detail (`path: ''`).
+ * A Nest exception may carry `message: string[]` (the shape the retired
+ * class-validator `ValidationPipe` produced, and what a guard or a third-party
+ * library can still throw). Those entries have no field path, so every one of
+ * them becomes a whole-payload detail (`path: ''`).
  * @param response - `HttpException.getResponse()`.
  */
 function readExceptionDetails(response: unknown): readonly ApiErrorDetail[] {

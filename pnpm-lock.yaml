@@ -123,12 +123,6 @@ importers:
       '@nestjs/platform-fastify':
         specifier: ^12.0.1
         version: 12.1.2(@nestjs/common@12.1.2(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2(@nestjs/common@12.1.2(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
-      class-transformer:
-        specifier: ^0.5.1
-        version: 0.5.1
-      class-validator:
-        specifier: ^0.14.2
-        version: 0.14.4
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(postgres@3.4.9)
@@ -6312,7 +6306,8 @@ snapshots:
 
   '@types/stack-utils@2.0.3': {}
 
-  '@types/validator@13.15.10': {}
+  '@types/validator@13.15.10':
+    optional: true
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -6984,13 +6979,15 @@ snapshots:
 
   cjs-module-lexer@2.3.0: {}
 
-  class-transformer@0.5.1: {}
+  class-transformer@0.5.1:
+    optional: true
 
   class-validator@0.14.4:
     dependencies:
       '@types/validator': 13.15.10
       libphonenumber-js: 1.13.15
       validator: 13.15.35
+    optional: true
 
   class-variance-authority@0.7.1:
     dependencies:
@@ -8155,7 +8152,8 @@ snapshots:
       prelude-ls: 1.2.1
       type-check: 0.4.0
 
-  libphonenumber-js@1.13.15: {}
+  libphonenumber-js@1.13.15:
+    optional: true
 
   light-my-request@6.6.0:
     dependencies:
@@ -9038,7 +9036,8 @@ snapshots:
       '@types/istanbul-lib-coverage': 2.0.6
       convert-source-map: 2.0.0
 
-  validator@13.15.35: {}
+  validator@13.15.35:
+    optional: true
 
   vite-node@3.2.4(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.15):
     dependencies:

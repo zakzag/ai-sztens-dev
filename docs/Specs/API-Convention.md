@@ -1,7 +1,7 @@
 # API Convention — unified request/response contract
 
 **Utolsó frissítés:** 2026-10-28
-**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md))
+**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95
 **Status:** living document — this file describes the *current* state of the API, not a snapshot.
 
 ---
@@ -21,7 +21,7 @@ Every request and response shape is defined **once**, in `packages/shared/src/co
 | `contract/<resource>/<resource>.contract.ts` | endpoint registry entries (`operationId`, method, path, `tag`, schemas, `errors`) |
 | `contract/endpoint.registry.ts` | `API_ENDPOINTS` + `ENVELOPE_EXEMPTIONS` |
 
-The same schema drives three artefacts: `z.infer` types, server validation (`ZodBodyPipe`), client parsing (`http-client`). There is no class-validator DTO and no hand-written interface in `apps/api/src/api-keys` any more.
+The same schema drives three artefacts: `z.infer` types, server validation (`ZodBodyPipe`), client parsing (`http-client`). There is no class-validator DTO and no hand-written interface in `apps/api/src/api-keys` any more — and since AIS-93 there is no `class-validator` / `class-transformer` dependency at all, nor a global `ValidationPipe` (see §7).
 
 ### 1.1 Endpoint registry
 
@@ -128,9 +128,14 @@ One `ApiEndpointContract` per operation, typed so a missing or misspelled field 
 | `GET /healthz` | Docker healthcheck + monitor watchdog parse a bare `{status, …}` | `@SkipEnvelope()` on the controller |
 | `POST /api/vapi/webhooks/tool-calls` | provider-owned contract | `@SkipEnvelope()` + e2e |
 | `POST /api/vapi/webhooks/end-of-call-report` | provider-owned contract | `@SkipEnvelope()` + e2e |
-| `/api/openapi.json`, `/api/docs` | generated documents (AIS-98) | `@SkipEnvelope()` |
 
 The list is mirrored in `ENVELOPE_EXEMPTIONS` (`@callback/shared`), each entry with a mandatory `reason`. Errors thrown on an exempt route are re-emitted in **Nest's raw shape**, so an exempt consumer never sees a body it does not understand.
+
+`ApiExceptionFilter` resolves the exemption from **either** source: the `@SkipEnvelope()` metadata of the failed handler/controller, or the registry entry matching the request's route pattern (`request.routeOptions.url`). The second source is not redundant — Nest hands the filter a host without a handler/class pair for route-handler **and** guard failures, so a metadata-only check would wrap a VAPI auth rejection in our envelope.
+
+The decorator and the registry are held in **exact two-way agreement** by tests: `apps/api/src/common/http/envelope-exemptions.spec.ts` (controller inventory, runs on every Node version) and `apps/api/test/envelope-exemptions.e2e-spec.ts` (discovers the controllers of the booted `AppModule`). A decorated-but-unlisted route and a listed-but-undecorated route both fail.
+
+> **TODO (AIS-98):** when `/api/openapi.json` and `/api/docs` are mounted they must carry `@SkipEnvelope()` **and** an `ENVELOPE_EXEMPTIONS` entry, otherwise the agreement test fails by design. They are deliberately absent from both lists until they exist.
 
 ---
 
@@ -143,6 +148,7 @@ Envelope      ApiResponseService.ok(data, ctx) / .fail(appError, ctx)
 Errors        ApiExceptionFilter (@Catch(), registered as APP_FILTER in HttpModule)
 ```
 
+* **No global `ValidationPipe`.** Validation is a route-level `ZodBodyPipe` / `ZodQueryPipe` carrying the shared schema; `class-validator` and `class-transformer` are not installed. A route without a pipe is a contract gap, not something a catch-all pipe compensates for.
 * A domain service is **HTTP-agnostic**: it throws `AppError` (code + message + details), never `HttpException`.
 * A controller **never returns domain data directly** — it calls `responses.ok(result, ctx)`; `ctx` comes from `@ReqCtx()`.
 * `ApiResponseService` is thin: it only calls the pure factories from `@callback/shared`.
@@ -153,15 +159,30 @@ Errors        ApiExceptionFilter (@Catch(), registered as APP_FILTER in HttpModu
 
 ## 8. Request correlation
 
-`X-Request-Id` is accepted inbound (Caddy/client), otherwise Fastify's `request.id` is used, otherwise a UUID is generated. The resolved id appears as `meta.requestId` / `error.requestId` **and** as the `X-Request-Id` response header, so a browser network entry and a server log line share the same value.
+Resolution order (`request-context.ts`, pure functions):
+
+1. a **valid** inbound `X-Request-Id` (Caddy / client / another service) is kept;
+2. otherwise Fastify's `request.id`, which `create-fastify-adapter.ts` generates with `genReqId: () => randomUUID()` — a UUID, **not** Fastify's default `req-1`, `req-2` counter, which is not unique across restarts or replicas;
+3. a random UUID as the last resort, so a context is never built without an id.
+
+Inbound values are validated before use (`request-id.const.ts`): max 128 characters, allow-list `A-Za-z0-9._:-`. The id lands in a response header and in every log line, so whitespace, newlines and other control characters are rejected and replaced by a generated id rather than echoed — an invalid value is treated exactly like an absent header.
+
+The resolved id appears as `meta.requestId` / `error.requestId` **and** as the `X-Request-Id` response header, so a browser network entry and a server log line share the same value.
+
+`@ReqCtx()` (`request-context.decorator.ts`) is the only way a controller receives the context; it never touches the raw request object.
+
+> **Filter-host caveat:** Nest does not always populate `getHandler()` / `getClass()` on the host handed to an exception filter (route-handler and guard failures both arrive without them), and `Reflector` throws on an `undefined` target. `ApiExceptionFilter` therefore skips missing targets and falls back to the `ENVELOPE_EXEMPTIONS` route-pattern lookup — without that, every 4xx collapsed into an opaque Fastify `500` and exempt routes lost their raw body. Covered by `api-exception.filter.spec.ts`, the unknown-route case in `apps/api/test/request-id.e2e-spec.ts` and the signed/unsigned VAPI webhook cases in `apps/api/test/vapi-webhooks.e2e-spec.ts` (which now runs the real `HttpModule`).
 
 ---
 
 ## 9. Client transport
 
-* `packages/api-client` parses `successEnvelopeSchema(callerSchema)` and returns **only `data`** — service signatures are unchanged.
-* A bare payload, a missing `meta`, or a `data: null` where the caller expects a resource becomes `ApiError` with `code: 'UNEXPECTED_PAYLOAD'`.
+* **One unwrap point:** `packages/api-client/src/envelope.logic.ts` — `unwrapEnvelope(schema, body)` returns a discriminated `{ ok: true, data }` / `{ ok: false, issues, cause }`. It is pure (no `Response`, no `fetch`, no `env`), so every drift case is unit-testable without a transport double. `http-client.ts` only reads the body and turns a failed unwrap into an error.
+* Two parses inside the unwrap: `successEnvelopeSchema(callerSchema)` proves the body is `{ data, meta }`, then the bare `callerSchema` re-validates `data` (so `data: null` is only accepted where the caller expects it). Only **`data`** is returned — service signatures are unchanged.
+* A bare payload, a missing `meta`, or a `data: null` where the caller expects a resource becomes `ApiError` with `code: 'UNEXPECTED_PAYLOAD'`, **non-empty `issues[]`** and `details[]` rendered from that same list (`formatIssueLine`), so the two can never disagree.
+* `issues[].path` is **payload-relative** (`identifier`, never `data.identifier`) — the envelope wrapper is stripped by `toPayloadRelativePath()`, because that is the form the admin maps onto a field. A payload-level problem (wrong type, `null` body) yields the empty path, i.e. “the whole body”.
 * `ApiError` carries `status`, `code`, `requestId`, `issues[]` **and** the legacy `details: string[]` (rendered lines), so existing callers keep working.
+* `api-error.const.ts` re-exports `HTTP_STATUS`, `API_ERROR_CODE` and the `ApiErrorCode` type from `@callback/shared`, so a consumer compares `code` against the catalogue instead of re-typing strings.
 * A non-JSON body (Caddy `502`, nginx `504`) still degrades to status-based error — the tolerant path is deliberate.
 * Request schemas are `.strict()` (an unknown field is a `400`), response schemas strip unknown keys (an additive backend field never breaks a bundle).
 
@@ -176,7 +197,23 @@ Errors        ApiExceptionFilter (@Catch(), registered as APP_FILTER in HttpModu
 | 3. App | dismissible top banner (session + notification store) | `401`, offline (`status === null`), `503` |
 | 4. Log drawer | system entries with `code`, `status`, `requestId` | all `5xx`, schema-drift payloads |
 
-`toErrorMessage(error)` maps **code first** (`ERROR_CODE_MESSAGE` in `apps/admin/src/lib/error-message.const.ts`), then falls back to the status copy. The server's `message`/`details` are never used as user copy.
+`toErrorMessage(error)` maps **code first** (`ERROR_CODE_MESSAGE` in `apps/admin/src/lib/error-message.const.ts`), then falls back to the status copy. The server's `message`/`details` are never used as user copy. Its signature (`unknown → string`) is frozen — the notification capture builds on it.
+
+### 10.1 Tier 1 — field mapping (`toFieldErrors`)
+
+Implemented by `toFieldErrors(error): { fields, form }` in
+`apps/admin/src/features/<use-case>/<use-case>.logic.ts` (API keys:
+[`api-keys.logic.ts`](../../apps/admin/src/features/api-keys/api-keys.logic.ts:1)). Pure, no React, no I/O.
+
+| Rule | Detail |
+|---|---|
+| **Code gate** | Only `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT` may produce field errors. Any other code — `CONFLICT`, `INTERNAL_ERROR`, a proxy `409` — stays a page `Alert`, even if it carries paths. |
+| **Path source** | `issues[].path` (payload-relative), matched against the form's declared field list. Never parsed out of `details[]` strings. |
+| **Unmapped path** | A path no input owns (dot path, array index, empty payload path) becomes the single `form` message, rendered as the page `Alert`. Mapped paths still get their own input. |
+| **Default path** | An allowed code with `issues: []` falls back to the code's default path (`API_KEY_IDENTIFIER_CONFLICT` → `identifier`), so an older server still highlights the right input. `VALIDATION_FAILED` has no default → page `Alert`. |
+| **Duplicate path** | First issue wins (server order = validator order). |
+| **Copy** | Client-owned: `API_KEY_IDENTIFIER_FIELD_MESSAGE` / `FIELD_INVALID_MESSAGE`. `issue.message` is English developer text and is never rendered. |
+| **Mutual exclusivity** | If every issue mapped, `form` is `null` (no page `Alert`); if some did not, the alert carries one sentence for those. |
 
 Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 ([`docs/plans/2026-10-22--15-40-00-frontend-notification-and-log-system-plan.md`](../plans/2026-10-22--15-40-00-frontend-notification-and-log-system-plan.md)) and are tracked as AIS-96.
@@ -202,13 +239,20 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 |---|---|
 | Envelope factories & code catalogue | `packages/shared/test/{envelope,error-envelope}.test.ts` |
 | Registry completeness (uniqueness, `<resource>.<action>` ids, tag = namespace, catalogue-only `errors`, payload parses, compile-time `@ts-expect-error` gate) | `packages/shared/test/endpoint-registry.test.ts` |
-| Error filter, pipes, response service, correlation | `apps/api/src/common/http/*.spec.ts` |
+| Error filter, pipes, response service, correlation, exemption metadata | `apps/api/src/common/http/*.spec.ts` |
+| `@SkipEnvelope()` ⇄ `ENVELOPE_EXEMPTIONS` agreement (no container needed) | `apps/api/src/common/http/envelope-exemptions.spec.ts` |
+| Same agreement over the discovered `AppModule` controllers | `apps/api/test/envelope-exemptions.e2e-spec.ts` |
 | `api-keys` service/controller behaviour | `apps/api/src/api-keys/*.spec.ts` |
 | Envelope end-to-end (incl. 409 code + `details[0].path`) | `apps/api/test/api-keys.e2e-spec.ts` |
+| `meta.requestId` ⇄ `X-Request-Id`, inbound pass-through, invalid id replaced, unknown route, `healthz` raw | `apps/api/test/request-id.e2e-spec.ts` |
 | `healthz` / VAPI raw bodies unchanged | `apps/api/test/{health,vapi-webhooks}.e2e-spec.ts` |
 | Client unwrap, drift, legacy fallback | `packages/api-client/test/{http-client,api-keys.service}.test.ts` |
+| Pure envelope unwrap + payload-relative paths | `packages/api-client/test/envelope.logic.test.ts` |
+| Error-body parsing, `details`/`issues` consistency, guards | `packages/api-client/test/api-error.test.ts` |
 | Client path derivation from the registry (`toClientPath`, `clientPathOf`) | `packages/api-client/test/endpoint-path.test.ts` |
 | Code-first user copy | `apps/admin/src/lib/error-message.test.ts` |
+| Field mapping rules (code gate, path mapping, defaults, duplicates, no server text) | `apps/admin/src/features/api-keys/api-keys.logic.test.ts` |
+| Field mapping in the UI (multi-field 400, unmapped path, legacy 409, no server text) | `apps/admin/src/pages/api-keys/ui/ApiKeyForm.test.tsx` |
 | No bare body outside the allow-list, OpenAPI baseline, breaking-change gate | **not built yet** — AIS-97 / AIS-98 / AIS-99 |
 
 ---
@@ -220,3 +264,4 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 * The `api-keys` routes are unauthenticated until AIS-73/74; the `401` code and banner behaviour are prepared but the login flow is not.
 * `/api/openapi.json` and Swagger UI (`/api/docs`) are not implemented; the registry is the committed seed for them.
 * e2e suites self-skip on Node < 24.9 (CommonJS `@nestjs/config` + Jest ESM); run `pnpm start` + curl for a manual verification in that case.
+* `apps/api/test/api-keys.e2e-spec.ts` needs a live Postgres and probes it with `select 1` (`test/lib/database-gate.ts`). Without a reachable database it warns with `[database-gate]` and self-skips instead of reporting six failed assertions — start it with `pnpm db:up` (and `DATABASE_URL`) to run the persistence half of the envelope contract.

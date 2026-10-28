@@ -1,17 +1,24 @@
 /**
  * Constants of the transport layer.
  *
- * The statuses are named instead of written as literals at the call sites, so a
- * future change (e.g. treating 422 like 400) touches one place. They come from
- * `@callback/shared` — the client and the server must not keep two copies of the
- * same table (D5 of the API convention plan). The messages are the technical
- * fallbacks used when the response carries no usable body; the UI never shows
- * them verbatim, it maps the error through `toErrorMessage`.
+ * The statuses and error codes are named instead of written as literals at the
+ * call sites, so a future change (e.g. treating 422 like 400) touches one place.
+ * Both come from `@callback/shared` — the client and the server must not keep two
+ * copies of the same table (D5/D8 of the API convention plan). The messages are
+ * the technical fallbacks used when the response carries no usable body; the UI
+ * never shows them verbatim, it maps the error through `toErrorMessage`.
+ *
+ * `API_ERROR_CODE` is re-exported so a consumer can compare a normalised
+ * `ApiError.code` against a catalogue constant (`code === API_ERROR_CODE.NOT_FOUND`)
+ * instead of re-typing the string, which is what keeps a typo from silently
+ * becoming “unhandled error”.
  */
 
-import { HTTP_STATUS } from '@callback/shared';
+import { API_ERROR_CODE, HTTP_STATUS } from '@callback/shared';
 
-export { HTTP_STATUS };
+export { API_ERROR_CODE, HTTP_STATUS };
+
+export type { ApiErrorCode } from '@callback/shared';
 
 /** `name` of every error raised by this package. */
 export const API_ERROR_NAME = 'ApiError';

@@ -20,7 +20,7 @@ Delivery already recorded in: `docs/history/2026-10-27--17-01-00-unified-api-env
 | # | Gap | Why it matters |
 |---|---|---|
 | G1 | Unwrap lives as private functions inside [`http-client.ts`](../../packages/api-client/src/http-client.ts:126); no `envelope.logic.ts` / `envelope.logic.test.ts` as the ticket's scope requires | the ticket's pure-function cases (extra `meta`, non-object body, `data: null`) can only be exercised through a `Response` double today |
-| G2 | Schema drift fills `details` but **not** `issues` — [`toPayloadError()`](../../packages/api-client/src/http-client.ts:111) never passes `issues` | DoD item “séma-eltérés → `UNEXPECTED_PAYLOAD` + `issues`” is unmet; the admin form maps fields from `issues[]`, so a drift renders as a page-level error with no field highlight |
+| G2 | Schema drift fills `details` but **not** `issues` — [`toPayloadError()`](../../packages/api-client/src/http-client.ts:111) never passes `issues`; additionally the paths come from [`successEnvelopeSchema()`](../../packages/shared/src/contract/envelope.schema.ts:56), i.e. they read `data.identifier`, not `identifier` | DoD item “séma-eltérés → `UNEXPECTED_PAYLOAD` + `issues`” is unmet; the admin form maps fields from `issues[]`, so a drift renders as a page-level error with no field highlight, and a `data.`-prefixed path would match no form field |
 | G3 | [`api-error.const.ts`](../../packages/api-client/src/api-error.const.ts:14) re-exports `HTTP_STATUS` only | ticket asks for `API_ERROR_CODE` too, otherwise consumers re-type codes as raw strings |
 | G4 | `api-error.ts` has no dedicated spec (`parseErrorBody`, `extractErrorDetails`, `is*` guards) | the ticket lists `parseErrorEnvelope` unit cases (`details` not an array, `null` body, code-only body) that only travel indirectly through transport tests |
 | G5 | [`createCodedError()`](../../apps/admin/src/test/mocks/api-error.mock.ts:23) cannot express `issues` | the admin field-mapping tests would hand-craft errors, against the mocks-in-one-place rule |
@@ -43,8 +43,8 @@ flowchart TD
 
 ## 4. Steps
 
-1. **Pure module** — add [`packages/api-client/src/envelope.logic.ts`](../../packages/api-client/src/envelope.logic.ts) with `toIssueDetails(zodError): readonly ApiErrorDetail[]` and `unwrapEnvelope(schema, body)` returning a discriminated result (`{ ok: true, data }` / `{ ok: false, issues }`); no `Response`, no `fetch`, no env read.
-2. **Transport uses it** — [`parsePayload()`](../../packages/api-client/src/http-client.ts:138) keeps reading the body but delegates both parses to `unwrapEnvelope`; `toPayloadError` passes `issues: result.issues` as well as the rendered `details` (G2).
+1. **Pure module** — add [`packages/api-client/src/envelope.logic.ts`](../../packages/api-client/src/envelope.logic.ts) with `toIssueDetails(zodError): readonly ApiErrorDetail[]` (maps `issue.path` to a dot path, **drops the leading `data` segment** because the envelope wraps the payload, so the path is payload-relative) and `unwrapEnvelope(schema, body)` returning a discriminated result (`{ ok: true, data }` / `{ ok: false, issues }`); no `Response`, no `fetch`, no env read.
+2. **Transport uses it** — [`parsePayload()`](../../packages/api-client/src/http-client.ts:138) keeps reading the body but delegates both parses to `unwrapEnvelope`; `toPayloadError` passes `issues: result.issues` as well as the rendered `details` (G2), the latter derived from the same issues so the two can never disagree.
 3. **Constants** — [`api-error.const.ts`](../../packages/api-client/src/api-error.const.ts:14) re-exports `API_ERROR_CODE` and the `ApiErrorCode` type from `@callback/shared`; add both to [`index.ts`](../../packages/api-client/src/index.ts:1).
 4. **Interfaces** — declare the unwrap result type in a new `envelope.logic.interface.ts` (named type, no inline shape).
 5. **Tests** —
@@ -60,6 +60,7 @@ flowchart TD
 - `client.get(path, apiKeyListSchema)` returns the array out of `{ data, meta }`; service signatures unchanged.
 - Error envelope → `ApiError` with `status`, `code`, `requestId`, `issues[]`, `details[]`.
 - Drift (missing `data`, missing `meta`, wrong payload) → `UNEXPECTED_PAYLOAD` **with non-empty `issues`**, never `undefined`.
+- `issues[].path` is payload-relative (`identifier`, not `data.identifier`), so the admin field map resolves it; `details` is the rendered projection of the same `issues`.
 - Non-JSON `502` → `ApiError` with `status: 502`, `code: null`, readable message.
 - All unwrap/parse logic reachable from one pure module with its own spec.
 - `pnpm --filter @callback/api-client test`, `pnpm --filter @callback/api-client build`, `pnpm --filter @callback/admin test`, `pnpm lint` green.

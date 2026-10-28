@@ -1,4 +1,5 @@
 export {
+  API_ERROR_CODE,
   API_ERROR_NAME,
   HTTP_STATUS,
   NETWORK_ERROR_MESSAGE,
@@ -7,9 +8,12 @@ export {
   UNPARSEABLE_ERROR_MESSAGE,
 } from './api-error.const.js';
 
+export type { ApiErrorCode } from './api-error.const.js';
+
 export {
   ApiError,
   extractErrorDetails,
+  formatIssueLine,
   isConflict,
   isNetworkError,
   isNotFoundError,
@@ -17,6 +21,18 @@ export {
   parseErrorBody,
   toFailureMessage,
 } from './api-error.js';
+
+export {
+  toIssueDetails,
+  toPayloadRelativePath,
+  unwrapEnvelope,
+} from './envelope.logic.js';
+
+export type {
+  EnvelopeUnwrapFailure,
+  EnvelopeUnwrapResult,
+  EnvelopeUnwrapSuccess,
+} from './envelope.logic.interface.js';
 
 export type {
   ApiErrorBody,

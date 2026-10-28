@@ -15,8 +15,8 @@
  * from tests and from Node without a bundle.
  */
 
-import { z } from 'zod';
-import { successEnvelopeSchema } from '@callback/shared';
+import type { z } from 'zod';
+import type { ApiErrorDetail } from '@callback/shared';
 import {
   NETWORK_ERROR_MESSAGE,
   UNEXPECTED_PAYLOAD_CODE,
@@ -24,9 +24,11 @@ import {
 } from './api-error.const.js';
 import {
   ApiError,
+  formatIssueLine,
   parseErrorBody,
   toFailureMessage,
 } from './api-error.js';
+import { unwrapEnvelope } from './envelope.logic.js';
 import type {
   HttpClient,
   HttpClientConfig,
@@ -96,64 +98,57 @@ async function readBody(response: Response): Promise<unknown> {
   }
 }
 
-/** Renders zod issues as `field: message` strings for the UI. */
-function toContractDetails(error: z.ZodError): readonly string[] {
-  return error.issues.map((issue) => {
-    const path = issue.path.join('.');
-    return path.length > 0 ? `${path}: ${issue.message}` : issue.message;
-  });
-}
-
 /**
  * Builds the “contract drift” error, i.e. a 2xx body that does not match the
- * shared schema. Its code is client-side: the server never sent one.
+ * shared contract. Its code is client-side: the server never sent one.
+ *
+ * `issues` carries payload-relative paths (the `data.` wrapper is stripped by
+ * the unwrap), so the admin can map a drift onto a form field, and `details` is
+ * derived from the same list — the two can never disagree.
+ *
+ * @param response - the 2xx response that carried the drifting body.
+ * @param url - absolute request URL, for logs.
+ * @param issues - payload-relative field issues; never empty.
+ * @param cause - the zod error behind the issues.
  */
 function toPayloadError(
   response: Response,
   url: string,
-  error: z.ZodError,
+  issues: readonly ApiErrorDetail[],
+  cause: unknown,
 ): ApiError {
   return new ApiError({
     message: UNEXPECTED_PAYLOAD_MESSAGE,
     status: response.status,
     url,
     code: UNEXPECTED_PAYLOAD_CODE,
-    details: toContractDetails(error),
-    cause: error,
+    issues,
+    details: issues.map(formatIssueLine),
+    cause,
   });
 }
 
 /**
  * Parses a 2xx body as the success envelope and returns its `data`.
  *
- * Two parses, on purpose:
- * 1. the **envelope** (shared schema) proves the body has `data` + `meta`; a
- *    bare payload or a missing key is a drift, not a success;
- * 2. the **payload** is then validated with the caller's schema, so a `null`
- *    `data` is only accepted when the caller expects it (a delete), never where
- *    a resource is required.
+ * All decoding happens in {@link unwrapEnvelope}; this function only owns the
+ * transport concerns: reading the body and turning a failed unwrap into the
+ * contract-drift {@link ApiError}.
  *
- * @throws {ApiError} with code `UNEXPECTED_PAYLOAD` when either parse fails.
+ * @throws {ApiError} with code `UNEXPECTED_PAYLOAD` when the unwrap fails.
  */
 async function parsePayload<T>(
   response: Response,
   schema: z.ZodType<T>,
   url: string,
 ): Promise<T> {
-  const body = await readBody(response);
-  const envelope = successEnvelopeSchema(schema).safeParse(body);
+  const result = unwrapEnvelope(schema, await readBody(response));
 
-  if (!envelope.success) {
-    throw toPayloadError(response, url, envelope.error);
+  if (!result.ok) {
+    throw toPayloadError(response, url, result.issues, result.cause);
   }
 
-  const payload = schema.safeParse(envelope.data.data);
-
-  if (!payload.success) {
-    throw toPayloadError(response, url, payload.error);
-  }
-
-  return payload.data;
+  return result.data;
 }
 
 /**

@@ -63,8 +63,17 @@ function toNonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
-/** Renders one issue the way the UI lists it. */
-function toDetailLine(detail: ApiErrorDetail): string {
+/**
+ * Renders one issue the way the UI lists it.
+ *
+ * Exported because the transport renders a contract-drift issue list with the
+ * exact same rule: `details` is always the projection of `issues`, so the two
+ * cannot diverge between the server-error path and the drift path.
+ *
+ * @param detail - one `{ path, message }` entry.
+ * @returns `path: message`, or the bare message for a payload-level issue.
+ */
+export function formatIssueLine(detail: ApiErrorDetail): string {
   return detail.path.length > 0 ? `${detail.path}: ${detail.message}` : detail.message;
 }
 
@@ -118,7 +127,7 @@ function parseEnvelopeError(body: unknown): ParsedErrorBody | null {
     code: toNonEmptyString(error['code']),
     requestId: toNonEmptyString(error['requestId']),
     issues,
-    details: issues.map(toDetailLine),
+    details: issues.map(formatIssueLine),
   };
 }
 

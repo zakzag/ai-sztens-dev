@@ -18,12 +18,16 @@ export const VALIDATION_DETAIL = 'identifier must match /^[A-Za-z0-9._-]+$/';
 /**
  * Builds one error from the contract envelope.
  *
- * @param init - status, code and optional rendered details.
+ * `issues` is the field-level list the UI maps onto inputs; `details` stays the
+ * rendered projection so a test can assert either view of the same failure.
+ *
+ * @param init - status, code, optional message, issues, details and requestId.
  */
 export function createCodedError(init: {
   readonly status: number;
   readonly code: string | null;
   readonly message?: string;
+  readonly issues?: readonly { readonly path: string; readonly message: string }[];
   readonly details?: readonly string[];
   readonly requestId?: string | null;
 }): ApiError {
@@ -33,6 +37,7 @@ export function createCodedError(init: {
     url: '/api/api-keys',
     code: init.code,
     requestId: init.requestId ?? null,
+    issues: init.issues ?? [],
     details: init.details ?? [],
   });
 }
@@ -58,7 +63,8 @@ export function createValidationError(): ApiError {
     status: HTTP_STATUS.BAD_REQUEST,
     code: 'VALIDATION_FAILED',
     message: 'The request payload does not match the API contract.',
-    details: [VALIDATION_DETAIL],
+    issues: [{ path: 'identifier', message: VALIDATION_DETAIL }],
+    details: [`identifier: ${VALIDATION_DETAIL}`],
   });
 }
 

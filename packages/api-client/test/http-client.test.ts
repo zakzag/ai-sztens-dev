@@ -449,6 +449,46 @@ describe('createHttpClient — contract drift', () => {
     expect((error as ApiError).details.join(' ')).toContain('name');
   });
 
+  it('exposes payload-relative field issues on a drift', async () => {
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 42 }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const error = await client
+      .get('/items', itemSchema)
+      .catch((caught: unknown) => caught);
+
+    const apiError = error as ApiError;
+
+    expect(apiError.code).toBe(UNEXPECTED_PAYLOAD_CODE);
+    expect(apiError.issues).toHaveLength(1);
+    expect(apiError.issues[0]?.path).toBe('name');
+    expect(apiError.issues[0]?.path.startsWith('data')).toBe(false);
+    expect(apiError.details).toEqual([`name: ${apiError.issues[0]?.message ?? ''}`]);
+  });
+
+  it('exposes a payload-level issue for a null `data` on a resource schema', async () => {
+    const fetchMock = createSequenceFetchMock([successResponse(null)]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const error = await client
+      .get('/items', itemSchema)
+      .catch((caught: unknown) => caught);
+
+    const apiError = error as ApiError;
+
+    expect(apiError.issues.length).toBeGreaterThan(0);
+    expect(apiError.issues[0]?.path).toBe('');
+    expect(apiError.details).toHaveLength(apiError.issues.length);
+  });
+
   it('rejects an empty 2xx body as a contract failure', async () => {
     const fetchMock = createSequenceFetchMock([emptyResponse(200)]);
     const client = createHttpClient({

@@ -51,15 +51,32 @@ export function createReply(): ReplySpy {
   return reply;
 }
 
+/**
+ * Which metadata targets the fake host exposes.
+ *
+ * Nest does not always populate `getHandler()` / `getClass()` on the host it
+ * hands to an exception filter (the route-handler path builds one from the raw
+ * `[req, res, next]` tuple), so the specs need to reproduce the missing-target
+ * case — `Reflector` throws `TypeError` on an `undefined` target.
+ */
+export type MetadataTargets = 'both' | 'handler' | 'class' | 'none';
+
 /** Options of {@link createHost}. */
 export interface HostOptions {
   /** Value `ArgumentsHost#getType()` reports; `'http'` unless overridden. */
   readonly type?: string;
+  /** Metadata targets the host exposes; `'both'` unless overridden. */
+  readonly metadataTargets?: MetadataTargets;
+  /** Concrete request URL; the fixture's `/api/api-keys` unless overridden. */
+  readonly requestUrl?: string;
+  /** Fastify route pattern (`request.routeOptions.url`), when there is one. */
+  readonly routePattern?: string;
 }
 
 /**
  * @param reply - reply double the filter must answer on.
- * @param options - overrides for the reported transport type.
+ * @param options - overrides for the reported transport type and the exposed
+ *   metadata targets.
  * @returns an `ArgumentsHost` double with a handler and a controller class.
  */
 export function createHost(
@@ -69,16 +86,29 @@ export function createHost(
   const handler = (): void => undefined;
   class ControllerStub {}
 
+  const targets = options.metadataTargets ?? 'both';
+  const exposesHandler = targets === 'both' || targets === 'handler';
+  const exposesClass = targets === 'both' || targets === 'class';
+
+  const request = {
+    ...REQUEST_FIXTURE,
+    url: options.requestUrl ?? REQUEST_FIXTURE.url,
+    routeOptions:
+      options.routePattern === undefined
+        ? undefined
+        : { url: options.routePattern },
+  };
+
   const http = {
-    getRequest: () => REQUEST_FIXTURE,
+    getRequest: () => request,
     getResponse: () => reply,
   };
 
   return {
     getType: () => options.type ?? 'http',
     switchToHttp: () => http,
-    getHandler: () => handler,
-    getClass: () => ControllerStub,
+    getHandler: () => (exposesHandler ? handler : undefined),
+    getClass: () => (exposesClass ? ControllerStub : undefined),
     getArgs: () => [],
     getArgByIndex: () => undefined,
     switchToRpc: () => {
@@ -114,8 +144,18 @@ export function createReflectorSpy(options: ReflectorSpyOptions): ReflectorSpy {
   const requestedKeys: string[] = [];
 
   const reflector = {
-    getAllAndOverride: (key: string): boolean => {
+    getAllAndOverride: (
+      key: string,
+      targets: readonly unknown[] = [],
+    ): boolean => {
       requestedKeys.push(key);
+
+      // `Reflect.getMetadata` throws on a non-object target; emulating that is
+      // what lets a spec prove the filter never forwards a missing handler or
+      // class (which would turn every 4xx into a 500).
+      if (targets.some((target) => target === undefined || target === null)) {
+        throw new TypeError('Reflect.getMetadata called on non-object');
+      }
 
       return options.exempt && key === SKIP_ENVELOPE_KEY;
     },

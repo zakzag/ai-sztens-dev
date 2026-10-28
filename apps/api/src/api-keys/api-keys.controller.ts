@@ -27,7 +27,7 @@ import {
 import { API_KEYS_ROUTE } from './api-keys.const.js';
 import { ApiKeysService } from './api-keys.service.js';
 import { ApiResponseService } from '../common/http/api-response.service.js';
-import { ReqCtx } from '../common/http/request-context.js';
+import { ReqCtx } from '../common/http/request-context.decorator.js';
 import type { RequestContext } from '../common/http/request-context.interface.js';
 import { ZodBodyPipe } from '../common/http/zod.pipe.js';
 

@@ -1,8 +1,6 @@
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
+import { createFastifyAdapter } from '../src/common/http/create-fastify-adapter.js';
 import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
 
 /**
@@ -74,7 +72,7 @@ async function bootApp(): Promise<NestFastifyApplication | null> {
   }).compile();
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(
-    new FastifyAdapter(),
+    createFastifyAdapter(),
   );
   // Same prefix config as production (see src/main.ts).
   app.setGlobalPrefix('api', { exclude: ['healthz'] });
@@ -93,6 +91,11 @@ describe('HealthController (e2e)', () => {
       });
 
       expect(response.statusCode).toBe(200);
+      // Exempt route: the body carries no envelope, but the correlation header
+      // must still be there so a healthcheck failure is traceable (AIS-92).
+      expect(response.headers['x-request-id']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
       const body: unknown = response.json();
       // Type-guard narrows `unknown` -> `HealthBody`; `expect()` would not.
       if (!isHealthBody(body)) throw new Error('health body shape mismatch');

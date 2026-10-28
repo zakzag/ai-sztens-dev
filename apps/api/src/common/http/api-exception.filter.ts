@@ -9,7 +9,8 @@
  * - 5xx bodies are sanitised by {@link toAppError} (details stay in the log);
  * - the resolved `requestId` is echoed as `X-Request-Id`, which is what makes a
  *   user report traceable to exactly one server log line;
- * - routes marked with `@SkipEnvelope()` reproduce Nest's raw error body, so the
+ * - routes marked with `@SkipEnvelope()` (and every route on the shared
+ *   `ENVELOPE_EXEMPTIONS` allow-list) reproduce Nest's raw error body, so the
  *   Docker healthcheck and the VAPI webhooks keep their contract.
  *
  * Registered as `APP_FILTER` from {@link HttpModule}; it is never thrown or
@@ -30,7 +31,7 @@ import type {
 // (ApiResponseService, ?)" and stops the application from booting.
 // Guarded by `http-wiring.metadata.spec.ts`.
 import { Reflector } from '@nestjs/core';
-import { HTTP_STATUS } from '@callback/shared';
+import { ENVELOPE_EXEMPTIONS, HTTP_STATUS } from '@callback/shared';
 import { ApiResponseService } from './api-response.service.js';
 import { INTERNAL_ERROR_MESSAGE } from './api-messages.const.js';
 import { SKIP_ENVELOPE_KEY } from './skip-envelope.const.js';
@@ -52,6 +53,22 @@ function toExemptBody(exception: unknown, status: number): unknown {
 }
 
 /**
+ * Element type of the target list `Reflector#getAllAndOverride` accepts, taken
+ * from Nest's own signature so this file never has to restate it (the list is
+ * a union of `Function` and `Type<any>`).
+ */
+type MetadataTarget = Parameters<Reflector['getAllAndOverride']>[1][number];
+
+/**
+ * @param value - a metadata target candidate (a controller class or a handler).
+ * @returns `true` when the value can carry `Reflect` metadata. Both a class and
+ *   a handler are callable, and an absent target is `undefined`.
+ */
+function isMetadataTarget(value: unknown): value is MetadataTarget {
+  return typeof value === 'function';
+}
+
+/**
  * @param exception - the caught throwable.
  * @returns the status a **non-exempt** error would have, used only for logging
  *   and for the exempt body.
@@ -62,6 +79,39 @@ function resolveExceptionStatus(exception: unknown): number {
   }
 
   return HTTP_STATUS.INTERNAL_SERVER_ERROR;
+}
+
+/**
+ * Reads the route pattern the request was matched against.
+ *
+ * Fastify exposes it as `request.routeOptions.url` (`/api/v1/items/:id`), which
+ * is exactly the notation the exemption list uses. The concrete URL (query
+ * string stripped) is the fallback for requests that never reached a route.
+ *
+ * @param host - filter host of the failed request.
+ * @returns the route pattern, or `''` when it cannot be read.
+ */
+function readRoutePattern(host: ArgumentsHost): string {
+  const request = host.switchToHttp().getRequest<HttpRequestLike>();
+  const pattern: unknown = request.routeOptions?.url;
+
+  if (typeof pattern === 'string' && pattern.length > 0) {
+    return pattern;
+  }
+
+  const url: unknown = request.url;
+
+  return typeof url === 'string' ? (url.split('?')[0] ?? '') : '';
+}
+
+/**
+ * @param host - filter host of the failed request.
+ * @returns `true` when the failed route is on the documented raw-body list.
+ */
+function isRegisteredExemption(host: ArgumentsHost): boolean {
+  const pattern = readRoutePattern(host);
+
+  return ENVELOPE_EXEMPTIONS.some((entry) => entry.path === pattern);
 }
 
 @Catch()
@@ -112,16 +162,49 @@ export class ApiExceptionFilter implements ExceptionFilter<unknown> {
   }
 
   /**
-   * @returns `true` when the matched handler or its controller opted out.
+   * @returns `true` when the failed route must keep a raw body.
    *
-   * The host arrives typed as `ArgumentsHost` (that is the `ExceptionFilter`
-   * contract), but an exception always reaches the filter through the HTTP
-   * context, which is an {@link ExecutionContext} and therefore exposes the
-   * handler and the controller class the metadata is attached to.
+   * Two independent sources are consulted and **either** is enough:
+   *
+   * 1. `@SkipEnvelope()` metadata on the matched handler or controller — the
+   *    normal path, but the host does not always carry the metadata targets;
+   * 2. the documented `ENVELOPE_EXEMPTIONS` allow-list, matched against the
+   *    route pattern of the request.
+   *
+   * Why both: Nest hands the filter more than one host shape. An error thrown by
+   * a route handler arrives with a host built from the raw `[req, res, next]`
+   * tuple, and a **guard** rejection arrives without a handler/class pair either
+   * — so the decorator alone cannot decide. `Reflector` additionally throws
+   * `TypeError` on an `undefined` target, which used to crash the filter and
+   * rewrite every 4xx into an opaque Fastify 500.
+   *
+   * Falling back to the registry keeps a guard rejection on `/healthz` or a VAPI
+   * webhook in Nest's raw shape, which is the contract those consumers have; the
+   * two lists are held in exact agreement by the exemption specs.
    */
   private isExempt(host: ArgumentsHost): boolean {
+    return this.hasSkipEnvelopeMetadata(host) || isRegisteredExemption(host);
+  }
+
+  /**
+   * @returns `true` when the metadata targets present on the host carry
+   *   `@SkipEnvelope()` (`false` when the host exposes none).
+   */
+  private hasSkipEnvelopeMetadata(host: ArgumentsHost): boolean {
     const context = host as ExecutionContext;
-    const targets = [context.getHandler(), context.getClass()];
+    const targets: MetadataTarget[] = [];
+
+    for (const target of [context.getHandler(), context.getClass()]) {
+      // A missing target carries no metadata, so skipping it is safe — and it
+      // is required, because `Reflector` throws on `undefined`.
+      if (isMetadataTarget(target)) {
+        targets.push(target);
+      }
+    }
+
+    if (targets.length === 0) {
+      return false;
+    }
 
     return (
       this.reflector.getAllAndOverride<boolean>(SKIP_ENVELOPE_KEY, targets) ===

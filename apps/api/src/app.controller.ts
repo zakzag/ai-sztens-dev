@@ -2,7 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import type { ApiEnvelope } from '@callback/shared';
 import { AppService } from './app.service.js';
 import { ApiResponseService } from './common/http/api-response.service.js';
-import { ReqCtx } from './common/http/request-context.js';
+import { ReqCtx } from './common/http/request-context.decorator.js';
 import type { RequestContext } from './common/http/request-context.interface.js';
 
 /**

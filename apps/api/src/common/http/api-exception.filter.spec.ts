@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { HttpException } from '@nestjs/common';
+import { HttpException, UnauthorizedException } from '@nestjs/common';
 import { z } from 'zod';
 import { API_ERROR_CODE, HTTP_STATUS } from '@callback/shared';
 import type { ApiErrorEnvelope } from '@callback/shared';
@@ -260,6 +260,123 @@ describe('ApiExceptionFilter', () => {
 
       expect(reflectorSpy.requestedKeys).toEqual([SKIP_ENVELOPE_KEY]);
       expect(readBody(reply).error.code).toBe(API_ERROR_CODE.NOT_FOUND);
+    });
+
+    it('skips the reflector entirely when the host has no handler or class', () => {
+      const reply = createReply();
+      captureLogger('warn');
+      const reflectorSpy = createReflectorSpy({ exempt: false });
+
+      // A route-handler error reaches the filter through a host built from the
+      // raw `[req, res, next]` tuple: no metadata targets at all. Passing
+      // `undefined` to `Reflector` throws and would answer 500 for every 4xx.
+      new ApiExceptionFilter(
+        new ApiResponseService(),
+        reflectorSpy.reflector,
+      ).catch(
+        new NotFoundAppError('gone'),
+        createHost(reply, { metadataTargets: 'none' }),
+      );
+
+      expect(reflectorSpy.requestedKeys).toEqual([]);
+      expect(reply.status).toHaveBeenCalledWith(HTTP_STATUS.NOT_FOUND);
+      expect(readBody(reply).error).toMatchObject({
+        code: API_ERROR_CODE.NOT_FOUND,
+        status: HTTP_STATUS.NOT_FOUND,
+        requestId: 'req-1',
+      });
+    });
+
+    it('falls back to the registry when a guard rejection has no metadata target', () => {
+      const reply = createReply();
+      captureLogger('warn');
+
+      // Guard errors reach the filter without a handler/class pair; only the
+      // documented allow-list can keep a VAPI / healthz rejection raw.
+      new ApiExceptionFilter(
+        new ApiResponseService(),
+        createReflectorSpy({ exempt: false }).reflector,
+      ).catch(
+        new UnauthorizedException('raw body missing'),
+        createHost(reply, {
+          metadataTargets: 'none',
+          routePattern: '/api/vapi/webhooks/tool-calls',
+        }),
+      );
+
+      expect(reply.status).toHaveBeenCalledWith(HTTP_STATUS.UNAUTHORIZED);
+      expect(reply.send).toHaveBeenCalledWith({
+        message: 'raw body missing',
+        error: 'Unauthorized',
+        statusCode: HTTP_STATUS.UNAUTHORIZED,
+      });
+    });
+
+    it('falls back to the request URL when Fastify exposes no route pattern', () => {
+      const reply = createReply();
+      captureLogger('warn');
+
+      new ApiExceptionFilter(
+        new ApiResponseService(),
+        createReflectorSpy({ exempt: false }).reflector,
+      ).catch(
+        new UnauthorizedException('probe'),
+        createHost(reply, {
+          metadataTargets: 'none',
+          requestUrl: '/healthz?verbose=1',
+        }),
+      );
+
+      expect(reply.send).toHaveBeenCalledWith({
+        message: 'probe',
+        error: 'Unauthorized',
+        statusCode: HTTP_STATUS.UNAUTHORIZED,
+      });
+    });
+
+    it('keeps the envelope for a route that is on neither list', () => {
+      const reply = createReply();
+      captureLogger('warn');
+
+      new ApiExceptionFilter(
+        new ApiResponseService(),
+        createReflectorSpy({ exempt: false }).reflector,
+      ).catch(
+        new UnauthorizedException('nope'),
+        createHost(reply, {
+          metadataTargets: 'none',
+          routePattern: '/api/api-keys',
+        }),
+      );
+
+      expect(readBody(reply).error.code).toBe(API_ERROR_CODE.UNAUTHENTICATED);
+      expect(readBody(reply).error.status).toBe(HTTP_STATUS.UNAUTHORIZED);
+    });
+
+    it('reads a class-level exemption when only the class target is available', () => {
+      const reply = createReply();
+      captureLogger('warn');
+
+      new ApiExceptionFilter(
+        new ApiResponseService(),
+        createReflectorSpy({ exempt: true }).reflector,
+      ).catch(
+        new HttpException(
+          {
+            statusCode: HTTP_STATUS.NOT_FOUND,
+            message: 'raw',
+            error: 'Not Found',
+          },
+          HTTP_STATUS.NOT_FOUND,
+        ),
+        createHost(reply, { metadataTargets: 'class' }),
+      );
+
+      expect(reply.send).toHaveBeenCalledWith({
+        statusCode: HTTP_STATUS.NOT_FOUND,
+        message: 'raw',
+        error: 'Not Found',
+      });
     });
   });
 });

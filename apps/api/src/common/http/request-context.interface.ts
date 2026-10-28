@@ -23,6 +23,15 @@ export interface HttpRequestLike {
   readonly url?: unknown;
   /** Request headers, used to accept an inbound `X-Request-Id`. */
   readonly headers: HttpHeadersLike;
+  /**
+   * Fastify's matched-route descriptor. `url` is the **route pattern**
+   * (`/api/api-keys/:identifier`), not the concrete URL, which is what the
+   * exemption allow-list is written in.
+   */
+  readonly routeOptions?: {
+    /** Route pattern of the matched route. */
+    readonly url?: unknown;
+  };
 }
 
 /** The subset of a Fastify reply the HTTP edge relies on. */

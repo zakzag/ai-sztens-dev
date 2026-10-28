@@ -1,9 +1,15 @@
 /**
  * Request correlation (AIS-92, plan `D10`).
  *
- * Three functions, no Nest types in the pure ones:
+ * Pure functions only — no Nest and no Fastify types, so the filter, the
+ * interceptor and the `@ReqCtx()` decorator (in
+ * `request-context.decorator.ts`) all build the same context from the same
+ * rules. Four functions:
  *
- * - {@link readRequestId} — is there an inbound `X-Request-Id`? (no generation)
+ * - {@link isValidRequestId} — is this inbound value an acceptable correlation
+ *   id at all? (length + character allow-list)
+ * - {@link readRequestId} — is there a *usable* inbound `X-Request-Id`?
+ *   (no generation)
  * - {@link resolveRequestId} — the id used in the envelope; generates one when
  *   neither the header nor Fastify's own id is available;
  * - {@link toRequestContext} — the `ErrorContext` handed to `ok()` / `fail()`.
@@ -13,10 +19,12 @@
  * resort so a context is never built without an id.
  */
 
-import { createParamDecorator } from '@nestjs/common';
-import type { ExecutionContext } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { REQUEST_ID_HEADER } from './api-messages.const.js';
+import {
+  REQUEST_ID_MAX_LENGTH,
+  REQUEST_ID_PATTERN,
+} from './request-id.const.js';
 import type {
   HttpHeadersLike,
   HttpRequestLike,
@@ -24,29 +32,57 @@ import type {
 } from './request-context.interface.js';
 
 /**
- * Reads the inbound correlation header.
+ * Decides whether an inbound value may be used as a correlation id.
  *
- * @param headers - request headers (Node lower-cases the names).
- * @returns the first non-blank value, or `undefined` when the header is absent.
+ * The value ends up in a response header and in every log line, so anything
+ * outside the allow-list (whitespace, newline, `<`, a 10 kB string) is refused
+ * and the request gets a generated id instead.
+ *
+ * @param value - candidate read from the request (`unknown`: the wire is untyped).
+ * @returns `true` only for a non-empty, length-bounded, allow-listed string.
  */
-export function readRequestId(headers: HttpHeadersLike): string | undefined {
-  const raw = headers[REQUEST_ID_HEADER];
+export function isValidRequestId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= REQUEST_ID_MAX_LENGTH &&
+    REQUEST_ID_PATTERN.test(value)
+  );
+}
 
-  if (typeof raw === 'string') {
-    return raw.trim().length > 0 ? raw.trim() : undefined;
-  }
+/**
+ * Extracts the first usable value of a header (Node hands a repeated header
+ * over as an array).
+ *
+ * @param raw - header value as Node exposes it.
+ * @returns the trimmed, validated value, or `undefined`.
+ */
+function firstValidRequestId(raw: unknown): string | undefined {
+  // `Array.isArray` narrows to `any[]`, so the element is re-typed as `unknown`
+  // before validation — no unsafe assignment reaches the id.
+  const candidate: unknown = Array.isArray(raw) ? raw[0] : raw;
 
-  if (!Array.isArray(raw)) {
+  if (typeof candidate !== 'string') {
     return undefined;
   }
 
-  // `Array.isArray` narrows a `readonly string[]` to `any[]`, so the element is
-  // read as `unknown` first — no unsafe assignment reaches the id.
-  const first: unknown = raw[0];
+  const trimmed = candidate.trim();
 
-  return typeof first === 'string' && first.trim().length > 0
-    ? first.trim()
-    : undefined;
+  return isValidRequestId(trimmed) ? trimmed : undefined;
+}
+
+/**
+ * Reads a **usable** inbound correlation header.
+ *
+ * An invalid value (blank, too long, forbidden character) is treated exactly
+ * like an absent header, so {@link resolveRequestId} falls back to a trusted
+ * source instead of echoing attacker-controlled text.
+ *
+ * @param headers - request headers (Node lower-cases the names).
+ * @returns the first valid value, or `undefined` when unusable/absent.
+ */
+export function readRequestId(headers: HttpHeadersLike): string | undefined {
+  return firstValidRequestId(headers[REQUEST_ID_HEADER]);
 }
 
 /**
@@ -89,14 +125,3 @@ export function toRequestContext(
     method: typeof request.method === 'string' ? request.method : 'GET',
   };
 }
-
-/**
- * Parameter decorator that hands the controller its {@link RequestContext}.
- *
- * Used as `@ReqCtx() ctx: RequestContext`; the controller passes it straight to
- * `responses.ok(result, ctx)`, so `meta.requestId` can never be forgotten.
- */
-export const ReqCtx = createParamDecorator(
-  (_data: unknown, context: ExecutionContext): RequestContext =>
-    toRequestContext(context.switchToHttp().getRequest<HttpRequestLike>()),
-);

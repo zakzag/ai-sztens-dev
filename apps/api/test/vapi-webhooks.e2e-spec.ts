@@ -1,11 +1,10 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { Logger } from '@nestjs/common';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 import { createHmac } from 'node:crypto';
+import { createFastifyAdapter } from '../src/common/http/create-fastify-adapter.js';
+import { HttpModule } from '../src/common/http/http.module.js';
 import { VAPI_WEBHOOK_CONFIG } from '../src/vapi-webhooks/vapi-webhook-config.js';
 import { VapiSignatureGuard } from '../src/vapi-webhooks/vapi-signature.guard.js';
 import { VapiWebhooksController } from '../src/vapi-webhooks/vapi-webhooks.controller.js';
@@ -16,8 +15,8 @@ import { VapiWebhooksService } from '../src/vapi-webhooks/vapi-webhooks.service.
  *
  * The application is assembled from the real controller/guard/service plus a
  * stubbed `VAPI_WEBHOOK_CONFIG`, and bootstrapped exactly like `main.ts`
- * (Fastify + `rawBody: true` + global `api` prefix + the same ValidationPipe).
- * That is deliberate:
+ * (Fastify + `rawBody: true` + global `api` prefix, and no global validation
+ * pipe — the Zod route pipes own validation). That is deliberate:
  *
  *   * `rawBody` must be passed as a **Nest application option**. The original
  *     version of this file (and of `main.ts`) passed it to `FastifyAdapter`,
@@ -65,6 +64,10 @@ async function createApp(options?: {
   rawBody?: boolean;
 }): Promise<NestFastifyApplication> {
   const moduleRef = await Test.createTestingModule({
+    // The real HTTP edge (global `ApiExceptionFilter` + `RequestIdInterceptor`),
+    // so the exemption and the correlation header are exercised exactly as in
+    // production — no test-only wiring.
+    imports: [HttpModule],
     controllers: [VapiWebhooksController],
     providers: [
       VapiWebhooksService,
@@ -82,17 +85,10 @@ async function createApp(options?: {
   // Mirror src/main.ts: `rawBody` is the SECOND argument of
   // `createNestApplication` (Nest application options), not an adapter option.
   const app = moduleRef.createNestApplication<NestFastifyApplication>(
-    new FastifyAdapter(),
+    createFastifyAdapter(),
     { rawBody: options?.rawBody ?? true },
   );
   app.setGlobalPrefix('api', { exclude: ['healthz'] });
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
   await app.init();
   return app;
 }
@@ -154,8 +150,14 @@ describe('VapiWebhooks (e2e)', () => {
     expect(response.statusCode).toBe(200);
     const body: unknown = response.json();
     if (!isJsonBody(body)) throw new Error('webhook body shape mismatch');
+    // The raw provider contract is untouched: no `meta`, no envelope keys.
+    expect(Object.keys(body).sort()).toEqual(['id', 'received']);
     expect(body.received).toBe(true);
     expect(body.id).toMatch(/^[0-9a-f-]{36}$/i); // uuid v4
+    // The correlation header is still set on an exempt route (AIS-92).
+    expect(response.headers['x-request-id']).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
   });
 
   it('accepts a correctly signed POST to /api/vapi/webhooks/end-of-call-report', async () => {

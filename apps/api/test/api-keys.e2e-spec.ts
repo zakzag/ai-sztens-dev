@@ -1,15 +1,13 @@
-import { ValidationPipe } from '@nestjs/common';
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { like } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { createFastifyAdapter } from '../src/common/http/create-fastify-adapter.js';
 import { DATABASE } from '../src/db/database.const.js';
 import type { Database } from '../src/db/database.interface.js';
 import { apiKeys } from '../src/db/schema.js';
 import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
+import { DATABASE_SKIP_REASON, probeDatabase } from './lib/database-gate.js';
 
 /**
  * End-to-end coverage of the API-key endpoints **and of the envelope**.
@@ -26,10 +24,11 @@ import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
  * - `AppModule` pulls in the CommonJS-only `@nestjs/config`; Jest's ESM runner
  *   can only `require()` it on Node >= 24.9, so on older runtimes the suite
  *   self-skips with a warning (see `test/lib/app-module-gate.ts`).
- * - `main.ts` applies the `api` prefix and the global `ValidationPipe` itself,
- *   so both are re-applied here. The envelope filter comes from the real
- *   `HttpModule` inside `AppModule`, so nothing has to be re-registered for it —
- *   which is exactly what this suite verifies.
+ * - `main.ts` applies the `api` prefix itself, so it is re-applied here. Body
+ *   validation is the route-level `ZodBodyPipe` (part of the controller), and
+ *   the envelope filter comes from the real `HttpModule` inside `AppModule`, so
+ *   nothing has to be re-registered for either — which is exactly what this
+ *   suite verifies.
  */
 
 interface ApiKeyBody {
@@ -103,6 +102,17 @@ function readError(body: unknown): ErrorEnvelopeBody {
   return body as ErrorEnvelopeBody;
 }
 
+/** Name of the correlation response header (Node lower-cases the names). */
+const REQUEST_ID_HEADER = 'x-request-id';
+
+/**
+ * @param value - an `inject()` response header value (untyped: may be an array).
+ * @returns it as a single string, or `undefined` when absent.
+ */
+function readHeader(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
 async function bootApp(): Promise<NestFastifyApplication | null> {
   const AppModule = await loadAppModuleOrSkip();
   if (AppModule === null) return null;
@@ -112,17 +122,11 @@ async function bootApp(): Promise<NestFastifyApplication | null> {
   }).compile();
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(
-    new FastifyAdapter(),
+    createFastifyAdapter(),
   );
-  // Mirror src/main.ts — see the file docblock.
+  // Mirror src/main.ts — see the file docblock. No global validation pipe is
+  // installed there any more (the Zod pipe on the route owns validation).
   app.setGlobalPrefix('api', { exclude: ['healthz'] });
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
   await app.init();
   return app;
 }
@@ -134,14 +138,35 @@ describe('ApiKeysController (e2e)', () => {
   const otherIdentifier = `e2e-${randomUUID()}`;
 
   beforeAll(async () => {
-    app = await bootApp();
-    if (app === null) return;
-    database = app.get<Database>(DATABASE);
+    const booted = await bootApp();
+    if (booted === null) return;
+
+    const handle = booted.get<Database>(DATABASE);
+
+    // This suite persists real rows, so it needs a reachable Postgres. Without
+    // one every call fails inside the repository (`ECONNREFUSED :5432`) and the
+    // filter answers 500 — a database outage, not a contract regression. Warn
+    // loudly and leave `app` null so every test self-skips.
+    if (!(await probeDatabase(handle))) {
+      console.warn(`[database-gate] ${DATABASE_SKIP_REASON}`);
+      await booted.close();
+      return;
+    }
+
+    app = booted;
+    database = handle;
   });
 
   afterAll(async () => {
     if (database !== null) {
-      await database.delete(apiKeys).where(like(apiKeys.identifier, 'e2e-%'));
+      await database
+        .delete(apiKeys)
+        .where(like(apiKeys.identifier, 'e2e-%'))
+        // A cleanup failure must not turn a finished run into "suite failed to
+        // run"; it is reported instead of swallowed silently.
+        .catch((error: unknown) => {
+          console.warn('[database-gate] cleanup failed:', error);
+        });
     }
     if (app !== null) {
       await app.close();
@@ -169,6 +194,10 @@ describe('ApiKeysController (e2e)', () => {
     const envelope = readEnvelope<unknown>(response.json());
     expect(envelope.meta.requestId.length).toBeGreaterThan(0);
     expect(Number.isNaN(Date.parse(envelope.meta.timestamp))).toBe(false);
+    // The same id must be on the header, so a network entry and a log line match.
+    expect(readHeader(response.headers[REQUEST_ID_HEADER])).toBe(
+      envelope.meta.requestId,
+    );
     expect(isApiKeyBody(envelope.data)).toBe(true);
     if (!isApiKeyBody(envelope.data)) return;
 
@@ -214,11 +243,18 @@ describe('ApiKeysController (e2e)', () => {
   it('GET /api/api-keys lists the created keys inside `data`', async () => {
     if (app === null) return;
 
-    const response = await app.inject({ method: 'GET', url: '/api/api-keys' });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/api-keys',
+      // A valid inbound id must survive end-to-end (proxy/client trace chaining).
+      headers: { [REQUEST_ID_HEADER]: 'test-123' },
+    });
 
     expect(response.statusCode).toBe(200);
 
     const envelope = readEnvelope<unknown>(response.json());
+    expect(envelope.meta.requestId).toBe('test-123');
+    expect(readHeader(response.headers[REQUEST_ID_HEADER])).toBe('test-123');
     expect(isApiKeyList(envelope.data)).toBe(true);
     if (!isApiKeyList(envelope.data)) return;
 
@@ -260,6 +296,10 @@ describe('ApiKeysController (e2e)', () => {
     expect(body.error.status).toBe(404);
     expect(body.error.requestId.length).toBeGreaterThan(0);
     expect(body.error.path).toContain('/api/api-keys/');
+    // The error envelope and the header carry the same id (see AIS-92).
+    expect(readHeader(response.headers[REQUEST_ID_HEADER])).toBe(
+      body.error.requestId,
+    );
   });
 
   it('POST /api/api-keys rejects a duplicate identifier with a coded 409', async () => {

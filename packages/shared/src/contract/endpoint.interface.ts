@@ -17,6 +17,7 @@
  */
 
 import type { z } from 'zod';
+import type { ApiErrorCode } from './error-code.const.js';
 
 /** HTTP methods the registry can describe. */
 export type ApiHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -36,12 +37,20 @@ export interface ApiEndpointContract {
   readonly path: string;
   /** One sentence, used as the OpenAPI `summary`. */
   readonly summary: string;
+  /** OpenAPI tag; groups the operation per resource (`api-keys`). */
+  readonly tag: string;
   /** Status of a successful call (`200` read, `201` create). */
   readonly successStatus: number;
   /** Schema of the payload (`data` when enveloped, the whole body when not). */
   readonly dataSchema: z.ZodTypeAny;
   /** Schema of the request body; absent for bodyless endpoints. */
   readonly requestSchema?: z.ZodTypeAny;
+  /**
+   * Error codes the endpoint can answer with, taken **from the catalogue**
+   * (`API_ERROR_CODE`) rather than from free text, so the generated spec and
+   * the client mapping can never disagree about a code.
+   */
+  readonly errors: readonly ApiErrorCode[];
   /** `false` only for the documented exemptions (`/healthz`, VAPI webhooks). */
   readonly envelope: boolean;
 }

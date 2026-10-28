@@ -27,6 +27,13 @@ export type {
 
 export { createHttpClient, joinUrl } from './http-client.js';
 
+export {
+  InvalidEndpointPathError,
+  UnknownEndpointError,
+  clientPathOf,
+  toClientPath,
+} from './endpoint-path.js';
+
 export type {
   HttpClient,
   HttpClientConfig,

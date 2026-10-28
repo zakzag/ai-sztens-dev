@@ -4,6 +4,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { API_GLOBAL_PREFIX } from '@callback/shared';
 import { AppModule } from './app.module.js';
 import { APP_ENV, APP_ENV_RAW, isProd } from './config/app-env.js';
 
@@ -35,7 +36,7 @@ async function bootstrap() {
   // can hit a stable, unprefixed path that never drifts with the business
   // routing. Keep this list in sync with the controllers that must stay
   // outside the prefix (currently only HealthController).
-  app.setGlobalPrefix('api', { exclude: ['healthz'] });
+  app.setGlobalPrefix(API_GLOBAL_PREFIX, { exclude: ['healthz'] });
 
   // CORS is driven by @fastify/cors (ships with @nestjs/platform-fastify).
   // The allow-list comes from the per-env file picked at boot by

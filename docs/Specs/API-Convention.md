@@ -1,6 +1,6 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-10-27
+**Utolsó frissítés:** 2026-10-28
 **Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md))
 **Status:** living document — this file describes the *current* state of the API, not a snapshot.
 
@@ -16,11 +16,29 @@ Every request and response shape is defined **once**, in `packages/shared/src/co
 | `contract/error-envelope.ts` | `apiErrorEnvelopeSchema`, `toErrorEnvelope()`, `resolveApiErrorStatus()` |
 | `contract/error-code.const.ts` | `API_ERROR_CODE` + `API_ERROR_CODE_STATUS` (code → status) |
 | `contract/http-status.const.ts` | `HTTP_STATUS` (shared by server and client) |
+| `contract/api-prefix.const.ts` | `API_GLOBAL_PREFIX` (`api`) + `API_PATH_PREFIX` (`/api`) |
 | `contract/<resource>/<resource>.schema.ts` | request/response Zod schemas |
-| `contract/<resource>/<resource>.contract.ts` | endpoint registry entries (`operationId`, method, path, schemas) |
+| `contract/<resource>/<resource>.contract.ts` | endpoint registry entries (`operationId`, method, path, `tag`, schemas, `errors`) |
 | `contract/endpoint.registry.ts` | `API_ENDPOINTS` + `ENVELOPE_EXEMPTIONS` |
 
 The same schema drives three artefacts: `z.infer` types, server validation (`ZodBodyPipe`), client parsing (`http-client`). There is no class-validator DTO and no hand-written interface in `apps/api/src/api-keys` any more.
+
+### 1.1 Endpoint registry
+
+One `ApiEndpointContract` per operation, typed so a missing or misspelled field is a build error:
+
+| Field | Meaning |
+|---|---|
+| `operationId` | Stable `<resource>.<action>` key (`apiKeys.list`); never changes when a route moves |
+| `method`, `path` | Nest route, **including** `API_PATH_PREFIX` (`/api/api-keys/:identifier`) |
+| `summary`, `tag` | OpenAPI `summary` and grouping (`api-keys`) |
+| `successStatus` | `200` read, `201` create |
+| `dataSchema` | Zod schema of the **payload** (the envelope is added once by `successEnvelopeSchema()`) |
+| `requestSchema` | Zod schema of the body; absent for bodyless endpoints |
+| `errors` | Codes from `API_ERROR_CODE` the route can actually answer with |
+| `envelope` | `true` for every registered route; raw routes live in `ENVELOPE_EXEMPTIONS` instead |
+
+**No route literal outside the registry:** `packages/api-client/src/<resource>/<resource>.const.ts` calls `clientPathOf('<operationId>')`, which strips `API_PATH_PREFIX` from the registry path. `apps/api/src/main.ts` calls `setGlobalPrefix(API_GLOBAL_PREFIX)` from the same file, so the prefix is written down once.
 
 ---
 
@@ -168,10 +186,10 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 ## 11. Recipe — adding an endpoint
 
 1. **Schema** in `packages/shared/src/contract/<resource>/<resource>.schema.ts` (request: `.strict()`, response: tolerant).
-2. **Registry entry** in `<resource>.contract.ts` (`operationId: '<resource>.<action>'`, method, path, `successStatus`, `dataSchema`, optional `requestSchema`).
+2. **Registry entry** in `<resource>.contract.ts` (`operationId: '<resource>.<action>'`, method, path, `tag`, `successStatus`, `dataSchema`, optional `requestSchema`, `errors` from the catalogue) — and a sample payload for it in `packages/shared/test/endpoint-registry.test.ts`.
 3. **Domain service** in `apps/api/src/<feature>/`: returns plain data, throws `AppError` subclasses (add a new subclass or a domain code if the failure mode is new).
 4. **Controller**: `@Body(new ZodBodyPipe(schema))` + `@ReqCtx()`, returns `this.responses.ok(await service…, ctx)`; `@HttpCode(HTTP_STATUS.CREATED)` for a create.
-5. **Client service** in `packages/api-client/src/<resource>/`: `client.get(path, schema)` / `client.post(path, body, schema)`.
+5. **Client service** in `packages/api-client/src/<resource>/`: the path comes from `clientPathOf('<operationId>')`, never from a literal; then `client.get(path, schema)` / `client.post(path, body, schema)`.
 6. **Query hook** in `apps/admin/src/features/<use-case>/`, page alert from the hook's error state, field errors from `issues[]`.
 7. **Tests**: pipe, service (`AppError` code + status), controller (`data` + `meta`), transport (envelope unwrap, error envelope → `ApiError.code`), hook.
 8. If the route must stay raw: `@SkipEnvelope()` **and** an entry in `ENVELOPE_EXEMPTIONS` with a reason. No silent exemptions.
@@ -182,12 +200,14 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 
 | Gate | Where |
 |---|---|
-| Envelope factories & code catalogue | `packages/shared/test/{envelope,error-envelope,endpoint-registry}.test.ts` |
+| Envelope factories & code catalogue | `packages/shared/test/{envelope,error-envelope}.test.ts` |
+| Registry completeness (uniqueness, `<resource>.<action>` ids, tag = namespace, catalogue-only `errors`, payload parses, compile-time `@ts-expect-error` gate) | `packages/shared/test/endpoint-registry.test.ts` |
 | Error filter, pipes, response service, correlation | `apps/api/src/common/http/*.spec.ts` |
 | `api-keys` service/controller behaviour | `apps/api/src/api-keys/*.spec.ts` |
 | Envelope end-to-end (incl. 409 code + `details[0].path`) | `apps/api/test/api-keys.e2e-spec.ts` |
 | `healthz` / VAPI raw bodies unchanged | `apps/api/test/{health,vapi-webhooks}.e2e-spec.ts` |
-| Client unwrap, drift, legacy fallback | `packages/api-client/test/*.test.ts` |
+| Client unwrap, drift, legacy fallback | `packages/api-client/test/{http-client,api-keys.service}.test.ts` |
+| Client path derivation from the registry (`toClientPath`, `clientPathOf`) | `packages/api-client/test/endpoint-path.test.ts` |
 | Code-first user copy | `apps/admin/src/lib/error-message.test.ts` |
 | No bare body outside the allow-list, OpenAPI baseline, breaking-change gate | **not built yet** — AIS-97 / AIS-98 / AIS-99 |
 

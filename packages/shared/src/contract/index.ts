@@ -12,6 +12,11 @@ export { HTTP_STATUS } from './http-status.const.js';
 export type { HttpStatus } from './http-status.const.js';
 
 export {
+  API_GLOBAL_PREFIX,
+  API_PATH_PREFIX,
+} from './api-prefix.const.js';
+
+export {
   API_ERROR_CODE,
   API_ERROR_CODE_STATUS,
   UNKNOWN_API_ERROR_CODE_STATUS,

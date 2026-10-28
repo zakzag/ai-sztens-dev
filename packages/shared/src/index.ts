@@ -57,7 +57,23 @@ export type {
   ErrorContext,
 } from './contract/error-envelope.interface.js';
 
+export type {
+  ApiEndpointContract,
+  ApiHttpMethod,
+} from './contract/endpoint.interface.js';
+
+export { API_KEYS_ENDPOINTS } from './contract/api-keys/api-keys.contract.js';
+
 export {
+  API_ENDPOINTS,
+  ENVELOPE_EXEMPTIONS,
+  findEndpoint,
+} from './contract/endpoint.registry.js';
+export type { EnvelopeExemption } from './contract/endpoint.registry.js';
+
+export {
+  API_KEYS_IDENTIFIER_PARAM,
+  API_KEYS_PATH,
   API_KEY_DESCRIPTION_MAX_LENGTH,
   API_KEY_IDENTIFIER_MAX_LENGTH,
   API_KEY_IDENTIFIER_PATTERN,

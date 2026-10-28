@@ -1,17 +1,17 @@
 /**
- * Contract limits of the `api-keys` resource, mirrored from the backend.
+ * Constants of the `api-keys` resource: route, limits and identifier shape.
  *
- * The API validates `POST /api/api-keys` with class-validator
- * ([`apps/api/src/api-keys/api-keys.const.ts`](../../../../../apps/api/src/api-keys/api-keys.const.ts));
- * the browser has to enforce the *same* numbers, otherwise the user gets a 400
- * only after a submit that the UI could have caught locally.
- *
- * The values are duplicated rather than imported, because `apps/api` is a
- * separate application bundle and must not depend on the shared package's build
- * for its own validation. Keeping the literals in one shared symbol here means
- * every frontend consumer (schema, form, tests) reads the same number, and a
- * backend change breaks exactly one file plus its tests.
+ * Everything a server controller, a client service and the registry need is
+ * defined **here**, once (plan `D6`). The API validates `POST /api/api-keys`
+ * with `createApiKeySchema`, which is built from these very symbols, so the
+ * browser and the server cannot enforce two different sets of numbers.
  */
+
+/** Route of the collection, mounted under the global `api` prefix. */
+export const API_KEYS_PATH = '/api/api-keys';
+
+/** Nest path-parameter placeholder of the single-resource route. */
+export const API_KEYS_IDENTIFIER_PARAM = ':identifier';
 
 /** Max length of the human readable `name`. */
 export const API_KEY_NAME_MAX_LENGTH = 200;

@@ -22,7 +22,14 @@ import type {
   ExceptionFilter,
   ExecutionContext,
 } from '@nestjs/common';
-import type { Reflector } from '@nestjs/core';
+// IMPORTANT: value import, never `import type`. `Reflector` is a constructor
+// parameter of a decorated class, so `emitDecoratorMetadata` has to reference
+// the class **at runtime**; a type-only import is erased and the emitted
+// `design:paramtypes` becomes `[ApiResponseService, Function]`, which makes Nest
+// fail with "Nest can't resolve dependencies of the ApiExceptionFilter
+// (ApiResponseService, ?)" and stops the application from booting.
+// Guarded by `http-wiring.metadata.spec.ts`.
+import { Reflector } from '@nestjs/core';
 import { HTTP_STATUS } from '@callback/shared';
 import { ApiResponseService } from './api-response.service.js';
 import { INTERNAL_ERROR_MESSAGE } from './api-messages.const.js';

@@ -84,6 +84,9 @@
         }
       ]
     },
+    "setupFiles": [
+      "<rootDir>/test/setup/silence-nest-logger.ts"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

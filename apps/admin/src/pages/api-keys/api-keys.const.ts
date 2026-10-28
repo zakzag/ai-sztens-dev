@@ -6,6 +6,7 @@
  * same constant the UI renders instead of a hard-coded string.
  */
 
+import type { ApiKeyFormFieldName } from '../../features/api-keys/api-keys.interface.js';
 import type { ApiKeyFormValues } from './api-keys.interface.js';
 
 /** Page header. */
@@ -18,8 +19,11 @@ export const API_KEYS_TABLE_TITLE = 'Tárolt kulcsok';
 export const API_KEYS_LOADING_MESSAGE = 'API kulcsok betöltése…';
 export const API_KEYS_EMPTY_MESSAGE =
   'Még nincs tárolt API kulcs. Vedd fel az elsőt a lenti űrlapon.';
+/**
+ * Title of the page-level error state. The retry labels are owned by
+ * `lib/error-surface.const.ts`, because every page's retry button reads the same.
+ */
 export const API_KEYS_ERROR_TITLE = 'Az API kulcsok betöltése nem sikerült.';
-export const API_KEYS_RETRY_LABEL = 'Újrapróbálás';
 
 /** Column headers, in render order. */
 export const API_KEY_COLUMNS = {
@@ -36,32 +40,38 @@ export const API_KEY_FORM_PENDING_LABEL = 'Mentés…';
 export const API_KEY_FORM_SUCCESS_MESSAGE = 'Az új API kulcs elmentve.';
 export const API_KEY_FORM_ERROR_TITLE = 'Az API kulcs mentése nem sikerült.';
 
-/** DOM ids of the form controls — also the `htmlFor`/`error` wiring keys. */
-export const API_KEY_FORM_FIELD_IDS = {
+/**
+ * DOM ids of the form controls — also the `htmlFor`/`error` wiring keys.
+ *
+ * Typed as a complete map over {@link ApiKeyFormFieldName} so a new field cannot
+ * be rendered without an id, and a renamed one breaks the build instead of the
+ * accessibility wiring.
+ */
+export const API_KEY_FORM_FIELD_IDS: Readonly<Record<ApiKeyFormFieldName, string>> = {
   name: 'api-key-name',
   identifier: 'api-key-identifier',
   description: 'api-key-description',
   apiKey: 'api-key-value',
   expiresAt: 'api-key-expires-at',
-} as const;
+};
 
-/** Visible labels. */
-export const API_KEY_FORM_LABELS = {
+/** Visible labels, one per form field. */
+export const API_KEY_FORM_LABELS: Readonly<Record<ApiKeyFormFieldName, string>> = {
   name: 'Név',
   identifier: 'Azonosító',
   description: 'Leírás',
   apiKey: 'API kulcs értéke',
   expiresAt: 'Lejárat',
-} as const;
+};
 
 /** Helper texts under the fields. */
-export const API_KEY_FORM_HINTS = {
+export const API_KEY_FORM_HINTS: Readonly<Record<ApiKeyFormFieldName, string>> = {
   name: 'Emberi olvasásra szánt név, legfeljebb 200 karakter.',
   identifier: 'Egyedi, URL-biztos azonosító: betű, szám, pont, kötőjel, aláhúzás.',
   description: 'Opcionális, legfeljebb 2000 karakter.',
   apiKey: 'A szolgáltatótól kapott token értéke.',
   expiresAt: 'Opcionális. Üresen hagyva a kulcs nem jár le.',
-} as const;
+};
 
 /**
  * Initial (and post-success) form values.

@@ -5,6 +5,7 @@
  */
 
 import type { ApiKeyViewModels } from '../../entities/api-key/api-key.interface.js';
+import type { ApiKeyFormFieldName } from '../../features/api-keys/api-keys.interface.js';
 
 /**
  * The five form fields, exactly as react-hook-form holds them.
@@ -14,24 +15,22 @@ import type { ApiKeyViewModels } from '../../entities/api-key/api-key.interface.
  * format happens once, in `toCreateApiKeyInput`.
  *
  * Fields are mutable (not `readonly`) because react-hook-form writes into this
- * object through `setValue`/`reset`.
+ * object through `setValue`/`reset`. Derived from {@link ApiKeyFormFieldName},
+ * the union the feature maps server `path`s onto, so a field added or renamed on
+ * one side cannot silently diverge from the other.
  */
-export interface ApiKeyFormValues {
-  name: string;
-  identifier: string;
-  description: string;
-  apiKey: string;
-  expiresAt: string;
-}
+export type ApiKeyFormValues = Record<ApiKeyFormFieldName, string>;
 
-/** Props of the list part of the page — all four async states are driven here. */
+/**
+ * Props of the list part of the page.
+ *
+ * The failure is **not** one of them: the error state moved to the page level
+ * (`PageErrorState`, plan `D11` tier 2), because a list error is the page's data
+ * being unavailable, not a property of the table.
+ */
 export interface ApiKeysTableProps {
   /** Already mapped rows; the table never sees the wire `apiKey` field. */
   readonly apiKeys: ApiKeyViewModels;
   /** `true` until the first response (or failure) arrives. */
   readonly isLoading: boolean;
-  /** User-facing load error, or `null`. */
-  readonly error: string | null;
-  /** Retry handler for the error state. */
-  readonly onRetry: () => void;
 }

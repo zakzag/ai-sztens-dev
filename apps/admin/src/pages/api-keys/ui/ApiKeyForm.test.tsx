@@ -12,8 +12,18 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_KEY_IDENTIFIER_CONFLICT_MESSAGE } from '../../../features/api-keys/api-keys.const.js';
-import { SERVER_ERROR_MESSAGE } from '../../../lib/error-message.const.js';
-import { createConflictError, createServerError } from '../../../test/mocks/api-error.mock.js';
+import {
+  FIELD_INVALID_MESSAGE,
+  SERVER_ERROR_MESSAGE,
+  VALIDATION_MESSAGE,
+} from '../../../lib/error-message.const.js';
+import {
+  createConflictError,
+  createLegacyConflictError,
+  createMultiFieldValidationError,
+  createServerError,
+  createValidationError,
+} from '../../../test/mocks/api-error.mock.js';
 import {
   API_KEYS_SERVICE_MOCK,
   resetApiKeysServiceMock,
@@ -198,6 +208,92 @@ describe('ApiKeyForm', () => {
     expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).not.toHaveAttribute(
       'aria-invalid',
     );
+  });
+
+  it('keeps a legacy 409 without details on the identifier field', async () => {
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createLegacyConflictError());
+
+    renderForm();
+
+    await fillRequiredFields();
+    await userEvent.click(getSubmitButton());
+
+    expect(await screen.findByText(API_KEY_IDENTIFIER_CONFLICT_MESSAGE)).toBeInTheDocument();
+    expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.queryByText(API_KEY_FORM_ERROR_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('puts every addressable field of a 400 on its own input', async () => {
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
+      createMultiFieldValidationError(),
+    );
+
+    renderForm();
+
+    await fillRequiredFields();
+    await userEvent.click(getSubmitButton());
+
+    await waitFor(() => {
+      expect(screen.getAllByText(FIELD_INVALID_MESSAGE)).toHaveLength(2);
+    });
+
+    expect(screen.getByLabelText(API_KEY_FORM_LABELS.name)).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.getByLabelText(API_KEY_FORM_LABELS.apiKey)).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    // The path no input owns is the only thing the page alert carries.
+    expect(screen.getByText(API_KEY_FORM_ERROR_TITLE)).toBeInTheDocument();
+    expect(screen.getByText(VALIDATION_MESSAGE)).toBeInTheDocument();
+  });
+
+  it('shows no page alert when the server blamed a field only', async () => {
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createValidationError());
+
+    renderForm();
+
+    await fillRequiredFields();
+    await userEvent.click(getSubmitButton());
+
+    expect(await screen.findByText(FIELD_INVALID_MESSAGE)).toBeInTheDocument();
+    expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.queryByText(API_KEY_FORM_ERROR_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('re-enables the submit button after a field-level failure', async () => {
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createConflictError());
+
+    renderForm();
+
+    await fillRequiredFields();
+    await userEvent.click(getSubmitButton());
+
+    await screen.findByText(API_KEY_IDENTIFIER_CONFLICT_MESSAGE);
+
+    await waitFor(() => {
+      expect(getSubmitButton()).toBeEnabled();
+    });
+  });
+
+  it('never renders the server text of a 5xx', async () => {
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createServerError(500, true));
+
+    renderForm();
+
+    await fillRequiredFields();
+    await userEvent.click(getSubmitButton());
+
+    expect(await screen.findByText(SERVER_ERROR_MESSAGE)).toBeInTheDocument();
+    expect(screen.queryByText(/Database is unavailable/)).not.toBeInTheDocument();
   });
 
   it('disables the submit and shows the pending label while the request is in flight', async () => {

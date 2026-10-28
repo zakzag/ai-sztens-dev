@@ -43,15 +43,53 @@ export function createCodedError(init: {
 }
 
 /**
- * @returns the failure of a duplicate identifier, with its domain code.
+ * @returns the failure of a duplicate identifier, with its domain code, the
+ *   `issues[]` entry that addresses the `identifier` input and a requestId.
  */
 export function createConflictError(): ApiError {
   return createCodedError({
     status: HTTP_STATUS.CONFLICT,
     code: 'API_KEY_IDENTIFIER_CONFLICT',
     message: 'identifier already exists',
-    details: [CONFLICT_DETAIL],
+    issues: [{ path: 'identifier', message: CONFLICT_DETAIL }],
+    details: [`identifier: ${CONFLICT_DETAIL}`],
     requestId: 'req-conflict',
+  });
+}
+
+/**
+ * @returns a duplicate identifier as an older server reports it — the domain
+ *   code, but no `issues[]` to say which field is at fault.
+ */
+export function createLegacyConflictError(): ApiError {
+  return createCodedError({
+    status: HTTP_STATUS.CONFLICT,
+    code: 'API_KEY_IDENTIFIER_CONFLICT',
+    message: 'identifier already exists',
+    details: [CONFLICT_DETAIL],
+    requestId: 'req-legacy-conflict',
+  });
+}
+
+/**
+ * @returns a `400` in which the server blames two inputs at once, plus a path
+ *   no form field owns — the case that must split between fields and the alert.
+ */
+export function createMultiFieldValidationError(): ApiError {
+  return createCodedError({
+    status: HTTP_STATUS.BAD_REQUEST,
+    code: 'VALIDATION_FAILED',
+    message: 'The request payload does not match the API contract.',
+    issues: [
+      { path: 'name', message: 'String must contain at least 1 character(s)' },
+      { path: 'apiKey', message: 'String must contain at least 8 character(s)' },
+      { path: 'metadata.owner', message: 'Unrecognized key' },
+    ],
+    details: [
+      `name: String must contain at least 1 character(s)`,
+      `apiKey: String must contain at least 8 character(s)`,
+      `metadata.owner: Unrecognized key`,
+    ],
   });
 }
 
@@ -107,4 +145,28 @@ export function createStatusError(
   code: string | null = null,
 ): ApiError {
   return createCodedError({ status, code, message: 'Request failed' });
+}
+
+/**
+ * @returns a rejection with the shape a cancelled request produces (`AbortError`
+ *   from `fetch`, `CancelledError` from TanStack Query), so the classifier can
+ *   be tested without involving a real transport.
+ */
+export function createAbortError(): Error {
+  const error = new Error('The operation was aborted.');
+  error.name = 'AbortError';
+  return error;
+}
+
+/**
+ * @returns a broken-backend failure that also carries a correlation id, so the
+ *   log tier (AIS-86) can be asserted against a realistic envelope.
+ */
+export function createServerErrorWithRequestId(): ApiError {
+  return createCodedError({
+    status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+    code: 'INTERNAL_ERROR',
+    message: 'Internal server error',
+    requestId: 'req-server',
+  });
 }

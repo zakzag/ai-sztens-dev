@@ -40,6 +40,26 @@ export const UNKNOWN_ERROR_MESSAGE = 'Váratlan hiba történt. Próbáld újra.
 export const IDENTIFIER_CONFLICT_MESSAGE =
   'Ez az azonosító már létezik. Válassz másikat.';
 
+/**
+ * Field-level copy of a duplicate identifier (plan `D11`, tier 1).
+ *
+ * Shorter and more actionable than {@link IDENTIFIER_CONFLICT_MESSAGE}, because
+ * it is rendered under the input the user has to change. The text is owned by
+ * the client: the server's `issue.message` is English and never rendered.
+ */
+export const API_KEY_IDENTIFIER_FIELD_MESSAGE =
+  'Ez az identifier már foglalt. Adj meg egyedit.';
+
+/**
+ * `VALIDATION_FAILED` on an identified field (plan `D11`, tier 1).
+ *
+ * Deliberately generic: the server's per-issue text (`issue.message`) is a
+ * developer sentence, and a field that the client already validated is one the
+ * server refused for a rule the client does not know — the user only needs to
+ * know *which* input is wrong and that it must be corrected.
+ */
+export const FIELD_INVALID_MESSAGE = 'Érvénytelen érték. Javítsd a mezőt.';
+
 /** `PAYLOAD_TOO_LARGE` — the body exceeded the configured limit. */
 export const PAYLOAD_TOO_LARGE_MESSAGE =
   'A beküldött adat túl nagy. Rövidítsd le, majd próbáld újra.';

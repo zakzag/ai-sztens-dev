@@ -2,9 +2,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Card, Input, Textarea } from '@callback/ui';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { toIdentifierFieldError } from '../../../features/api-keys/api-keys.logic.js';
+import { API_KEY_FIELD_PATHS } from '../../../features/api-keys/api-keys.const.js';
+import { toFieldErrors } from '../../../features/api-keys/api-keys.logic.js';
 import { useCreateApiKeyMutation } from '../../../features/api-keys/use-api-keys.js';
-import { toErrorMessage } from '../../../lib/error-message.js';
 import {
   API_KEY_FORM_DEFAULTS,
   API_KEY_FORM_ERROR_TITLE,
@@ -27,9 +27,14 @@ import { apiKeyFormSchema, toCreateApiKeyInput } from '../api-keys.logic.js';
  * the mutation hook invalidates the list and only then runs `onCreated`, which
  * is where the fields are cleared.
  *
- * Error routing (plan decision D36):
- * - HTTP 409 → `setError('identifier')`, a field-level problem the user can fix;
- * - anything else → a page-level `Alert`, text mapped by `toErrorMessage`.
+ * Error routing (plan decisions D1, D11 tier 1, D13):
+ * - `toFieldErrors` decides: allowed `code` + addressable `details[].path` →
+ *   `setError(path)`, one message per input;
+ * - whatever the mapping could not address (or a code outside the allow-list) →
+ *   the page-level `Alert`, text mapped by `toErrorMessage`.
+ *
+ * The component only applies the result: it never inspects `status`, `code` or
+ * the server's `message`, so a new server code cannot smuggle text into the UI.
  *
  * @returns the form card.
  */
@@ -71,15 +76,19 @@ export function ApiKeyForm() {
     try {
       await createApiKey(toCreateApiKeyInput(values));
     } catch (error) {
-      const identifierError = toIdentifierFieldError(error);
+      const { fields, form } = toFieldErrors(error);
 
-      if (identifierError !== null) {
-        setError('identifier', { type: 'conflict', message: identifierError }, { shouldFocus: true });
+      // Iterating the declared field order makes the focus deterministic: the
+      // first invalid input in visual order is the one that gets it.
+      for (const field of API_KEY_FIELD_PATHS) {
+        const message = fields[field];
 
-        return;
+        if (message !== undefined) {
+          setError(field, { type: 'server', message }, { shouldFocus: true });
+        }
       }
 
-      setPageError(toErrorMessage(error));
+      setPageError(form);
     }
   }
 

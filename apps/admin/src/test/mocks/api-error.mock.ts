@@ -2,62 +2,79 @@
  * `ApiError` factories for the admin tests.
  *
  * Every failure the UI has to distinguish is built here, in the shape the real
- * transport produces (`status` + `details`), so a test never hand-crafts an
- * error object and a change of the `ApiErrorInit` contract breaks one file
- * instead of ten test suites.
+ * transport produces (`status` + `code` + `issues` + `details`), so a test never
+ * hand-crafts an error object and a change of the `ApiErrorInit` contract breaks
+ * one file instead of ten test suites.
  */
 
 import { ApiError, HTTP_STATUS } from '@callback/api-client';
 
-/** Backend text of a duplicate-identifier response (from `apps/api`). */
+/** Backend text of a duplicate-identifier response (for logs only). */
 export const CONFLICT_DETAIL = 'identifier must be unique';
 
-/** Validator text of a rejected payload (Nest `ValidationPipe` output). */
+/** Validator text of a rejected payload (for logs only). */
 export const VALIDATION_DETAIL = 'identifier must match /^[A-Za-z0-9._-]+$/';
 
 /**
- * @param message - technical message; defaults to the Nest conflict text.
- * @returns the failure of a duplicate identifier (`409`).
+ * Builds one error from the contract envelope.
+ *
+ * @param init - status, code and optional rendered details.
  */
-export function createConflictError(
-  message = 'Identifier already exists',
-): ApiError {
+export function createCodedError(init: {
+  readonly status: number;
+  readonly code: string | null;
+  readonly message?: string;
+  readonly details?: readonly string[];
+  readonly requestId?: string | null;
+}): ApiError {
   return new ApiError({
-    message,
-    status: HTTP_STATUS.CONFLICT,
+    message: init.message ?? 'Request failed',
+    status: init.status,
     url: '/api/api-keys',
-    details: [CONFLICT_DETAIL],
+    code: init.code,
+    requestId: init.requestId ?? null,
+    details: init.details ?? [],
   });
 }
 
 /**
- * @param message - technical message; defaults to the Nest validation text.
+ * @returns the failure of a duplicate identifier, with its domain code.
+ */
+export function createConflictError(): ApiError {
+  return createCodedError({
+    status: HTTP_STATUS.CONFLICT,
+    code: 'API_KEY_IDENTIFIER_CONFLICT',
+    message: 'identifier already exists',
+    details: [CONFLICT_DETAIL],
+    requestId: 'req-conflict',
+  });
+}
+
+/**
  * @returns the failure of a payload the backend rejected (`400`).
  */
-export function createValidationError(
-  message = VALIDATION_DETAIL,
-): ApiError {
-  return new ApiError({
-    message,
+export function createValidationError(): ApiError {
+  return createCodedError({
     status: HTTP_STATUS.BAD_REQUEST,
-    url: '/api/api-keys',
-    details: [message],
+    code: 'VALIDATION_FAILED',
+    message: 'The request payload does not match the API contract.',
+    details: [VALIDATION_DETAIL],
   });
 }
 
 /**
  * @param status - the 5xx status to simulate; defaults to `500`.
- * @param withDetails - whether the body carries a message.
+ * @param withDetails - whether the body carries leftover detail text.
  * @returns the failure of a broken backend.
  */
 export function createServerError(
   status = 500,
   withDetails = false,
 ): ApiError {
-  return new ApiError({
-    message: 'Internal server error',
+  return createCodedError({
     status,
-    url: '/api/api-keys',
+    code: status === HTTP_STATUS.SERVICE_UNAVAILABLE ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_ERROR',
+    message: 'Internal server error',
     details: withDetails ? ['Database is unavailable'] : [],
   });
 }
@@ -76,13 +93,12 @@ export function createNetworkError(): ApiError {
 
 /**
  * @param status - the 4xx status to simulate; defaults to `403`.
+ * @param code - the envelope code, `null` for a legacy body without one.
  * @returns a failure the UI has no field-level mapping for.
  */
-export function createStatusError(status: number = HTTP_STATUS.FORBIDDEN): ApiError {
-  return new ApiError({
-    message: 'Request failed',
-    status,
-    url: '/api/api-keys',
-    details: [],
-  });
+export function createStatusError(
+  status: number = HTTP_STATUS.FORBIDDEN,
+  code: string | null = null,
+): ApiError {
+  return createCodedError({ status, code, message: 'Request failed' });
 }

@@ -2,45 +2,69 @@
  * The single error → text mapping of the UI.
  *
  * Components and query hooks never render `error.message` directly: the backend
- * message is English and sometimes technical, while the user needs a sentence
- * that says what to do next. Keeping the mapping in one pure function means a
- * new status is handled once, and every page stays consistent.
+ * message is English and technical, while the user needs a sentence that says
+ * what to do next.
  *
- * The decision is made on `ApiError.status` — never on message text (plan
- * decision **D4**), so a translated backend message cannot change the UI.
+ * Decision order (plan `D3`, `D11`):
+ *
+ * 1. **no response** (`status === null`) → offline copy;
+ * 2. **`code`** → the Hungarian copy from {@link ERROR_CODE_MESSAGE} — this is
+ *    the primary key, because it is stable and locale independent;
+ * 3. **`status`** → fallback copy, so a code from a newer server still produces
+ *    a usable sentence instead of a crash.
+ *
+ * The server's own `message`/`details` are **never** used as user copy: they
+ * exist for logs and for field-level mapping (see the form's `setError`), not for
+ * the page alert.
  */
 
 import { ApiError, HTTP_STATUS } from '@callback/api-client';
 import {
   CONFLICT_MESSAGE,
+  ERROR_CODE_MESSAGE,
   FORBIDDEN_MESSAGE,
   NETWORK_ERROR_USER_MESSAGE,
   NOT_FOUND_MESSAGE,
-  SESSION_EXPIRED_MESSAGE,
   SERVER_ERROR_MESSAGE,
+  SESSION_EXPIRED_MESSAGE,
   UNKNOWN_ERROR_MESSAGE,
   VALIDATION_MESSAGE,
 } from './error-message.const.js';
 
 /**
- * Reads the first usable message out of the normalised error details.
- *
- * @param error - the normalised API failure.
- * @returns the first non-blank detail, or `null` when the API sent none.
+ * @param code - the envelope code, or `null` for a legacy body.
+ * @returns the Hungarian copy, or `null` when the code is not mapped.
  */
-function firstDetail(error: ApiError): string | null {
-  const [detail] = error.details;
+function toCodeMessage(code: string | null): string | null {
+  if (code === null) {
+    return null;
+  }
 
-  return typeof detail === 'string' && detail.trim().length > 0 ? detail : null;
+  return Object.hasOwn(ERROR_CODE_MESSAGE, code)
+    ? (ERROR_CODE_MESSAGE[code] ?? null)
+    : null;
 }
 
 /**
- * @param status - HTTP status, or `null` when no response was received.
- * @returns the 5xx range test result (kept as a named helper so the main
- *   function reads as a list of decisions).
+ * @param status - HTTP status of a failure (never `null` here).
+ * @returns the status-based fallback copy.
  */
-function isServerFailure(status: number | null): boolean {
-  return status !== null && status >= 500;
+function toStatusMessage(status: number): string {
+  switch (status) {
+    case HTTP_STATUS.UNAUTHORIZED:
+      return SESSION_EXPIRED_MESSAGE;
+    case HTTP_STATUS.FORBIDDEN:
+      return FORBIDDEN_MESSAGE;
+    case HTTP_STATUS.NOT_FOUND:
+      return NOT_FOUND_MESSAGE;
+    case HTTP_STATUS.CONFLICT:
+      return CONFLICT_MESSAGE;
+    case HTTP_STATUS.BAD_REQUEST:
+    case HTTP_STATUS.UNPROCESSABLE_ENTITY:
+      return VALIDATION_MESSAGE;
+    default:
+      return status >= 500 ? SERVER_ERROR_MESSAGE : UNKNOWN_ERROR_MESSAGE;
+  }
 }
 
 /**
@@ -55,33 +79,12 @@ export function toErrorMessage(error: unknown): string {
     return UNKNOWN_ERROR_MESSAGE;
   }
 
-  const status = error.status;
+  // Destructured so the `null` check narrows `status` for the fallback call.
+  const { status, code } = error;
 
-  switch (status) {
-    case null:
-      return NETWORK_ERROR_USER_MESSAGE;
-    case HTTP_STATUS.UNAUTHORIZED:
-      return SESSION_EXPIRED_MESSAGE;
-    case HTTP_STATUS.FORBIDDEN:
-      return FORBIDDEN_MESSAGE;
-    case HTTP_STATUS.NOT_FOUND:
-      return NOT_FOUND_MESSAGE;
-    case HTTP_STATUS.CONFLICT:
-      return firstDetail(error) ?? CONFLICT_MESSAGE;
-    default:
-      break;
+  if (status === null) {
+    return NETWORK_ERROR_USER_MESSAGE;
   }
 
-  if (
-    status === HTTP_STATUS.BAD_REQUEST ||
-    status === HTTP_STATUS.UNPROCESSABLE_ENTITY
-  ) {
-    return firstDetail(error) ?? VALIDATION_MESSAGE;
-  }
-
-  if (isServerFailure(status)) {
-    return SERVER_ERROR_MESSAGE;
-  }
-
-  return firstDetail(error) ?? UNKNOWN_ERROR_MESSAGE;
+  return toCodeMessage(code) ?? toStatusMessage(status);
 }

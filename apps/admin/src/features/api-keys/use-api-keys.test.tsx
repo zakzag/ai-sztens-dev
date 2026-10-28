@@ -14,7 +14,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createConflictError,
   createNetworkError,
-  CONFLICT_DETAIL,
 } from '../../test/mocks/api-error.mock.js';
 import {
   API_KEYS_SERVICE_MOCK,
@@ -27,7 +26,10 @@ import {
   createTestQueryClient,
   TestQueryProvider,
 } from '../../test/mocks/query-client.mock.js';
-import { NETWORK_ERROR_USER_MESSAGE } from '../../lib/error-message.const.js';
+import {
+  IDENTIFIER_CONFLICT_MESSAGE,
+  NETWORK_ERROR_USER_MESSAGE,
+} from '../../lib/error-message.const.js';
 import { API_KEYS_QUERY_KEYS } from './api-keys.const.js';
 import { toIdentifierFieldError } from './api-keys.logic.js';
 import {
@@ -190,7 +192,9 @@ describe('useCreateApiKeyMutation', () => {
       'Ez az identifier már foglalt. Adj meg egyedit.',
     );
     await waitFor(() => {
-      expect(result.current.error).toBe(CONFLICT_DETAIL);
+      // Code-first copy: the 409 carries `API_KEY_IDENTIFIER_CONFLICT`, so the
+      // page-level message is the domain sentence, never the server's English one.
+      expect(result.current.error).toBe(IDENTIFIER_CONFLICT_MESSAGE);
     });
     expect(result.current.isSuccess).toBe(false);
     expect(result.current.isPending).toBe(false);
@@ -238,7 +242,7 @@ describe('useCreateApiKeyMutation', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.error).toBe(CONFLICT_DETAIL);
+      expect(result.current.error).toBe(IDENTIFIER_CONFLICT_MESSAGE);
     });
 
     act(() => {

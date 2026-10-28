@@ -1,6 +1,10 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
 import { jest } from '@jest/globals';
+import { API_ERROR_CODE } from '@callback/shared';
 import type { ApiKeyRow, NewApiKeyRow } from '../db/schema.js';
+import {
+  ConflictAppError,
+  NotFoundAppError,
+} from '../common/http/app-error.js';
 import { ApiKeyIdentifierConflictError } from './api-keys.errors.js';
 import { ApiKeysService } from './api-keys.service.js';
 import type { ApiKeysRepository } from './api-keys.repository.interface.js';
@@ -18,8 +22,8 @@ import {
  * The repository is a plain object mock (the service depends on the
  * `ApiKeysRepository` interface), so no Nest container and no database is
  * involved. What is verified here is exactly the orchestration: the payload that
- * reaches the repository, the HTTP exception translation, and the response
- * mapping.
+ * reaches the repository, the **AppError** translation (code + status + field
+ * details, never an HTTP exception), and the response mapping.
  */
 
 interface RepositoryMock {
@@ -93,16 +97,25 @@ describe('ApiKeysService', () => {
       expect(result.expiresAt).toBeNull();
     });
 
-    it('translates an identifier conflict into a 409 ConflictException', async () => {
+    it('translates an identifier conflict into the domain-specific 409 code', async () => {
       const mocks = createRepositoryMock();
       mocks.create.mockRejectedValue(
         new ApiKeyIdentifierConflictError('vapi-prod', new Error('23505')),
       );
       const service = new ApiKeysService(mocks.repository);
 
-      await expect(
-        service.create(buildCreateApiKeyInput()),
-      ).rejects.toBeInstanceOf(ConflictException);
+      const error = await service
+        .create(buildCreateApiKeyInput())
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ConflictAppError);
+      expect(error).toMatchObject({
+        code: API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT,
+        status: 409,
+      });
+      expect((error as ConflictAppError).details).toEqual([
+        { path: 'identifier', message: 'This identifier is already taken.' },
+      ]);
     });
 
     it('propagates any other repository error unchanged', async () => {
@@ -152,14 +165,20 @@ describe('ApiKeysService', () => {
       expect(result).toEqual(buildApiKeyResponse());
     });
 
-    it('translates a missing row into a 404 NotFoundException', async () => {
+    it('translates a missing row into a NOT_FOUND AppError', async () => {
       const mocks = createRepositoryMock();
       mocks.findByIdentifier.mockResolvedValue(null);
       const service = new ApiKeysService(mocks.repository);
 
-      await expect(service.findByIdentifier('nope')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      const error = await service
+        .findByIdentifier('nope')
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(NotFoundAppError);
+      expect(error).toMatchObject({
+        code: API_ERROR_CODE.NOT_FOUND,
+        status: 404,
+      });
     });
   });
 });

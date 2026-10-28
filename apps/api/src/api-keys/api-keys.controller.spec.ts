@@ -1,10 +1,10 @@
-import { plainToInstance } from 'class-transformer';
 import { jest } from '@jest/globals';
 import type { ApiKeyRow, NewApiKeyRow } from '../db/schema.js';
+import { ApiResponseService } from '../common/http/api-response.service.js';
+import type { RequestContext } from '../common/http/request-context.interface.js';
 import { ApiKeysController } from './api-keys.controller.js';
 import { ApiKeysService } from './api-keys.service.js';
 import type { ApiKeysRepository } from './api-keys.repository.interface.js';
-import { CreateApiKeyDto } from './dto/create-api-key.dto.js';
 import {
   buildApiKeyResponse,
   buildApiKeyRow,
@@ -12,17 +12,22 @@ import {
 } from './test/mocks/api-keys.mock.js';
 
 /**
- * Unit tests for the HTTP layer's delegation.
+ * Unit tests for the HTTP layer's delegation **and** its wrapping.
  *
- * The controller is built over a real `ApiKeysService` whose repository is
- * mocked, so the test proves the wiring *and* the throughput of the request
- * body — without a Nest container.
- *
- * HTTP status codes are intentionally **not** asserted here (they would require
- * poking Nest's metadata keys): `POST` → 201, `GET` → 200, duplicate → 409 and
- * validation → 400 are covered end-to-end by `test/api-keys.e2e-spec.ts`, where
- * they are actually observable.
+ * The controller is built over a real `ApiKeysService` (repository mocked) and a
+ * real `ApiResponseService`, so the suite proves the two things the controller
+ * owns: the request context ends up in `meta`, and the payload ends up in
+ * `data`. HTTP status codes are covered end-to-end by
+ * `test/api-keys.e2e-spec.ts`, where they are observable.
  */
+
+/** Fixed request context, so `meta` assertions need no clock mocking. */
+const CTX: RequestContext = {
+  requestId: '0192f3c4-0000-4000-8000-000000000001',
+  timestamp: '2026-10-27T10:00:00.000Z',
+  path: '/api/api-keys',
+  method: 'GET',
+};
 
 interface ControllerFixture {
   readonly controller: ApiKeysController;
@@ -43,7 +48,7 @@ function createFixture(): ControllerFixture {
   const service = new ApiKeysService(repository);
 
   return {
-    controller: new ApiKeysController(service),
+    controller: new ApiKeysController(service, new ApiResponseService()),
     create,
     findAll,
     findByIdentifier,
@@ -51,35 +56,50 @@ function createFixture(): ControllerFixture {
 }
 
 describe('ApiKeysController', () => {
-  it('returns the service list result unchanged', async () => {
+  it('wraps the list in `data` and echoes the request context in `meta`', async () => {
     const fixture = createFixture();
     fixture.findAll.mockResolvedValue([
       buildApiKeyRow({ identifier: 'one' }),
       buildApiKeyRow({ identifier: 'two' }),
     ]);
 
-    const result = await fixture.controller.list();
+    const result = await fixture.controller.list(CTX);
 
-    expect(result.map((item) => item.identifier)).toEqual(['one', 'two']);
+    expect(result.data?.map((item) => item.identifier)).toEqual(['one', 'two']);
+    expect(result.meta).toEqual({
+      requestId: CTX.requestId,
+      timestamp: CTX.timestamp,
+    });
   });
 
-  it('passes the path parameter through to the lookup', async () => {
+  it('returns an empty list as `data: []`, never null', async () => {
+    const fixture = createFixture();
+    fixture.findAll.mockResolvedValue([]);
+
+    const result = await fixture.controller.list(CTX);
+
+    expect(result.data).toEqual([]);
+  });
+
+  it('passes the path parameter through to the lookup and wraps the result', async () => {
     const fixture = createFixture();
     fixture.findByIdentifier.mockResolvedValue(buildApiKeyRow());
 
-    const result = await fixture.controller.findByIdentifier('vapi-prod');
+    const result = await fixture.controller.findByIdentifier('vapi-prod', CTX);
 
     expect(fixture.findByIdentifier).toHaveBeenCalledWith('vapi-prod');
-    expect(result).toEqual(buildApiKeyResponse());
+    expect(result.data).toEqual(buildApiKeyResponse());
+    expect(result.meta.requestId).toBe(CTX.requestId);
   });
 
-  it('maps the validated body into the repository payload and returns the response', async () => {
+  it('maps the validated body into the repository payload and wraps the created row', async () => {
     const fixture = createFixture();
     fixture.create.mockResolvedValue(buildApiKeyRow());
-    const payload: Record<string, unknown> = { ...buildCreateApiKeyInput() };
-    const dto = plainToInstance(CreateApiKeyDto, payload);
 
-    const result = await fixture.controller.create(dto);
+    const result = await fixture.controller.create(
+      buildCreateApiKeyInput(),
+      CTX,
+    );
 
     expect(fixture.create).toHaveBeenCalledTimes(1);
     expect(fixture.create.mock.calls[0]?.[0]).toMatchObject({
@@ -87,16 +107,16 @@ describe('ApiKeysController', () => {
       name: 'Vapi prod',
       apiKey: 'tok_123',
     });
-    expect(result).toEqual(buildApiKeyResponse());
+    expect(result.data).toEqual(buildApiKeyResponse());
   });
 
-  it('lets the service exception bubble up (no swallowing in the controller)', async () => {
+  it('lets the service error bubble up (the filter wraps it, not the controller)', async () => {
     const fixture = createFixture();
     const driverError = new Error('boom');
     fixture.findByIdentifier.mockRejectedValue(driverError);
 
-    await expect(fixture.controller.findByIdentifier('vapi-prod')).rejects.toBe(
-      driverError,
-    );
+    await expect(
+      fixture.controller.findByIdentifier('vapi-prod', CTX),
+    ).rejects.toBe(driverError);
   });
 });

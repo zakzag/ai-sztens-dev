@@ -1,8 +1,5 @@
+import type { ApiKey, CreateApiKeyInput } from '@callback/shared';
 import type { ApiKeyRow } from '../../../db/schema.js';
-import type {
-  ApiKeyResponse,
-  CreateApiKeyInput,
-} from '../../api-keys.interface.js';
 
 /**
  * Fixtures for the `api-keys` specs.
@@ -10,6 +7,10 @@ import type {
  * Centralised here (coding standard: no fixtures inline in test files) so the
  * row shape stays in sync with `schema.ts` — if a column is added, only this
  * file needs updating and every spec keeps compiling with a meaningful default.
+ *
+ * The payload type comes from `@callback/shared` (`ApiKey`), not from a local
+ * interface: the fixture is a value of the **contract** type, so a schema change
+ * breaks this file first instead of silently diverging.
  */
 
 /** Fixed UUID so assertions can compare without regex noise. */
@@ -43,12 +44,10 @@ export function buildApiKeyRow(overrides: Partial<ApiKeyRow> = {}): ApiKeyRow {
 }
 
 /**
- * @param overrides - fields to replace on the default response.
- * @returns a response body matching {@link buildApiKeyRow}.
+ * @param overrides - fields to replace on the default payload.
+ * @returns a payload matching {@link buildApiKeyRow}.
  */
-export function buildApiKeyResponse(
-  overrides: Partial<ApiKeyResponse> = {},
-): ApiKeyResponse {
+export function buildApiKeyResponse(overrides: Partial<ApiKey> = {}): ApiKey {
   return {
     id: API_KEY_ROW_ID,
     name: 'Vapi prod',

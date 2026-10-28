@@ -2,54 +2,69 @@
  * HTTP surface of the API-key store.
  *
  * Routes (all under the global `api` prefix from `main.ts`):
- * - `GET  /api/api-keys`               → 200 list, newest first
- * - `GET  /api/api-keys/:identifier`   → 200 single key, 404 when unknown
- * - `POST /api/api-keys`               → 201 created, 400 invalid, 409 duplicate
+ * - `GET  /api/api-keys`               → 200 `{ data: [...], meta }`
+ * - `GET  /api/api-keys/:identifier`   → 200 `{ data: {...}, meta }`, 404 envelope when unknown
+ * - `POST /api/api-keys`               → 201 `{ data: {...}, meta }`, 400/409 envelope
  *
- * The controller only routes and delegates: validation is the DTO's job, the
- * 409/404 decisions belong to the service, and persistence to the repository.
+ * The controller only routes, validates the body with the **shared** zod schema
+ * and wraps the result: the `409`/`404` decisions belong to the service, and
+ * persistence to the repository. Nothing here defines a payload shape — that is
+ * `@callback/shared` (see `docs/Specs/API-Convention.md`).
  *
- * Known limitation (deliberate, plan D13): these routes are **unauthenticated**
- * until the admin auth story lands. They return the stored token value, so they
- * must not be exposed publicly before that story is implemented.
+ * Known limitation (deliberate, follows the auth story): these routes are
+ * **unauthenticated** until the admin auth lands. They return the stored token
+ * value, so they must not be exposed publicly before that story is implemented.
  */
 
+import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Post,
-} from '@nestjs/common';
+  HTTP_STATUS,
+  createApiKeySchema,
+  type ApiEnvelope,
+  type ApiKey,
+  type CreateApiKeyInput,
+} from '@callback/shared';
 import { API_KEYS_ROUTE } from './api-keys.const.js';
-import type { ApiKeyResponse } from './api-keys.interface.js';
 import { ApiKeysService } from './api-keys.service.js';
-import { CreateApiKeyDto } from './dto/create-api-key.dto.js';
+import { ApiResponseService } from '../common/http/api-response.service.js';
+import { ReqCtx } from '../common/http/request-context.js';
+import type { RequestContext } from '../common/http/request-context.interface.js';
+import { ZodBodyPipe } from '../common/http/zod.pipe.js';
 
 @Controller(API_KEYS_ROUTE)
 export class ApiKeysController {
-  constructor(private readonly apiKeys: ApiKeysService) {}
+  constructor(
+    private readonly apiKeys: ApiKeysService,
+    private readonly responses: ApiResponseService,
+  ) {}
 
   /** `GET /api/api-keys` — every stored key, `created_at DESC`. */
   @Get()
-  list(): Promise<ApiKeyResponse[]> {
-    return this.apiKeys.list();
+  async list(
+    @ReqCtx() ctx: RequestContext,
+  ): Promise<ApiEnvelope<readonly ApiKey[]>> {
+    return this.responses.ok(await this.apiKeys.list(), ctx);
   }
 
   /** `GET /api/api-keys/:identifier` — one key by its unique identifier. */
   @Get(':identifier')
-  findByIdentifier(
+  async findByIdentifier(
     @Param('identifier') identifier: string,
-  ): Promise<ApiKeyResponse> {
-    return this.apiKeys.findByIdentifier(identifier);
+    @ReqCtx() ctx: RequestContext,
+  ): Promise<ApiEnvelope<ApiKey>> {
+    return this.responses.ok(
+      await this.apiKeys.findByIdentifier(identifier),
+      ctx,
+    );
   }
 
   /** `POST /api/api-keys` — create; 201 with the persisted resource. */
   @Post()
-  @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreateApiKeyDto): Promise<ApiKeyResponse> {
-    return this.apiKeys.create(dto);
+  @HttpCode(HTTP_STATUS.CREATED)
+  async create(
+    @Body(new ZodBodyPipe(createApiKeySchema)) input: CreateApiKeyInput,
+    @ReqCtx() ctx: RequestContext,
+  ): Promise<ApiEnvelope<ApiKey>> {
+    return this.responses.ok(await this.apiKeys.create(input), ctx);
   }
 }

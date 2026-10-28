@@ -3,27 +3,33 @@
  *
  * Responsibilities, and nothing else:
  * - call the repository through its interface;
- * - translate the one domain failure into an HTTP exception (409);
+ * - translate the one domain failure into an `AppError` (a `409` code, never an
+ *   HTTP status — those are derived from the shared catalogue);
  * - map rows to the wire contract through the pure mapper.
  *
- * The repository is injected via {@link API_KEYS_REPOSITORY}, not by class, so
- * this file has no knowledge of Drizzle and the spec can pass a plain object.
+ * The service imports **no** `@nestjs/common` HTTP exception any more (plan
+ * `D7`): it must stay callable from a worker or a script, where “HTTP 409” means
+ * nothing. The global `ApiExceptionFilter` is what turns the code into a
+ * response.
  */
 
+import { Inject, Injectable } from '@nestjs/common';
 import {
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import type {
-  ApiKeyResponse,
-  CreateApiKeyInput,
-} from './api-keys.interface.js';
-import { toApiKeyResponse, toNewApiKeyRow } from './api-keys.mapper.js';
+  API_ERROR_CODE,
+  type ApiKey,
+  type CreateApiKeyInput,
+} from '@callback/shared';
 import { API_KEYS_REPOSITORY } from './api-keys.const.js';
 import { ApiKeyIdentifierConflictError } from './api-keys.errors.js';
+import { toApiKeyResponse, toNewApiKeyRow } from './api-keys.mapper.js';
 import type { ApiKeysRepository } from './api-keys.repository.interface.js';
+import {
+  ConflictAppError,
+  NotFoundAppError,
+} from '../common/http/app-error.js';
+
+/** Field-level detail sent with an identifier conflict. */
+const IDENTIFIER_CONFLICT_DETAIL = 'This identifier is already taken.';
 
 @Injectable()
 export class ApiKeysService {
@@ -37,7 +43,7 @@ export class ApiKeysService {
    *
    * @returns the full list, mapped to the wire contract (empty array allowed).
    */
-  async list(): Promise<ApiKeyResponse[]> {
+  async list(): Promise<ApiKey[]> {
     const rows = await this.repository.findAll();
     return rows.map(toApiKeyResponse);
   }
@@ -47,13 +53,13 @@ export class ApiKeysService {
    *
    * @param identifier - path parameter of `GET /api/api-keys/:identifier`.
    * @returns the matching key.
-   * @throws {NotFoundException} when no row owns the identifier (or it is blank).
+   * @throws {NotFoundAppError} when no row owns the identifier (or it is blank).
    */
-  async findByIdentifier(identifier: string): Promise<ApiKeyResponse> {
+  async findByIdentifier(identifier: string): Promise<ApiKey> {
     const row = await this.repository.findByIdentifier(identifier);
 
     if (row === null) {
-      throw new NotFoundException(
+      throw new NotFoundAppError(
         `No API key with identifier "${identifier}" was found.`,
       );
     }
@@ -64,17 +70,23 @@ export class ApiKeysService {
   /**
    * Creates a new key.
    *
-   * @param input - body validated by {@link CreateApiKeyDto}.
-   * @returns the persisted key (201 body).
-   * @throws {ConflictException} when `identifier` is already taken.
+   * @param input - body validated by the shared `createApiKeySchema`.
+   * @returns the persisted key (201 payload).
+   * @throws {ConflictAppError} with `API_KEY_IDENTIFIER_CONFLICT` when the
+   *   identifier is already taken — the specific code is what lets the admin put
+   *   the message on the `identifier` field instead of a page-level alert.
    */
-  async create(input: CreateApiKeyInput): Promise<ApiKeyResponse> {
+  async create(input: CreateApiKeyInput): Promise<ApiKey> {
     try {
       const row = await this.repository.create(toNewApiKeyRow(input));
       return toApiKeyResponse(row);
     } catch (error) {
       if (error instanceof ApiKeyIdentifierConflictError) {
-        throw new ConflictException(error.message);
+        throw new ConflictAppError(
+          error.message,
+          API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT,
+          [{ path: 'identifier', message: IDENTIFIER_CONFLICT_DETAIL }],
+        );
       }
       throw error;
     }

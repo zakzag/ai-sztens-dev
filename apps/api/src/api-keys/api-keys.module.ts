@@ -8,6 +8,7 @@
  */
 
 import { Module } from '@nestjs/common';
+import { HttpModule } from '../common/http/http.module.js';
 import { DatabaseModule } from '../db/database.module.js';
 import { API_KEYS_REPOSITORY } from './api-keys.const.js';
 import { ApiKeysController } from './api-keys.controller.js';
@@ -15,7 +16,7 @@ import { DrizzleApiKeysRepository } from './api-keys.repository.js';
 import { ApiKeysService } from './api-keys.service.js';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, HttpModule],
   controllers: [ApiKeysController],
   providers: [
     ApiKeysService,

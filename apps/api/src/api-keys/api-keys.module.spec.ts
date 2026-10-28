@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { JEST_CAN_REQUIRE_ESM } from '../../test/lib/app-module-gate.js';
+import { ApiResponseService } from '../common/http/api-response.service.js';
 import { DATABASE, DATABASE_CLIENT } from '../db/database.const.js';
 import { createSqlClientMock } from '../db/test/mocks/postgres.mock.js';
 import { API_KEYS_REPOSITORY } from './api-keys.const.js';
@@ -55,6 +56,9 @@ describe('ApiKeysModule', () => {
       controllers: [ApiKeysController],
       providers: [
         ApiKeysService,
+        // The controller wraps its payload, so it needs the envelope service —
+        // provided by the global `HttpModule` in the real graph.
+        ApiResponseService,
         { provide: API_KEYS_REPOSITORY, useClass: DrizzleApiKeysRepository },
         { provide: DATABASE, useValue: database.db },
       ],

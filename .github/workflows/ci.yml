@@ -75,3 +75,70 @@ jobs:
       # because stdout is not a TTY, so no extra flag is needed.
       - name: Unit tests (api)
         run: pnpm --filter @callback/api test
+
+  # The envelope and OpenAPI contract gates live in the e2e suite (AIS-97).
+  # Separate job, and not only for speed:
+  #
+  #   * the DB-backed branches need a reachable Postgres (migrations create the
+  #     `platform` / `email` schemas themselves, so a plain service is enough);
+  #   * nearly every `AppModule` suite self-skips below Node 24.9, because Jest's
+  #     ESM runner cannot `require()` the CommonJS `@nestjs/config` there
+  #     (see apps/api/test/lib/app-module-gate.ts). Running the gate on Node 22
+  #     would be green without executing anything — the exact failure mode this
+  #     job exists to prevent.
+  api-e2e:
+    name: API e2e (envelope + OpenAPI gates, Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aisztens
+          POSTGRES_PASSWORD: aisztens
+          POSTGRES_DB: aisztens_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aisztens -d aisztens_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      APP_ENV: dev
+      DATABASE_URL: postgres://aisztens:aisztens@localhost:5432/aisztens_db
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm --filter @callback/shared build
+
+      - name: Build api
+        run: pnpm --filter @callback/api build
+
+      - name: Apply database migrations
+        run: pnpm --filter @callback/api db:migrate
+
+      # Fails on: a route that answers with the envelope without a registry
+      # entry, an exemption that does not exist, an untracked raw route, a 500
+      # whose body leaks, or a mapper that drifts from the shared schema.
+      - name: E2E tests (envelope, OpenAPI, contract gate)
+        run: pnpm --filter @callback/api test:e2e

@@ -259,7 +259,11 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 | Prod never exposes the UI / validator (`isOpenApiDocsEnabled`, `isResponseAssertEnabled`) | `apps/api/src/common/openapi/openapi.config.spec.ts` |
 | Dev response validator (bare body, dropped field, additive field, exempt route) | `apps/api/src/common/openapi/{response-assert.logic,response-assert.interceptor,route-match.logic}.spec.ts` |
 | `/api/openapi.json` 200 + `openapi: 3.1.0`, `/api/docs` 200, `healthz` still raw | `apps/api/test/openapi.e2e-spec.ts` |
-| No bare body outside the allow-list, OpenAPI baseline, breaking-change gate | **not built yet** — AIS-97 / AIS-99 |
+| Envelope branches (success, empty collection, 404, sanitised 500 + log proof) | `apps/api/test/envelope.e2e-spec.ts` |
+| Route audit: every non-exempt route registered (verb + path), every exemption backed by a decorator, no orphan entry (with negative fixtures) | `apps/api/test/lib/controller-audit.ts` → `apps/api/test/envelope-contract.e2e-spec.ts` |
+| Mapper ⇄ shared-schema drift (fixture through `apiKeySchema` + the dev validator's assertion) | `apps/api/test/envelope-contract.e2e-spec.ts` |
+| CI runs the e2e gates on Node 24 with Postgres | `.github/workflows/ci.yml` → `api-e2e` job |
+| OpenAPI baseline + breaking-change gate | **not built yet** — AIS-99 |
 
 ---
 

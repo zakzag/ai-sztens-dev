@@ -22,6 +22,31 @@ import { SKIP_ENVELOPE_KEY } from '../../skip-envelope.const.js';
  */
 const PATH_METADATA = 'path';
 
+/** Nest's `METHOD_METADATA` key; holds a `RequestMethod` enum value. */
+const METHOD_METADATA = 'method';
+
+/**
+ * Verb names indexed by Nest's `RequestMethod` enum value.
+ *
+ * The enum lives in `@nestjs/common` but exposing it here would make the audit
+ * depend on Nest's ordering; the list is short, stable and asserted by the gate
+ * (an unrecognised value is reported, never silently skipped).
+ */
+const METHOD_BY_REQUEST_METHOD: readonly string[] = [
+  'GET',
+  'POST',
+  'PUT',
+  'DELETE',
+  'PATCH',
+  'ALL',
+  'OPTIONS',
+  'HEAD',
+  'SEARCH',
+];
+
+/** Reported when a handler carries a route path but no known HTTP verb. */
+export const UNKNOWN_HTTP_METHOD = 'UNKNOWN';
+
 /** Mirrors `main.ts`: the global route prefix. */
 const GLOBAL_PREFIX = 'api';
 
@@ -42,6 +67,20 @@ export interface RouteTable {
   readonly exempt: readonly string[];
   /** Routes that must answer with the envelope. */
   readonly enveloped: readonly string[];
+}
+
+/** One mounted route, with the verb and the handler that produced it. */
+export interface MethodRoute {
+  /** Controller class name, for actionable violation messages. */
+  readonly controller: string;
+  /** Handler method name, for actionable violation messages. */
+  readonly handler: string;
+  /** HTTP verb (`GET`, `POST`, …), or {@link UNKNOWN_HTTP_METHOD}. */
+  readonly method: string;
+  /** Route as Nest mounts it, global prefix applied. */
+  readonly path: string;
+  /** Whether `@SkipEnvelope()` applies to the handler or its controller. */
+  readonly exempt: boolean;
 }
 
 /**
@@ -123,19 +162,52 @@ function mountRoute(controllerPath: string, handlerPath: string): string {
 }
 
 /**
- * @param controllers - controller classes to inspect.
- * @returns every route they mount, split by the exemption decision.
+ * @param value - a controller class (untyped when it comes from discovery).
+ * @returns its class name, used in violation messages.
  */
-export function toRouteTable(controllers: readonly unknown[]): RouteTable {
+function readControllerName(value: unknown): string {
+  const name: unknown = Reflect.get(value as object, 'name');
+
+  return typeof name === 'string' && name.length > 0 ? name : '<anonymous>';
+}
+
+/**
+ * @param handler - a route handler function.
+ * @returns its HTTP verb, or {@link UNKNOWN_HTTP_METHOD}.
+ */
+function readMethod(handler: unknown): string {
+  const value: unknown = Reflect.getMetadata(METHOD_METADATA, handler);
+
+  if (typeof value !== 'number') {
+    return UNKNOWN_HTTP_METHOD;
+  }
+
+  return METHOD_BY_REQUEST_METHOD[value] ?? UNKNOWN_HTTP_METHOD;
+}
+
+/**
+ * Method-aware counterpart of {@link toRouteTable}.
+ *
+ * The verb is what the registry is keyed by (`GET /api/api-keys` and
+ * `POST /api/api-keys` are two contracts), so the CI gate needs it — a
+ * path-level comparison would let a documented `GET` excuse an undocumented
+ * `DELETE`.
+ *
+ * @param controllers - controller classes to inspect.
+ * @returns every route they mount, with verb, handler and exemption decision.
+ */
+export function toMethodRoutes(
+  controllers: readonly unknown[],
+): readonly MethodRoute[] {
   const scanner = new MetadataScanner();
-  const exempt: string[] = [];
-  const enveloped: string[] = [];
+  const routes: MethodRoute[] = [];
 
   for (const value of controllers) {
     const controller = toController(value);
     if (controller === null) continue;
 
     const controllerPath = readPathMetadata(controller.target);
+    const controllerName = readControllerName(controller.target);
 
     for (const name of scanner.getAllMethodNames(controller.prototype)) {
       const handler: unknown = controller.prototype[name];
@@ -146,12 +218,30 @@ export function toRouteTable(controllers: readonly unknown[]): RouteTable {
       const handlerPath: unknown = Reflect.getMetadata(PATH_METADATA, handler);
       if (typeof handlerPath !== 'string') continue;
 
-      const route = mountRoute(controllerPath, handlerPath);
-      const skipped =
-        isEnvelopeSkipped(handler) || isEnvelopeSkipped(controller.target);
-
-      (skipped ? exempt : enveloped).push(route);
+      routes.push({
+        controller: controllerName,
+        handler: name,
+        method: readMethod(handler),
+        path: mountRoute(controllerPath, handlerPath),
+        exempt:
+          isEnvelopeSkipped(handler) || isEnvelopeSkipped(controller.target),
+      });
     }
+  }
+
+  return routes;
+}
+
+/**
+ * @param controllers - controller classes to inspect.
+ * @returns every route they mount, split by the exemption decision.
+ */
+export function toRouteTable(controllers: readonly unknown[]): RouteTable {
+  const exempt: string[] = [];
+  const enveloped: string[] = [];
+
+  for (const route of toMethodRoutes(controllers)) {
+    (route.exempt ? exempt : enveloped).push(route.path);
   }
 
   return { exempt: sortUnique(exempt), enveloped: sortUnique(enveloped) };

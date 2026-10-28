@@ -2,12 +2,13 @@ import {
   API_KEYS_PATH,
   createApiKeysService,
 } from '../src/index.js';
-import { isConflict } from '../src/api-error.js';
+import { ApiError, isConflict } from '../src/api-error.js';
 import { createHttpClient } from '../src/http-client.js';
 import type { RecordedCall } from './mocks/fetch.mock.js';
 import {
   createSequenceFetchMock,
-  jsonResponse,
+  errorResponse,
+  successResponse,
 } from './mocks/fetch.mock.js';
 import {
   SECOND_API_KEY,
@@ -60,9 +61,7 @@ describe('API_KEYS_PATH', () => {
 
 describe('createApiKeysService — list', () => {
   it('calls GET /api/api-keys and returns the parsed list in order', async () => {
-    const { service, fetchMock } = setup([
-      jsonResponse(VALID_API_KEY_LIST),
-    ]);
+    const { service, fetchMock } = setup([successResponse(VALID_API_KEY_LIST)]);
 
     const result = await service.list();
 
@@ -74,14 +73,14 @@ describe('createApiKeysService — list', () => {
   });
 
   it('returns an empty list when nothing is stored', async () => {
-    const { service } = setup([jsonResponse([])]);
+    const { service } = setup([successResponse([])]);
 
     await expect(service.list()).resolves.toEqual([]);
   });
 
   it('rejects a malformed row instead of returning a half-typed object', async () => {
     const { service } = setup([
-      jsonResponse([{ ...VALID_API_KEY, expiresAt: '2027-01-31' }]),
+      successResponse([{ ...VALID_API_KEY, expiresAt: '2027-01-31' }]),
     ]);
 
     await expect(service.list()).rejects.toMatchObject({ name: 'ApiError' });
@@ -90,7 +89,7 @@ describe('createApiKeysService — list', () => {
 
 describe('createApiKeysService — create', () => {
   it('posts the payload unchanged and returns the created key', async () => {
-    const { service, fetchMock } = setup([jsonResponse(VALID_API_KEY, 201)]);
+    const { service, fetchMock } = setup([successResponse(VALID_API_KEY, 201)]);
 
     const result = await service.create(VALID_CREATE_INPUT);
 
@@ -101,7 +100,7 @@ describe('createApiKeysService — create', () => {
   });
 
   it('does not invent optional fields when the caller omitted them', async () => {
-    const { service, fetchMock } = setup([jsonResponse(VALID_API_KEY, 201)]);
+    const { service, fetchMock } = setup([successResponse(VALID_API_KEY, 201)]);
 
     await service.create(VALID_CREATE_INPUT);
 
@@ -115,7 +114,7 @@ describe('createApiKeysService — create', () => {
   });
 
   it('sends the optional fields when they are present', async () => {
-    const { service, fetchMock } = setup([jsonResponse(VALID_API_KEY, 201)]);
+    const { service, fetchMock } = setup([successResponse(VALID_API_KEY, 201)]);
 
     await service.create({
       ...VALID_CREATE_INPUT,
@@ -129,16 +128,14 @@ describe('createApiKeysService — create', () => {
     });
   });
 
-  it('surfaces a duplicate identifier as a 409 conflict', async () => {
+  it('surfaces a duplicate identifier as a coded 409 conflict', async () => {
     const { service } = setup([
-      jsonResponse(
-        {
-          statusCode: 409,
-          message: 'API key identifier "vapi-staging" already exists.',
-          error: 'Conflict',
-        },
-        409,
-      ),
+      errorResponse({
+        code: 'API_KEY_IDENTIFIER_CONFLICT',
+        status: 409,
+        message: 'identifier already exists',
+        details: [{ path: 'identifier', message: 'already taken' }],
+      }),
     ]);
 
     const error = await service
@@ -146,24 +143,28 @@ describe('createApiKeysService — create', () => {
       .catch((e: unknown) => e);
 
     expect(isConflict(error)).toBe(true);
-    expect((error as { message: string }).message).toContain('vapi-staging');
+    expect((error as ApiError).code).toBe('API_KEY_IDENTIFIER_CONFLICT');
+    expect((error as ApiError).issues[0]?.path).toBe('identifier');
   });
 
-  it('surfaces a validation failure with the validator messages', async () => {
+  it('surfaces a validation failure with field issues', async () => {
     const { service } = setup([
-      jsonResponse(
-        { statusCode: 400, message: ['identifier must be URL-safe'] },
-        400,
-      ),
+      errorResponse({
+        code: 'VALIDATION_FAILED',
+        status: 400,
+        message: 'The request payload does not match the API contract.',
+        details: [{ path: 'identifier', message: 'must be URL-safe' }],
+      }),
     ]);
 
     const error = await service
       .create(VALID_CREATE_INPUT)
       .catch((e: unknown) => e);
 
-    expect((error as { status: number }).status).toBe(400);
-    expect((error as { details: readonly string[] }).details).toEqual([
-      'identifier must be URL-safe',
+    expect((error as ApiError).status).toBe(400);
+    expect((error as ApiError).code).toBe('VALIDATION_FAILED');
+    expect((error as ApiError).details).toEqual([
+      'identifier: must be URL-safe',
     ]);
   });
 });

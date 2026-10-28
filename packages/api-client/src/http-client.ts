@@ -4,9 +4,10 @@
  * Responsibilities are deliberately narrow:
  * 1. compose the URL from the injected `baseUrl` and the service path,
  * 2. attach the optional bearer token,
- * 3. turn every failure — transport, HTTP status, schema mismatch — into one
- *    {@link ApiError},
- * 4. parse a successful body with the caller's zod schema.
+ * 3. parse a successful body as the contract envelope and hand the service only
+ *    its `data` (plan `D12`) — callers keep their signatures,
+ * 4. turn every failure — transport, HTTP status, schema mismatch — into one
+ *    {@link ApiError} carrying `code`, `requestId` and `issues`.
  *
  * There is no React import and no `import.meta.env` read here: the base URL and
  * the token supplier are injected by the app's composition root
@@ -15,13 +16,15 @@
  */
 
 import { z } from 'zod';
+import { successEnvelopeSchema } from '@callback/shared';
 import {
   NETWORK_ERROR_MESSAGE,
+  UNEXPECTED_PAYLOAD_CODE,
   UNEXPECTED_PAYLOAD_MESSAGE,
 } from './api-error.const.js';
 import {
   ApiError,
-  extractErrorDetails,
+  parseErrorBody,
   toFailureMessage,
 } from './api-error.js';
 import type {
@@ -102,9 +105,35 @@ function toContractDetails(error: z.ZodError): readonly string[] {
 }
 
 /**
- * Parses a 2xx body with the supplied schema.
+ * Builds the “contract drift” error, i.e. a 2xx body that does not match the
+ * shared schema. Its code is client-side: the server never sent one.
+ */
+function toPayloadError(
+  response: Response,
+  url: string,
+  error: z.ZodError,
+): ApiError {
+  return new ApiError({
+    message: UNEXPECTED_PAYLOAD_MESSAGE,
+    status: response.status,
+    url,
+    code: UNEXPECTED_PAYLOAD_CODE,
+    details: toContractDetails(error),
+    cause: error,
+  });
+}
+
+/**
+ * Parses a 2xx body as the success envelope and returns its `data`.
  *
- * @throws {ApiError} when the payload does not match the shared contract.
+ * Two parses, on purpose:
+ * 1. the **envelope** (shared schema) proves the body has `data` + `meta`; a
+ *    bare payload or a missing key is a drift, not a success;
+ * 2. the **payload** is then validated with the caller's schema, so a `null`
+ *    `data` is only accepted when the caller expects it (a delete), never where
+ *    a resource is required.
+ *
+ * @throws {ApiError} with code `UNEXPECTED_PAYLOAD` when either parse fails.
  */
 async function parsePayload<T>(
   response: Response,
@@ -112,19 +141,19 @@ async function parsePayload<T>(
   url: string,
 ): Promise<T> {
   const body = await readBody(response);
-  const result = schema.safeParse(body);
+  const envelope = successEnvelopeSchema(schema).safeParse(body);
 
-  if (!result.success) {
-    throw new ApiError({
-      message: UNEXPECTED_PAYLOAD_MESSAGE,
-      status: response.status,
-      url,
-      details: toContractDetails(result.error),
-      cause: result.error,
-    });
+  if (!envelope.success) {
+    throw toPayloadError(response, url, envelope.error);
   }
 
-  return result.data;
+  const payload = schema.safeParse(envelope.data.data);
+
+  if (!payload.success) {
+    throw toPayloadError(response, url, payload.error);
+  }
+
+  return payload.data;
 }
 
 /**
@@ -134,12 +163,16 @@ async function parsePayload<T>(
  */
 async function toFailure(response: Response, url: string): Promise<never> {
   const body = await readBody(response);
+  const parsed = parseErrorBody(body);
 
   throw new ApiError({
     message: toFailureMessage(body, response.statusText),
     status: response.status,
     url,
-    details: extractErrorDetails(body),
+    code: parsed.code,
+    requestId: parsed.requestId,
+    issues: parsed.issues,
+    details: parsed.details,
   });
 }
 

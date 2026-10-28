@@ -4,6 +4,9 @@
  * Every test injects one of these through `HttpClientConfig.fetchImpl`, so no
  * request ever leaves the process. The doubles live here (not inside the spec
  * files) because the service tests and the transport tests share them.
+ *
+ * `successResponse` / `errorResponse` build the **contract envelope**, so a test
+ * asserts the same shape the server produces instead of a bare payload.
  */
 
 /** One recorded invocation of the doubled `fetch`. */
@@ -52,6 +55,58 @@ export function textResponse(body: string, status = 500): Response {
 /** Response with no body at all. */
 export function emptyResponse(status = 204): Response {
   return new Response(null, { status });
+}
+
+/** Fixed `meta` used by every enveloped double. */
+export const TEST_META = {
+  requestId: 'req-test-1',
+  timestamp: '2026-10-27T10:00:00.000Z',
+} as const;
+
+/**
+ * Builds a success envelope response (`{ data, meta }`).
+ *
+ * @param data - payload of the response (`null` for “nothing to return”).
+ * @param status - HTTP status (default 200).
+ */
+export function successResponse(data: unknown, status = 200): Response {
+  return jsonResponse({ data, meta: TEST_META }, status);
+}
+
+/** Input of {@link errorResponse}: the facts a test wants to assert on. */
+export interface ErrorResponseInput {
+  readonly code: string;
+  readonly status: number;
+  readonly message: string;
+  readonly details?: readonly { readonly path: string; readonly message: string }[];
+  readonly requestId?: string;
+  readonly path?: string;
+}
+
+/**
+ * Builds an error envelope response (`{ error }`).
+ *
+ * @param input - code, status, message and optional details/requestId/path.
+ * @param status - HTTP status (defaults to `input.status`).
+ */
+export function errorResponse(
+  input: ErrorResponseInput,
+  status: number = input.status,
+): Response {
+  return jsonResponse(
+    {
+      error: {
+        code: input.code,
+        status: input.status,
+        message: input.message,
+        details: input.details ?? [],
+        requestId: input.requestId ?? TEST_META.requestId,
+        timestamp: TEST_META.timestamp,
+        path: input.path ?? '/api/api-keys',
+      },
+    },
+    status,
+  );
 }
 
 /** Minimal status-text table, so failures read like a real server. */

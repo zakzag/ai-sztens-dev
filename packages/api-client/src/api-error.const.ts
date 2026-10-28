@@ -23,5 +23,14 @@ export const NETWORK_ERROR_MESSAGE = 'The request could not be completed.';
 export const UNEXPECTED_PAYLOAD_MESSAGE =
   'The server returned an unexpected response payload.';
 
+/**
+ * Client-side error code for a contract drift.
+ *
+ * The server never sends this: it marks a response that did **not** follow the
+ * contract (missing `data`, wrong field type, a bare body). It exists so the
+ * log drawer can file a drift under a code instead of guessing from a message.
+ */
+export const UNEXPECTED_PAYLOAD_CODE = 'UNEXPECTED_PAYLOAD';
+
 /** Message used when the error response body cannot be parsed as JSON. */
 export const UNPARSEABLE_ERROR_MESSAGE = 'The request failed.';

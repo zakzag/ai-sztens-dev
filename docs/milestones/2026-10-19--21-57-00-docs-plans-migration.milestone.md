@@ -15,15 +15,15 @@ plan filenames that never existed.
 
 ## 2. Measured data / evidence
 
-| Measurement | Value |
-|---|---|
-| Plans in `docs/plans/` before | 15 |
-| Plans still in `docs/history/` before | 21 |
-| Plans in `docs/history/` after | 0 |
-| Plans in `docs/plans/` after | 36 |
-| Markdown files rewritten | 41 |
-| Broken plan links after migration | 0 (only 2 pre-existing, unrelated hits remain) |
-| Same-filename duplicates (history vs plans) | 0 |
+| Measurement                                 | Value                                          |
+| ------------------------------------------- | ---------------------------------------------- |
+| Plans in `docs/plans/` before               | 15                                             |
+| Plans still in `docs/history/` before       | 21                                             |
+| Plans in `docs/history/` after              | 0                                              |
+| Plans in `docs/plans/` after                | 36                                             |
+| Markdown files rewritten                    | 41                                             |
+| Broken plan links after migration           | 0 (only 2 pre-existing, unrelated hits remain) |
+| Same-filename duplicates (history vs plans) | 0                                              |
 
 Stale filenames found and repaired (they never existed in either folder):
 `2026-09-28-api-healthcheck-fail-plan.md`, `2026-09-26-container-mem-limits-after-oom-plan.md`,
@@ -50,17 +50,17 @@ must not be falsified; only link targets and labels were touched.
 
 ## 4. Solution / implementation
 
-| File / group | Change |
-|---|---|
-| `docs/history/*-plan.md` → `docs/plans/*-plan.md` | 21 files moved with `git mv`; no content change beyond link repair |
-| `.roo/rules/general.coding-standards.md` | plan path → `docs/plans/<YYYY-MM-DD--HH-ii-ss>-<plan-description>-plan.md`; added "change summaries stay in `docs/history/`" |
-| `.roo/rules/instructions.md` | new bullet: plans live in `docs/plans/`, `docs/history/` holds only change summaries |
-| `docs/Specs/{Three-Env-Verification,Local-Development,Infrastructure-Docker,Caddy-Reverse-Proxy,Production-Runbook}.md` | plan links re-pointed to `../plans/…`, labels aligned |
-| `docs/milestones/*.milestone.md` (11 files) | `Plan:` lines re-pointed to `../plans/…`; one wrong "Day-to-day narrative" link restored to `../history/…` |
-| `docs/history/*.md` (17 files) | bare/short plan links → `../plans/<real-filename>`; labels aligned |
-| `docs/plans/*.md` (9 files) | relative links recomputed for the new folder; self-references and sibling-plan links normalised |
-| `docs/docker-cheatsheet.md`, `docs/docker-debug-playbook.md`, `docs/snapshot-2026-10-01.md`, `deploy/README.md` | `history/<plan>.md` → `plans/<plan>.md` |
-| `docs/plans/2026-09-21--16-46-20-documentation-structure-plan.md` | plan-storage row marked "superseded 2026-10-19" |
+| File / group                                                                                                            | Change                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `docs/history/*-plan.md` → `docs/plans/*-plan.md`                                                                       | 21 files moved with `git mv`; no content change beyond link repair                                                           |
+| `.roo/rules/general.coding-standards.md`                                                                                | plan path → `docs/plans/<YYYY-MM-DD--HH-ii-ss>-<plan-description>-plan.md`; added "change summaries stay in `docs/history/`" |
+| `.roo/rules/instructions.md`                                                                                            | new bullet: plans live in `docs/plans/`, `docs/history/` holds only change summaries                                         |
+| `docs/Specs/{Three-Env-Verification,Local-Development,Infrastructure-Docker,Caddy-Reverse-Proxy,Production-Runbook}.md` | plan links re-pointed to `../plans/…`, labels aligned                                                                        |
+| `docs/milestones/*.milestone.md` (11 files)                                                                             | `Plan:` lines re-pointed to `../plans/…`; one wrong "Day-to-day narrative" link restored to `../history/…`                   |
+| `docs/history/*.md` (17 files)                                                                                          | bare/short plan links → `../plans/<real-filename>`; labels aligned                                                           |
+| `docs/plans/*.md` (9 files)                                                                                             | relative links recomputed for the new folder; self-references and sibling-plan links normalised                              |
+| `docs/docker-cheatsheet.md`, `docs/docker-debug-playbook.md`, `docs/snapshot-2026-10-01.md`, `deploy/README.md`         | `history/<plan>.md` → `plans/<plan>.md`                                                                                      |
+| `docs/plans/2026-09-21--16-46-20-documentation-structure-plan.md`                                                       | plan-storage row marked "superseded 2026-10-19"                                                                              |
 
 ## 5. Outcome and how to verify
 

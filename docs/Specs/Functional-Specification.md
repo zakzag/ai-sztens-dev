@@ -18,19 +18,19 @@
 
 ## 2. Funkciók a felhasználó szemszögéből (amit a hívó / látogató lát)
 
-| ID | Funkció | Leírás (user story / use case) | MVP? | Prioritás |
-|---|---|---|---|---|
-| F1 | [Funkció neve] | [Leírás: ki, mit, miért] | [Igen / Nem] | [P0 / P1 / P2] |
-| F2 | [Funkció neve] | [Leírás] | [Igen / Nem] | [P0 / P1 / P2] |
-| F3 | [Funkció neve] | [Leírás] | [Igen / Nem] | [P0 / P1 / P2] |
+| ID  | Funkció        | Leírás (user story / use case) | MVP?         | Prioritás      |
+| --- | -------------- | ------------------------------ | ------------ | -------------- |
+| F1  | [Funkció neve] | [Leírás: ki, mit, miért]       | [Igen / Nem] | [P0 / P1 / P2] |
+| F2  | [Funkció neve] | [Leírás]                       | [Igen / Nem] | [P0 / P1 / P2] |
+| F3  | [Funkció neve] | [Leírás]                       | [Igen / Nem] | [P0 / P1 / P2] |
 
 ## 3. Funkciók a működtető szemszögéből (amit az üzemeltető / admin lát)
 
-| ID | Funkció | Leírás (user story / use case) | MVP? | Prioritás |
-|---|---|---|---|---|
-| O1 | [Funkció neve] | [Leírás: ki, mit, miért] | [Igen / Nem] | [P0 / P1 / P2] |
-| O2 | [Funkció neve] | [Leírás] | [Igen / Nem] | [P0 / P1 / P2] |
-| O3 | [Funkció neve] | [Leírás] | [Igen / Nem] | [P0 / P1 / P2] |
+| ID  | Funkció        | Leírás (user story / use case) | MVP?         | Prioritás      |
+| --- | -------------- | ------------------------------ | ------------ | -------------- |
+| O1  | [Funkció neve] | [Leírás: ki, mit, miért]       | [Igen / Nem] | [P0 / P1 / P2] |
+| O2  | [Funkció neve] | [Leírás]                       | [Igen / Nem] | [P0 / P1 / P2] |
+| O3  | [Funkció neve] | [Leírás]                       | [Igen / Nem] | [P0 / P1 / P2] |
 
 ## 4. MVP scope összefoglaló (levezetve a fenti táblázatokból)
 

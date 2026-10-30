@@ -10,7 +10,10 @@ import { cn } from '../../lib/cn.js';
 export function Table({ className, children, ...rest }: TableProps) {
   return (
     <div className="overflow-x-auto rounded-card border border-hairline border-border-hairline bg-surface-raised shadow-neu-raised">
-      <table {...rest} className={cn('w-full border-collapse text-left text-sm', className)}>
+      <table
+        {...rest}
+        className={cn('w-full border-collapse text-left text-sm', className)}
+      >
         {children}
       </table>
     </div>

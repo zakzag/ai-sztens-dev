@@ -24,26 +24,39 @@ describe('PageErrorState', () => {
       />,
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Az API kulcsok betöltése nem sikerült.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Az API kulcsok betöltése nem sikerült.',
+    );
     expect(screen.getByText('A szerver hibát jelzett.')).toBeInTheDocument();
   });
 
   it('calls the retry callback once per click', async () => {
     const onRetry = vi.fn();
 
-    render(<PageErrorState title="Hiba" message="Nem elérhető." onRetry={onRetry} />);
+    render(
+      <PageErrorState title="Hiba" message="Nem elérhető." onRetry={onRetry} />,
+    );
 
-    await userEvent.click(screen.getByRole('button', { name: PAGE_ERROR_RETRY_LABEL }));
+    await userEvent.click(
+      screen.getByRole('button', { name: PAGE_ERROR_RETRY_LABEL }),
+    );
 
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it('disables the button and shows the pending label while retrying', () => {
     render(
-      <PageErrorState title="Hiba" message="Nem elérhető." onRetry={vi.fn()} isRetrying />,
+      <PageErrorState
+        title="Hiba"
+        message="Nem elérhető."
+        onRetry={vi.fn()}
+        isRetrying
+      />,
     );
 
-    const button = screen.getByRole('button', { name: PAGE_ERROR_RETRY_PENDING_LABEL });
+    const button = screen.getByRole('button', {
+      name: PAGE_ERROR_RETRY_PENDING_LABEL,
+    });
 
     expect(button).toBeDisabled();
   });
@@ -60,6 +73,8 @@ describe('PageErrorState', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Folyamatban' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Folyamatban' }),
+    ).toBeInTheDocument();
   });
 });

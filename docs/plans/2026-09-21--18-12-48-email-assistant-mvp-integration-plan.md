@@ -42,15 +42,15 @@ Rationale:
 - A documented escape hatch allows extracting the email context into a
   separate `apps/email` later if scale or team size requires it.
 
-| Dimension | Modular monolith (chosen) | Separate app |
-|---|---|---|
-| Ops footprint | 1 container, 1 DB, 1 queue | 2 containers, coordinated migrations |
-| Shared platform | Trivial, no duplication | Must be extracted first |
-| Blast radius | Shared process | Independent |
-| Deploy coupling | Redeploy both on any change | Independent deploys |
-| Independent scaling | Harder | Easier |
-| Module boundaries | Enforced by discipline | Enforced by process |
-| Time to first pilot | Fastest | Slower |
+| Dimension           | Modular monolith (chosen)   | Separate app                         |
+| ------------------- | --------------------------- | ------------------------------------ |
+| Ops footprint       | 1 container, 1 DB, 1 queue  | 2 containers, coordinated migrations |
+| Shared platform     | Trivial, no duplication     | Must be extracted first              |
+| Blast radius        | Shared process              | Independent                          |
+| Deploy coupling     | Redeploy both on any change | Independent deploys                  |
+| Independent scaling | Harder                      | Easier                               |
+| Module boundaries   | Enforced by discipline      | Enforced by process                  |
+| Time to first pilot | Fastest                     | Slower                               |
 
 ## 4. Target structure
 

@@ -12,32 +12,32 @@
 AIS-98 shipped the generated OpenAPI document and the dev response validator, but
 AIS-97's own DoD was still open:
 
-* no e2e proof of the `500` branch (sanitised body + `requestId` + the detail only
+- no e2e proof of the `500` branch (sanitised body + `requestId` + the detail only
   in the log);
-* no e2e proof of the empty-collection rule (`[]`, never `null`);
-* no shared matchers — each spec re-declared its own body guards;
-* **no CI gate** that fails when a non-exempt route answers with a bare body;
-* no contract-drift fixture (mapper ↔ shared schema);
-* `.github/workflows/ci.yml` never ran `test:e2e` at all, and on Node 22 every
+- no e2e proof of the empty-collection rule (`[]`, never `null`);
+- no shared matchers — each spec re-declared its own body guards;
+- **no CI gate** that fails when a non-exempt route answers with a bare body;
+- no contract-drift fixture (mapper ↔ shared schema);
+- `.github/workflows/ci.yml` never ran `test:e2e` at all, and on Node 22 every
   `AppModule` suite self-skips anyway.
 
 ## What was added
 
-| File | Role |
-|---|---|
-| [`apps/api/test/lib/envelope.matchers.ts`](../../apps/api/test/lib/envelope.matchers.ts) | `expectSuccessEnvelope`, `expectErrorEnvelope`, `expectRawBody`, `expectRequestIdHeaderEcho` — one assertion per contract rule |
-| [`apps/api/test/lib/controller-audit.ts`](../../apps/api/test/lib/controller-audit.ts) | the gate: verb-aware route ↔ registry ↔ exemption audit with four violation codes |
-| [`apps/api/test/lib/audit-fixtures.ts`](../../apps/api/test/lib/audit-fixtures.ts) | permanent negative fixtures (bare body, unlisted exemption) — the gate's self-proof |
-| [`apps/api/test/lib/envelope-probe.ts`](../../apps/api/test/lib/envelope-probe.ts) | test-only controllers: enveloped success, empty list, thrown failure |
-| [`apps/api/test/envelope.e2e-spec.ts`](../../apps/api/test/envelope.e2e-spec.ts) | the four branches, booted from `HttpModule` + probes (no DB, no `@nestjs/config`) |
-| [`apps/api/test/envelope-contract.e2e-spec.ts`](../../apps/api/test/envelope-contract.e2e-spec.ts) | the gate over the real module graph, its three negative cases, and the mapper↔schema drift fixture |
-| [`apps/api/src/common/http/test/support/envelope-route.ts`](../../apps/api/src/common/http/test/support/envelope-route.ts) | `toMethodRoutes()` (verb + handler + exemption per route); `toRouteTable()` now derives from it |
-| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | new `api-e2e` job: Postgres service, Node 24, migrations, `test:e2e` |
-| `docs/Specs/API-Convention.md` | enforcement table updated, only the AIS-99 baseline left as “not built yet” |
+| File                                                                                                                       | Role                                                                                                                           |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| [`apps/api/test/lib/envelope.matchers.ts`](../../apps/api/test/lib/envelope.matchers.ts)                                   | `expectSuccessEnvelope`, `expectErrorEnvelope`, `expectRawBody`, `expectRequestIdHeaderEcho` — one assertion per contract rule |
+| [`apps/api/test/lib/controller-audit.ts`](../../apps/api/test/lib/controller-audit.ts)                                     | the gate: verb-aware route ↔ registry ↔ exemption audit with four violation codes                                              |
+| [`apps/api/test/lib/audit-fixtures.ts`](../../apps/api/test/lib/audit-fixtures.ts)                                         | permanent negative fixtures (bare body, unlisted exemption) — the gate's self-proof                                            |
+| [`apps/api/test/lib/envelope-probe.ts`](../../apps/api/test/lib/envelope-probe.ts)                                         | test-only controllers: enveloped success, empty list, thrown failure                                                           |
+| [`apps/api/test/envelope.e2e-spec.ts`](../../apps/api/test/envelope.e2e-spec.ts)                                           | the four branches, booted from `HttpModule` + probes (no DB, no `@nestjs/config`)                                              |
+| [`apps/api/test/envelope-contract.e2e-spec.ts`](../../apps/api/test/envelope-contract.e2e-spec.ts)                         | the gate over the real module graph, its three negative cases, and the mapper↔schema drift fixture                             |
+| [`apps/api/src/common/http/test/support/envelope-route.ts`](../../apps/api/src/common/http/test/support/envelope-route.ts) | `toMethodRoutes()` (verb + handler + exemption per route); `toRouteTable()` now derives from it                                |
+| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)                                                               | new `api-e2e` job: Postgres service, Node 24, migrations, `test:e2e`                                                           |
+| `docs/Specs/API-Convention.md`                                                                                             | enforcement table updated, only the AIS-99 baseline left as “not built yet”                                                    |
 
 ## Decisions
 
-1. **The branch suite does not boot `AppModule`.** `HttpModule` *is* the production
+1. **The branch suite does not boot `AppModule`.** `HttpModule` _is_ the production
    HTTP edge (filter, request-id interceptor, `ApiResponseService`, exemptions);
    leaving out `ConfigModule`/`DatabaseModule` means the suite needs no database
    and no Node 24, so it actually runs on a developer machine and in CI. The
@@ -74,8 +74,8 @@ everywhere, and the five non-graph assertions of `envelope-contract.e2e-spec.ts`
 
 ## Not done here
 
-* `docs/Specs/openapi.json` baseline + `openapi:generate` / `openapi:check` and the
+- `docs/Specs/openapi.json` baseline + `openapi:generate` / `openapi:check` and the
   breaking-change gate → **AIS-99**.
-* The CI job was written from the repo's own local runbook and cannot be executed
+- The CI job was written from the repo's own local runbook and cannot be executed
   from this machine; the first PR will show whether the Postgres service and the
   `db:migrate` step need an extra env var.

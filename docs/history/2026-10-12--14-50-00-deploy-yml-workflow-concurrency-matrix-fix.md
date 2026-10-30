@@ -23,8 +23,8 @@ Line 76 of the file as it sat on disk was:
 
 ```yaml
 75 concurrency:
- 76   group: deploy-${{ matrix.app_env }}
- 77   cancel-in-progress: false
+  76   group: deploy-${{ matrix.app_env }}
+  77   cancel-in-progress: false
 ```
 
 ## 2. Root cause
@@ -33,12 +33,12 @@ The previous fix moved `env.APP_ENV` to `matrix.app_env` for six sites (the [202
 
 Per the [GitHub Actions expressions docs](https://docs.github.com/en/actions/learn-github-actions/expressions#contexts-allowed-for-expressions):
 
-| Key | Allowed contexts |
-|---|---|
-| `concurrency.group` (workflow-level) | `github`, `inputs`, `vars`, `needs` |
-| `jobs.<id>.concurrency.group` | `github`, `inputs`, `vars`, `needs`, `matrix` |
-| `jobs.<id>.name` | `github`, `inputs`, `vars`, `matrix`, `secrets`, `runner` |
-| `jobs.<id>.environment` | `github`, `inputs`, `vars`, `matrix`, `secrets`, `runner` |
+| Key                                  | Allowed contexts                                          |
+| ------------------------------------ | --------------------------------------------------------- |
+| `concurrency.group` (workflow-level) | `github`, `inputs`, `vars`, `needs`                       |
+| `jobs.<id>.concurrency.group`        | `github`, `inputs`, `vars`, `needs`, `matrix`             |
+| `jobs.<id>.name`                     | `github`, `inputs`, `vars`, `matrix`, `secrets`, `runner` |
+| `jobs.<id>.environment`              | `github`, `inputs`, `vars`, `matrix`, `secrets`, `runner` |
 
 Note the asymmetry: `concurrency.group` at the **job** level IS allowed to read `matrix`, but at the **workflow** level it is not. The previous history entry treated the two as identical and shipped a workflow-level reference that was always going to fail.
 
@@ -61,14 +61,14 @@ The rest of the workflow is unchanged: the job-level `if:`, the `strategy.matrix
 
 ## 5. Files touched
 
-| File | Why |
-|---|---|
-| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:1) | Deleted the 6-line workflow-level `concurrency:` block (previous lines 72–77); replaced with a 5-line `# NOTE:` comment; extended the file-header rationale block (previous lines 36–50) with a new "Why no workflow-level `concurrency:` block" section that documents the GitHub Actions expression-context restriction and the two replacement mechanisms. |
-| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:1) | Prepended a new `Utolsó frissítés` bullet for the workflow-level concurrency removal; §9.1 `deploy.yml` prose now says the workflow-level `concurrency:` block has been deleted and that per-env separation comes from the job-level `if:` + `jobs.deploy.environment` only. |
-| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md:1) | Same `Utolsó frissítés` bullet prepended; §7.1 prose updated. |
-| [`scripts/test/_deploy-yml-concurrency-audit.py`](../../scripts/test/_deploy-yml-concurrency-audit.py:1) | **New.** Six offline checks: YAML parses; no workflow-level `concurrency:` block; every remaining `matrix.*` reference lives inside the `jobs.deploy.*` subtree; the Three-Env §5.2 INFRA_ENV grep still matches ≥ 3 lines; `jobs.deploy.environment` still uses `matrix.app_env`; `jobs.deploy.strategy.matrix.app_env` is still `[dev, prod]`. Fails loud if any future edit reintroduces the same shape of bug. |
-| [`docs/history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md`](2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md:1) | This file. |
-| [`docs/milestones/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.milestone.md`](../milestones/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.milestone.md:1) | Decision-grade summary. |
+| File                                                                                                                                                                                           | Why                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:1)                                                                                                                         | Deleted the 6-line workflow-level `concurrency:` block (previous lines 72–77); replaced with a 5-line `# NOTE:` comment; extended the file-header rationale block (previous lines 36–50) with a new "Why no workflow-level `concurrency:` block" section that documents the GitHub Actions expression-context restriction and the two replacement mechanisms.                                                      |
+| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:1)                                                                                                                 | Prepended a new `Utolsó frissítés` bullet for the workflow-level concurrency removal; §9.1 `deploy.yml` prose now says the workflow-level `concurrency:` block has been deleted and that per-env separation comes from the job-level `if:` + `jobs.deploy.environment` only.                                                                                                                                       |
+| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md:1)                                                                                                               | Same `Utolsó frissítés` bullet prepended; §7.1 prose updated.                                                                                                                                                                                                                                                                                                                                                      |
+| [`scripts/test/_deploy-yml-concurrency-audit.py`](../../scripts/test/_deploy-yml-concurrency-audit.py:1)                                                                                       | **New.** Six offline checks: YAML parses; no workflow-level `concurrency:` block; every remaining `matrix.*` reference lives inside the `jobs.deploy.*` subtree; the Three-Env §5.2 INFRA_ENV grep still matches ≥ 3 lines; `jobs.deploy.environment` still uses `matrix.app_env`; `jobs.deploy.strategy.matrix.app_env` is still `[dev, prod]`. Fails loud if any future edit reintroduces the same shape of bug. |
+| [`docs/history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md`](2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md:1)                                      | This file.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| [`docs/milestones/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.milestone.md`](../milestones/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.milestone.md:1) | Decision-grade summary.                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ## 6. How to verify
 

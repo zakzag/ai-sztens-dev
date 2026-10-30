@@ -5,14 +5,14 @@
 
 ## Létrehozott ticketek
 
-| Ticket | Típus | Szülő | Tartalom |
-|---|---|---|---|
-| AIS-64 | Story | AIS-1 | Visszahívás (callback) funkció teljes eltávolítása az API-ból, az admin appból és az adatbázisból |
-| AIS-65 | Subtask | AIS-64 | API: callback-requests modul, repository, séma-elemek eltávolítása |
-| AIS-66 | Subtask | AIS-64 | Adatbázis: drop migráció + callback séma kivétele az init scriptekből és a smoke tesztekből |
-| AIS-67 | Subtask | AIS-64 | Admin: dashboard, lib/api.ts és nav eltávolítása + placeholder |
-| AIS-68 | Subtask | AIS-64 | Dokumentáció + Jira housekeeping (AIS-38 cancel, AIS-29 re-scope, AIS-57 minta csere) |
-| AIS-69 | Subtask | AIS-64 | Publikus web űrlap + shared sémák (GATED — blokkoló döntés 1.) |
+| Ticket | Típus   | Szülő  | Tartalom                                                                                          |
+| ------ | ------- | ------ | ------------------------------------------------------------------------------------------------- |
+| AIS-64 | Story   | AIS-1  | Visszahívás (callback) funkció teljes eltávolítása az API-ból, az admin appból és az adatbázisból |
+| AIS-65 | Subtask | AIS-64 | API: callback-requests modul, repository, séma-elemek eltávolítása                                |
+| AIS-66 | Subtask | AIS-64 | Adatbázis: drop migráció + callback séma kivétele az init scriptekből és a smoke tesztekből       |
+| AIS-67 | Subtask | AIS-64 | Admin: dashboard, lib/api.ts és nav eltávolítása + placeholder                                    |
+| AIS-68 | Subtask | AIS-64 | Dokumentáció + Jira housekeeping (AIS-38 cancel, AIS-29 re-scope, AIS-57 minta csere)             |
+| AIS-69 | Subtask | AIS-64 | Publikus web űrlap + shared sémák (GATED — blokkoló döntés 1.)                                    |
 
 ## Blokkoló döntések (a story indítása előtt)
 

@@ -6,16 +6,16 @@
 
 ## Verdict per finding
 
-| # | Finding | Before | After | Status |
-|---|---|---|---|---|
-| A1 | REMOTE_DIR mismatch | `deploy/.env=/opt/aisztens` vs scripts+README=`/opt/callback` | All four files now use `/opt/aisztens` ([`deploy/.env:12`](../../deploy/.env), [`deploy/deploy.sh:29`](../../deploy/deploy.sh), [`deploy/bootstrap.sh:11,19`](../../deploy/bootstrap.sh), [`deploy/README.md:11,43`](../../deploy/README.md)) | ✅ Fixed |
-| A2 | `HOST=` empty | empty | `HOST=164.92.248.194` ([`deploy/.env:8`](../../deploy/.env)) | ✅ Fixed |
-| A3 | `DOMAIN=localhost` | localhost | `DOMAIN=164.92.248.184` ([`infra/.env:8`](../../infra/.env)) | ⚠️ See issue below |
-| A4 | `ACME_EMAIL=ops@example.com` | placeholder | `ACME_EMAIL=aisztens@gmail.com` ([`infra/.env:9`](../../infra/.env)) | ✅ Fixed |
-| B1 | `VAPI_WEBHOOK_SECRET=change-me-vapi-secret` | placeholder | `VAPI_WEBHOOK_SECRET=aisztens_real_secret_238!` ([`infra/.env:17`](../../infra/.env)) | ✅ Fixed (but see below) |
-| B2 | `MONITOR_ALERT_WEBHOOK_URL` empty | empty | **still empty** ([`infra/.env:39`](../../infra/.env)) | ❌ Not fixed |
-| C2 | Doc says `01-roles.sql` | wrong | **still says `01-roles.sql`** ([`docs/plans/2026-09-21--16-46-30-droplet-deploy-infra-plan.md:41`](../plans/2026-09-21--16-46-30-droplet-deploy-infra-plan.md)) | ❌ Not fixed (cosmetic) |
-| C3 | SSH `.pub.example` placeholders | missing | **still missing** (`deploy/ssh-keys/` only holds real `*.pub`) | ❌ Not fixed (cosmetic) |
+| #   | Finding                                     | Before                                                        | After                                                                                                                                                                                                                                         | Status                   |
+| --- | ------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| A1  | REMOTE_DIR mismatch                         | `deploy/.env=/opt/aisztens` vs scripts+README=`/opt/callback` | All four files now use `/opt/aisztens` ([`deploy/.env:12`](../../deploy/.env), [`deploy/deploy.sh:29`](../../deploy/deploy.sh), [`deploy/bootstrap.sh:11,19`](../../deploy/bootstrap.sh), [`deploy/README.md:11,43`](../../deploy/README.md)) | ✅ Fixed                 |
+| A2  | `HOST=` empty                               | empty                                                         | `HOST=164.92.248.194` ([`deploy/.env:8`](../../deploy/.env))                                                                                                                                                                                  | ✅ Fixed                 |
+| A3  | `DOMAIN=localhost`                          | localhost                                                     | `DOMAIN=164.92.248.184` ([`infra/.env:8`](../../infra/.env))                                                                                                                                                                                  | ⚠️ See issue below       |
+| A4  | `ACME_EMAIL=ops@example.com`                | placeholder                                                   | `ACME_EMAIL=aisztens@gmail.com` ([`infra/.env:9`](../../infra/.env))                                                                                                                                                                          | ✅ Fixed                 |
+| B1  | `VAPI_WEBHOOK_SECRET=change-me-vapi-secret` | placeholder                                                   | `VAPI_WEBHOOK_SECRET=aisztens_real_secret_238!` ([`infra/.env:17`](../../infra/.env))                                                                                                                                                         | ✅ Fixed (but see below) |
+| B2  | `MONITOR_ALERT_WEBHOOK_URL` empty           | empty                                                         | **still empty** ([`infra/.env:39`](../../infra/.env))                                                                                                                                                                                         | ❌ Not fixed             |
+| C2  | Doc says `01-roles.sql`                     | wrong                                                         | **still says `01-roles.sql`** ([`docs/plans/2026-09-21--16-46-30-droplet-deploy-infra-plan.md:41`](../plans/2026-09-21--16-46-30-droplet-deploy-infra-plan.md))                                                                               | ❌ Not fixed (cosmetic)  |
+| C3  | SSH `.pub.example` placeholders             | missing                                                       | **still missing** (`deploy/ssh-keys/` only holds real `*.pub`)                                                                                                                                                                                | ❌ Not fixed (cosmetic)  |
 
 ## New issues found this pass
 

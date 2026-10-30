@@ -15,13 +15,13 @@ preflight printed `Preflight OK` because its probe only does `touch`+`rm`.
 
 ## 2. Measured data / evidence
 
-| # | Check | Result |
-|---|---|---|
-| 1 | `deploy.sh up dev` @ 22:25 | `rsync -az --delete` aborted with exit 23; tree was root-owned 777 |
-| 2 | `assert_remote_ready()` `@22:25` | printed `Preflight OK` (false negative); the `OWNER=` it collected was never compared against the login user |
-| 3 | `deploy.sh bootstrap dev` (live) | four `WARNING: no public key at …` lines; `*.pub` files live in `deploy/ssh-keys/`, which `upload()` rsync-excludes |
-| 4 | Live state at 22:57 | `/opt/aisztens` missing; `monitor` in `Restarting (255)` loop; `monitor` image contained CRLF-line-ending `watch.sh`, so kernel `execve` returned `ENOENT` |
-| 5 | `deployer`'s `authorized_keys` | already present, mtime `2026-10-07T15:34` — bootstrap had been run out-of-band before, but the key transport path is not in the deploy script |
+| #   | Check                            | Result                                                                                                                                                     |
+| --- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `deploy.sh up dev` @ 22:25       | `rsync -az --delete` aborted with exit 23; tree was root-owned 777                                                                                         |
+| 2   | `assert_remote_ready()` `@22:25` | printed `Preflight OK` (false negative); the `OWNER=` it collected was never compared against the login user                                               |
+| 3   | `deploy.sh bootstrap dev` (live) | four `WARNING: no public key at …` lines; `*.pub` files live in `deploy/ssh-keys/`, which `upload()` rsync-excludes                                        |
+| 4   | Live state at 22:57              | `/opt/aisztens` missing; `monitor` in `Restarting (255)` loop; `monitor` image contained CRLF-line-ending `watch.sh`, so kernel `execve` returned `ENOENT` |
+| 5   | `deployer`'s `authorized_keys`   | already present, mtime `2026-10-07T15:34` — bootstrap had been run out-of-band before, but the key transport path is not in the deploy script              |
 
 ## 3. Root cause / design rationale
 
@@ -39,15 +39,15 @@ makes a fresh droplet truly self-provisioning.
 
 ## 4. Solution / implementation
 
-| File | Change |
-|---|---|
-| [`deploy/deploy.sh`](../../deploy/deploy.sh:786) | Ship `*.pub` from `deploy/ssh-keys/` to `$REMOTE_DIR/deploy/ssh-keys/` before invoking `bootstrap.sh`. Aborts if no `.pub` exists locally. |
-| [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh:19) | New `DEPLOY_USER` env (default `deployer`). |
-| [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh:75) | `create_user` now errors on missing sudo-user keys; app user remains allowed. |
-| [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh:170) | Post-loop: `chown -R` + `chmod 600` + `chmod -R o-w`. |
-| [`deploy/deploy.sh`](../../deploy/deploy.sh:643) | `assert_remote_ready()` compares `OWNER=` to `$SSH_USER`. Skipped when running as root. |
-| [`scripts/test/_deploy-sh-remote-compose-path-test.sh`](../../scripts/test/_deploy-sh-remote-compose-path-test.sh:264) | Scenarios 7 and 8 — owner mismatch + `bootstrap dev` pub-shipping. |
-| Live droplet | Recreated `/opt/aisztens` as `deployer:deployer 755`; stripped CRLF from the `monitor` image's `/app/watch.sh` and committed a fresh `aisztens/monitor:latest`; recreated the `monitor` container on `aisztens_internal`. |
+| File                                                                                                                   | Change                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`deploy/deploy.sh`](../../deploy/deploy.sh:786)                                                                       | Ship `*.pub` from `deploy/ssh-keys/` to `$REMOTE_DIR/deploy/ssh-keys/` before invoking `bootstrap.sh`. Aborts if no `.pub` exists locally.                                                                                |
+| [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh:19)                                                                  | New `DEPLOY_USER` env (default `deployer`).                                                                                                                                                                               |
+| [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh:75)                                                                  | `create_user` now errors on missing sudo-user keys; app user remains allowed.                                                                                                                                             |
+| [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh:170)                                                                 | Post-loop: `chown -R` + `chmod 600` + `chmod -R o-w`.                                                                                                                                                                     |
+| [`deploy/deploy.sh`](../../deploy/deploy.sh:643)                                                                       | `assert_remote_ready()` compares `OWNER=` to `$SSH_USER`. Skipped when running as root.                                                                                                                                   |
+| [`scripts/test/_deploy-sh-remote-compose-path-test.sh`](../../scripts/test/_deploy-sh-remote-compose-path-test.sh:264) | Scenarios 7 and 8 — owner mismatch + `bootstrap dev` pub-shipping.                                                                                                                                                        |
+| Live droplet                                                                                                           | Recreated `/opt/aisztens` as `deployer:deployer 755`; stripped CRLF from the `monitor` image's `/app/watch.sh` and committed a fresh `aisztens/monitor:latest`; recreated the `monitor` container on `aisztens_internal`. |
 
 ## 5. Outcome and how to verify
 
@@ -72,6 +72,6 @@ sed -i 's|^SSH_USER=root$|SSH_USER=deployer|' deploy/.env.dev
 - The 1 GB build host still pays 136 s of `chown -R` on `node_modules`
   ([`infra/app/Dockerfile:73`](../../infra/app/Dockerfile:73)) on every
   image rebuild. `COPY --from=build --chown=nodeapp:nodeapp` removes it.
-- `prune_legacy_stack` runs `docker compose down` *before* upload ([`deploy/deploy.sh:747`](../../deploy/deploy.sh:747)),
+- `prune_legacy_stack` runs `docker compose down` _before_ upload ([`deploy/deploy.sh:747`](../../deploy/deploy.sh:747)),
   so any upload/build failure leaves the site dark. Upload-then-swap is
   future M7.

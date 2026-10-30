@@ -25,16 +25,16 @@ duplicate=500
 ```
 
 All 189 unit tests passed at that moment, i.e. the mocks were faithful to the
-*database* but not to the *driver*.
+_database_ but not to the _driver_.
 
 ## 3. Root cause / design rationale
 
 Two mismatches between the assumed and the real error shape:
 
-| Assumption in the first version | Reality |
-|---|---|
+| Assumption in the first version              | Reality                                               |
+| -------------------------------------------- | ----------------------------------------------------- |
 | `error.code === '23505'` on the caught value | Drizzle wraps it: the SQLSTATE lives on `error.cause` |
-| the constraint name is on `error.constraint` | `postgres.js` uses `error.constraint_name` |
+| the constraint name is on `error.constraint` | `postgres.js` uses `error.constraint_name`            |
 
 The classifier therefore never matched, the error fell through to the default
 handler, and the client got 500. Message-text matching would have hidden the bug
@@ -50,18 +50,18 @@ owns `Date → ISO 8601` and “omitted → `null`”; the repository sits behin
 
 ## 4. Solution — changed files
 
-| File | Change |
-|---|---|
-| [`api-keys.error-guard.ts`](../../apps/api/src/api-keys/api-keys.error-guard.ts) | walks up to 5 `cause` levels; reads `constraint_name` **or** `constraint`; `23505` without a name still counts |
-| [`api-keys.repository.ts`](../../apps/api/src/api-keys/api-keys.repository.ts) | uses the guard; `created_at DESC`; blank identifier short-circuits to `null` without a query |
-| [`api-keys.service.ts`](../../apps/api/src/api-keys/api-keys.service.ts) / [`api-keys.controller.ts`](../../apps/api/src/api-keys/api-keys.controller.ts) | 404/409 translation, three routes, `POST` → 201 |
-| [`api-keys.mapper.ts`](../../apps/api/src/api-keys/api-keys.mapper.ts) | pure row ↔ wire mapping, ISO timestamps, explicit `null`s |
-| [`api-keys.module.ts`](../../apps/api/src/api-keys/api-keys.module.ts) + [`app.module.ts`](../../apps/api/src/app.module.ts) | token-bound repository, explicit `DatabaseModule` import, module registered |
-| [`dto/create-api-key.dto.ts`](../../apps/api/src/api-keys/dto/create-api-key.dto.ts) | class-validator rules; `forbidNonWhitelisted` blocks `id`/`createdAt`/`updatedAt` |
-| [`api-keys/test/mocks/database.mock.ts`](../../apps/api/src/api-keys/test/mocks/database.mock.ts) | chainable `insert/select` mock + `PostgresErrorMock` + `wrapDrizzleQueryError()` |
-| [`error-guard.spec.ts`](../../apps/api/src/api-keys/api-keys.error-guard.spec.ts), [`repository.spec.ts`](../../apps/api/src/api-keys/api-keys.repository.spec.ts) | wrapped/chain/constraint-name cases |
-| `test/api-keys.e2e-spec.ts` | real `AppModule` + real DB, unique `e2e-<uuid>`, self-cleaning |
-| [`docs/Specs/Database-Local.md`](../Specs/Database-Local.md) | §9: `platform.api_keys` now has an API consumer; unauthenticated + no-pagination limitations |
+| File                                                                                                                                                               | Change                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| [`api-keys.error-guard.ts`](../../apps/api/src/api-keys/api-keys.error-guard.ts)                                                                                   | walks up to 5 `cause` levels; reads `constraint_name` **or** `constraint`; `23505` without a name still counts |
+| [`api-keys.repository.ts`](../../apps/api/src/api-keys/api-keys.repository.ts)                                                                                     | uses the guard; `created_at DESC`; blank identifier short-circuits to `null` without a query                   |
+| [`api-keys.service.ts`](../../apps/api/src/api-keys/api-keys.service.ts) / [`api-keys.controller.ts`](../../apps/api/src/api-keys/api-keys.controller.ts)          | 404/409 translation, three routes, `POST` → 201                                                                |
+| [`api-keys.mapper.ts`](../../apps/api/src/api-keys/api-keys.mapper.ts)                                                                                             | pure row ↔ wire mapping, ISO timestamps, explicit `null`s                                                      |
+| [`api-keys.module.ts`](../../apps/api/src/api-keys/api-keys.module.ts) + [`app.module.ts`](../../apps/api/src/app.module.ts)                                       | token-bound repository, explicit `DatabaseModule` import, module registered                                    |
+| [`dto/create-api-key.dto.ts`](../../apps/api/src/api-keys/dto/create-api-key.dto.ts)                                                                               | class-validator rules; `forbidNonWhitelisted` blocks `id`/`createdAt`/`updatedAt`                              |
+| [`api-keys/test/mocks/database.mock.ts`](../../apps/api/src/api-keys/test/mocks/database.mock.ts)                                                                  | chainable `insert/select` mock + `PostgresErrorMock` + `wrapDrizzleQueryError()`                               |
+| [`error-guard.spec.ts`](../../apps/api/src/api-keys/api-keys.error-guard.spec.ts), [`repository.spec.ts`](../../apps/api/src/api-keys/api-keys.repository.spec.ts) | wrapped/chain/constraint-name cases                                                                            |
+| `test/api-keys.e2e-spec.ts`                                                                                                                                        | real `AppModule` + real DB, unique `e2e-<uuid>`, self-cleaning                                                 |
+| [`docs/Specs/Database-Local.md`](../Specs/Database-Local.md)                                                                                                       | §9: `platform.api_keys` now has an API consumer; unauthenticated + no-pagination limitations                   |
 
 ## 5. Outcome and how to verify
 

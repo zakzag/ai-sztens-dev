@@ -27,7 +27,7 @@ reachable through an explicit `border-border-hairline`, which none of the primit
 
 ## 3. Root cause / rationale
 
-Choosing *width* tokens without a *colour* token in the recipe is the bug; the palette
+Choosing _width_ tokens without a _colour_ token in the recipe is the bug; the palette
 itself (`0.33` lightness hairline) was already dark. Fixing only the tokens would not have
 helped. Alternatives considered:
 
@@ -40,17 +40,17 @@ helped. Alternatives considered:
 
 ## 4. Implementation
 
-| File | Change |
-|---|---|
-| `packages/ui/src/styles/theme.css` | New graphite/ash surfaces (`L 0.135–0.255`, hue 250, chroma ≤0.01), teal accent (`195°`), dark border ladder `0.30 / 0.36 / 0.45`, teal focus ring, dark neomorphic shadows. `@layer base` sets `border-color: var(--color-border-hairline)` on `*, ::before, ::after, ::backdrop, ::file-selector-button`; adds `::selection` and `:focus-visible` accents. |
-| `packages/ui/src/components/button/button.variants.ts` | `border-border-hairline` in the base recipe. |
-| `packages/ui/src/components/badge/badge.variants.ts` | `border-border-hairline` in the base recipe. |
-| `packages/ui/src/components/input/input.variants.ts` | `border-border-hairline` resting outline. |
-| `packages/ui/src/components/textarea/textarea.variants.ts` | `border-border-hairline` resting outline. |
-| `packages/ui/src/components/card/Card.tsx` | Explicit dark outline. |
-| `packages/ui/src/components/table/Table.tsx` | Explicit dark outline on the scroll container. |
-| `packages/ui/test/{card,badge,button,input,textarea,table}.test.tsx` | Assert `border-border-hairline` present and `border-current` absent. |
-| `docs/Specs/UI-Architecture.md` | §3.1 theme identity, §3.2.1 decision **D40** (default border colour). |
+| File                                                                 | Change                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/ui/src/styles/theme.css`                                   | New graphite/ash surfaces (`L 0.135–0.255`, hue 250, chroma ≤0.01), teal accent (`195°`), dark border ladder `0.30 / 0.36 / 0.45`, teal focus ring, dark neomorphic shadows. `@layer base` sets `border-color: var(--color-border-hairline)` on `*, ::before, ::after, ::backdrop, ::file-selector-button`; adds `::selection` and `:focus-visible` accents. |
+| `packages/ui/src/components/button/button.variants.ts`               | `border-border-hairline` in the base recipe.                                                                                                                                                                                                                                                                                                                 |
+| `packages/ui/src/components/badge/badge.variants.ts`                 | `border-border-hairline` in the base recipe.                                                                                                                                                                                                                                                                                                                 |
+| `packages/ui/src/components/input/input.variants.ts`                 | `border-border-hairline` resting outline.                                                                                                                                                                                                                                                                                                                    |
+| `packages/ui/src/components/textarea/textarea.variants.ts`           | `border-border-hairline` resting outline.                                                                                                                                                                                                                                                                                                                    |
+| `packages/ui/src/components/card/Card.tsx`                           | Explicit dark outline.                                                                                                                                                                                                                                                                                                                                       |
+| `packages/ui/src/components/table/Table.tsx`                         | Explicit dark outline on the scroll container.                                                                                                                                                                                                                                                                                                               |
+| `packages/ui/test/{card,badge,button,input,textarea,table}.test.tsx` | Assert `border-border-hairline` present and `border-current` absent.                                                                                                                                                                                                                                                                                         |
+| `docs/Specs/UI-Architecture.md`                                      | §3.1 theme identity, §3.2.1 decision **D40** (default border colour).                                                                                                                                                                                                                                                                                        |
 
 Token names are unchanged, so no page or feature code changed. `Alert` keeps its semantic
 `border-{info,success,warning,danger}` accent; the `Button` loading spinner keeps

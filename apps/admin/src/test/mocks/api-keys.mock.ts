@@ -77,8 +77,7 @@ export interface ApiKeysServiceMock {
  */
 export function createApiKeysServiceMock(): ApiKeysServiceMock {
   const listMock = vi.fn<() => Promise<readonly ApiKey[]>>();
-  const createMock =
-    vi.fn<(input: CreateApiKeyInput) => Promise<ApiKey>>();
+  const createMock = vi.fn<(input: CreateApiKeyInput) => Promise<ApiKey>>();
 
   return {
     service: { list: listMock, create: createMock },

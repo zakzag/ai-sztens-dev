@@ -4,6 +4,7 @@
 **Status:** awaiting user approval
 **Author:** architect mode (Zoo)
 **Related artefacts:**
+
 - [`apps/api/src/app.module.ts`](../../apps/api/src/app.module.ts:11) — NestJS ConfigModule
 - [`apps/api/src/main.ts`](../../apps/api/src/main.ts:30) — CORS
 - [`apps/web/vite.config.ts`](../../apps/web/vite.config.ts:1) — Vite dev proxy
@@ -19,6 +20,7 @@
 ## 0. Why this plan exists
 
 The user clarified the target topology:
+
 - **local** = the developer’s own machine (localhost, no public DNS, no TLS).
 - **dev** = the **droplet that already exists today** (the one currently referenced everywhere as `*.aisztens.hu`). It is the deployment target the team uses for day-to-day verification — so a Caddy + public host, but **not yet a separate production-grade environment**.
 - **prod** = **does not exist yet**. When it does, it should be wired up the same way (new droplet, new `DOMAIN`, new secrets) **without code changes**.
@@ -26,6 +28,7 @@ The user clarified the target topology:
 Today the project has only two effective modes: “local WSL” and “the droplet” — and they share the same `infra/.env`, the same `apps/api/.env` template, and the same deploy script. Introducing a real prod environment now (even before the prod droplet exists) means the file layout, the code-level switching, and the deploy pipeline have to support three targets from day one.
 
 Goal: a **quick, low-risk** refactor that
+
 1. splits env files by target,
 2. makes the code pick the right one automatically,
 3. lets a future prod droplet come online with **zero code change** and only env-file + secret changes.
@@ -34,11 +37,11 @@ Goal: a **quick, low-risk** refactor that
 
 ## 1. Naming and scope
 
-| Term | Meaning | Where it runs |
-|---|---|---|
-| **local** | A single developer’s machine, localhost-only | Windows / WSL / Git Bash, `docker compose ... -f docker-compose.local.yml up` |
-| **dev** | The currently running droplet, used as a pre-prod / verification environment | DigitalOcean droplet, `docker compose ... -f docker-compose.yml up` (the file we have today) |
-| **prod** | A **future** dedicated production droplet (does not exist yet) | New DigitalOcean droplet, same compose file, **different env file and different secrets** |
+| Term      | Meaning                                                                      | Where it runs                                                                                |
+| --------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **local** | A single developer’s machine, localhost-only                                 | Windows / WSL / Git Bash, `docker compose ... -f docker-compose.local.yml up`                |
+| **dev**   | The currently running droplet, used as a pre-prod / verification environment | DigitalOcean droplet, `docker compose ... -f docker-compose.yml up` (the file we have today) |
+| **prod**  | A **future** dedicated production droplet (does not exist yet)               | New DigitalOcean droplet, same compose file, **different env file and different secrets**    |
 
 Key principle: **dev ≠ prod** even though the code is the same. They differ in secrets, in `CORS_ORIGINS`, in DB passwords, in `VAPI_WEBHOOK_SECRET`, and in `MONITOR_ALERT_WEBHOOK_URL`. The code reads from an env file chosen at deploy/boot time; it does not branch on the environment name anywhere.
 
@@ -137,11 +140,13 @@ export const isProd = APP_ENV === 'prod';
 ```
 
 Used to:
+
 - tighten CORS logging in prod ([`main.ts:30`](../../apps/api/src/main.ts:30)),
 - decide whether the VapiSignatureGuard logs the `message.id` (it already does, no change),
 - gate verbose error payloads in prod (future).
 
 `APP_ENV` is set in:
+
 - the local run helper as `APP_ENV=local`,
 - the dev droplet via `infra/.env.dev` → compose `environment:` block,
 - the future prod droplet via `infra/.env.prod` → compose `environment:` block.
@@ -154,10 +159,10 @@ Vite already supports modes; we just stop fighting it. The dev script in `apps/w
 {
   "scripts": {
     "dev": "vite",
-    "dev:dev": "vite --mode dev",    // optional: load .env.dev instead of .env.local
+    "dev:dev": "vite --mode dev", // optional: load .env.dev instead of .env.local
     "build:dev": "vite build --mode dev",
-    "build:prod": "vite build --mode prod"
-  }
+    "build:prod": "vite build --mode prod",
+  },
 }
 ```
 
@@ -227,45 +232,45 @@ CI mirror: [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) 
 
 ### 5.1 `local` (developer machine)
 
-| File | Key | Value |
-|---|---|---|
-| [`apps/api/.env.local`](../../apps/api/.env.example) | `PORT` | `3000` |
-| | `CORS_ORIGINS` | `http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174` |
-| [`apps/web/.env.local`](../../apps/web/.env.example) | `VITE_API_BASE_URL` | `/api` |
-| [`apps/admin/.env.local`](../../apps/admin/.env.example) | `VITE_API_BASE_URL` | `/api` |
-| [`infra/.env.local`](../../infra/.env.example) | `DOMAIN` | `localhost` (unused; Caddy disabled) |
-| | `ACME_EMAIL` | `dev@localhost` (unused) |
-| | `POSTGRES_PASSWORD`, `AISZTENS_DB_PASSWORD`, `TKOVARI_DB_PASSWORD`, `KRAK_DB_PASSWORD` | **dev-only weak values** committed in `infra/.env.example`, but the real `infra/.env.local` overrides with locally generated strings (e.g. `openssl rand -hex 16`) |
-| | `VAPI_WEBHOOK_SECRET` | `local-vapi-secret` (or empty to disable the route locally) |
-| | `MONITOR_ALERT_WEBHOOK_URL` | empty |
+| File                                                     | Key                                                                                    | Value                                                                                                                                                              |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`apps/api/.env.local`](../../apps/api/.env.example)     | `PORT`                                                                                 | `3000`                                                                                                                                                             |
+|                                                          | `CORS_ORIGINS`                                                                         | `http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174`                                                                          |
+| [`apps/web/.env.local`](../../apps/web/.env.example)     | `VITE_API_BASE_URL`                                                                    | `/api`                                                                                                                                                             |
+| [`apps/admin/.env.local`](../../apps/admin/.env.example) | `VITE_API_BASE_URL`                                                                    | `/api`                                                                                                                                                             |
+| [`infra/.env.local`](../../infra/.env.example)           | `DOMAIN`                                                                               | `localhost` (unused; Caddy disabled)                                                                                                                               |
+|                                                          | `ACME_EMAIL`                                                                           | `dev@localhost` (unused)                                                                                                                                           |
+|                                                          | `POSTGRES_PASSWORD`, `AISZTENS_DB_PASSWORD`, `TKOVARI_DB_PASSWORD`, `KRAK_DB_PASSWORD` | **dev-only weak values** committed in `infra/.env.example`, but the real `infra/.env.local` overrides with locally generated strings (e.g. `openssl rand -hex 16`) |
+|                                                          | `VAPI_WEBHOOK_SECRET`                                                                  | `local-vapi-secret` (or empty to disable the route locally)                                                                                                        |
+|                                                          | `MONITOR_ALERT_WEBHOOK_URL`                                                            | empty                                                                                                                                                              |
 
 ### 5.2 `dev` (existing droplet)
 
-| File | Key | Value |
-|---|---|---|
-| [`apps/api/.env.dev`](../../apps/api/.env.example) | `PORT` | `3000` |
-| | `CORS_ORIGINS` | `https://web.aisztens.hu,https://admin.aisztens.hu` (per the CORS-cleanup PR, `api.aisztens.hu` no longer belongs here) |
-| [`apps/web/.env.dev`](../../apps/web/.env.example) | `VITE_API_BASE_URL` | `https://api.aisztens.hu/api` |
-| [`apps/admin/.env.dev`](../../apps/admin/.env.example) | `VITE_API_BASE_URL` | `https://api.aisztens.hu/api` |
-| [`infra/.env.dev`](../../infra/.env.example) | `DOMAIN` | `aisztens.hu` |
-| | `ACME_EMAIL` | `ops@aisztens.hu` (current value) |
-| | DB passwords | current real values (currently live in `infra/.env`) |
-| | `VAPI_WEBHOOK_SECRET` | current real value |
-| | `MONITOR_ALERT_WEBHOOK_URL` | current real value (if any) |
+| File                                                   | Key                         | Value                                                                                                                   |
+| ------------------------------------------------------ | --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| [`apps/api/.env.dev`](../../apps/api/.env.example)     | `PORT`                      | `3000`                                                                                                                  |
+|                                                        | `CORS_ORIGINS`              | `https://web.aisztens.hu,https://admin.aisztens.hu` (per the CORS-cleanup PR, `api.aisztens.hu` no longer belongs here) |
+| [`apps/web/.env.dev`](../../apps/web/.env.example)     | `VITE_API_BASE_URL`         | `https://api.aisztens.hu/api`                                                                                           |
+| [`apps/admin/.env.dev`](../../apps/admin/.env.example) | `VITE_API_BASE_URL`         | `https://api.aisztens.hu/api`                                                                                           |
+| [`infra/.env.dev`](../../infra/.env.example)           | `DOMAIN`                    | `aisztens.hu`                                                                                                           |
+|                                                        | `ACME_EMAIL`                | `ops@aisztens.hu` (current value)                                                                                       |
+|                                                        | DB passwords                | current real values (currently live in `infra/.env`)                                                                    |
+|                                                        | `VAPI_WEBHOOK_SECRET`       | current real value                                                                                                      |
+|                                                        | `MONITOR_ALERT_WEBHOOK_URL` | current real value (if any)                                                                                             |
 
 The migration of the **current** `infra/.env` → `infra/.env.dev` is mechanical: `mv infra/.env infra/.env.dev` and edit. The deploy script + compose flow already accept `--env-file`, so the live droplet needs only `cp infra/.env.dev infra/.env` (or the deploy script does it for them) + restart.
 
 ### 5.3 `prod` (future, file ready now, droplet TBD)
 
-| File | Key | Value |
-|---|---|---|
-| [`apps/api/.env.prod`](../../apps/api/.env.example) | `PORT` | `3000` |
-| | `CORS_ORIGINS` | `https://web.<prod-domain>,https://admin.<prod-domain>` |
-| [`apps/web/.env.prod`](../../apps/web/.env.example) | `VITE_API_BASE_URL` | `https://api.<prod-domain>/api` |
-| [`apps/admin/.env.prod`](../../apps/admin/.env.example) | `VITE_API_BASE_URL` | `https://api.<prod-domain>/api` |
-| [`infra/.env.prod`](../../infra/.env.example) | `DOMAIN` | `<prod-domain>` (e.g. `aisztens.com`) |
-| | `ACME_EMAIL` | `ops@<prod-domain>` |
-| | DB passwords, `VAPI_WEBHOOK_SECRET`, `MONITOR_ALERT_WEBHOOK_URL` | unique, generated for prod, never reused from dev |
+| File                                                    | Key                                                              | Value                                                   |
+| ------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
+| [`apps/api/.env.prod`](../../apps/api/.env.example)     | `PORT`                                                           | `3000`                                                  |
+|                                                         | `CORS_ORIGINS`                                                   | `https://web.<prod-domain>,https://admin.<prod-domain>` |
+| [`apps/web/.env.prod`](../../apps/web/.env.example)     | `VITE_API_BASE_URL`                                              | `https://api.<prod-domain>/api`                         |
+| [`apps/admin/.env.prod`](../../apps/admin/.env.example) | `VITE_API_BASE_URL`                                              | `https://api.<prod-domain>/api`                         |
+| [`infra/.env.prod`](../../infra/.env.example)           | `DOMAIN`                                                         | `<prod-domain>` (e.g. `aisztens.com`)                   |
+|                                                         | `ACME_EMAIL`                                                     | `ops@<prod-domain>`                                     |
+|                                                         | DB passwords, `VAPI_WEBHOOK_SECRET`, `MONITOR_ALERT_WEBHOOK_URL` | unique, generated for prod, never reused from dev       |
 
 The files exist as **templates** from day one; only the secrets and the `DOMAIN` placeholder change when the prod droplet is provisioned.
 
@@ -273,32 +278,32 @@ The files exist as **templates** from day one; only the secrets and the `DOMAIN`
 
 ## 6. Code changes — file-by-file
 
-| File | Action | Notes |
-|---|---|---|
-| [`.gitignore`](../../.gitignore:42) | edit | add the 6 `*.local/*.dev/*.prod` patterns (see §2.3) |
-| [`apps/api/src/app.module.ts`](../../apps/api/src/app.module.ts:11) | edit | add `envFilePath` array + `ignoreEnvFile` flag, see §3.1 |
-| [`apps/api/src/config/app-env.ts`](../../apps/api/src/config/app-env.ts) | **create** | `APP_ENV` constant + `isProd` flag, §3.1 |
-| [`apps/api/src/main.ts`](../../apps/api/src/main.ts:30) | edit | log selected env at boot; tighten verbose error payload behind `isProd` |
-| [`apps/web/vite.config.ts`](../../apps/web/vite.config.ts:1) | edit (small) | nothing — default mode is `local`; just add a `mode` parameter to scripts |
-| [`apps/web/package.json`](../../apps/web/package.json) | edit | add `dev:dev`, `build:dev`, `build:prod` scripts |
-| [`apps/admin/vite.config.ts`](../../apps/admin/vite.config.ts:1) | edit (small) | same as web |
-| [`apps/admin/package.json`](../../apps/admin/package.json) | edit | same as web |
-| [`apps/api/.env.example`](../../apps/api/.env.example) | rewrite | document all three envs in one file with section headers |
-| [`apps/web/.env.example`](../../apps/web/.env.example) | rewrite | same |
-| [`apps/admin/.env.example`](../../apps/admin/.env.example) | rewrite | same |
-| [`infra/.env.example`](../../infra/.env.example) | rewrite | same; explicitly note per-env guidance in header |
-| [`infra/docker-compose.yml`](../../infra/docker-compose.yml:29) | edit (small) | add `APP_ENV: ${APP_ENV:-dev}` line to the `api.environment` block |
-| [`infra/docker-compose.wsl.yml`](../../infra/docker-compose.wsl.yml:1) | rename to `infra/docker-compose.local.yml` | content stays; only the filename changes (and the header comment) |
-| `apps/api/.env.local` | **create** | the four localhost CORS origins, port 3000 |
-| `apps/web/.env.local`, `apps/admin/.env.local` | **create** | `VITE_API_BASE_URL=/api` |
-| `apps/api/.env.dev`, `apps/web/.env.dev`, `apps/admin/.env.dev` | **create** | dev values (5.2) |
-| `apps/api/.env.prod`, `apps/web/.env.prod`, `apps/admin/.env.prod` | **create** | prod templates with `<prod-domain>` placeholders (5.3) |
-| `infra/.env.local` | **create** | local values (5.1); DB passwords can be `dev-` prefixed weak defaults, or generated |
-| `infra/.env.dev` | **create** by renaming the current `infra/.env` | `mv infra/.env infra/.env.dev` + edit if needed |
-| `infra/.env.prod` | **create** | template with placeholders |
-| [`deploy/deploy.sh`](../../deploy/deploy.sh:81) | edit | add `APP_ENV` selector, §4 |
-| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) | edit | matrix on `environment`, two secrets (`INFRA_ENV_DEV`, `INFRA_ENV_PROD`) |
-| `scripts/dev-stack.sh` | **create** | local run helper, §3.4 |
+| File                                                                     | Action                                          | Notes                                                                               |
+| ------------------------------------------------------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`.gitignore`](../../.gitignore:42)                                      | edit                                            | add the 6 `*.local/*.dev/*.prod` patterns (see §2.3)                                |
+| [`apps/api/src/app.module.ts`](../../apps/api/src/app.module.ts:11)      | edit                                            | add `envFilePath` array + `ignoreEnvFile` flag, see §3.1                            |
+| [`apps/api/src/config/app-env.ts`](../../apps/api/src/config/app-env.ts) | **create**                                      | `APP_ENV` constant + `isProd` flag, §3.1                                            |
+| [`apps/api/src/main.ts`](../../apps/api/src/main.ts:30)                  | edit                                            | log selected env at boot; tighten verbose error payload behind `isProd`             |
+| [`apps/web/vite.config.ts`](../../apps/web/vite.config.ts:1)             | edit (small)                                    | nothing — default mode is `local`; just add a `mode` parameter to scripts           |
+| [`apps/web/package.json`](../../apps/web/package.json)                   | edit                                            | add `dev:dev`, `build:dev`, `build:prod` scripts                                    |
+| [`apps/admin/vite.config.ts`](../../apps/admin/vite.config.ts:1)         | edit (small)                                    | same as web                                                                         |
+| [`apps/admin/package.json`](../../apps/admin/package.json)               | edit                                            | same as web                                                                         |
+| [`apps/api/.env.example`](../../apps/api/.env.example)                   | rewrite                                         | document all three envs in one file with section headers                            |
+| [`apps/web/.env.example`](../../apps/web/.env.example)                   | rewrite                                         | same                                                                                |
+| [`apps/admin/.env.example`](../../apps/admin/.env.example)               | rewrite                                         | same                                                                                |
+| [`infra/.env.example`](../../infra/.env.example)                         | rewrite                                         | same; explicitly note per-env guidance in header                                    |
+| [`infra/docker-compose.yml`](../../infra/docker-compose.yml:29)          | edit (small)                                    | add `APP_ENV: ${APP_ENV:-dev}` line to the `api.environment` block                  |
+| [`infra/docker-compose.wsl.yml`](../../infra/docker-compose.wsl.yml:1)   | rename to `infra/docker-compose.local.yml`      | content stays; only the filename changes (and the header comment)                   |
+| `apps/api/.env.local`                                                    | **create**                                      | the four localhost CORS origins, port 3000                                          |
+| `apps/web/.env.local`, `apps/admin/.env.local`                           | **create**                                      | `VITE_API_BASE_URL=/api`                                                            |
+| `apps/api/.env.dev`, `apps/web/.env.dev`, `apps/admin/.env.dev`          | **create**                                      | dev values (5.2)                                                                    |
+| `apps/api/.env.prod`, `apps/web/.env.prod`, `apps/admin/.env.prod`       | **create**                                      | prod templates with `<prod-domain>` placeholders (5.3)                              |
+| `infra/.env.local`                                                       | **create**                                      | local values (5.1); DB passwords can be `dev-` prefixed weak defaults, or generated |
+| `infra/.env.dev`                                                         | **create** by renaming the current `infra/.env` | `mv infra/.env infra/.env.dev` + edit if needed                                     |
+| `infra/.env.prod`                                                        | **create**                                      | template with placeholders                                                          |
+| [`deploy/deploy.sh`](../../deploy/deploy.sh:81)                          | edit                                            | add `APP_ENV` selector, §4                                                          |
+| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml)     | edit                                            | matrix on `environment`, two secrets (`INFRA_ENV_DEV`, `INFRA_ENV_PROD`)            |
+| `scripts/dev-stack.sh`                                                   | **create**                                      | local run helper, §3.4                                                              |
 
 **Total code edits:** ~6 small files in the runtime tree (app.module.ts, main.ts, both vite.config.ts, both package.json, the compose file). The bulk of the work is creating the example/seed env files, which is mechanical.
 
@@ -309,26 +314,31 @@ The files exist as **templates** from day one; only the secrets and the `DOMAIN`
 The plan is structured so each step is independently shippable and reversible.
 
 ### Step 0 — prep (no behaviour change)
+
 - Move current `infra/.env` → `infra/.env.dev`. Update `.gitignore` patterns. Nothing else changes; the deploy script still reads `infra/.env` via its fallback branch in §4, so the dev droplet keeps working.
 - Result: dev droplet unchanged, repo is ready for the next step.
 
 ### Step 1 — Vite modes (frontend only)
+
 - Add `dev:dev` / `build:dev` / `build:prod` scripts to `apps/web/package.json` and `apps/admin/package.json`.
 - Create `apps/web/.env.local` / `apps/web/.env.dev` / `apps/web/.env.prod` (and the admin counterparts).
 - Update [`deploy/deploy.sh:104`](../../deploy/deploy.sh:104): replace the inline `VITE_API_BASE_URL` injection with `pnpm --filter @callback/web build --mode dev` (and `prod` for the future).
 - Result: SPAs now build from per-env files; dev droplet bundle still ends up identical to today.
 
 ### Step 2 — NestJS env resolution
+
 - Create `apps/api/src/config/app-env.ts`. Update [`app.module.ts:11`](../../apps/api/src/app.module.ts:11) to use `envFilePath` + `ignoreEnvFile`.
 - Add `APP_ENV` to the `api` `environment:` block in [`docker-compose.yml:29`](../../infra/docker-compose.yml:29).
 - Create `apps/api/.env.local`, `apps/api/.env.dev`, `apps/api/.env.prod`.
 - Result: API now reads the right file per env; behaviour identical because the dev values equal today’s.
 
 ### Step 3 — local run helper
+
 - Create `scripts/dev-stack.sh` (and PowerShell equivalent if needed) that runs compose with `infra/.env.local` and `docker-compose.local.yml`. Document in `README.md`.
 - Result: `dev-stack.sh` becomes the single command for local development; no impact on prod/deploy.
 
 ### Step 4 — CI matrix (prepares for prod)
+
 - Add `environment: [dev, prod]` to `.github/workflows/deploy.yml`. Branch `main` deploys dev; `prod` is `workflow_dispatch` against a protected GitHub Environment.
 - Add secrets `INFRA_ENV_DEV` and `INFRA_ENV_PROD`.
 - The `prod` job stays dormant until the prod droplet exists, but the matrix is already in place.
@@ -338,14 +348,14 @@ The plan is structured so each step is independently shippable and reversible.
 
 ## 8. Risks and how the plan handles them
 
-| Risk | Mitigation |
-|---|---|
-| CORS mis-match after the CORS-cleanup PR | The dev `CORS_ORIGINS` already removes `api.aisztens.hu` (planned in the VAPI prompt); this plan adopts the same value. |
-| Existing `infra/.env` on the dev droplet is read by both old and new deploy scripts | The new `deploy.sh` tries `infra/.env.${APP_ENV}` first and falls back to `infra/.env`, so a half-migrated droplet still works. |
-| Developers forget to copy `.env.local` and the API silently falls back to defaults | `apps/api/.env.example` becomes the single source of truth for what should be in each file, and `scripts/dev-stack.sh` fails fast if `infra/.env.local` is missing. |
-| A future env (e.g. `staging`) added without updating the code | The convention `envFilePath: '.env.${APP_ENV}'` + the deploy script’s `APP_ENV="${1:-dev}"` accept any value; the only requirement is the env file exists. |
-| Secrets leak into a committed file by mistake | `.gitignore` covers the new patterns; the existing `infra/app/.dockerignore` already excludes `**/.env` and `**/.env.*`, so no secret enters the prod image. |
-| `prod` is provisioned before this plan is complete | Step 4 is the only one required to be in place before a prod droplet exists; Steps 1–3 are improvements but not prerequisites. |
+| Risk                                                                                | Mitigation                                                                                                                                                          |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CORS mis-match after the CORS-cleanup PR                                            | The dev `CORS_ORIGINS` already removes `api.aisztens.hu` (planned in the VAPI prompt); this plan adopts the same value.                                             |
+| Existing `infra/.env` on the dev droplet is read by both old and new deploy scripts | The new `deploy.sh` tries `infra/.env.${APP_ENV}` first and falls back to `infra/.env`, so a half-migrated droplet still works.                                     |
+| Developers forget to copy `.env.local` and the API silently falls back to defaults  | `apps/api/.env.example` becomes the single source of truth for what should be in each file, and `scripts/dev-stack.sh` fails fast if `infra/.env.local` is missing. |
+| A future env (e.g. `staging`) added without updating the code                       | The convention `envFilePath: '.env.${APP_ENV}'` + the deploy script’s `APP_ENV="${1:-dev}"` accept any value; the only requirement is the env file exists.          |
+| Secrets leak into a committed file by mistake                                       | `.gitignore` covers the new patterns; the existing `infra/app/.dockerignore` already excludes `**/.env` and `**/.env.*`, so no secret enters the prod image.        |
+| `prod` is provisioned before this plan is complete                                  | Step 4 is the only one required to be in place before a prod droplet exists; Steps 1–3 are improvements but not prerequisites.                                      |
 
 ---
 

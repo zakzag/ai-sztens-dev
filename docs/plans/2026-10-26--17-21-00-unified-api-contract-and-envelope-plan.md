@@ -23,26 +23,28 @@ One written, enforced convention for every server↔client exchange:
 
 ## 2. Facts today (verified in code)
 
-| Area | State | File |
-|---|---|---|
-| Response shape | Bare payload straight from the controller, no envelope | [`api-keys.controller.ts`](../../apps/api/src/api-keys/api-keys.controller.ts:37) |
-| Error shape | Nest default `{ statusCode, message, error }` — no filter, no code | no `APP_FILTER` anywhere in `apps/api/src` |
-| Contract duplication | server: class-validator DTO + own interface; shared: same rules in Zod | [`create-api-key.dto.ts`](../../apps/api/src/api-keys/dto/create-api-key.dto.ts:35), [`api-keys.interface.ts`](../../apps/api/src/api-keys/api-keys.interface.ts:1), [`api-key.schema.ts`](../../packages/shared/src/schemas/api-key.schema.ts:50) |
-| `@callback/shared` in api | listed in `apps/api/package.json`, **never imported in `src`** | [`package.json`](../../apps/api/package.json:27) |
-| Client transport | one HTTP place, everything becomes `ApiError`, `details` read from `body.message` | [`http-client.ts`](../../packages/api-client/src/http-client.ts:135), [`api-error.ts`](../../packages/api-client/src/api-error.ts:47) |
-| Error → copy | decision by `status`, never by message text | [`error-message.ts`](../../apps/admin/src/lib/error-message.ts:53) |
-| Notification system | planned (store + toasts + log drawer), **not built** | [`notification plan`](2026-10-22--15-40-00-frontend-notification-and-log-system-plan.md:1) |
+| Area                      | State                                                                             | File                                                                                                                                                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Response shape            | Bare payload straight from the controller, no envelope                            | [`api-keys.controller.ts`](../../apps/api/src/api-keys/api-keys.controller.ts:37)                                                                                                                                                                  |
+| Error shape               | Nest default `{ statusCode, message, error }` — no filter, no code                | no `APP_FILTER` anywhere in `apps/api/src`                                                                                                                                                                                                         |
+| Contract duplication      | server: class-validator DTO + own interface; shared: same rules in Zod            | [`create-api-key.dto.ts`](../../apps/api/src/api-keys/dto/create-api-key.dto.ts:35), [`api-keys.interface.ts`](../../apps/api/src/api-keys/api-keys.interface.ts:1), [`api-key.schema.ts`](../../packages/shared/src/schemas/api-key.schema.ts:50) |
+| `@callback/shared` in api | listed in `apps/api/package.json`, **never imported in `src`**                    | [`package.json`](../../apps/api/package.json:27)                                                                                                                                                                                                   |
+| Client transport          | one HTTP place, everything becomes `ApiError`, `details` read from `body.message` | [`http-client.ts`](../../packages/api-client/src/http-client.ts:135), [`api-error.ts`](../../packages/api-client/src/api-error.ts:47)                                                                                                              |
+| Error → copy              | decision by `status`, never by message text                                       | [`error-message.ts`](../../apps/admin/src/lib/error-message.ts:53)                                                                                                                                                                                 |
+| Notification system       | planned (store + toasts + log drawer), **not built**                              | [`notification plan`](2026-10-22--15-40-00-frontend-notification-and-log-system-plan.md:1)                                                                                                                                                         |
 
-Consequence: the envelope touches exactly **3 controllers** (`api-keys`, `healthz`, `vapi-webhooks`) and **1 client package** — a breaking change is cheap *now* and expensive after the second feature.
+Consequence: the envelope touches exactly **3 controllers** (`api-keys`, `healthz`, `vapi-webhooks`) and **1 client package** — a breaking change is cheap _now_ and expensive after the second feature.
 
 ---
 
 ## 3. Decisions
 
 ### D1 — Transport
+
 `application/json; charset=utf-8` in and out, `Accept: application/json`. JSON property names are **camelCase**. No form-encoded, no XML, no top-level bare scalars.
 
 ### D2 — Success envelope (always)
+
 ```jsonc
 {
   "data": { /* object */ } | [ /* array */ ] | null,
@@ -53,23 +55,26 @@ Consequence: the envelope touches exactly **3 controllers** (`api-keys`, `health
   }
 }
 ```
+
 - `data` **always present**; a list is `[]` when nothing matches; a "nothing to return" success (e.g. `DELETE`) is `data: null` with **200** — never `204`, so the client always parses one shape.
 - `meta` **always present** (at minimum `requestId` + `timestamp`) → every response is traceable to a server log line.
 
 ### D3 — Error envelope (always)
+
 ```jsonc
 {
   "error": {
     "code": "API_KEY_IDENTIFIER_CONFLICT",
     "status": 409,
     "message": "identifier already exists",
-    "details": [ { "path": "identifier", "message": "already taken" } ],
+    "details": [{ "path": "identifier", "message": "already taken" }],
     "requestId": "0192f3c4-...",
     "timestamp": "2026-10-26T15:21:48.752Z",
-    "path": "/api/api-keys"
-  }
+    "path": "/api/api-keys",
+  },
 }
 ```
+
 - `code` — stable, locale-independent, from a shared enum. **This is the decision key on the client.**
 - `message` — English, for developers/logs. **Never rendered as user copy.**
 - `details` — field-level issues for form mapping (`path` is a dot path, `''` for whole-payload errors).
@@ -77,21 +82,23 @@ Consequence: the envelope touches exactly **3 controllers** (`api-keys`, `health
 
 ### D4 — Empty / zero-result rules (one rule per type)
 
-| Situation | Wire | Never |
-|---|---|---|
-| List with no matches | `"data": []` (200) | `null`, `404`, omitted key |
-| Single resource missing | `404` + error envelope | `200` with `data: null` |
-| Optional scalar absent | present as `null` | missing key, `undefined`, `''` |
-| Counter | `0` as number | `"0"`, `null` |
-| Nested object absent | `{}` present | omitted key |
-| Success with nothing to return | `"data": null`, 200 | `204` |
-| Duplicate | `409` + `code: *_CONFLICT` | silent overwrite |
-| Validation | `400`/`422` + `details[]` | one concatenated string |
+| Situation                      | Wire                       | Never                          |
+| ------------------------------ | -------------------------- | ------------------------------ |
+| List with no matches           | `"data": []` (200)         | `null`, `404`, omitted key     |
+| Single resource missing        | `404` + error envelope     | `200` with `data: null`        |
+| Optional scalar absent         | present as `null`          | missing key, `undefined`, `''` |
+| Counter                        | `0` as number              | `"0"`, `null`                  |
+| Nested object absent           | `{}` present               | omitted key                    |
+| Success with nothing to return | `"data": null`, 200        | `204`                          |
+| Duplicate                      | `409` + `code: *_CONFLICT` | silent overwrite               |
+| Validation                     | `400`/`422` + `details[]`  | one concatenated string        |
 
 ### D5 — Status codes (single table, enforced on both sides)
+
 `200` read/update/delete · `201` create · `400` malformed/shape · `401` unauthenticated · `403` forbidden · `404` missing · `409` conflict · `413` payload too large · `422` semantic validation · `429` rate limited · `500` internal · `503` dependency down.
 
 ### D6 — Single source of truth (contract-first, Zod)
+
 The contract lives **only** in `@callback/shared`:
 
 ```text
@@ -107,15 +114,16 @@ packages/shared/src/contract/
 
 Three artefacts derive from that one definition:
 
-| Artefact | How |
-|---|---|
-| TS types | `z.infer<typeof schema>` re-exported from `<resource>.interface.ts` |
+| Artefact          | How                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| TS types          | `z.infer<typeof schema>` re-exported from `<resource>.interface.ts`                                     |
 | Server validation | `ZodBodyPipe(schema)` / `ZodQueryPipe(schema)` in the controller — **class-validator DTOs are removed** |
-| Client parsing | `client.get(path, <resource>Schema)` — unchanged mechanism, now unwrapping `data` |
+| Client parsing    | `client.get(path, <resource>Schema)` — unchanged mechanism, now unwrapping `data`                       |
 
 The endpoint registry is optional today but is the seed for OpenAPI generation later (`zod-to-json-schema`) — no second description ever gets written.
 
 ### D7 — Server layering: data service + envelope service + error filter
+
 This is the core of the request: **a service produces the data, another service wraps it.**
 
 ```mermaid
@@ -143,13 +151,14 @@ flowchart LR
     FACT --> WIRE[JSON on the wire]
 ```
 
-- **`ApiResponseService`** (injectable, `apps/api/src/common/http/`) — *thin*: no business logic, only calls the pure factories in `@callback/shared`. Two methods: `ok(data, meta?)`, `fail(appError, context)`.
+- **`ApiResponseService`** (injectable, `apps/api/src/common/http/`) — _thin_: no business logic, only calls the pure factories in `@callback/shared`. Two methods: `ok(data, meta?)`, `fail(appError, context)`.
 - **Controllers never return domain data directly.** They call the domain service, then `return this.responses.ok(result)`. One wrap point per endpoint, explicit, greppable.
 - **Errors never escape as Nest exceptions.** Domain services throw `AppError` subclasses carrying `code` + `status`; the global `ApiExceptionFilter` (`APP_FILTER`) normalises **any** throwable (Nest `HttpException`, `ZodError`, unknown `Error`) into the error envelope through the same `ApiResponseService`.
 - Why not a success interceptor: it would wrap implicitly, hide the shape decision from the code, and cannot be used from a service. An interceptor is only added later as a **dev-only assertion** that a non-enveloped body never leaves the process.
 - Health check and VAPI webhooks are **exempt** (see D9) and must keep their current raw bodies.
 
 ### D8 — Error code catalogue
+
 ```ts
 export const API_ERROR_CODE = {
   VALIDATION_FAILED: 'VALIDATION_FAILED',
@@ -164,62 +173,69 @@ export const API_ERROR_CODE = {
   API_KEY_IDENTIFIER_CONFLICT: 'API_KEY_IDENTIFIER_CONFLICT', // domain-specific
 } as const;
 ```
+
 Generic codes map 1:1 from status in the filter; feature services may emit a more specific code with the same status. The client maps **code → Hungarian user copy**; unknown code falls back to status copy, so a new server code never breaks an old bundle.
 
 ### D9 — Exemptions (must be written down, or they will be broken)
-| Route | Why unwrapped |
-|---|---|
-| `GET /healthz` | Docker healthcheck + monitor watchdog parse a bare `{status}` |
-| `POST /api/vapi/webhooks` | provider-owned contract; VAPI expects its own body |
-Implementation: a `@SkipEnvelope()` metadata decorator + `Reflector` check in the filter and the dev assertion.
+
+| Route                                                                                                           | Why unwrapped                                                 |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `GET /healthz`                                                                                                  | Docker healthcheck + monitor watchdog parse a bare `{status}` |
+| `POST /api/vapi/webhooks`                                                                                       | provider-owned contract; VAPI expects its own body            |
+| Implementation: a `@SkipEnvelope()` metadata decorator + `Reflector` check in the filter and the dev assertion. |
 
 ### D10 — Request correlation
+
 `X-Request-Id` accepted inbound (or generated by Fastify `genReqId`), echoed in `meta.requestId` / `error.requestId` and returned as a response header. The client forwards it into the notification store so a log-drawer entry always carries the server-side trace id.
 
 ### D11 — Where a server error becomes visible (answer to the open question)
+
 Four tiers, each with exactly one job. No popup window, no separate bottom bar.
 
-| Tier | Component | Applies to |
-|---|---|---|
-| 1. Field | inline message under the input, via RHF `setError(path)` from `details[]` | `400`/`422` |
-| 2. Page | `Alert` inside the page content region + retry button (`features` mutation/query error state) | `403`, `404`, `409`, `500` on the page's main data |
-| 3. App | one dismissible top banner in the layout shell (session store + notification store) | `401` (login CTA), `status === null` offline, `503` maintenance |
-| 4. Log drawer | system entries, `toast: false`, with `code`, `status`, `requestId`, copy button | all `5xx`, schema-drift payload errors |
+| Tier          | Component                                                                                     | Applies to                                                      |
+| ------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1. Field      | inline message under the input, via RHF `setError(path)` from `details[]`                     | `400`/`422`                                                     |
+| 2. Page       | `Alert` inside the page content region + retry button (`features` mutation/query error state) | `403`, `404`, `409`, `500` on the page's main data              |
+| 3. App        | one dismissible top banner in the layout shell (session store + notification store)           | `401` (login CTA), `status === null` offline, `503` maintenance |
+| 4. Log drawer | system entries, `toast: false`, with `code`, `status`, `requestId`, copy button               | all `5xx`, schema-drift payload errors                          |
 
 Rule: **toast = the outcome of an action the user just performed; banner = a persistent condition; alert = the page's data is unavailable; field error = the input is wrong; log = diagnostics.** Server `message` is never shown at tiers 1–3.
 
 ### D12 — Client unpacking
+
 - `http-client` parses `successEnvelopeSchema(callerSchema)` and returns `.data` — services keep their current signatures, callers see no change.
 - `ApiError` gains `code: string | null`, `requestId: string | null`, `issues: readonly ApiErrorDetail[]`; the existing `details: readonly string[]` is **kept** (rendered lines) so [`toErrorMessage()`](../../apps/admin/src/lib/error-message.ts:53) and its tests keep working.
 - Non-JSON error bodies (Caddy `502`, nginx `504`) still degrade to status-based copy — keep the existing tolerant path.
 
 ### D13 — Validation detail shape
+
 `details: [{ path, message }]` with dot paths (`name`, `lines.2.quantity`). The admin maps them onto react-hook-form fields; unmapped paths go to the page alert. This is what makes "which field is wrong" answerable without string parsing.
 
 ### D14 — Versioning & deprecation
+
 Additive fields are safe (client strips unknown keys). A breaking reshape goes to `/api/v2`; v1 then gets a documented sunset. The envelope itself is stable from day one, so most future changes are additive.
 
 ---
 
 ## 4. Things that must also be designed (checklist)
 
-| # | Topic | Rule to write down |
-|---|---|---|
-| 1 | **Secrets** | `apiKey` values in `GET /api/api-keys` are a leak risk — plan masking/one-time reveal before auth lands |
-| 2 | **5xx sanitation** | filter logs the full error, sends only `INTERNAL_ERROR` + `requestId` |
-| 3 | **Body size / timeout** | Fastify `bodyLimit` + request timeout, both answered with the envelope (`413`, `503`) |
-| 4 | **Dates** | ISO 8601 UTC with `Z` on the wire, `Date` object inside the app, never a local string |
-| 5 | **Numbers** | money as string or minor-unit integer; bigint as string; never a float for currency |
-| 6 | **Enums forward-compat** | client maps unknown enum values to a fallback variant instead of throwing |
-| 7 | **Pagination contract** | `page`/`limit` in, `meta.pagination` out; default + max limit declared once |
-| 8 | **Delete/update semantics** | `200` + `data: null`; `409` for constraint violations, never `500` |
-| 9 | **Bulk operations** | `data: { succeeded: [], failed: [{ id, code, message }] }` + `200`, not a partial `500` |
-| 10 | **CORS / proxy** | Caddy/nginx error pages are not JSON — client must keep the tolerant path; document it |
-| 11 | **i18n policy** | server English developer messages, client Hungarian UI copy in one `code → message` map |
-| 12 | **Logs** | structured server logs carry `requestId`, route, status, duration; no PII, no tokens |
-| 13 | **Testing gates** | shared contract tests, e2e asserting the envelope for every route, contract-drift fixture test, `api-client` tests |
-| 14 | **Docs** | `docs/Specs/API-Convention.md` (living) + ADR + `docs/history` + milestone entry |
-| 15 | **Dependencies** | `zod` becomes a direct dependency of `apps/api`; `class-validator`/`class-transformer` removed once the DTOs are gone |
+| #   | Topic                       | Rule to write down                                                                                                    |
+| --- | --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Secrets**                 | `apiKey` values in `GET /api/api-keys` are a leak risk — plan masking/one-time reveal before auth lands               |
+| 2   | **5xx sanitation**          | filter logs the full error, sends only `INTERNAL_ERROR` + `requestId`                                                 |
+| 3   | **Body size / timeout**     | Fastify `bodyLimit` + request timeout, both answered with the envelope (`413`, `503`)                                 |
+| 4   | **Dates**                   | ISO 8601 UTC with `Z` on the wire, `Date` object inside the app, never a local string                                 |
+| 5   | **Numbers**                 | money as string or minor-unit integer; bigint as string; never a float for currency                                   |
+| 6   | **Enums forward-compat**    | client maps unknown enum values to a fallback variant instead of throwing                                             |
+| 7   | **Pagination contract**     | `page`/`limit` in, `meta.pagination` out; default + max limit declared once                                           |
+| 8   | **Delete/update semantics** | `200` + `data: null`; `409` for constraint violations, never `500`                                                    |
+| 9   | **Bulk operations**         | `data: { succeeded: [], failed: [{ id, code, message }] }` + `200`, not a partial `500`                               |
+| 10  | **CORS / proxy**            | Caddy/nginx error pages are not JSON — client must keep the tolerant path; document it                                |
+| 11  | **i18n policy**             | server English developer messages, client Hungarian UI copy in one `code → message` map                               |
+| 12  | **Logs**                    | structured server logs carry `requestId`, route, status, duration; no PII, no tokens                                  |
+| 13  | **Testing gates**           | shared contract tests, e2e asserting the envelope for every route, contract-drift fixture test, `api-client` tests    |
+| 14  | **Docs**                    | `docs/Specs/API-Convention.md` (living) + ADR + `docs/history` + milestone entry                                      |
+| 15  | **Dependencies**            | `zod` becomes a direct dependency of `apps/api`; `class-validator`/`class-transformer` removed once the DTOs are gone |
 
 ---
 
@@ -315,38 +331,42 @@ jobs, so it is not decorative documentation:
 5. a **machine-readable contract** for agents, Postman/Insomnia and future CRM/VAPI integrations.
 
 ### 8.1 Principle: one direction only
+
 `@callback/shared` Zod schemas → endpoint registry → generated OpenAPI → Swagger UI. The spec is an
 **artefact**. It is never the place where an endpoint gets designed (that would reintroduce the drift D6 removes).
 
 ### 8.2 Why not `@nestjs/swagger`
+
 It describes shapes with decorators (`@ApiProperty`, `@ApiResponse`) on DTO classes — a second,
 independent description of the same data, built on the class-validator DTOs that step 3 deletes. It can
 only express the envelope with per-route decorators. **Rejected as the primary mechanism**, kept as a
 fallback if Zod generation stalls.
 
 ### 8.3 Toolchain
-| Piece | Choice | Why |
-|---|---|---|
-| Spec generation | `@asteasolutions/zod-to-openapi` | consumes the *same* Zod schemas; no second description |
-| Doc serving | `@fastify/swagger` (openapi mode) + `@fastify/swagger-ui` | the app already runs Fastify; no Express adapter |
+
+| Piece                | Choice                                                             | Why                                                    |
+| -------------------- | ------------------------------------------------------------------ | ------------------------------------------------------ |
+| Spec generation      | `@asteasolutions/zod-to-openapi`                                   | consumes the _same_ Zod schemas; no second description |
+| Doc serving          | `@fastify/swagger` (openapi mode) + `@fastify/swagger-ui`          | the app already runs Fastify; no Express adapter       |
 | Envelope in the spec | one `envelopeOf(schema)` helper + `components.schemas.ApiEnvelope` | the envelope is documented once, reused by every route |
-| Error responses | register the error envelope once for `400/401/403/404/409/422/500` | a new endpoint inherits the documented failures |
-| Examples | taken from the contract registry, not hand-written | the UI is meaningful without a second description |
+| Error responses      | register the error envelope once for `400/401/403/404/409/422/500` | a new endpoint inherits the documented failures        |
+| Examples             | taken from the contract registry, not hand-written                 | the UI is meaningful without a second description      |
 
 ### 8.4 The five jobs, concretely
 
-| # | Job | Mechanism | Where it lives |
-|---|---|---|---|
-| 1 | Clickable reference | Swagger UI served by the app, `Try it out` against dev/staging, bearer scheme pre-wired | `/api/docs` |
-| 2 | Reviewable API diff | `pnpm openapi:generate` rewrites the baseline; CI regenerates and fails if the file is stale | `scripts/openapi/generate.mjs` |
-| 3 | Breaking-change gate | CI diffs baseline vs generated: removed field, narrowed enum, changed status or envelope shape -> fail unless the PR is labelled `contract-change` | `scripts/openapi/check.mjs` |
-| 4 | Self-check of responses | dev/staging-only interceptor validates the outgoing body against the route's response schema; a forgotten `responses.ok()` or an extra mapper field fails fast instead of reaching the browser | `response-assert.interceptor.ts` |
-| 5 | Coverage + external consumers | test walks the registered controllers, asserts a contract entry and presence in the spec; `/api/openapi.json` feeds agents, Postman and future partners | `apps/api/test/openapi.e2e-spec.ts` |
+| #   | Job                           | Mechanism                                                                                                                                                                                      | Where it lives                      |
+| --- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| 1   | Clickable reference           | Swagger UI served by the app, `Try it out` against dev/staging, bearer scheme pre-wired                                                                                                        | `/api/docs`                         |
+| 2   | Reviewable API diff           | `pnpm openapi:generate` rewrites the baseline; CI regenerates and fails if the file is stale                                                                                                   | `scripts/openapi/generate.mjs`      |
+| 3   | Breaking-change gate          | CI diffs baseline vs generated: removed field, narrowed enum, changed status or envelope shape -> fail unless the PR is labelled `contract-change`                                             | `scripts/openapi/check.mjs`         |
+| 4   | Self-check of responses       | dev/staging-only interceptor validates the outgoing body against the route's response schema; a forgotten `responses.ok()` or an extra mapper field fails fast instead of reaching the browser | `response-assert.interceptor.ts`    |
+| 5   | Coverage + external consumers | test walks the registered controllers, asserts a contract entry and presence in the spec; `/api/openapi.json` feeds agents, Postman and future partners                                        | `apps/api/test/openapi.e2e-spec.ts` |
 
 Job 4 is what turns Swagger from documentation into server-side enforcement: the client validates its
-*input* (D12), this validates the server's *output*.
+_input_ (D12), this validates the server's _output_.
 
 ### 8.5 The pipeline
+
 ```mermaid
 flowchart LR
     ZOD[Shared Zod schemas] --> REG[Endpoint registry]
@@ -359,6 +379,7 @@ flowchart LR
 ```
 
 ### 8.6 Guardrails and exposure
+
 - `/api/openapi.json` and `/api/docs` are on the `@SkipEnvelope` allow-list and are never wrapped.
 - Swagger UI: dev/staging only, or behind Caddy basic-auth in prod. `openapi.json` stays reachable in every env.
 - The generated file is committed, so an API change is a visible line in the diff — reviewers see it even in a frontend-only PR.
@@ -366,14 +387,16 @@ flowchart LR
 - Swagger UI is third-party HTML: it does not go through `packages/ui` and does not affect the token rules.
 
 ### 8.7 What we deliberately do NOT do
-| Do not | Because |
-|---|---|
-| design endpoints in the spec (spec-first) | the Zod contract is the source; spec-first needs a second sync step, which is where drift lives |
-| generate client types from the spec | they are already `z.infer` of the same schemas — a second derivation means worse errors and a possible second truth |
-| annotate DTOs with `@ApiProperty` | that is exactly the `@nestjs/swagger` duplication rejected in 8.2 |
-| expose the UI in prod by default | it hands out the admin surface map for free |
+
+| Do not                                    | Because                                                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| design endpoints in the spec (spec-first) | the Zod contract is the source; spec-first needs a second sync step, which is where drift lives                     |
+| generate client types from the spec       | they are already `z.infer` of the same schemas — a second derivation means worse errors and a possible second truth |
+| annotate DTOs with `@ApiProperty`         | that is exactly the `@nestjs/swagger` duplication rejected in 8.2                                                   |
+| expose the UI in prod by default          | it hands out the admin surface map for free                                                                         |
 
 ### 8.8 Cost/benefit, honestly
+
 Cost: two dependencies, roughly 150 lines of registry/generation code, one CI job. Payoff: the contract
 stops being an oral tradition — it is clickable, diffable, machine-readable and self-checking, and the
 first external consumer (VAPI/CRM/public call-back API) needs no extra work because everything is derived.
@@ -382,11 +405,11 @@ first external consumer (VAPI/CRM/public call-back API) needs no extra work beca
 
 ## 9. Open questions
 
-| # | Question | Recommended default |
-|---|---|---|
-| Q1 | Does `meta` stay on every response or only where it adds value? | every response — uniform parsing, free correlation |
-| Q2 | `204` for `DELETE`, or `200` + `data: null`? | `200` + `data: null` |
-| Q3 | Do we ship the endpoint registry and the generated OpenAPI now? | registry shape now, OpenAPI + Swagger UI right after the envelope lands (§8) |
-| Q4 | Do domain services wrap, or only controllers? | only controllers — services stay HTTP-agnostic |
-| Q5 | Should the envelope carry `deprecation` / `sunset` hints? | defer |
-| Q6 | Is API-key value masking in scope here or a separate security task? | separate task, documented as a follow-up |
+| #   | Question                                                            | Recommended default                                                          |
+| --- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Q1  | Does `meta` stay on every response or only where it adds value?     | every response — uniform parsing, free correlation                           |
+| Q2  | `204` for `DELETE`, or `200` + `data: null`?                        | `200` + `data: null`                                                         |
+| Q3  | Do we ship the endpoint registry and the generated OpenAPI now?     | registry shape now, OpenAPI + Swagger UI right after the envelope lands (§8) |
+| Q4  | Do domain services wrap, or only controllers?                       | only controllers — services stay HTTP-agnostic                               |
+| Q5  | Should the envelope carry `deprecation` / `sunset` hints?           | defer                                                                        |
+| Q6  | Is API-key value masking in scope here or a separate security task? | separate task, documented as a follow-up                                     |

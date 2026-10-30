@@ -10,27 +10,27 @@
 A complete vertical slice for storing provider credentials in
 `platform.api_keys`, from HTTP to Postgres:
 
-| Method | Route | Behaviour |
-|---|---|---|
-| `GET` | `/api/api-keys` | 200, full list, `created_at DESC` |
-| `GET` | `/api/api-keys/:identifier` | 200 single key, 404 when unknown |
-| `POST` | `/api/api-keys` | 201 + created resource, 400 invalid payload, 409 duplicate `identifier` |
+| Method | Route                       | Behaviour                                                               |
+| ------ | --------------------------- | ----------------------------------------------------------------------- |
+| `GET`  | `/api/api-keys`             | 200, full list, `created_at DESC`                                       |
+| `GET`  | `/api/api-keys/:identifier` | 200 single key, 404 when unknown                                        |
+| `POST` | `/api/api-keys`             | 201 + created resource, 400 invalid payload, 409 duplicate `identifier` |
 
 New files (all under [`apps/api/src/api-keys/`](../../apps/api/src/api-keys/)):
 
-| File | Role |
-|---|---|
-| [`api-keys.const.ts`](../../apps/api/src/api-keys/api-keys.const.ts) | DI token, route segment, DTO limits, `23505`, constraint name |
-| [`api-keys.interface.ts`](../../apps/api/src/api-keys/api-keys.interface.ts) | `CreateApiKeyInput`, `ApiKeyResponse` (wire shapes) |
-| [`api-keys.errors.ts`](../../apps/api/src/api-keys/api-keys.errors.ts) | `ApiKeyIdentifierConflictError`, `ApiKeyRowMissingError` |
-| [`api-keys.error-guard.ts`](../../apps/api/src/api-keys/api-keys.error-guard.ts) | `isIdentifierConflict()` — walks the `cause` chain |
-| [`api-keys.mapper.ts`](../../apps/api/src/api-keys/api-keys.mapper.ts) | `toApiKeyResponse()`, `toNewApiKeyRow()` |
-| [`api-keys.repository.interface.ts`](../../apps/api/src/api-keys/api-keys.repository.interface.ts) | Persistence contract |
-| [`api-keys.repository.ts`](../../apps/api/src/api-keys/api-keys.repository.ts) | `DrizzleApiKeysRepository` |
-| [`api-keys.service.ts`](../../apps/api/src/api-keys/api-keys.service.ts) | Orchestration + 404/409 translation |
-| [`api-keys.controller.ts`](../../apps/api/src/api-keys/api-keys.controller.ts) | The three routes |
-| [`api-keys.module.ts`](../../apps/api/src/api-keys/api-keys.module.ts) | Binds the repository to the token, imports `DatabaseModule` |
-| [`dto/create-api-key.dto.ts`](../../apps/api/src/api-keys/dto/create-api-key.dto.ts) | class-validator rules |
+| File                                                                                               | Role                                                          |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [`api-keys.const.ts`](../../apps/api/src/api-keys/api-keys.const.ts)                               | DI token, route segment, DTO limits, `23505`, constraint name |
+| [`api-keys.interface.ts`](../../apps/api/src/api-keys/api-keys.interface.ts)                       | `CreateApiKeyInput`, `ApiKeyResponse` (wire shapes)           |
+| [`api-keys.errors.ts`](../../apps/api/src/api-keys/api-keys.errors.ts)                             | `ApiKeyIdentifierConflictError`, `ApiKeyRowMissingError`      |
+| [`api-keys.error-guard.ts`](../../apps/api/src/api-keys/api-keys.error-guard.ts)                   | `isIdentifierConflict()` — walks the `cause` chain            |
+| [`api-keys.mapper.ts`](../../apps/api/src/api-keys/api-keys.mapper.ts)                             | `toApiKeyResponse()`, `toNewApiKeyRow()`                      |
+| [`api-keys.repository.interface.ts`](../../apps/api/src/api-keys/api-keys.repository.interface.ts) | Persistence contract                                          |
+| [`api-keys.repository.ts`](../../apps/api/src/api-keys/api-keys.repository.ts)                     | `DrizzleApiKeysRepository`                                    |
+| [`api-keys.service.ts`](../../apps/api/src/api-keys/api-keys.service.ts)                           | Orchestration + 404/409 translation                           |
+| [`api-keys.controller.ts`](../../apps/api/src/api-keys/api-keys.controller.ts)                     | The three routes                                              |
+| [`api-keys.module.ts`](../../apps/api/src/api-keys/api-keys.module.ts)                             | Binds the repository to the token, imports `DatabaseModule`   |
+| [`dto/create-api-key.dto.ts`](../../apps/api/src/api-keys/dto/create-api-key.dto.ts)               | class-validator rules                                         |
 
 Modified: [`app.module.ts`](../../apps/api/src/app.module.ts) (registers `ApiKeysModule`),
 [`sql-expression.ts`](../../apps/api/src/db/test/helpers/sql-expression.ts) (new
@@ -107,9 +107,9 @@ Node.
 
 ## 5. Known limitations (deliberate)
 
-| Limitation | Reason / follow-up |
-|---|---|
-| Routes are unauthenticated | Admin auth is a separate story (plan D13); they return the token value, so they must not be exposed publicly before that |
-| `GET` list returns `api_key` in full | Masking/rotation is out of scope in the story and recorded in the milestone |
-| No pagination / search | The table holds a handful of provider credentials |
-| No update/delete/rotation endpoints | Not in the ticket scope (AIS-41 is read + create) |
+| Limitation                           | Reason / follow-up                                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Routes are unauthenticated           | Admin auth is a separate story (plan D13); they return the token value, so they must not be exposed publicly before that |
+| `GET` list returns `api_key` in full | Masking/rotation is out of scope in the story and recorded in the milestone                                              |
+| No pagination / search               | The table holds a handful of provider credentials                                                                        |
+| No update/delete/rotation endpoints  | Not in the ticket scope (AIS-41 is read + create)                                                                        |

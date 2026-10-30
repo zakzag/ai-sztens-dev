@@ -35,7 +35,7 @@ Inside a `$(...)` command substitution the author wrote `tr -d \"'\"`,
 but tokenisation of the inner string is:
 
 - `\"` → escaped double quote, becomes a literal `"`.
-- `'`   → **opens a single-quoted string** that never closes.
+- `'` → **opens a single-quoted string** that never closes.
 - `\"` → inside `'...'`, both characters are literal.
 
 The single-quoted string swallows the rest of the line including the
@@ -75,27 +75,27 @@ above the two lines explains the trap so the next reader does not
 
 ## 5. Alternatives considered (validated locally, not chosen)
 
-| Variant | Form | Verdict |
-|---|---|---|
-| B | `awk -F= '/^DOMAIN=/{gsub(/["\047]/,"",$2); print $2; exit}'` | Works; `gsub` deletes both characters; the `\047` octal avoids any single-quote-in-SQ problem. |
-| D | `tr -d $'"\047"'` (ANSI-C quoting) | Works; one line change, no extra variable. |
-| A | `tr -d "$_quote_chars"` with `_quote_chars="\"'"` | **Chosen** — smallest diff, intent obvious, no language tricks. |
+| Variant | Form                                                          | Verdict                                                                                        |
+| ------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| B       | `awk -F= '/^DOMAIN=/{gsub(/["\047]/,"",$2); print $2; exit}'` | Works; `gsub` deletes both characters; the `\047` octal avoids any single-quote-in-SQ problem. |
+| D       | `tr -d $'"\047"'` (ANSI-C quoting)                            | Works; one line change, no extra variable.                                                     |
+| A       | `tr -d "$_quote_chars"` with `_quote_chars="\"'"`             | **Chosen** — smallest diff, intent obvious, no language tricks.                                |
 
 ## 6. Validation
 
 Standalone test with the exact line copied verbatim from the workflow,
 8/8 cases pass:
 
-| Case | Input `INFRA_ENV` | Expected `domain` | Got |
-|---|---|---|---|
-| unquoted    | `DOMAIN=example.com`            | `example.com`     | `example.com`     |
-| dq-wrapped  | `DOMAIN="example.com"`          | `example.com`     | `example.com`     |
-| sq-in-value | `DOMAIN=it's-me.com`            | `its-me.com`      | `its-me.com`      |
-| dq-in-value | `DOMAIN=he"said.com`            | `hesaid.com`      | `hesaid.com`      |
-| both-quotes | `DOMAIN=a'b"c.com`              | `abc.com`         | `abc.com`         |
-| with-noise  | `A=1\nDOMAIN=multi.host.com\nB=2` | `multi.host.com` | `multi.host.com`  |
-| no-domain   | `X=y`                           | (empty)           | (empty)           |
-| trailing-eq | `DOMAIN=multi.host.com=`        | `multi.host.com=` | `multi.host.com=` |
+| Case        | Input `INFRA_ENV`                 | Expected `domain` | Got               |
+| ----------- | --------------------------------- | ----------------- | ----------------- |
+| unquoted    | `DOMAIN=example.com`              | `example.com`     | `example.com`     |
+| dq-wrapped  | `DOMAIN="example.com"`            | `example.com`     | `example.com`     |
+| sq-in-value | `DOMAIN=it's-me.com`              | `its-me.com`      | `its-me.com`      |
+| dq-in-value | `DOMAIN=he"said.com`              | `hesaid.com`      | `hesaid.com`      |
+| both-quotes | `DOMAIN=a'b"c.com`                | `abc.com`         | `abc.com`         |
+| with-noise  | `A=1\nDOMAIN=multi.host.com\nB=2` | `multi.host.com`  | `multi.host.com`  |
+| no-domain   | `X=y`                             | (empty)           | (empty)           |
+| trailing-eq | `DOMAIN=multi.host.com=`          | `multi.host.com=` | `multi.host.com=` |
 
 Also `python -c "yaml.safe_load(...)"` confirms the workflow YAML
 parses cleanly after the change.

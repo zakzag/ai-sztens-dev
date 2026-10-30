@@ -90,16 +90,24 @@ function normalizeOverride(slug, value, filePath) {
     const emit = toStringArray(value.emit, `${filePath}: "${slug}".emit`);
     for (const item of emit) {
       if (!EMITTABLE.includes(item)) {
-        throw new Error(`${filePath}: "${slug}".emit contains unknown artefact "${item}" (known: ${EMITTABLE.join(', ')})`);
+        throw new Error(
+          `${filePath}: "${slug}".emit contains unknown artefact "${item}" (known: ${EMITTABLE.join(', ')})`,
+        );
       }
     }
     override.emit = emit;
   }
   if (value.copilotTools !== undefined) {
-    override.copilotTools = toStringArray(value.copilotTools, `${filePath}: "${slug}".copilotTools`);
+    override.copilotTools = toStringArray(
+      value.copilotTools,
+      `${filePath}: "${slug}".copilotTools`,
+    );
   }
   if (value.claudeTools !== undefined) {
-    override.claudeTools = toStringArray(value.claudeTools, `${filePath}: "${slug}".claudeTools`);
+    override.claudeTools = toStringArray(
+      value.claudeTools,
+      `${filePath}: "${slug}".claudeTools`,
+    );
   }
 
   return override;
@@ -112,7 +120,9 @@ function normalizeOverride(slug, value, filePath) {
  */
 function toStringArray(value, label) {
   const list = Array.isArray(value) ? value : [value];
-  const result = list.map((item) => String(item).trim()).filter((item) => item !== '');
+  const result = list
+    .map((item) => String(item).trim())
+    .filter((item) => item !== '');
   if (result.length === 0) {
     throw new Error(`${label} must not be empty`);
   }

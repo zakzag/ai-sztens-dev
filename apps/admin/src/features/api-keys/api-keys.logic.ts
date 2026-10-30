@@ -20,7 +20,10 @@ import {
   DEFAULT_FIELD_PATH_BY_CODE,
   FIELD_ERROR_CODES,
 } from './api-keys.const.js';
-import type { ApiKeyFieldErrors, ApiKeyFormFieldName } from './api-keys.interface.js';
+import type {
+  ApiKeyFieldErrors,
+  ApiKeyFormFieldName,
+} from './api-keys.interface.js';
 
 /** A failure whose `code` allows field-level reporting (plan `D1`). */
 type FieldErrorApiError = ApiError & { readonly code: string };
@@ -73,7 +76,10 @@ function toFieldMessage(code: string): string {
 function collectFields(
   issues: readonly { readonly path: string }[],
   message: string,
-): { readonly fields: Partial<Record<ApiKeyFormFieldName, string>>; readonly hasUnmapped: boolean } {
+): {
+  readonly fields: Partial<Record<ApiKeyFormFieldName, string>>;
+  readonly hasUnmapped: boolean;
+} {
   const fields: Partial<Record<ApiKeyFormFieldName, string>> = {};
   let hasUnmapped = false;
 

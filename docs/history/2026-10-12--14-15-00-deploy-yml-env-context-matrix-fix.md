@@ -26,11 +26,11 @@ the workflow-file parse with:
 Three sites referenced `${{ env.APP_ENV }}` from positions where the
 `env` context is **not** in the allowed-context list:
 
-| Line | Key | Allowed contexts (per [GitHub docs](https://docs.github.com/en/actions/learn-github-actions/expressions)) |
-|---|---|---|
-| 62 | `concurrency.group` | `github`, `inputs`, `vars`, `needs`, `strategy`, `matrix` |
-| 82 | `jobs.<id>.name` | `github`, `inputs`, `vars`, `matrix`, `secrets`, `runner`, `env` ← (the `env` here is the **runner env**, not the workflow `env` block) |
-| 90 | `jobs.<id>.environment` | (not documented as expression-eligible; was accepted by accident in earlier runs and broken in newer ones) |
+| Line | Key                     | Allowed contexts (per [GitHub docs](https://docs.github.com/en/actions/learn-github-actions/expressions))                               |
+| ---- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 62   | `concurrency.group`     | `github`, `inputs`, `vars`, `needs`, `strategy`, `matrix`                                                                               |
+| 82   | `jobs.<id>.name`        | `github`, `inputs`, `vars`, `matrix`, `secrets`, `runner`, `env` ← (the `env` here is the **runner env**, not the workflow `env` block) |
+| 90   | `jobs.<id>.environment` | (not documented as expression-eligible; was accepted by accident in earlier runs and broken in newer ones)                              |
 
 The official GitHub Actions docs are explicit: "You can use the `env`
 context in the value of any key in a **step** except for the `id` and
@@ -49,13 +49,13 @@ The new workflow shape:
 
 ```yaml
 concurrency:
-  group: deploy-${{ matrix.app_env }}     # matrix is allowed here
+  group: deploy-${{ matrix.app_env }} # matrix is allowed here
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy (${{ matrix.app_env }}) + smoke-test   # matrix is allowed here
-    environment: ${{ matrix.app_env == 'prod' && 'production' || 'dev' }}  # matrix is allowed here
+    name: Deploy (${{ matrix.app_env }}) + smoke-test # matrix is allowed here
+    environment: ${{ matrix.app_env == 'prod' && 'production' || 'dev' }} # matrix is allowed here
     if: >-
       matrix.app_env == (
         inputs.app_env
@@ -139,14 +139,14 @@ grep -E 'INFRA_ENV_(DEV|PROD)' .github/workflows/deploy.yml | wc -l
 
 ## 5. Files touched
 
-| File | Why |
-|---|---|
-| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:1) | Removed the workflow-level `env.APP_ENV`; added `strategy.matrix.app_env: [dev, prod]`; rewrote the `concurrency.group`, `jobs.<id>.name`, `jobs.<id>.environment` and the two `INFRA_ENV:` env-block reads to use `matrix.app_env`; added a job-level `if:` that picks the matching matrix entry. The file header now documents the rationale. |
-| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:1) | "Utolsó frissítés" bullet added; the §9.1 deploy.yml bullet now describes the matrix shape and links to this history entry. |
-| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md:1) | "Utolsó frissítés" bullet added; the §7.1 deploy.yml bullet rewrites the stale `secrets[format(...)]` reference to the new `matrix.app_env` form. |
-| [`scripts/test/_deploy-yml-matrix-pick-test.py`](../../scripts/test/_deploy-yml-matrix-pick-test.py:1) | New offline test (Python 3, no dependencies). Mirrors the `if:` expression in pure Python and exercises it against 14 trigger shapes. Run with `python scripts/test/_deploy-yml-matrix-pick-test.py`. |
-| [`docs/history/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md`](2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md) | This file. |
-| [`docs/milestones/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.milestone.md`](../milestones/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.milestone.md) | Decision-grade summary. |
+| File                                                                                                                                                                       | Why                                                                                                                                                                                                                                                                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:1)                                                                                                     | Removed the workflow-level `env.APP_ENV`; added `strategy.matrix.app_env: [dev, prod]`; rewrote the `concurrency.group`, `jobs.<id>.name`, `jobs.<id>.environment` and the two `INFRA_ENV:` env-block reads to use `matrix.app_env`; added a job-level `if:` that picks the matching matrix entry. The file header now documents the rationale. |
+| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:1)                                                                                             | "Utolsó frissítés" bullet added; the §9.1 deploy.yml bullet now describes the matrix shape and links to this history entry.                                                                                                                                                                                                                     |
+| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md:1)                                                                                           | "Utolsó frissítés" bullet added; the §7.1 deploy.yml bullet rewrites the stale `secrets[format(...)]` reference to the new `matrix.app_env` form.                                                                                                                                                                                               |
+| [`scripts/test/_deploy-yml-matrix-pick-test.py`](../../scripts/test/_deploy-yml-matrix-pick-test.py:1)                                                                     | New offline test (Python 3, no dependencies). Mirrors the `if:` expression in pure Python and exercises it against 14 trigger shapes. Run with `python scripts/test/_deploy-yml-matrix-pick-test.py`.                                                                                                                                           |
+| [`docs/history/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md`](2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md)                                      | This file.                                                                                                                                                                                                                                                                                                                                      |
+| [`docs/milestones/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.milestone.md`](../milestones/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.milestone.md) | Decision-grade summary.                                                                                                                                                                                                                                                                                                                         |
 
 ## 6. Follow-ups (optional, tracked separately)
 

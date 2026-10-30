@@ -47,12 +47,12 @@ Három, egymásra épülő védelmi vonal:
 - A `VAPI_WEBHOOK_SECRET` olvasása `ConfigService.get('VAPI_WEBHOOK_SECRET')` metódussal.
 - A [`apps/api/src/main.ts:9`](../../apps/api/src/main.ts:9)-ben a `FastifyAdapter`-en engedélyezd a `rawBody`-t, mert a HMAC számításához a nyers JSON body kell (a parser különben módosítja a body-t). A Fastify-nél az `addContentTypeParser('application/json', { parseAs: 'string' })` kell, vagy a Nest `FastifyAdapter` `rawBody: true` flag-je.
 - A `VapiSignatureGuard.canActivate` logikája:
-    1. Secret olvasása (ha hiányzik → 500 fail-closed).
-    2. `X-Vapi-Signature` + `X-Vapi-Timestamp` header olvasása (timestamp tolerance: 300 sec, opcionális `VAPI_WEBHOOK_TIMESTAMP_TOLERANCE_SEC` env-vel felülírható).
-    3. Raw body lekérése a request-ből.
-    4. ``expected = HMAC_SHA256(secret, `${timestamp}.${rawBody}`)`` hex formában.
-    5. `timingSafeEqual(expected, signatureHeader)` — `crypto.timingSafeEqual`.
-    6. Ha bármely lépés hibás → 401, **NE** 500 (így nem szivárogtatunk információt).
+  1. Secret olvasása (ha hiányzik → 500 fail-closed).
+  2. `X-Vapi-Signature` + `X-Vapi-Timestamp` header olvasása (timestamp tolerance: 300 sec, opcionális `VAPI_WEBHOOK_TIMESTAMP_TOLERANCE_SEC` env-vel felülírható).
+  3. Raw body lekérése a request-ből.
+  4. ``expected = HMAC_SHA256(secret, `${timestamp}.${rawBody}`)`` hex formában.
+  5. `timingSafeEqual(expected, signatureHeader)` — `crypto.timingSafeEqual`.
+  6. Ha bármely lépés hibás → 401, **NE** 500 (így nem szivárogtatunk információt).
 - Unit tesztek a `vapi-signature.guard.spec.ts` fájlban: helyes HMAC → 200, helytelen → 401, lejárt timestamp → 401, hiányzó secret → 500.
 - A PR #1 végén a controller üres, tehát a futó rendszerre nincs hatás — rollback nincs mit csinálni.
 

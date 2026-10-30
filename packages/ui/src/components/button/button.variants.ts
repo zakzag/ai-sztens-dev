@@ -14,10 +14,14 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-primary-foreground shadow-neu-raised hover:bg-primary-hover',
-        secondary: 'bg-surface-raised text-text-primary shadow-neu-raised hover:shadow-neu-pressed',
-        ghost: 'border-transparent bg-transparent text-text-secondary shadow-none hover:text-text-primary',
-        danger: 'bg-danger text-danger-foreground shadow-neu-raised hover:shadow-neu-pressed',
+        primary:
+          'bg-primary text-primary-foreground shadow-neu-raised hover:bg-primary-hover',
+        secondary:
+          'bg-surface-raised text-text-primary shadow-neu-raised hover:shadow-neu-pressed',
+        ghost:
+          'border-transparent bg-transparent text-text-secondary shadow-none hover:text-text-primary',
+        danger:
+          'bg-danger text-danger-foreground shadow-neu-raised hover:shadow-neu-pressed',
       },
       size: {
         sm: 'h-8 px-3 text-sm',

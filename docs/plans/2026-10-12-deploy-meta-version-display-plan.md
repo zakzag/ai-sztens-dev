@@ -8,6 +8,7 @@ for the implementation narrative and
 for the decision-grade summary.
 **Scope:** bake build metadata (build timestamp + full commit SHA) into the
 api/web/admin images at CI build time and surface it:
+
 - `web` front page `/` → [`apps/web/src/pages/HomePage.tsx`](../../apps/web/src/pages/HomePage.tsx:1)
 - `admin` front page `/` → [`apps/admin/src/pages/DashboardPage.tsx`](../../apps/admin/src/pages/DashboardPage.tsx:1)
 - `api` `GET /healthz` → [`apps/api/src/health/health.controller.ts`](../../apps/api/src/health/health.controller.ts:12)
@@ -16,11 +17,11 @@ api/web/admin images at CI build time and surface it:
 
 ## 1. Decision (confirmed with requester)
 
-| Question | Decision |
-|---|---|
+| Question    | Decision                                                                   |
+| ----------- | -------------------------------------------------------------------------- |
 | Date source | Build time of `.github/workflows/images.yml` (immutable, baked into image) |
-| Hash format | Full 40-char commit SHA (`github.sha`) |
-| Consistency | api / web / admin all show the SAME values for a given revision |
+| Hash format | Full 40-char commit SHA (`github.sha`)                                     |
+| Consistency | api / web / admin all show the SAME values for a given revision            |
 
 Local builds (`scripts/dev-stack.sh up`, `pnpm --filter ... dev`) do **not**
 pass these args, so the Dockerfiles keep empty-string defaults and the UI /
@@ -45,7 +46,7 @@ flowchart LR
 
 ## 3. Changes
 
-### 3.1 [` .github/workflows/images.yml `](../../.github/workflows/images.yml:147)
+### 3.1 [`.github/workflows/images.yml`](../../.github/workflows/images.yml:147)
 
 Extend the `meta` step with two new outputs (the existing `short_sha` stays):
 
@@ -77,7 +78,7 @@ Then add build args to the three application build steps:
 
 No change to the monitor image (it does not need the metadata).
 
-### 3.2 [` infra/app/Dockerfile `](../../infra/app/Dockerfile:44) — runtime stage
+### 3.2 [`infra/app/Dockerfile`](../../infra/app/Dockerfile:44) — runtime stage
 
 The build args must be declared and exported as ENV in the **runtime**
 stage (an ENV set in an intermediate stage does not carry over):
@@ -92,7 +93,7 @@ ENV COMMIT_HASH=${COMMIT_HASH} \
 Place this before the final `CMD` (e.g. next to the existing
 `ENV NODE_OPTIONS=...` block), while the stage is still `root`.
 
-### 3.3 [` infra/web/Dockerfile `](../../infra/web/Dockerfile:51) and [` infra/admin/Dockerfile `](../../infra/admin/Dockerfile:43)
+### 3.3 [`infra/web/Dockerfile`](../../infra/web/Dockerfile:51) and [`infra/admin/Dockerfile`](../../infra/admin/Dockerfile:43)
 
 Add two ARGs and extend the existing build-stage ENV so Vite sees them
 (Vite only exposes `VITE_*`-prefixed variables to the client bundle):
@@ -107,7 +108,7 @@ ENV APP_ENV=${APP_ENV} \
     VITE_COMMIT_HASH=${VITE_COMMIT_HASH}
 ```
 
-### 3.4 [` apps/api/src/health/health.controller.ts `](../../apps/api/src/health/health.controller.ts:14)
+### 3.4 [`apps/api/src/health/health.controller.ts`](../../apps/api/src/health/health.controller.ts:14)
 
 Add `deployDate` and `commitHash` right after `status` (read from env at
 call time; `null` when unset in local/dev-server runs):
@@ -132,14 +133,15 @@ check(): {
 
 The route stays guard/pipe/middleware-free (liveness contract unchanged).
 
-### 3.5 [` apps/api/src/health/health.controller.spec.ts `](../../apps/api/src/health/health.controller.spec.ts:19)
+### 3.5 [`apps/api/src/health/health.controller.spec.ts`](../../apps/api/src/health/health.controller.spec.ts:19)
 
 Add cases:
+
 - with `DEPLOY_DATE`/`COMMIT_HASH` set → returned verbatim;
 - without them → both `null`;
 - existing `status`/`uptime`/`timestamp` assertions stay.
 
-### 3.6 [` apps/web/src/pages/HomePage.tsx `](../../apps/web/src/pages/HomePage.tsx:1)
+### 3.6 [`apps/web/src/pages/HomePage.tsx`](../../apps/web/src/pages/HomePage.tsx:1)
 
 Render a small footer line on the front page (below the feature grid):
 
@@ -151,7 +153,7 @@ const commitHash = import.meta.env.VITE_COMMIT_HASH as string | undefined;
 Show `deployDate` (humanised) and the full `commitHash`, hiding or
 rendering `—` when undefined (local `vite` dev server has no such vars).
 
-### 3.7 [` apps/admin/src/pages/DashboardPage.tsx `](../../apps/admin/src/pages/DashboardPage.tsx:1)
+### 3.7 [`apps/admin/src/pages/DashboardPage.tsx`](../../apps/admin/src/pages/DashboardPage.tsx:1)
 
 Same build-info line, placed at the bottom of the authenticated `/`
 dashboard (admin `/` is [`DashboardPage`](../../apps/admin/src/pages/DashboardPage.tsx:18)).

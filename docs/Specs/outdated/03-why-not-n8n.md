@@ -55,15 +55,15 @@ amit üzemeltetni, védeni és verziózni kell — új meghibásodási pont.
 
 ## n8n vs. kód-alapú gerinc
 
-| Szempont | n8n | Kód-alapú gerinc (NestJS / Laravel) |
-|---|---|---|
-| Állapotgép | Nehezen, vizuálisan | Típusos, explicit tranzíciók |
-| Tranzakció (DB + queue) | Nincs natívan | pg-boss / database driver, natívan |
-| Idempotencia | Kerülőutakkal | Dedup-kulcs + unique constraint |
-| Tesztelés | Gyenge | Unit-teszt, type-safe |
-| Verziókezelés | JSON-export | Git, review, CI/CD |
-| Függőség | Plusz runtime | Nincs plusz komponens |
-| Erősség | 3. feles összekötése gyorsan | Determinista, állapottartó backend |
+| Szempont                | n8n                          | Kód-alapú gerinc (NestJS / Laravel) |
+| ----------------------- | ---------------------------- | ----------------------------------- |
+| Állapotgép              | Nehezen, vizuálisan          | Típusos, explicit tranzíciók        |
+| Tranzakció (DB + queue) | Nincs natívan                | pg-boss / database driver, natívan  |
+| Idempotencia            | Kerülőutakkal                | Dedup-kulcs + unique constraint     |
+| Tesztelés               | Gyenge                       | Unit-teszt, type-safe               |
+| Verziókezelés           | JSON-export                  | Git, review, CI/CD                  |
+| Függőség                | Plusz runtime                | Nincs plusz komponens               |
+| Erősség                 | 3. feles összekötése gyorsan | Determinista, állapottartó backend  |
 
 ## Miért javasolja Kálmán mégis mindenhova?
 

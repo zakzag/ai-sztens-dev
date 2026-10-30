@@ -1,6 +1,7 @@
 # Silence spurious ERROR lines from VapiSignatureGuard unit and e2e tests
 
 ## Context
+
 Running the API test suites surfaced Nest log lines that looked like real
 production failures even though every test passed:
 
@@ -14,24 +15,26 @@ guard specs; `pnpm test:e2e` emitted them again — once each — from the
 e2e negative paths.
 
 ## Diagnosis
+
 All four ERROR lines come from negative-path branches inside
 [`apps/api/src/vapi-webhooks/vapi-signature.guard.ts`](../../apps/api/src/vapi-webhooks/vapi-signature.guard.ts:88) (`canActivate()`),
-which logs *before* throwing — correct production behaviour (operators
+which logs _before_ throwing — correct production behaviour (operators
 reading live logs deserve to know why a webhook was rejected). The tests
 assert on the throw; the log is the noise we want to mute.
 
-| Log line | Source |
-|---|---|
-| `rawBody missing` (unit) | `apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts` — `'throws UnauthorizedException when the raw body is missing'` |
+| Log line                                    | Source                                                                                                                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `rawBody missing` (unit)                    | `apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts` — `'throws UnauthorizedException when the raw body is missing'`                                    |
 | `VAPI_WEBHOOK_SECRET not configured` (unit) | same file — `'throws InternalServerErrorException when the secret is not configured (fail closed)'` (twice: `makeGuard({})` and `makeGuard({ secret: '' })`) |
-| `rawBody missing` (e2e) | `apps/api/test/vapi-webhooks.e2e-spec.ts` — `'rejects the request when raw body capture is disabled (regression guard)'` |
-| `VAPI_WEBHOOK_SECRET not configured` (e2e) | same file — `'fails closed with 500 when no secret is configured'` |
+| `rawBody missing` (e2e)                     | `apps/api/test/vapi-webhooks.e2e-spec.ts` — `'rejects the request when raw body capture is disabled (regression guard)'`                                     |
+| `VAPI_WEBHOOK_SECRET not configured` (e2e)  | same file — `'fails closed with 500 when no secret is configured'`                                                                                           |
 
 The controller spec does not use the guard, so its `PASS` line shows up
 because of Jest's per-worker parallelism and stderr-flush ordering, not
 because of anything in that file.
 
 ## Fix
+
 Suppress the guard's intentional failure-path log emissions inside both
 suites, while still asserting on the thrown exception / returned status
 code.

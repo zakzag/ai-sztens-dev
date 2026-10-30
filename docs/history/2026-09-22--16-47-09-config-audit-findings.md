@@ -9,28 +9,28 @@
 
 ### `.env.example` files (5) — committed
 
-| Path | Purpose |
-|---|---|
-| [`infra/.env.example`](../../infra/.env.example) | Runtime stack: domain, ACME, API, Postgres, monitor, CORS, webhook secret |
-| [`apps/api/.env.example`](../../apps/api/.env.example) | API dev defaults (PORT, CORS_ORIGINS) |
-| [`apps/web/.env.example`](../../apps/web/.env.example) | Frontend dev: VITE_API_BASE_URL |
-| [`apps/admin/.env.example`](../../apps/admin/.env.example) | Admin dev: VITE_API_BASE_URL |
-| [`deploy/.env.example`](../../deploy/.env.example) | Droplet config: HOST, SSH_USER, REMOTE_DIR, users, UFW |
+| Path                                                       | Purpose                                                                   |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [`infra/.env.example`](../../infra/.env.example)           | Runtime stack: domain, ACME, API, Postgres, monitor, CORS, webhook secret |
+| [`apps/api/.env.example`](../../apps/api/.env.example)     | API dev defaults (PORT, CORS_ORIGINS)                                     |
+| [`apps/web/.env.example`](../../apps/web/.env.example)     | Frontend dev: VITE_API_BASE_URL                                           |
+| [`apps/admin/.env.example`](../../apps/admin/.env.example) | Admin dev: VITE_API_BASE_URL                                              |
+| [`deploy/.env.example`](../../deploy/.env.example)         | Droplet config: HOST, SSH_USER, REMOTE_DIR, users, UFW                    |
 
 ### Real `.env` files (2) — present, gitignored
 
-| Path | Status |
-|---|---|
-| [`infra/.env`](../../infra/.env) | Present, filled with `aisztens.hu` values |
-| [`deploy/.env`](../../deploy/.env) | Present, but `HOST=` is empty |
+| Path                               | Status                                    |
+| ---------------------------------- | ----------------------------------------- |
+| [`infra/.env`](../../infra/.env)   | Present, filled with `aisztens.hu` values |
+| [`deploy/.env`](../../deploy/.env) | Present, but `HOST=` is empty             |
 
 ### Missing `.env` files (3)
 
-| Path | Notes |
-|---|---|
-| `apps/api/.env` | Not required at runtime (Docker sets `PORT`, `CORS_ORIGINS`, `DATABASE_URL`, `VAPI_WEBHOOK_SECRET`). Optional for local `pnpm dev`. |
-| `apps/web/.env` | Same — only needed for local Vite dev. |
-| `apps/admin/.env` | Same. |
+| Path              | Notes                                                                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env`   | Not required at runtime (Docker sets `PORT`, `CORS_ORIGINS`, `DATABASE_URL`, `VAPI_WEBHOOK_SECRET`). Optional for local `pnpm dev`. |
+| `apps/web/.env`   | Same — only needed for local Vite dev.                                                                                              |
+| `apps/admin/.env` | Same.                                                                                                                               |
 
 ### SSH public keys (`deploy/ssh-keys/`)
 
@@ -42,36 +42,36 @@ the plan called for them, only real `.pub` files exist locally.
 
 ### [`infra/.env`](../../infra/.env)
 
-| Var | Value | Verdict |
-|---|---|---|
-| `DOMAIN` | `localhost` | Wrong for production; should be `aisztens.hu` (Caddy uses this for TLS + vhosts). |
-| `ACME_EMAIL` | `ops@example.com` | Wrong — Let's Encrypt will email ops@example.com instead of you. |
-| `API_PORT` | `3000` | OK |
-| `CORS_ORIGINS` | `https://aisztens.hu,...` | OK (matches the domain pattern expected) |
-| `VAPI_WEBHOOK_SECRET` | `change-me-vapi-secret` | **Placeholder — must be replaced** before VAPI integration. |
-| `POSTGRES_DB` | `aisztens_db` | OK |
-| `POSTGRES_USER` | `postgres` | OK |
-| `POSTGRES_PASSWORD` | `postgres.238!` | OK (rotated, not the example placeholder) |
-| `AISZTENS_DB_USER` | `aisztens` | OK |
-| `AISZTENS_DB_PASSWORD` | `aisztens.238!` | OK |
-| `TKOVARI_DB_PASSWORD` | `Sentinel.647` | OK |
-| `KRAK_DB_PASSWORD` | `krak.238!` | OK |
-| `MONITOR_TARGET_URL` | `http://api:3000/api` | OK |
-| `MONITOR_INTERVAL_SECONDS` | `30` | OK |
-| `MONITOR_ALERT_WEBHOOK_URL` | empty | Optional but recommended (Healthchecks.io / Slack / Discord). |
-| `MONITOR_FAIL_THRESHOLD` | not in `.env.example`, defaulted by `docker-compose.yml` to `2` | OK (uses compose default) |
-| `WEB_DIST_PATH`, `ADMIN_DIST_PATH` | left empty in compose | OK (commented out in compose) |
+| Var                                | Value                                                           | Verdict                                                                           |
+| ---------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `DOMAIN`                           | `localhost`                                                     | Wrong for production; should be `aisztens.hu` (Caddy uses this for TLS + vhosts). |
+| `ACME_EMAIL`                       | `ops@example.com`                                               | Wrong — Let's Encrypt will email ops@example.com instead of you.                  |
+| `API_PORT`                         | `3000`                                                          | OK                                                                                |
+| `CORS_ORIGINS`                     | `https://aisztens.hu,...`                                       | OK (matches the domain pattern expected)                                          |
+| `VAPI_WEBHOOK_SECRET`              | `change-me-vapi-secret`                                         | **Placeholder — must be replaced** before VAPI integration.                       |
+| `POSTGRES_DB`                      | `aisztens_db`                                                   | OK                                                                                |
+| `POSTGRES_USER`                    | `postgres`                                                      | OK                                                                                |
+| `POSTGRES_PASSWORD`                | `postgres.238!`                                                 | OK (rotated, not the example placeholder)                                         |
+| `AISZTENS_DB_USER`                 | `aisztens`                                                      | OK                                                                                |
+| `AISZTENS_DB_PASSWORD`             | `aisztens.238!`                                                 | OK                                                                                |
+| `TKOVARI_DB_PASSWORD`              | `Sentinel.647`                                                  | OK                                                                                |
+| `KRAK_DB_PASSWORD`                 | `krak.238!`                                                     | OK                                                                                |
+| `MONITOR_TARGET_URL`               | `http://api:3000/api`                                           | OK                                                                                |
+| `MONITOR_INTERVAL_SECONDS`         | `30`                                                            | OK                                                                                |
+| `MONITOR_ALERT_WEBHOOK_URL`        | empty                                                           | Optional but recommended (Healthchecks.io / Slack / Discord).                     |
+| `MONITOR_FAIL_THRESHOLD`           | not in `.env.example`, defaulted by `docker-compose.yml` to `2` | OK (uses compose default)                                                         |
+| `WEB_DIST_PATH`, `ADMIN_DIST_PATH` | left empty in compose                                           | OK (commented out in compose)                                                     |
 
 ### [`deploy/.env`](../../deploy/.env)
 
-| Var | Value | Verdict |
-|---|---|---|
-| `HOST` | **empty** | **Required** — first deploy will fail with `HOST:? Set HOST= in deploy/.env`. |
-| `SSH_USER` | `root` | OK for first deploy |
-| `REMOTE_DIR` | `/opt/aisztens` | **Inconsistent** — see finding A1 below. |
-| `SUDO_USERS` | `tkovari,krak,deployer` | OK |
-| `APP_USER` | `aisztens` | OK |
-| `UFW_ENABLE` | `0` | OK (cloud firewall is on) |
+| Var          | Value                   | Verdict                                                                       |
+| ------------ | ----------------------- | ----------------------------------------------------------------------------- |
+| `HOST`       | **empty**               | **Required** — first deploy will fail with `HOST:? Set HOST= in deploy/.env`. |
+| `SSH_USER`   | `root`                  | OK for first deploy                                                           |
+| `REMOTE_DIR` | `/opt/aisztens`         | **Inconsistent** — see finding A1 below.                                      |
+| `SUDO_USERS` | `tkovari,krak,deployer` | OK                                                                            |
+| `APP_USER`   | `aisztens`              | OK                                                                            |
+| `UFW_ENABLE` | `0`                     | OK (cloud firewall is on)                                                     |
 
 ## 3. Findings
 
@@ -80,7 +80,7 @@ the plan called for them, only real `.pub` files exist locally.
 1. **A1 — `REMOTE_DIR` mismatch.** [`deploy/.env`](../../deploy/.env) sets `REMOTE_DIR=/opt/aisztens`, but [`deploy/deploy.sh:29`](../../deploy/deploy.sh:29) and [`deploy/bootstrap.sh:11,19`](../../deploy/bootstrap.sh:11) hard-code `/opt/callback` (and the README at [`deploy/README.md:43`](../../deploy/README.md:43) references `/opt/callback`). On the first run:
    - `deploy.sh up` will `rsync` into `/opt/aisztens`,
    - but `bootstrap.sh` will look for SSH keys under `/opt/callback/deploy/ssh-keys` and fail with `WARNING: no public key at ...`.
-   Fix: pick one path and align all three files (recommended: keep `/opt/aisztens` because the running app user is `aisztens`, then update both shell scripts and the README).
+     Fix: pick one path and align all three files (recommended: keep `/opt/aisztens` because the running app user is `aisztens`, then update both shell scripts and the README).
 
 2. **A2 — `deploy/.env` has empty `HOST`.** First deploy will exit immediately. Fill in the droplet's public IPv4 or DNS hostname.
 

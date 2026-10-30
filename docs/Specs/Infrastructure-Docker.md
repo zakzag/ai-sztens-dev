@@ -58,30 +58,30 @@ flowchart LR
 
 ## 2. Jelmagyarázat / Legend
 
-| Jel | Jelentés |
-|---|---|
-| Folyamatos nyíl | Runtime forgalom (HTTP/HTTPS kérés vagy adatbázis-kapcsolat) |
-| Szaggatott vonal | Mount / kötet-csatolás a named volume-hoz |
-| `depends_on` | Compose indítási sorrend (nem adatforgalom) — lásd a táblázatot lent |
+| Jel              | Jelentés                                                             |
+| ---------------- | -------------------------------------------------------------------- |
+| Folyamatos nyíl  | Runtime forgalom (HTTP/HTTPS kérés vagy adatbázis-kapcsolat)         |
+| Szaggatott vonal | Mount / kötet-csatolás a named volume-hoz                            |
+| `depends_on`     | Compose indítási sorrend (nem adatforgalom) — lásd a táblázatot lent |
 
 ## 3. Mi van az egyes konténerekben?
 
-| Service | Image | Tartalma / mit futtat | Belső port | mem_limit | depends_on |
-|---|---|---|---|---|---|
-| `caddy` | `caddy:2-alpine` | Renderelt `Caddyfile.rendered`; TLS termináció + reverse proxy + ACME | 80, 443 (host-publikált) | 64m | `api`, `web`, `admin` started |
-| `api` | `ghcr.io/…/aisztens-api` | NestJS + Fastify alkalmazás; `node apps/api/dist/main.js`; `NODE_OPTIONS=--max-old-space-size=384` | 3000 | 400m | `postgres` healthy |
-| `web` | `ghcr.io/…/aisztens-web` | nginx:1.27-alpine a `@callback/web` Vite build-jét szolgálja ki | 80 | 32m | — |
-| `admin` | `ghcr.io/…/aisztens-admin` | nginx:1.27-alpine a `@callback/admin` Vite build-jét szolgálja ki | 80 | 32m | — |
-| `postgres` | `postgres:16-alpine` | PostgreSQL; idempotens role/db/séma init a `./postgres/init`-ből ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh), [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh)); `shared_buffers=128MB` | 5432 | 400m | — |
-| `monitor` | `ghcr.io/…/aisztens-monitor` | alpine:3.20 + curl + `watch.sh` polling loop | — | 32m | `api` started |
+| Service    | Image                        | Tartalma / mit futtat                                                                                                                                                                                         | Belső port               | mem_limit | depends_on                    |
+| ---------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------- | ----------------------------- |
+| `caddy`    | `caddy:2-alpine`             | Renderelt `Caddyfile.rendered`; TLS termináció + reverse proxy + ACME                                                                                                                                         | 80, 443 (host-publikált) | 64m       | `api`, `web`, `admin` started |
+| `api`      | `ghcr.io/…/aisztens-api`     | NestJS + Fastify alkalmazás; `node apps/api/dist/main.js`; `NODE_OPTIONS=--max-old-space-size=384`                                                                                                            | 3000                     | 400m      | `postgres` healthy            |
+| `web`      | `ghcr.io/…/aisztens-web`     | nginx:1.27-alpine a `@callback/web` Vite build-jét szolgálja ki                                                                                                                                               | 80                       | 32m       | —                             |
+| `admin`    | `ghcr.io/…/aisztens-admin`   | nginx:1.27-alpine a `@callback/admin` Vite build-jét szolgálja ki                                                                                                                                             | 80                       | 32m       | —                             |
+| `postgres` | `postgres:16-alpine`         | PostgreSQL; idempotens role/db/séma init a `./postgres/init`-ből ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh), [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh)); `shared_buffers=128MB` | 5432                     | 400m      | —                             |
+| `monitor`  | `ghcr.io/…/aisztens-monitor` | alpine:3.20 + curl + `watch.sh` polling loop                                                                                                                                                                  | —                        | 32m       | `api` started                 |
 
 ## 4. Named volume-ok
 
-| Volume | Mount-pont | Cél |
-|---|---|---|
-| `pgdata` | postgres `/var/lib/postgresql/data` | Adatbázis-adatok perzisztenciája |
-| `caddy_data` | caddy `/data` | Let's Encrypt tanúsítványok + ACME állapot |
-| `caddy_config` | caddy `/config` | Caddy futásidejű konfiguráció |
+| Volume         | Mount-pont                          | Cél                                        |
+| -------------- | ----------------------------------- | ------------------------------------------ |
+| `pgdata`       | postgres `/var/lib/postgresql/data` | Adatbázis-adatok perzisztenciája           |
+| `caddy_data`   | caddy `/data`                       | Let's Encrypt tanúsítványok + ACME állapot |
+| `caddy_config` | caddy `/config`                     | Caddy futásidejű konfiguráció              |
 
 ## 5. Kommunikáció összefoglaló
 
@@ -100,11 +100,11 @@ flowchart LR
 
 A `api`, `web` és `admin` ugyanabból a monorepóból, ugyanabban a CI jobban épül, de **három külön Dockerfile** van, és mindegyik más package-et választ ki a `pnpm --filter` segítségével:
 
-| App | Dockerfile | Mit buildel / mi kerül a képbe | Runtime a képben |
-|---|---|---|---|
-| `api` | [`infra/app/Dockerfile`](../../infra/app/Dockerfile) | `@callback/shared` + `@callback/api` → `apps/api/dist` | Node 22, `node apps/api/dist/main.js` |
-| `web` | [`infra/web/Dockerfile`](../../infra/web/Dockerfile) | `@callback/shared` + `@callback/web` → `apps/web/dist` | nginx:1.27-alpine |
-| `admin` | [`infra/admin/Dockerfile`](../../infra/admin/Dockerfile) | `@callback/shared` + `@callback/admin` → `apps/admin/dist` | nginx:1.27-alpine |
+| App     | Dockerfile                                               | Mit buildel / mi kerül a képbe                             | Runtime a képben                      |
+| ------- | -------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------- |
+| `api`   | [`infra/app/Dockerfile`](../../infra/app/Dockerfile)     | `@callback/shared` + `@callback/api` → `apps/api/dist`     | Node 22, `node apps/api/dist/main.js` |
+| `web`   | [`infra/web/Dockerfile`](../../infra/web/Dockerfile)     | `@callback/shared` + `@callback/web` → `apps/web/dist`     | nginx:1.27-alpine                     |
+| `admin` | [`infra/admin/Dockerfile`](../../infra/admin/Dockerfile) | `@callback/shared` + `@callback/admin` → `apps/admin/dist` | nginx:1.27-alpine                     |
 
 A szétválasztás két ponton történik:
 
@@ -119,19 +119,19 @@ A szétválasztás két ponton történik:
 
 Az [`.github/workflows/images.yml`](../../.github/workflows/images.yml) `Compute image metadata` lépése **egyetlen forrásból** számolja a metadata-t, így a három kép ugyanazt az értéket kapja egy adott revízióhoz:
 
-| Output | Érték | Felhasználás |
-|---|---|---|
-| `short_sha` | `github.sha` első 7 karaktere | Image tag (`sha-<7>`) — változatlan |
+| Output        | Érték                             | Felhasználás                                  |
+| ------------- | --------------------------------- | --------------------------------------------- |
+| `short_sha`   | `github.sha` első 7 karaktere     | Image tag (`sha-<7>`) — változatlan           |
 | `commit_hash` | teljes `github.sha` (40 karakter) | api: `COMMIT_HASH`, SPA-k: `VITE_COMMIT_HASH` |
-| `deploy_date` | `date -u +%Y-%m-%dT%H:%M:%SZ` | api: `DEPLOY_DATE`, SPA-k: `VITE_DEPLOY_DATE` |
+| `deploy_date` | `date -u +%Y-%m-%dT%H:%M:%SZ`     | api: `DEPLOY_DATE`, SPA-k: `VITE_DEPLOY_DATE` |
 
 A build-argok célja Dockerfile-onként:
 
-| Dockerfile | Build-arg | Hogyan kerül a képbe | Hol jelenik meg |
-|---|---|---|---|
-| [`infra/app/Dockerfile`](../../infra/app/Dockerfile) | `COMMIT_HASH`, `DEPLOY_DATE` | `ARG` + `ENV` a **runtime** stage-ben (egy intermediate stage ENV-je nem öröklődik át egy későbbi `FROM`-ba) | `GET /healthz` → `commitHash`, `deployDate` |
-| [`infra/web/Dockerfile`](../../infra/web/Dockerfile) | `VITE_COMMIT_HASH`, `VITE_DEPLOY_DATE` | `ARG` + `ENV` a **build** stage-ben, hogy a Vite lássa (csak `VITE_*` prefixű változó kerül a kliens bundle-be) | `web` kezdőlap jobb alsó build-info sora |
-| [`infra/admin/Dockerfile`](../../infra/admin/Dockerfile) | `VITE_COMMIT_HASH`, `VITE_DEPLOY_DATE` | ugyanaz, mint a `web`-nél | `admin` dashboard build-info sora |
+| Dockerfile                                               | Build-arg                              | Hogyan kerül a képbe                                                                                            | Hol jelenik meg                             |
+| -------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| [`infra/app/Dockerfile`](../../infra/app/Dockerfile)     | `COMMIT_HASH`, `DEPLOY_DATE`           | `ARG` + `ENV` a **runtime** stage-ben (egy intermediate stage ENV-je nem öröklődik át egy későbbi `FROM`-ba)    | `GET /healthz` → `commitHash`, `deployDate` |
+| [`infra/web/Dockerfile`](../../infra/web/Dockerfile)     | `VITE_COMMIT_HASH`, `VITE_DEPLOY_DATE` | `ARG` + `ENV` a **build** stage-ben, hogy a Vite lássa (csak `VITE_*` prefixű változó kerül a kliens bundle-be) | `web` kezdőlap jobb alsó build-info sora    |
+| [`infra/admin/Dockerfile`](../../infra/admin/Dockerfile) | `VITE_COMMIT_HASH`, `VITE_DEPLOY_DATE` | ugyanaz, mint a `web`-nél                                                                                       | `admin` dashboard build-info sora           |
 
 A `monitor` kép szándékosan nem kapja meg ezeket (nincs rájuk szüksége).
 
@@ -166,19 +166,19 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml \
   exec -T postgres bash /docker-entrypoint-initdb.d/02-schemas.sh
 ```
 
-| Script | Felelősség |
-|---|---|
-| [`01-roles.sh`](../../infra/postgres/init/01-roles.sh) | `aisztens` (app), `tkovari` (owner) és `krak` (operátor) role; a database tulajdonosa az `aisztens`; séma-szintű grantok `\gexec`-guarddal — friss initen no-op, mert a sémák ekkor még nem léteznek |
-| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform` és `email` sémákra, majd a grant-mátrix |
+| Script                                                     | Felelősség                                                                                                                                                                                           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`01-roles.sh`](../../infra/postgres/init/01-roles.sh)     | `aisztens` (app), `tkovari` (owner) és `krak` (operátor) role; a database tulajdonosa az `aisztens`; séma-szintű grantok `\gexec`-guarddal — friss initen no-op, mert a sémák ekkor még nem léteznek |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform` és `email` sémákra, majd a grant-mátrix                                                                                                                   |
 
 Séma ↔ bounded context: `platform` (üzemeltetési adatok + az alkalmazás táblái,
 pl. `platform.api_keys`), `email` (email engine). A sémahatár egyben modulhatár,
 ezért a grantok is ezt követik:
 
-| Séma | `aisztens` (app) | `tkovari` (owner) | `krak` (operátor) |
-|---|---|---|---|
-| `platform` | USAGE + **CREATE** | USAGE | USAGE |
-| `email` | USAGE | USAGE | USAGE |
+| Séma       | `aisztens` (app)   | `tkovari` (owner) | `krak` (operátor) |
+| ---------- | ------------------ | ----------------- | ----------------- |
+| `platform` | USAGE + **CREATE** | USAGE             | USAGE             |
+| `email`    | USAGE              | USAGE             | USAGE             |
 
 > **AIS-64 (2026-10-21):** a `callback` séma megszűnt (a teljes visszahívás-funkció
 > törlése). A korábbi mátrixban szereplő `callback | USAGE + CREATE` sor eltűnt;

@@ -47,9 +47,8 @@ import { ApiKeyForm } from './ApiKeyForm.js';
  * imports the mock module dynamically because `vi.mock` calls are hoisted.
  */
 vi.mock('../../../services/api-client.js', async () => {
-  const { API_KEYS_SERVICE_MOCK: serviceMock } = await import(
-    '../../../test/mocks/api-keys.mock.js'
-  );
+  const { API_KEYS_SERVICE_MOCK: serviceMock } =
+    await import('../../../test/mocks/api-keys.mock.js');
 
   return { apiKeysService: serviceMock.service };
 });
@@ -81,11 +80,13 @@ function getSubmitButton(): HTMLElement {
  *
  * @param overrides - values that differ from the defaults.
  */
-async function fillRequiredFields(overrides: {
-  readonly name?: string;
-  readonly identifier?: string;
-  readonly apiKey?: string;
-} = {}): Promise<void> {
+async function fillRequiredFields(
+  overrides: {
+    readonly name?: string;
+    readonly identifier?: string;
+    readonly apiKey?: string;
+  } = {},
+): Promise<void> {
   await userEvent.type(
     screen.getByLabelText(API_KEY_FORM_LABELS.name),
     overrides.name ?? 'Vapi staging',
@@ -110,11 +111,15 @@ describe('ApiKeyForm', () => {
 
     await userEvent.click(getSubmitButton());
 
-    expect(await screen.findByText(API_KEY_FORM_VALIDATION_MESSAGES.nameRequired)).toBeInTheDocument();
+    expect(
+      await screen.findByText(API_KEY_FORM_VALIDATION_MESSAGES.nameRequired),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(API_KEY_FORM_VALIDATION_MESSAGES.identifierRequired),
     ).toBeInTheDocument();
-    expect(screen.getByText(API_KEY_FORM_VALIDATION_MESSAGES.apiKeyRequired)).toBeInTheDocument();
+    expect(
+      screen.getByText(API_KEY_FORM_VALIDATION_MESSAGES.apiKeyRequired),
+    ).toBeInTheDocument();
     expect(API_KEYS_SERVICE_MOCK.createMock).not.toHaveBeenCalled();
   });
 
@@ -125,7 +130,9 @@ describe('ApiKeyForm', () => {
     await userEvent.click(getSubmitButton());
 
     expect(
-      await screen.findByText(API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid),
+      await screen.findByText(
+        API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid,
+      ),
     ).toBeInTheDocument();
     expect(API_KEYS_SERVICE_MOCK.createMock).not.toHaveBeenCalled();
   });
@@ -146,9 +153,13 @@ describe('ApiKeyForm', () => {
       apiKey: 'sk-stage-42',
     });
 
-    expect(await screen.findByText(API_KEY_FORM_SUCCESS_MESSAGE)).toBeInTheDocument();
+    expect(
+      await screen.findByText(API_KEY_FORM_SUCCESS_MESSAGE),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(API_KEY_FORM_LABELS.name)).toHaveValue('');
-    expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).toHaveValue('');
+    expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).toHaveValue(
+      '',
+    );
     expect(screen.getByLabelText(API_KEY_FORM_LABELS.apiKey)).toHaveValue('');
   });
 
@@ -156,7 +167,10 @@ describe('ApiKeyForm', () => {
     renderForm();
 
     await fillRequiredFields();
-    await userEvent.type(screen.getByLabelText(API_KEY_FORM_LABELS.description), 'Éles kulcs');
+    await userEvent.type(
+      screen.getByLabelText(API_KEY_FORM_LABELS.description),
+      'Éles kulcs',
+    );
     fireEvent.change(screen.getByLabelText(API_KEY_FORM_LABELS.expiresAt), {
       target: { value: '2027-01-31' },
     });
@@ -179,19 +193,24 @@ describe('ApiKeyForm', () => {
   });
 
   it('maps a 409 onto the identifier field instead of the page', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createConflictError());
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
+      createConflictError(),
+    );
 
     renderForm();
 
     await fillRequiredFields();
     await userEvent.click(getSubmitButton());
 
-    expect(await screen.findByText(API_KEY_IDENTIFIER_CONFLICT_MESSAGE)).toBeInTheDocument();
-    expect(screen.queryByText(API_KEY_FORM_ERROR_TITLE)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).toHaveAttribute(
-      'aria-invalid',
-      'true',
-    );
+    expect(
+      await screen.findByText(API_KEY_IDENTIFIER_CONFLICT_MESSAGE),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(API_KEY_FORM_ERROR_TITLE),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText(API_KEY_FORM_LABELS.identifier),
+    ).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('shows a page-level error for a non-conflict failure', async () => {
@@ -202,28 +221,37 @@ describe('ApiKeyForm', () => {
     await fillRequiredFields();
     await userEvent.click(getSubmitButton());
 
-    expect(await screen.findByText(API_KEY_FORM_ERROR_TITLE)).toBeInTheDocument();
+    expect(
+      await screen.findByText(API_KEY_FORM_ERROR_TITLE),
+    ).toBeInTheDocument();
     expect(screen.getByText(SERVER_ERROR_MESSAGE)).toBeInTheDocument();
-    expect(screen.queryByText(API_KEY_IDENTIFIER_CONFLICT_MESSAGE)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).not.toHaveAttribute(
-      'aria-invalid',
-    );
+    expect(
+      screen.queryByText(API_KEY_IDENTIFIER_CONFLICT_MESSAGE),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText(API_KEY_FORM_LABELS.identifier),
+    ).not.toHaveAttribute('aria-invalid');
   });
 
   it('keeps a legacy 409 without details on the identifier field', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createLegacyConflictError());
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
+      createLegacyConflictError(),
+    );
 
     renderForm();
 
     await fillRequiredFields();
     await userEvent.click(getSubmitButton());
 
-    expect(await screen.findByText(API_KEY_IDENTIFIER_CONFLICT_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).toHaveAttribute(
-      'aria-invalid',
-      'true',
-    );
-    expect(screen.queryByText(API_KEY_FORM_ERROR_TITLE)).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(API_KEY_IDENTIFIER_CONFLICT_MESSAGE),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(API_KEY_FORM_LABELS.identifier),
+    ).toHaveAttribute('aria-invalid', 'true');
+    expect(
+      screen.queryByText(API_KEY_FORM_ERROR_TITLE),
+    ).not.toBeInTheDocument();
   });
 
   it('puts every addressable field of a 400 on its own input', async () => {
@@ -254,7 +282,9 @@ describe('ApiKeyForm', () => {
   });
 
   it('shows no page alert when the server blamed a field only', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createValidationError());
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
+      createValidationError(),
+    );
 
     renderForm();
 
@@ -262,15 +292,18 @@ describe('ApiKeyForm', () => {
     await userEvent.click(getSubmitButton());
 
     expect(await screen.findByText(FIELD_INVALID_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).toHaveAttribute(
-      'aria-invalid',
-      'true',
-    );
-    expect(screen.queryByText(API_KEY_FORM_ERROR_TITLE)).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText(API_KEY_FORM_LABELS.identifier),
+    ).toHaveAttribute('aria-invalid', 'true');
+    expect(
+      screen.queryByText(API_KEY_FORM_ERROR_TITLE),
+    ).not.toBeInTheDocument();
   });
 
   it('re-enables the submit button after a field-level failure', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createConflictError());
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
+      createConflictError(),
+    );
 
     renderForm();
 
@@ -285,7 +318,9 @@ describe('ApiKeyForm', () => {
   });
 
   it('never renders the server text of a 5xx', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createServerError(500, true));
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
+      createServerError(500, true),
+    );
 
     renderForm();
 
@@ -293,7 +328,9 @@ describe('ApiKeyForm', () => {
     await userEvent.click(getSubmitButton());
 
     expect(await screen.findByText(SERVER_ERROR_MESSAGE)).toBeInTheDocument();
-    expect(screen.queryByText(/Database is unavailable/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Database is unavailable/),
+    ).not.toBeInTheDocument();
   });
 
   it('disables the submit and shows the pending label while the request is in flight', async () => {

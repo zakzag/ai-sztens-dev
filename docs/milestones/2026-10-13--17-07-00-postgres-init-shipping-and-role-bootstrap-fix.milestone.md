@@ -15,14 +15,14 @@ checking the live droplet. Three defects surfaced:
 
 ## 2. Measured data / evidence
 
-| Observation | Command / source | Result |
-|---|---|---|
-| Roles present | `SELECT rolname FROM pg_roles` | only `postgres` + built-in `pg_*`; `aisztens`, `tkovari`, `krak` **absent** |
-| Why no init ran | `docker logs aisztens-postgres-1` | `PostgreSQL Database directory appears to contain a database; Skipping initialization` |
-| Bind mount target | `docker inspect -f '{{range .Mounts}}…' aisztens-postgres-1` | `bind /opt/aisztens/infra/postgres/init -> /docker-entrypoint-initdb.d (rw=false)` |
-| Data volume | same | `volume aisztens_pgdata -> /var/lib/postgresql/data (rw=true)` |
-| Init script behaviour | `docker compose exec -T postgres bash /docker-entrypoint-initdb.d/01-roles.sh` | `ERROR: syntax error at or near ":"` (exit 3) |
-| Postgres source | [`deploy/.env.example`](../../deploy/.env.example) + compose | `postgres:16-alpine` from Docker Hub, exempt from `IMAGE_TAG` |
+| Observation           | Command / source                                                               | Result                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Roles present         | `SELECT rolname FROM pg_roles`                                                 | only `postgres` + built-in `pg_*`; `aisztens`, `tkovari`, `krak` **absent**            |
+| Why no init ran       | `docker logs aisztens-postgres-1`                                              | `PostgreSQL Database directory appears to contain a database; Skipping initialization` |
+| Bind mount target     | `docker inspect -f '{{range .Mounts}}…' aisztens-postgres-1`                   | `bind /opt/aisztens/infra/postgres/init -> /docker-entrypoint-initdb.d (rw=false)`     |
+| Data volume           | same                                                                           | `volume aisztens_pgdata -> /var/lib/postgresql/data (rw=true)`                         |
+| Init script behaviour | `docker compose exec -T postgres bash /docker-entrypoint-initdb.d/01-roles.sh` | `ERROR: syntax error at or near ":"` (exit 3)                                          |
+| Postgres source       | [`deploy/.env.example`](../../deploy/.env.example) + compose                   | `postgres:16-alpine` from Docker Hub, exempt from `IMAGE_TAG`                          |
 
 ## 3. Root cause / design rationale
 
@@ -41,12 +41,12 @@ checking the live droplet. Three defects surfaced:
 
 ## 4. Solution / implementation
 
-| File | Change |
-|---|---|
-| `.github/workflows/deploy.yml` | `infra/postgres/init` added to the deploy job's `sparse-checkout` **and** to the `appleboy/scp-action` `source` list, with a comment explaining that the bind mount depends on it |
-| `deploy/deploy.sh` | `upload()` now `scp -r`s `infra/postgres/init` into `$REMOTE_DIR/infra/postgres/` (mkdir first, warn if absent); header/usage wording updated from "3 files" to "the deploy files" |
-| `infra/postgres/init/01-roles.sh` | Rewritten without `DO $$ … $$`: idempotent `SELECT format('CREATE ROLE …') WHERE NOT EXISTS … \gexec`, then `ALTER ROLE … WITH LOGIN PASSWORD …`, then `ALTER DATABASE … OWNER TO …` / `GRANT CONNECT`. The psql interpolation trap is documented in the header |
-| `docs/Specs/Infrastructure-Docker.md` | New **§6.2**: Postgres is not our image, is Docker Hub–sourced, is exempt from `IMAGE_TAG`, the container is re-created per deploy while `pgdata` persists, the init runs once per volume, plus the manual re-apply command and the `DO $$` prohibition |
+| File                                  | Change                                                                                                                                                                                                                                                          |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/deploy.yml`        | `infra/postgres/init` added to the deploy job's `sparse-checkout` **and** to the `appleboy/scp-action` `source` list, with a comment explaining that the bind mount depends on it                                                                               |
+| `deploy/deploy.sh`                    | `upload()` now `scp -r`s `infra/postgres/init` into `$REMOTE_DIR/infra/postgres/` (mkdir first, warn if absent); header/usage wording updated from "3 files" to "the deploy files"                                                                              |
+| `infra/postgres/init/01-roles.sh`     | Rewritten without `DO $$ … $$`: idempotent `SELECT format('CREATE ROLE …') WHERE NOT EXISTS … \gexec`, then `ALTER ROLE … WITH LOGIN PASSWORD …`, then `ALTER DATABASE … OWNER TO …` / `GRANT CONNECT`. The psql interpolation trap is documented in the header |
+| `docs/Specs/Infrastructure-Docker.md` | New **§6.2**: Postgres is not our image, is Docker Hub–sourced, is exempt from `IMAGE_TAG`, the container is re-created per deploy while `pgdata` persists, the init runs once per volume, plus the manual re-apply command and the `DO $$` prohibition         |
 
 D1 and D4 had to land together: shipping the init dir without fixing the script
 would make a **fresh** droplet execute the broken script at first init, fail,

@@ -24,11 +24,11 @@ It complements the droplet-side runbook
 
 ## 1. The three environments at a glance
 
-| Env | Where it runs | Config files it reads | How it boots |
-|---|---|---|---|
-| **local** | The developer's own machine (Windows / WSL / Linux / macOS) | [`infra/.env.local`](../../infra/.env.example) + [`apps/api/.env.local`](../../apps/api/.env.example) + `apps/web/.env.local` + `apps/admin/.env.local` | [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) `up` |
-| **dev** | The currently running droplet (`aisztens.hu`) | [`infra/.env.dev`](../../infra/.env.example) (rendered into `infra/.env` on the droplet by `deploy.sh` or the CI deploy) + [`deploy/.env.dev`](../../deploy/.env.example) (operator/SSH config for the dev droplet) + compose `environment:` block | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up dev` (or plain `up` — `dev` is the default target), or auto-deploy by [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) via its `workflow_run` trigger (after `images.yml` publishes the images), or a manual `workflow_dispatch` |
-| **prod** | A **future** dedicated production droplet (does not exist yet) | [`infra/.env.prod`](../../infra/.env.example) (dormant template; replace `<prod-domain>` with the real apex when provisioning) + `deploy/.env.prod` (operator/SSH config for the prod droplet) | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up prod`, or the same deploy pipeline dispatched manually with `app_env=prod` |
+| Env       | Where it runs                                                  | Config files it reads                                                                                                                                                                                                                              | How it boots                                                                                                                                                                                                                                                                                          |
+| --------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **local** | The developer's own machine (Windows / WSL / Linux / macOS)    | [`infra/.env.local`](../../infra/.env.example) + [`apps/api/.env.local`](../../apps/api/.env.example) + `apps/web/.env.local` + `apps/admin/.env.local`                                                                                            | [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) `up`                                                                                                                                                                                                                                             |
+| **dev**   | The currently running droplet (`aisztens.hu`)                  | [`infra/.env.dev`](../../infra/.env.example) (rendered into `infra/.env` on the droplet by `deploy.sh` or the CI deploy) + [`deploy/.env.dev`](../../deploy/.env.example) (operator/SSH config for the dev droplet) + compose `environment:` block | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up dev` (or plain `up` — `dev` is the default target), or auto-deploy by [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) via its `workflow_run` trigger (after `images.yml` publishes the images), or a manual `workflow_dispatch` |
+| **prod**  | A **future** dedicated production droplet (does not exist yet) | [`infra/.env.prod`](../../infra/.env.example) (dormant template; replace `<prod-domain>` with the real apex when provisioning) + `deploy/.env.prod` (operator/SSH config for the prod droplet)                                                     | [`deploy/deploy.sh`](../../deploy/deploy.sh) `up prod`, or the same deploy pipeline dispatched manually with `app_env=prod`                                                                                                                                                                           |
 
 All real env files are **gitignored** — only `*.env.example` templates are
 tracked. The plan added the patterns in
@@ -100,15 +100,15 @@ the sections below are the minimum you need to run the API.
 **before** the first start (`scripts/dev-stack.sh up` seeds it automatically,
 `pnpm db:up` does not). The bootstrap reads exactly these keys:
 
-| Key | Default if missing | Used by |
-|---|---|---|
-| `POSTGRES_DB` | `aisztens_db` | compose + both init scripts |
-| `POSTGRES_USER` | `postgres` | compose + both init scripts (superuser that runs the init) |
-| `POSTGRES_PASSWORD` | — (**required**) | compose |
-| `AISZTENS_DB_USER` | `aisztens` | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh), [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) |
-| `AISZTENS_DB_PASSWORD` | — (**required**) | `01-roles.sh` |
-| `TKOVARI_DB_PASSWORD` | — (**required**) | `01-roles.sh` |
-| `KRAK_DB_PASSWORD` | — (**required**) | `01-roles.sh` |
+| Key                    | Default if missing | Used by                                                                                                            |
+| ---------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `POSTGRES_DB`          | `aisztens_db`      | compose + both init scripts                                                                                        |
+| `POSTGRES_USER`        | `postgres`         | compose + both init scripts (superuser that runs the init)                                                         |
+| `POSTGRES_PASSWORD`    | — (**required**)   | compose                                                                                                            |
+| `AISZTENS_DB_USER`     | `aisztens`         | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh), [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) |
+| `AISZTENS_DB_PASSWORD` | — (**required**)   | `01-roles.sh`                                                                                                      |
+| `TKOVARI_DB_PASSWORD`  | — (**required**)   | `01-roles.sh`                                                                                                      |
+| `KRAK_DB_PASSWORD`     | — (**required**)   | `01-roles.sh`                                                                                                      |
 
 Placeholder passwords are enough to boot the container, but the init script then
 creates the roles with them — replace them before you post real data.
@@ -166,10 +166,10 @@ $DC logs postgres
 The bind-mounted init directory holds two scripts, and the image's entrypoint
 runs them in lexicographic order **once, on an empty `pgdata_local` volume**:
 
-| Script | Creates |
-|---|---|
-| [`01-roles.sh`](../../infra/postgres/init/01-roles.sh) | roles `aisztens` / `tkovari` / `krak`, database ownership, schema grants |
-| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | schemas `platform`, `callback`, `email` plus the grant matrix |
+| Script                                                     | Creates                                                                  |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [`01-roles.sh`](../../infra/postgres/init/01-roles.sh)     | roles `aisztens` / `tkovari` / `krak`, database ownership, schema grants |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | schemas `platform`, `callback`, `email` plus the grant matrix            |
 
 When the volume already exists (the normal case after pulling this change) the
 schemas and the `callback` `CREATE` grant are **missing**, and `db:migrate`
@@ -228,18 +228,18 @@ Vite (`apps/web`, `apps/admin`) and NestJS (`apps/api`) both resolve
 [env file conventions](https://vitejs.dev/guide/env-and-mode.html#env-files);
 NestJS's `@nestjs/config` uses the same priority order. We use:
 
-| File | Loaded when |
-|---|---|
-| `.env.example` | **Documentation only** — never loaded, always tracked. Documents what each per-env file should contain. |
-| `.env.local` | Local developer machine. It is the `.env.${APP_ENV}` candidate when `APP_ENV=local`, **and always the second candidate** in the NestJS `envFilePath` array — so it is also read when `APP_ENV` is unset (which falls back to `dev`). Values from `.env.dev` win over it, because `@nestjs/config` does not let a later file override an earlier one. Gitignored. |
-| `.env.dev` | The dev droplet (`APP_ENV=dev` via the compose `environment:` block and the `api.environment.APP_ENV` value). Gitignored. |
-| `.env.prod` | Future prod droplet (`APP_ENV=prod`). Dormant template; gitignored. |
-| `.env` | Fallback only — never written by anyone, exists only on the dev droplet pre-cutover (and on the developer machine pre-cutover). Gitignored. |
+| File           | Loaded when                                                                                                                                                                                                                                                                                                                                                      |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.env.example` | **Documentation only** — never loaded, always tracked. Documents what each per-env file should contain.                                                                                                                                                                                                                                                          |
+| `.env.local`   | Local developer machine. It is the `.env.${APP_ENV}` candidate when `APP_ENV=local`, **and always the second candidate** in the NestJS `envFilePath` array — so it is also read when `APP_ENV` is unset (which falls back to `dev`). Values from `.env.dev` win over it, because `@nestjs/config` does not let a later file override an earlier one. Gitignored. |
+| `.env.dev`     | The dev droplet (`APP_ENV=dev` via the compose `environment:` block and the `api.environment.APP_ENV` value). Gitignored.                                                                                                                                                                                                                                        |
+| `.env.prod`    | Future prod droplet (`APP_ENV=prod`). Dormant template; gitignored.                                                                                                                                                                                                                                                                                              |
+| `.env`         | Fallback only — never written by anyone, exists only on the dev droplet pre-cutover (and on the developer machine pre-cutover). Gitignored.                                                                                                                                                                                                                      |
 
 Vite's resolution priority is:
 
 1. `.env.[mode].local`
-2. `.env.[mode]`  ← the file Vite loads for `--mode dev` is `.env.dev`
+2. `.env.[mode]` ← the file Vite loads for `--mode dev` is `.env.dev`
 3. `.env.local`
 4. `.env`
 
@@ -270,11 +270,11 @@ scripts/dev-stack.sh up
 The same `APP_ENV` is set in three layers, each with a different
 responsibility:
 
-| Layer | Reads `APP_ENV` from | Effect |
-|---|---|---|
-| Shell (`scripts/dev-stack.sh`) | `export APP_ENV=...` (set by the script) | Docker compose picks the env-file by name; NestJS inherits it via the container env. |
-| Docker compose (`infra/docker-compose.yml:30`) | `APP_ENV: ${APP_ENV:-dev}` in the `api.environment:` block | Sets the **default** when the shell didn't pass one (defaults to `dev`). |
-| NestJS (`apps/api/src/app.module.ts:30`) | `ConfigModule.forRoot({ envFilePath: ['.env.${APP_ENV}', '.env.local'], ignoreEnvFile: APP_ENV === 'prod' })` | Picks the right per-env file at boot. Fail-closes in prod against `.env*` files. |
+| Layer                                          | Reads `APP_ENV` from                                                                                          | Effect                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Shell (`scripts/dev-stack.sh`)                 | `export APP_ENV=...` (set by the script)                                                                      | Docker compose picks the env-file by name; NestJS inherits it via the container env. |
+| Docker compose (`infra/docker-compose.yml:30`) | `APP_ENV: ${APP_ENV:-dev}` in the `api.environment:` block                                                    | Sets the **default** when the shell didn't pass one (defaults to `dev`).             |
+| NestJS (`apps/api/src/app.module.ts:30`)       | `ConfigModule.forRoot({ envFilePath: ['.env.${APP_ENV}', '.env.local'], ignoreEnvFile: APP_ENV === 'prod' })` | Picks the right per-env file at boot. Fail-closes in prod against `.env*` files.     |
 
 Three places, one source of truth. If you change the `APP_ENV` value in
 one place, the others propagate.
@@ -314,7 +314,7 @@ one place, the others propagate.
 - **A SPA deep link can be swallowed by the `/api` dev proxy.** Opening
   `http://localhost:5174/api-keys` directly returned the API's
   `{"message":"Cannot GET /api-keys","statusCode":404}`, because a plain `'/api'`
-  proxy key is a *prefix* match. Fixed by using the regex `'^/api/'` in
+  proxy key is a _prefix_ match. Fixed by using the regex `'^/api/'` in
   [`apps/admin/vite.config.ts`](../../apps/admin/vite.config.ts:16) and
   [`apps/web/vite.config.ts`](../../apps/web/vite.config.ts:16); check with
   `curl -s -o NUL -w "%{http_code} %{content_type}\n" http://localhost:5174/api-keys`
@@ -356,7 +356,7 @@ one place, the others propagate.
 
 - **Windows: `pnpm install` aborts with `Failed to create symlink … os error 32`**
   (`the process cannot access the file because it is being used by another
-  process`). pnpm's `node_modules/.pnpm` layout is a tree of symlinks, so any
+process`). pnpm's `node_modules/.pnpm` layout is a tree of symlinks, so any
   process holding a handle inside `node_modules` makes link creation fail —
   typically an IDE TypeScript language service (`js-language-service.js`,
   `typingsInstaller.js`), a Tailwind language server, a running
@@ -506,9 +506,9 @@ Portok: API `3000`, admin SPA `5174`, publikus web `5173`.
 1. Böngésző: **`http://localhost:5174/api-keys`** (a login oldal helyőrző: bármilyen nem üres
    jelszó beléptet).
 2. Az űrlapon öt mező: **Név, Azonosító, Leírás, API kulcs értéke, Lejárat**.
-   * `Azonosító`: egyedi, URL-biztos (`betű/szám/._-`), pl. `vapi-prod`.
-   * `API kulcs értéke`: a szolgáltatótól kapott token, pl. `sk-live-abc123`.
-   * `Lejárat`: üresen hagyható → a sorban „nincs lejárat” jelenik meg.
+   - `Azonosító`: egyedi, URL-biztos (`betű/szám/._-`), pl. `vapi-prod`.
+   - `API kulcs értéke`: a szolgáltatótól kapott token, pl. `sk-live-abc123`.
+   - `Lejárat`: üresen hagyható → a sorban „nincs lejárat” jelenik meg.
 3. **Kulcs mentése** → zöld siker-`Alert`, az űrlap kiürül, és a lista **újratöltés nélkül**
    megkapja az új sort.
 4. Ugyanazzal az azonosítóval újra mentve a hiba az **Azonosító mezőn** jelenik meg

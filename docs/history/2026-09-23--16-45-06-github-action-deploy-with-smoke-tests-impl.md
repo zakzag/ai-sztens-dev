@@ -15,12 +15,12 @@ behavioural drift between manual and automatic deploys.
 
 ## Files added
 
-| File | Purpose |
-|---|---|
-| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) | On push to `dev` (and `workflow_dispatch`): renders `infra/.env` from the `INFRA_ENV` secret, SCPs the repo to the droplet as `deployer`, runs `docker compose up -d --build`, waits for `api=healthy`, then runs `scripts/test/stack-smoke.sh` against the live stack. On failure, dumps the last 500 log lines of every container into the workflow run. |
-| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | PR-time workflow: `pnpm install --frozen-lockfile`, `pnpm -r build`, `pnpm -r lint`, `pnpm --filter @callback/api test`. Runs on PRs into `main`/`dev` and on pushes to `dev`. Concurrency cancels stale runs so PR authors get fast feedback. |
-| `docs/plans/2026-09-23--16-29-21-github-action-deploy-with-smoke-tests-plan.md` | Plan document for this change. |
-| `docs/history/2026-09-23-github-action-deploy-with-smoke-tests-impl.md` | This file. |
+| File                                                                            | Purpose                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml)            | On push to `dev` (and `workflow_dispatch`): renders `infra/.env` from the `INFRA_ENV` secret, SCPs the repo to the droplet as `deployer`, runs `docker compose up -d --build`, waits for `api=healthy`, then runs `scripts/test/stack-smoke.sh` against the live stack. On failure, dumps the last 500 log lines of every container into the workflow run. |
+| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)                    | PR-time workflow: `pnpm install --frozen-lockfile`, `pnpm -r build`, `pnpm -r lint`, `pnpm --filter @callback/api test`. Runs on PRs into `main`/`dev` and on pushes to `dev`. Concurrency cancels stale runs so PR authors get fast feedback.                                                                                                             |
+| `docs/plans/2026-09-23--16-29-21-github-action-deploy-with-smoke-tests-plan.md` | Plan document for this change.                                                                                                                                                                                                                                                                                                                             |
+| `docs/history/2026-09-23-github-action-deploy-with-smoke-tests-impl.md`         | This file.                                                                                                                                                                                                                                                                                                                                                 |
 
 ## Files modified
 

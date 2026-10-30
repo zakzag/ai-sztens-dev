@@ -17,14 +17,14 @@
 
 ## 2. Evidence
 
-| Source | Observation |
-|---|---|
-| `ssh deployer@ssh.aisztens.hu` then `docker ps -a` | Empty — zero containers. |
-| `docker images` on droplet | Only legacy `aisztens/api:latest`, `aisztens/monitor:latest`, `caddy:2-alpine`, `postgres:16-alpine`. No GHCR images at any sha. |
-| `docker compose config --services` on droplet | 4 services (`api, caddy, monitor, postgres`). Working-tree compose defines 6 (adds `web`, `admin`). |
-| `cat /opt/aisztens/infra/docker-compose.yml` on droplet | Legacy 4-service, `build:` blocks for api/monitor, `image: aisztens/*:latest` literals — the pre-`2026-10-08-dockerized-stack-and-image-based-deploy` compose. The image-based compose in the working tree was never shipped. |
-| `deploy/log/latest.log` | Last run was **2026-10-10 00:52** (manual `tkovari` from `DESKTOP-5CMS04A`). Ran `prune_legacy_stack` (`docker compose down --remove-orphans` killed all six containers), started rsync upload, and aborted. No `compose up` ever ran. |
-| HTTPS probes (post-fix) | `https://api.aisztens.hu/api` 200, `/healthz` 200, `/api/callback-requests` returns `[]`; `https://web.aisztens.hu/` 200; `https://admin.aisztens.hu/` 200 (Hungarian SPA, `lang="hu"`). |
+| Source                                                  | Observation                                                                                                                                                                                                                            |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ssh deployer@ssh.aisztens.hu` then `docker ps -a`      | Empty — zero containers.                                                                                                                                                                                                               |
+| `docker images` on droplet                              | Only legacy `aisztens/api:latest`, `aisztens/monitor:latest`, `caddy:2-alpine`, `postgres:16-alpine`. No GHCR images at any sha.                                                                                                       |
+| `docker compose config --services` on droplet           | 4 services (`api, caddy, monitor, postgres`). Working-tree compose defines 6 (adds `web`, `admin`).                                                                                                                                    |
+| `cat /opt/aisztens/infra/docker-compose.yml` on droplet | Legacy 4-service, `build:` blocks for api/monitor, `image: aisztens/*:latest` literals — the pre-`2026-10-08-dockerized-stack-and-image-based-deploy` compose. The image-based compose in the working tree was never shipped.          |
+| `deploy/log/latest.log`                                 | Last run was **2026-10-10 00:52** (manual `tkovari` from `DESKTOP-5CMS04A`). Ran `prune_legacy_stack` (`docker compose down --remove-orphans` killed all six containers), started rsync upload, and aborted. No `compose up` ever ran. |
+| HTTPS probes (post-fix)                                 | `https://api.aisztens.hu/api` 200, `/healthz` 200, `/api/callback-requests` returns `[]`; `https://web.aisztens.hu/` 200; `https://admin.aisztens.hu/` 200 (Hungarian SPA, `lang="hu"`).                                               |
 
 ## 3. Root cause
 
@@ -46,25 +46,25 @@ The droplet never received a CI deploy after the 2026-10-08 image-based migratio
 
 ### Hardening (committed locally; await commit/push)
 
-| Change | Reason |
-|---|---|
-| `deploy.yml` `up -d --remove-orphans` → `… --force-recreate` | Compose changes always materialise on every CI run; eliminates the silent "live but stale" failure mode. |
-| `deploy.yml` new step `Verify every service is running IMAGE_TAG` | A failing image pull / a leftover `aisztens/*:latest` local image / a hand-deployed compose drift is now a **red workflow**, not a silent broken host. |
-| `deploy.sh up` guard at the top: refuses if `infra/docker-compose.yml` has a `build:` block or no `${REGISTRY…}` reference | Stops the next operator from accidentally shipping the legacy local-source compose. |
+| Change                                                                                                                     | Reason                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `deploy.yml` `up -d --remove-orphans` → `… --force-recreate`                                                               | Compose changes always materialise on every CI run; eliminates the silent "live but stale" failure mode.                                               |
+| `deploy.yml` new step `Verify every service is running IMAGE_TAG`                                                          | A failing image pull / a leftover `aisztens/*:latest` local image / a hand-deployed compose drift is now a **red workflow**, not a silent broken host. |
+| `deploy.sh up` guard at the top: refuses if `infra/docker-compose.yml` has a `build:` block or no `${REGISTRY…}` reference | Stops the next operator from accidentally shipping the legacy local-source compose.                                                                    |
 
 ## 5. Verification
 
-| Check | Result |
-|---|---|
-| All 6 containers up with GHCR images at sha-3a8f5b6 | pass |
-| `https://api.aisztens.hu/api` returns 200 | pass |
-| `https://api.aisztens.hu/healthz` returns `{"status":"ok", ...}` | pass |
-| `https://api.aisztens.hu/api/callback-requests` returns `[]` | pass |
-| `https://web.aisztens.hu/` returns 200 (Vite SPA bundle) | pass |
-| `https://admin.aisztens.hu/` returns 200 (Hungarian SPA) | pass |
-| `bash -n deploy/deploy.sh` and `deploy/lib/logger.sh` | pass |
-| YAML brace balance on `.github/workflows/deploy.yml` | pass |
-| `docker compose config --services` (droplet) | lists admin, api, caddy, monitor, postgres, web (6) — pass |
+| Check                                                            | Result                                                     |
+| ---------------------------------------------------------------- | ---------------------------------------------------------- |
+| All 6 containers up with GHCR images at sha-3a8f5b6              | pass                                                       |
+| `https://api.aisztens.hu/api` returns 200                        | pass                                                       |
+| `https://api.aisztens.hu/healthz` returns `{"status":"ok", ...}` | pass                                                       |
+| `https://api.aisztens.hu/api/callback-requests` returns `[]`     | pass                                                       |
+| `https://web.aisztens.hu/` returns 200 (Vite SPA bundle)         | pass                                                       |
+| `https://admin.aisztens.hu/` returns 200 (Hungarian SPA)         | pass                                                       |
+| `bash -n deploy/deploy.sh` and `deploy/lib/logger.sh`            | pass                                                       |
+| YAML brace balance on `.github/workflows/deploy.yml`             | pass                                                       |
+| `docker compose config --services` (droplet)                     | lists admin, api, caddy, monitor, postgres, web (6) — pass |
 
 ## 6. Outcome
 

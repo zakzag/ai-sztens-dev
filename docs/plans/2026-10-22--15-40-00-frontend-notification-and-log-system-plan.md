@@ -11,7 +11,7 @@
 One notification/log subsystem for every page of every React app, with three hard properties:
 
 1. **UI-independent core.** An internal store holds every notification and system message
-   (log). The UI is a *subscriber*, not the owner. Calling it must work from a service,
+   (log). The UI is a _subscriber_, not the owner. Calling it must work from a service,
    a query hook, a router guard or plain TS — with no React mounted.
 2. **Toast layer.** A new message appears bottom-right; new toasts stack above the old ones;
    old toasts disappear after a while.
@@ -23,17 +23,17 @@ One notification/log subsystem for every page of every React app, with three har
 
 ## 2. What exists today (facts, not assumptions)
 
-| Area | State | File |
-|---|---|---|
-| Design tokens | Tailwind v4 `@theme`, graphite + teal, `--ease-neu`, `--duration-fast/base`, `shadow-neu-*` | [`theme.css`](../../packages/ui/src/styles/theme.css:22) |
-| Primitives | `Button`, `Input`, `Textarea`, `Card`, `Table*`, `Badge`, `Alert`, `cn()` — explicit exports only | [`index.ts`](../../packages/ui/src/index.ts:6) |
-| Admin app shell | No `src/app/`; `App.tsx` holds routes + `ProtectedLayout`, `main.tsx` holds `QueryClientProvider` | [`App.tsx`](../../apps/admin/src/App.tsx:7) |
-| Error mapping | Single pure `toErrorMessage(error)` in `lib/error-message.ts` | [`error-message.ts`](../../apps/admin/src/lib/error-message.ts:53) |
-| Form feedback today | Per-form `Alert` + page-level error state; success via `mutation.isSuccess` | [`ApiKeyForm.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyForm.tsx:36) |
-| Server state | TanStack Query v5, one service instance injected in the composition root | [`api-client.ts`](../../apps/admin/src/services/api-client.ts:42) |
-| Toast library | **none installed** (no sonner, react-hot-toast, react-toastify) | `apps/*/package.json` |
-| `zustand` | **not installed** ("planned" row in the dependency table) | [`UI-Architecture.md`](../../docs/Specs/UI-Architecture.md:201) |
-| `apps/web` | Not migrated to tokens (raw `slate-*`), no api-client, no react-query, no tests | [`App.tsx`](../../apps/web/src/App.tsx:8) |
+| Area                | State                                                                                             | File                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Design tokens       | Tailwind v4 `@theme`, graphite + teal, `--ease-neu`, `--duration-fast/base`, `shadow-neu-*`       | [`theme.css`](../../packages/ui/src/styles/theme.css:22)                     |
+| Primitives          | `Button`, `Input`, `Textarea`, `Card`, `Table*`, `Badge`, `Alert`, `cn()` — explicit exports only | [`index.ts`](../../packages/ui/src/index.ts:6)                               |
+| Admin app shell     | No `src/app/`; `App.tsx` holds routes + `ProtectedLayout`, `main.tsx` holds `QueryClientProvider` | [`App.tsx`](../../apps/admin/src/App.tsx:7)                                  |
+| Error mapping       | Single pure `toErrorMessage(error)` in `lib/error-message.ts`                                     | [`error-message.ts`](../../apps/admin/src/lib/error-message.ts:53)           |
+| Form feedback today | Per-form `Alert` + page-level error state; success via `mutation.isSuccess`                       | [`ApiKeyForm.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyForm.tsx:36) |
+| Server state        | TanStack Query v5, one service instance injected in the composition root                          | [`api-client.ts`](../../apps/admin/src/services/api-client.ts:42)            |
+| Toast library       | **none installed** (no sonner, react-hot-toast, react-toastify)                                   | `apps/*/package.json`                                                        |
+| `zustand`           | **not installed** ("planned" row in the dependency table)                                         | [`UI-Architecture.md`](../../docs/Specs/UI-Architecture.md:201)              |
+| `apps/web`          | Not migrated to tokens (raw `slate-*`), no api-client, no react-query, no tests                   | [`App.tsx`](../../apps/web/src/App.tsx:8)                                    |
 
 Consequence: `apps/web` cannot host a token-styled drawer today without breaking the
 "no palette utilities" rule — see open question **Q4**.
@@ -52,12 +52,12 @@ Researched with Brave search, sources at the end of the section.
   existing tokens and CVA recipes.
 - Zero new runtime dependency.
 
-Pros: the log store *must* exist anyway; one single source of truth; no second copy of toast
+Pros: the log store _must_ exist anyway; one single source of truth; no second copy of toast
 state inside a library; full token compliance; testable without React (pure store) and with
 React (vitest); works in both apps and in non-React code; no CSS import, no theme fight.
 
 Cons: we own the animation math (stack offset, `scale`, enter/exit transitions), the timer
-pausing, and the swipe-to-dismiss niceties — realistically the *simple* subset of Sonner.
+pausing, and the swipe-to-dismiss niceties — realistically the _simple_ subset of Sonner.
 
 Precedent: Sonner itself is a ~500-line observer store + `toast()` free function + one
 `<Toaster />` subscriber ([Emil Kowalski, "Building a toast component"](https://emilkowal.ski/ui/building-a-toast-component)).
@@ -96,15 +96,15 @@ Verdict: rejected for this repo.
 
 ### Comparison
 
-| Criterion | A in-house | B Sonner | C hot-toast | D toastify |
-|---|---|---|---|---|
-| Single source of truth (log ↔ toast) | yes | no (mirrored) | no (mirrored) | no |
-| Token compliance | full | overrides | overrides | CSS theme override |
-| New dependency | none | ~11 KB | ~5 KB | ~42 KB |
-| Stack animation out of the box | we build (simple) | excellent | no | no |
-| Log panel | ours in every option | ours | ours | ours |
-| Works from non-React code | yes | yes (`toast()` is free) | yes | yes |
-| Test story | pure store + RTL | wrapping a lib | wrapping a lib | wrapping a lib |
+| Criterion                            | A in-house           | B Sonner                | C hot-toast    | D toastify         |
+| ------------------------------------ | -------------------- | ----------------------- | -------------- | ------------------ |
+| Single source of truth (log ↔ toast) | yes                  | no (mirrored)           | no (mirrored)  | no                 |
+| Token compliance                     | full                 | overrides               | overrides      | CSS theme override |
+| New dependency                       | none                 | ~11 KB                  | ~5 KB          | ~42 KB             |
+| Stack animation out of the box       | we build (simple)    | excellent               | no             | no                 |
+| Log panel                            | ours in every option | ours                    | ours           | ours               |
+| Works from non-React code            | yes                  | yes (`toast()` is free) | yes            | yes                |
+| Test story                           | pure store + RTL     | wrapping a lib          | wrapping a lib | wrapping a lib     |
 
 **Recommendation: Option A.** The store + log panel are ~70 % of the feature and are required
 regardless; a library would only save the stack animation while introducing a second state.
@@ -159,19 +159,21 @@ in the layout shell and call `notify.*` from forms/hooks.
 ### 4.1 Entry model
 
 ```ts
-export type NotificationLevel = 'success' | 'error' | 'warning' | 'info' | 'system';
+export type NotificationLevel =
+  'success' | 'error' | 'warning' | 'info' | 'system';
 
-export type NotificationSource = 'form' | 'api' | 'router' | 'runtime' | 'manual';
+export type NotificationSource =
+  'form' | 'api' | 'router' | 'runtime' | 'manual';
 
 export interface NotificationEntry {
   readonly id: string;
   readonly level: NotificationLevel;
   readonly message: string;
-  readonly detail?: string;      // stack trace / HTTP status / request url
+  readonly detail?: string; // stack trace / HTTP status / request url
   readonly source: NotificationSource;
-  readonly createdAt: number;    // epoch ms
-  readonly read: boolean;        // drives the "unseen" badge on the drawer tab
-  readonly toast: boolean;       // false for pure log entries (system noise)
+  readonly createdAt: number; // epoch ms
+  readonly read: boolean; // drives the "unseen" badge on the drawer tab
+  readonly toast: boolean; // false for pure log entries (system noise)
 }
 ```
 
@@ -180,11 +182,11 @@ export interface NotificationEntry {
 ```ts
 export interface NotificationStore {
   emit(input: EmitInput): NotificationEntry;
-  dismiss(id: string): void;          // toast only
-  markAllRead(): void;                // drawer opened
-  clear(): void;                      // drawer "clear" button
+  dismiss(id: string): void; // toast only
+  markAllRead(): void; // drawer opened
+  clear(): void; // drawer "clear" button
   subscribe(listener: () => void): () => void;
-  getSnapshot(): NotificationState;   // immutable, referentially stable when unchanged
+  getSnapshot(): NotificationState; // immutable, referentially stable when unchanged
   getServerSnapshot(): NotificationState; // useSyncExternalStore SSR guard
 }
 ```
@@ -195,6 +197,7 @@ Cap: `MAX_ENTRIES = 500` (ring buffer, oldest dropped); `MAX_VISIBLE_TOASTS = 3`
 ### 4.3 Behaviour spec
 
 Toasts
+
 - bottom-right fixed viewport, column-reverse stack; new toast on top.
 - `success`/`info` auto-dismiss after 4 s, `warning` 6 s, `error` **sticky** until dismissed.
 - hover pauses the timer (`pointerenter`/`pointerleave`), `document.hidden` pauses as well.
@@ -205,10 +208,11 @@ Toasts
   adding a toast.
 
 Log drawer
+
 - collapsed: 40 px wide edge tab at mid-right with a `ChevronLeft` glyph and an unseen-count
   `Badge`; `aria-expanded`, `aria-controls`.
 - expanded: 360–420 px panel sliding in from the right (`transition-transform duration-base
-  ease-neu`, `bg-surface-overlay`, `shadow-neu-raised`), non-modal — no focus trap, page stays
+ease-neu`, `bg-surface-overlay`, `shadow-neu-raised`), non-modal — no focus trap, page stays
   scrollable.
 - initial render: last `LOG_INITIAL_PAGE = 20` entries, newest first.
 - footer button **"Korábbiak betöltése"** appends the next 50 (`onLoadMore`), disabled when the
@@ -220,6 +224,7 @@ Log drawer
 - timestamps via the existing [`lib/date.ts`](../../apps/admin/src/lib/date.ts:1) formatter.
 
 Persistence (P2 — decided)
+
 - `sessionStorage` mirror under the key `aisztens.notifications.v1`; envelope
   `{ version: 1, entries: NotificationEntry[] }`, cap **200** entries (oldest dropped).
 - **Only `entries` are persisted.** `toasts` and their timers never are — a reload must not
@@ -234,13 +239,13 @@ Persistence (P2 — decided)
 
 ### 4.4 Where messages come from (full automatic capture — decided)
 
-| Source | Mechanism | Notes |
-|---|---|---|
-| Forms | explicit `notify.success(...)` / `notify.error(...)` in the submit handler | the human-readable message; replaces the inline success `Alert` in `ApiKeyForm`; field-level errors stay in `setError` |
-| TanStack Query | global `QueryCache` / `MutationCache` callbacks on the `QueryClient` in `main.tsx` | catches every current and future form for free; text through the existing `toErrorMessage`; `mutationKey` becomes the entry's `detail` |
-| HTTP layer | new optional `onEvent?: (event: HttpEvent) => void` on `HttpClientConfig`, injected in [`api-client.ts`](../../apps/admin/src/services/api-client.ts:42) | no React import in `packages/api-client`; 2xx → `system` entry with `toast: false`, 4xx/5xx/network → toast + log |
-| Global | `window` `error` + `unhandledrejection` listeners registered by the provider | `level: 'error'`, `source: 'runtime'` |
-| Router | navigation logging at `system` level, `toast: false` | **disabled by default** (`logNavigation: false`) — pure noise until someone asks for it |
+| Source         | Mechanism                                                                                                                                                | Notes                                                                                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Forms          | explicit `notify.success(...)` / `notify.error(...)` in the submit handler                                                                               | the human-readable message; replaces the inline success `Alert` in `ApiKeyForm`; field-level errors stay in `setError`                 |
+| TanStack Query | global `QueryCache` / `MutationCache` callbacks on the `QueryClient` in `main.tsx`                                                                       | catches every current and future form for free; text through the existing `toErrorMessage`; `mutationKey` becomes the entry's `detail` |
+| HTTP layer     | new optional `onEvent?: (event: HttpEvent) => void` on `HttpClientConfig`, injected in [`api-client.ts`](../../apps/admin/src/services/api-client.ts:42) | no React import in `packages/api-client`; 2xx → `system` entry with `toast: false`, 4xx/5xx/network → toast + log                      |
+| Global         | `window` `error` + `unhandledrejection` listeners registered by the provider                                                                             | `level: 'error'`, `source: 'runtime'`                                                                                                  |
+| Router         | navigation logging at `system` level, `toast: false`                                                                                                     | **disabled by default** (`logNavigation: false`) — pure noise until someone asks for it                                                |
 
 The three automatic channels are additive: a failed mutation produces one `notify` entry from the
 mutation callback and one `system` entry from the HTTP hook, which is exactly what the log panel is
@@ -315,15 +320,15 @@ apps/admin/src/App.tsx                               + <NotificationHost /> insi
 
 ## 5. Decisions
 
-| # | Decision | State |
-|---|---|---|
-| N1 | Build the core + UI in-house instead of adopting Sonner/react-hot-toast | **AGREED (2026-10-22)** — Option A |
-| N2 | New workspace package `packages/notifications` holds the core **and** the React bindings; `packages/ui` keeps only presentational `Toast` / `ToastStack` / `LogDrawer` / `LogEntryRow` | **AGREED (2026-10-22)** |
-| N3 | Toast rules: 3 visible, 4 s / 6 s / sticky error, hover + tab-hidden pause, 2 s dedupe | **AGREED (2026-10-22)** |
-| N4 | Drawer: 20 initial + 50 per load-more, right edge, non-modal, filters + clear | **AGREED (2026-10-22)** |
-| N5 | Scope: admin only in this change; `packages/notifications` stays app-agnostic and `apps/web` adopts it in a follow-up after its token migration | **AGREED (2026-10-22)** |
-| N6 | Persistence: `sessionStorage` mirror, cap 200, restored at provider mount, toasts never persisted | **AGREED (2026-10-22)** |
-| N7 | Full automatic capture — `QueryCache`/`MutationCache`, HTTP `onEvent`, global `error`/`unhandledrejection` — in addition to explicit `notify.*` | **AGREED (2026-10-22)** |
+| #   | Decision                                                                                                                                                                               | State                              |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| N1  | Build the core + UI in-house instead of adopting Sonner/react-hot-toast                                                                                                                | **AGREED (2026-10-22)** — Option A |
+| N2  | New workspace package `packages/notifications` holds the core **and** the React bindings; `packages/ui` keeps only presentational `Toast` / `ToastStack` / `LogDrawer` / `LogEntryRow` | **AGREED (2026-10-22)**            |
+| N3  | Toast rules: 3 visible, 4 s / 6 s / sticky error, hover + tab-hidden pause, 2 s dedupe                                                                                                 | **AGREED (2026-10-22)**            |
+| N4  | Drawer: 20 initial + 50 per load-more, right edge, non-modal, filters + clear                                                                                                          | **AGREED (2026-10-22)**            |
+| N5  | Scope: admin only in this change; `packages/notifications` stays app-agnostic and `apps/web` adopts it in a follow-up after its token migration                                        | **AGREED (2026-10-22)**            |
+| N6  | Persistence: `sessionStorage` mirror, cap 200, restored at provider mount, toasts never persisted                                                                                      | **AGREED (2026-10-22)**            |
+| N7  | Full automatic capture — `QueryCache`/`MutationCache`, HTTP `onEvent`, global `error`/`unhandledrejection` — in addition to explicit `notify.*`                                        | **AGREED (2026-10-22)**            |
 
 ### 5.1 Why in-house won (Q1) and what it costs
 
@@ -346,12 +351,12 @@ apps/admin/src/App.tsx                               + <NotificationHost /> insi
 
 ### 5.3 Package boundary contract
 
-| Package | May import | Must never import |
-|---|---|---|
-| `packages/notifications` (core) | nothing (plain TS) | React, `@callback/ui`, zod |
-| `packages/notifications` (react) | `react`, `@callback/ui`, its own core | apps, `@callback/api-client` |
-| `packages/ui` | `clsx`, `tailwind-merge`, `cva` | `@callback/notifications`, apps |
-| `apps/*` | all of the above | — |
+| Package                          | May import                            | Must never import               |
+| -------------------------------- | ------------------------------------- | ------------------------------- |
+| `packages/notifications` (core)  | nothing (plain TS)                    | React, `@callback/ui`, zod      |
+| `packages/notifications` (react) | `react`, `@callback/ui`, its own core | apps, `@callback/api-client`    |
+| `packages/ui`                    | `clsx`, `tailwind-merge`, `cva`       | `@callback/notifications`, apps |
+| `apps/*`                         | all of the above                      | —                               |
 
 ---
 
@@ -412,13 +417,13 @@ Manual checks
 
 ## 8. Discussion log (all questions resolved)
 
-| Q | Question asked in the chat | Answer |
-|---|---|---|
-| Q1 | In-house vs Sonner vs react-hot-toast | **In-house** — the log store is required anyway and a library would add a second state |
-| Q2 | New package vs everything inside `packages/ui` | **New `packages/notifications`** (core + React bindings); `packages/ui` stays presentational |
-| Q3 | Toast / drawer numbers | **3 visible, 4 s / 6 s / sticky error, 2 s dedupe, 20 initial + 50 per load-more** |
-| Q4 | Scope | **Admin only**; `apps/web` after its token migration |
-| Q5 | Capture + persistence | **Full automatic capture + `sessionStorage` mirror (cap 200)** |
+| Q   | Question asked in the chat                     | Answer                                                                                       |
+| --- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Q1  | In-house vs Sonner vs react-hot-toast          | **In-house** — the log store is required anyway and a library would add a second state       |
+| Q2  | New package vs everything inside `packages/ui` | **New `packages/notifications`** (core + React bindings); `packages/ui` stays presentational |
+| Q3  | Toast / drawer numbers                         | **3 visible, 4 s / 6 s / sticky error, 2 s dedupe, 20 initial + 50 per load-more**           |
+| Q4  | Scope                                          | **Admin only**; `apps/web` after its token migration                                         |
+| Q5  | Capture + persistence                          | **Full automatic capture + `sessionStorage` mirror (cap 200)**                               |
 
 Researched sources: [Building a toast component](https://emilkowal.ski/ui/building-a-toast-component) ·
 [Toast library comparison 2026](https://www.pkgpulse.com/guides/react-hot-toast-vs-react-toastify-vs-sonner-2026) ·

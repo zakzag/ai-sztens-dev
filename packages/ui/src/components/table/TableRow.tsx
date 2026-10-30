@@ -9,7 +9,13 @@ import { cn } from '../../lib/cn.js';
  */
 export function TableRow({ className, children, ...rest }: TableRowProps) {
   return (
-    <tr {...rest} className={cn('transition-shadow duration-fast hover:bg-surface-overlay', className)}>
+    <tr
+      {...rest}
+      className={cn(
+        'transition-shadow duration-fast hover:bg-surface-overlay',
+        className,
+      )}
+    >
       {children}
     </tr>
   );

@@ -69,22 +69,22 @@ CORS cleanup) are meaningless individually and create three
 intermediate half-states on the production deploy. One PR, one
 review, one atomic deploy.
 
-| File | Change |
-|---|---|
-| `apps/api/src/vapi-webhooks/vapi-signature.guard.ts` | New HMAC-SHA256 guard over `${ts}.${rawBody}`, 300s tolerance, fail-closed on missing secret |
-| `apps/api/src/vapi-webhooks/vapi-webhooks.controller.ts` | `POST /api/vapi/webhooks/tool-calls` + `end-of-call-report`, behind the guard |
-| `apps/api/src/vapi-webhooks/vapi-webhooks.service.ts` | In-memory event store (mirrors CallbackRequestsService) |
-| `apps/api/src/vapi-webhooks/vapi-webhooks.module.ts` | New module wired in `app.module.ts` |
-| `apps/api/src/vapi-webhooks/dto/vapi-event.dto.ts` | Minimal envelope (plain TypeScript interface — **no Zod**, corrected 2026-10-06) |
-| `apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts` | Unit tests: 11 cases incl. v1 prefix, tolerance, raw body missing |
-| `apps/api/test/vapi-webhooks.e2e-spec.ts` | E2E: 200 + 401 (invalid) + 401 (missing) + 401 (stale) |
-| `apps/api/src/main.ts` | `{ rawBody: true }` as a **Nest application** option (`FastifyAdapter` never accepted it — corrected 2026-10-06) |
-| `apps/api/src/app.module.ts` | `VapiWebhooksModule` registration |
-| `infra/caddy/Caddyfile` | `@vapi_match` named matcher (path + header + method) + 405 fallback |
-| `infra/.env.example` + `infra/.env` | `CORS_ORIGINS` shortened to web + admin only; `VAPI_WEBHOOK_SECRET` rotation comment |
-| `docs/Specs/Caddy-Reverse-Proxy.md` | §4.1 table updated, new §4.4 with mermaid + rotation command |
-| `docs/Specs/Production-Runbook.md` | §4.4 curl examples: 405 edge, 200/401 HMAC round-trip |
-| `scripts/test/lib/10-services.sh` | Two new checks: Caddy 405 pre-filter + NestJS 200 happy path |
+| File                                                      | Change                                                                                                           |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/vapi-webhooks/vapi-signature.guard.ts`      | New HMAC-SHA256 guard over `${ts}.${rawBody}`, 300s tolerance, fail-closed on missing secret                     |
+| `apps/api/src/vapi-webhooks/vapi-webhooks.controller.ts`  | `POST /api/vapi/webhooks/tool-calls` + `end-of-call-report`, behind the guard                                    |
+| `apps/api/src/vapi-webhooks/vapi-webhooks.service.ts`     | In-memory event store (mirrors CallbackRequestsService)                                                          |
+| `apps/api/src/vapi-webhooks/vapi-webhooks.module.ts`      | New module wired in `app.module.ts`                                                                              |
+| `apps/api/src/vapi-webhooks/dto/vapi-event.dto.ts`        | Minimal envelope (plain TypeScript interface — **no Zod**, corrected 2026-10-06)                                 |
+| `apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts` | Unit tests: 11 cases incl. v1 prefix, tolerance, raw body missing                                                |
+| `apps/api/test/vapi-webhooks.e2e-spec.ts`                 | E2E: 200 + 401 (invalid) + 401 (missing) + 401 (stale)                                                           |
+| `apps/api/src/main.ts`                                    | `{ rawBody: true }` as a **Nest application** option (`FastifyAdapter` never accepted it — corrected 2026-10-06) |
+| `apps/api/src/app.module.ts`                              | `VapiWebhooksModule` registration                                                                                |
+| `infra/caddy/Caddyfile`                                   | `@vapi_match` named matcher (path + header + method) + 405 fallback                                              |
+| `infra/.env.example` + `infra/.env`                       | `CORS_ORIGINS` shortened to web + admin only; `VAPI_WEBHOOK_SECRET` rotation comment                             |
+| `docs/Specs/Caddy-Reverse-Proxy.md`                       | §4.1 table updated, new §4.4 with mermaid + rotation command                                                     |
+| `docs/Specs/Production-Runbook.md`                        | §4.4 curl examples: 405 edge, 200/401 HMAC round-trip                                                            |
+| `scripts/test/lib/10-services.sh`                         | Two new checks: Caddy 405 pre-filter + NestJS 200 happy path                                                     |
 
 ## 5. Outcome and how to verify
 
@@ -150,14 +150,14 @@ defects made the feature unusable. Full diagnosis, evidence and the fix:
 [`docs/milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md`](2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md)
 and its [history entry](../history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md).
 
-| Claim in this milestone | Reality |
-|---|---|
-| `FastifyAdapter({ rawBody: true })` works | `rawBody` is a Nest *application* option; the adapter form does not compile and never captured the body |
-| The guard verifies real webhooks | The guard required a `string` raw body; the adapter delivers a **Buffer** → every webhook would have got 401 |
-| The module boots | `import type { ConfigService }` ⇒ `UnknownDependenciesException` at startup — the API could not start at all |
-| `pnpm test:e2e` runs the e2e tests | The suites could not even load (Jest ESM + CommonJS-only `@nestjs/config`) |
-| “Zod `passthrough()` schema” | No Zod anywhere; a plain TypeScript interface |
-| Deployed and verified on the droplet | The droplet still runs the pre-VAPI image (`/api/vapi/*` → 404 from NestJS) |
+| Claim in this milestone                   | Reality                                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `FastifyAdapter({ rawBody: true })` works | `rawBody` is a Nest _application_ option; the adapter form does not compile and never captured the body      |
+| The guard verifies real webhooks          | The guard required a `string` raw body; the adapter delivers a **Buffer** → every webhook would have got 401 |
+| The module boots                          | `import type { ConfigService }` ⇒ `UnknownDependenciesException` at startup — the API could not start at all |
+| `pnpm test:e2e` runs the e2e tests        | The suites could not even load (Jest ESM + CommonJS-only `@nestjs/config`)                                   |
+| “Zod `passthrough()` schema”              | No Zod anywhere; a plain TypeScript interface                                                                |
+| Deployed and verified on the droplet      | The droplet still runs the pre-VAPI image (`/api/vapi/*` → 404 from NestJS)                                  |
 
 What **did** hold up: the Caddy `@vapi_match` pre-filter (verified with
 `caddy adapt`: one mutually-exclusive group, `/api/vapi/*` 405 before

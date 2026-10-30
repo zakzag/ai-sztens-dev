@@ -49,11 +49,11 @@ Additionally, `powershell -File scripts/init.ps1` aborted at the write step on W
 
 ## Implementation
 
-| File | Change |
-|---|---|
-| `scripts/init.ps1` | `$SourcePattern`/`$PrimarySourceName` constants; `Get-RuleSourceNames()` discovery + ordering; warning on missing `instructions.md`, fatal on empty dir; LF/no-BOM writes; `Split-Path -Path` + `New-Item -Path` fixes; diagnostics in `catch` |
-| `scripts/init.sh` | `SOURCE_PATTERN`/`PRIMARY_SOURCE_NAME` + `discover_source_files()`; sentinel read preserving trailing blank lines; `${EM_DASH}` via ANSI-C quoting; CRLF-tolerant `.gitignore` match |
-| `scripts/README.md` | Documents the discovery + ordering contract |
+| File                | Change                                                                                                                                                                                                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/init.ps1`  | `$SourcePattern`/`$PrimarySourceName` constants; `Get-RuleSourceNames()` discovery + ordering; warning on missing `instructions.md`, fatal on empty dir; LF/no-BOM writes; `Split-Path -Path` + `New-Item -Path` fixes; diagnostics in `catch` |
+| `scripts/init.sh`   | `SOURCE_PATTERN`/`PRIMARY_SOURCE_NAME` + `discover_source_files()`; sentinel read preserving trailing blank lines; `${EM_DASH}` via ANSI-C quoting; CRLF-tolerant `.gitignore` match                                                           |
+| `scripts/README.md` | Documents the discovery + ordering contract                                                                                                                                                                                                    |
 
 ## Outcome & verification
 

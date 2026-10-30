@@ -31,15 +31,15 @@ Források: [Building a toast component](https://emilkowal.ski/ui/building-a-toas
 
 ## Döntések
 
-| # | Döntés |
-|---|---|
-| N1 | Saját core + saját UI (Option A), library nélkül |
-| N2 | Új `packages/notifications` csomag (core + React bindings); a `packages/ui` csak prezentációs `Toast` / `ToastStack` / `LogDrawer` / `LogEntryRow` primitíveket kap |
-| N3 | Toast: max 3 látható, success/info 4 s, warning 6 s, error sticky, hover és rejtett tab pause, 2 s-en belüli azonos üzenet dedupe |
-| N4 | Drawer: jobb szél, non-modális, 20 bejegyzés nyitáskor, „Korábbiak betöltése” +50, szint szűrők, törlés, Escape |
-| N5 | Scope: csak `apps/admin`; az `apps/web` külön follow-up a token-migráció után |
-| N6 | Log perzisztencia: `sessionStorage` tükör, cap 200, mountkor visszatöltés, toast **nem** perzisztálódik |
-| N7 | Teljes automatikus capture: `QueryCache`/`MutationCache` callbackek + HTTP `onEvent` + globális `error`/`unhandledrejection`, az explicit `notify.*` mellett |
+| #   | Döntés                                                                                                                                                              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| N1  | Saját core + saját UI (Option A), library nélkül                                                                                                                    |
+| N2  | Új `packages/notifications` csomag (core + React bindings); a `packages/ui` csak prezentációs `Toast` / `ToastStack` / `LogDrawer` / `LogEntryRow` primitíveket kap |
+| N3  | Toast: max 3 látható, success/info 4 s, warning 6 s, error sticky, hover és rejtett tab pause, 2 s-en belüli azonos üzenet dedupe                                   |
+| N4  | Drawer: jobb szél, non-modális, 20 bejegyzés nyitáskor, „Korábbiak betöltése” +50, szint szűrők, törlés, Escape                                                     |
+| N5  | Scope: csak `apps/admin`; az `apps/web` külön follow-up a token-migráció után                                                                                       |
+| N6  | Log perzisztencia: `sessionStorage` tükör, cap 200, mountkor visszatöltés, toast **nem** perzisztálódik                                                             |
+| N7  | Teljes automatikus capture: `QueryCache`/`MutationCache` callbackek + HTTP `onEvent` + globális `error`/`unhandledrejection`, az explicit `notify.*` mellett        |
 
 ## Amit a tervezés során kiderítettünk a jelenlegi kódról
 

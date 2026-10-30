@@ -1,4 +1,4 @@
- # AIsztens — deploy to the DigitalOcean droplet (dev now, prod later).
+# AIsztens — deploy to the DigitalOcean droplet (dev now, prod later).
 #
 # This workflow is the consumer of the images published by
 # `.github/workflows/images.yml`. It does NOT build anything; it ships
@@ -277,7 +277,7 @@ jobs:
           # Postgres initialization never creates the aisztens/tkovari/krak
           # roles (smoke check #5 then fails, and the API would hit
           # `role "aisztens" does not exist` on its first DB call).
-          source: "infra/docker-compose.yml,infra/.env,infra/caddy/Caddyfile.rendered,infra/postgres/init,scripts/test/stack-smoke.sh,scripts/test/lib"
+          source: 'infra/docker-compose.yml,infra/.env,infra/caddy/Caddyfile.rendered,infra/postgres/init,scripts/test/stack-smoke.sh,scripts/test/lib'
           target: ${{ env.REMOTE_DIR }}
           overwrite: true
           strip_components: 0

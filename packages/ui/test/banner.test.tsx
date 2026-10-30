@@ -23,11 +23,16 @@ describe('Banner', () => {
     ['info', 'border-info'],
     ['warning', 'border-warning'],
     ['danger', 'border-danger'],
-  ] as const)('maps the %s variant to its accent token', (variant, expectedClass) => {
-    const { container } = render(<Banner variant={variant}>{variant}</Banner>);
+  ] as const)(
+    'maps the %s variant to its accent token',
+    (variant, expectedClass) => {
+      const { container } = render(
+        <Banner variant={variant}>{variant}</Banner>,
+      );
 
-    expect(container.firstElementChild?.className).toContain(expectedClass);
-  });
+      expect(container.firstElementChild?.className).toContain(expectedClass);
+    },
+  );
 
   it('renders the title above the body', () => {
     render(<Banner title="Offline">A kérések nem mennek ki.</Banner>);
@@ -37,9 +42,15 @@ describe('Banner', () => {
   });
 
   it('renders the action slot', () => {
-    render(<Banner action={<button type="button">Bejelentkezés</button>}>Lejárt</Banner>);
+    render(
+      <Banner action={<button type="button">Bejelentkezés</button>}>
+        Lejárt
+      </Banner>,
+    );
 
-    expect(screen.getByRole('button', { name: 'Bejelentkezés' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Bejelentkezés' }),
+    ).toBeInTheDocument();
   });
 
   it('renders a labelled dismiss control and calls it once per click', async () => {
@@ -51,7 +62,9 @@ describe('Banner', () => {
       </Banner>,
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Banner bezárása' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Banner bezárása' }),
+    );
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });

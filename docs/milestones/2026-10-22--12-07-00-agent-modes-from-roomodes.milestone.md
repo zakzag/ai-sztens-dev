@@ -10,20 +10,20 @@ level and make the init scripts project every `.roomodes` mode onto the other ag
 
 ## Evidence
 
-| Location | State before |
-| --- | --- |
-| repo `.roomodes` | absent |
+| Location                                                                                                 | State before                              |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| repo `.roomodes`                                                                                         | absent                                    |
 | `%APPDATA%\JetBrains\WebStorm2025.2\options\zoo-code-extension-storage.xml` → entry `WeCode-AI.zoo-code` | contained the mode (JSON `customModes[]`) |
-| `…/Code/User/globalStorage/zoocodeorganization.zoo-code/settings/custom_modes.yaml` | `customModes: []` |
+| `…/Code/User/globalStorage/zoocodeorganization.zoo-code/settings/custom_modes.yaml`                      | `customModes: []`                         |
 
 The mode is now project-level in the root `.roomodes` (`source: project`).
 
 ## Design rationale
 
 - **Root `.roomodes` stays the single source of truth** — it is what Zoo Code itself reads, and the
-  UI edits it. The generator therefore *reads* it and never writes it, so the UI and the script can
+  UI edits it. The generator therefore _reads_ it and never writes it, so the UI and the script can
   never fight over the same file.
-- **One Node implementation behind both wrappers.** Rendering in PowerShell *and* bash had already
+- **One Node implementation behind both wrappers.** Rendering in PowerShell _and_ bash had already
   produced three classes of divergence (BOM, CRLF, duplicated `.gitignore` lines); the mode pipeline
   would have doubled that. `init.sh` / `init.ps1` are now thin interactive wrappers around
   `generate.mjs`, and the earlier byte-identity hacks disappeared with the duplicated code.
@@ -38,18 +38,18 @@ The mode is now project-level in the root `.roomodes` (`source: project`).
 
 ## Implementation
 
-| File | Change |
-| --- | --- |
-| `scripts/lib/agent-artifacts/generate.mjs` | CLI: `--agent`, `--root`, `--dry-run`, `--check` (exit 2 = stale) |
-| `…/yaml-lite.mjs` | dependency-free YAML subset parser |
-| `…/roomodes.mjs` | `.roomodes` loader + validation (required fields, groups, duplicate slug) |
-| `…/tools.mjs`, `…/overrides.mjs`, `…/mode-overrides.json` | group → tool mapping, per-mode overrides |
-| `…/render-body.mjs`, `…/render-copilot.mjs`, `…/render-claude.mjs`, `…/render-cursor.mjs` | artefact renderers |
-| `…/rules.mjs` | `.roo/rules/*.md` discovery + instruction-file rendering (moved out of the shells) |
-| `…/writer.mjs` | idempotent write, `.bak`, `.gitignore` sync (and `.bak` pairs, CRLF-tolerant, never `.roomodes`) |
-| `scripts/init.sh`, `scripts/init.ps1` | thin wrappers (menu + `node` pre-flight); `init.ps1` re-saved with a UTF-8 BOM (PS 5.1 needs it) |
-| `package.json` | `test:agents` |
-| `scripts/README.md`, `docs/Specs/AI-Agent-Artifacts.md` | documentation |
+| File                                                                                      | Change                                                                                           |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `scripts/lib/agent-artifacts/generate.mjs`                                                | CLI: `--agent`, `--root`, `--dry-run`, `--check` (exit 2 = stale)                                |
+| `…/yaml-lite.mjs`                                                                         | dependency-free YAML subset parser                                                               |
+| `…/roomodes.mjs`                                                                          | `.roomodes` loader + validation (required fields, groups, duplicate slug)                        |
+| `…/tools.mjs`, `…/overrides.mjs`, `…/mode-overrides.json`                                 | group → tool mapping, per-mode overrides                                                         |
+| `…/render-body.mjs`, `…/render-copilot.mjs`, `…/render-claude.mjs`, `…/render-cursor.mjs` | artefact renderers                                                                               |
+| `…/rules.mjs`                                                                             | `.roo/rules/*.md` discovery + instruction-file rendering (moved out of the shells)               |
+| `…/writer.mjs`                                                                            | idempotent write, `.bak`, `.gitignore` sync (and `.bak` pairs, CRLF-tolerant, never `.roomodes`) |
+| `scripts/init.sh`, `scripts/init.ps1`                                                     | thin wrappers (menu + `node` pre-flight); `init.ps1` re-saved with a UTF-8 BOM (PS 5.1 needs it) |
+| `package.json`                                                                            | `test:agents`                                                                                    |
+| `scripts/README.md`, `docs/Specs/AI-Agent-Artifacts.md`                                   | documentation                                                                                    |
 
 ## Outcome and how to verify
 

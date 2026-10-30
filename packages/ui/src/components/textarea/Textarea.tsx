@@ -16,13 +16,23 @@ import { cn } from '../../lib/cn.js';
  * @param props - see {@link TextareaProps}.
  */
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  function Textarea({ id, label, error, hint, invalid, className, rows = 4, ...rest }, ref) {
+  function Textarea(
+    { id, label, error, hint, invalid, className, rows = 4, ...rest },
+    ref,
+  ) {
     const hasError = Boolean(error);
-    const messageId = hasError ? `${id}-error` : hint ? `${id}-hint` : undefined;
+    const messageId = hasError
+      ? `${id}-error`
+      : hint
+        ? `${id}-hint`
+        : undefined;
 
     return (
       <div className="space-y-1">
-        <label htmlFor={id} className="block text-sm font-medium text-text-secondary">
+        <label
+          htmlFor={id}
+          className="block text-sm font-medium text-text-secondary"
+        >
           {label}
         </label>
         <textarea
@@ -30,7 +40,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={id}
           rows={rows}
-          className={cn(textareaVariants({ invalid: hasError || Boolean(invalid) }), className)}
+          className={cn(
+            textareaVariants({ invalid: hasError || Boolean(invalid) }),
+            className,
+          )}
           aria-invalid={hasError || undefined}
           aria-describedby={messageId}
         />

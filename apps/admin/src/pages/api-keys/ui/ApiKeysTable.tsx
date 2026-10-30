@@ -32,7 +32,9 @@ import type { ApiKeysTableProps } from '../api-keys.interface.js';
 export function ApiKeysTable({ apiKeys, isLoading }: ApiKeysTableProps) {
   return (
     <Card className="space-y-4">
-      <h2 className="text-lg font-semibold text-text-primary">{API_KEYS_TABLE_TITLE}</h2>
+      <h2 className="text-lg font-semibold text-text-primary">
+        {API_KEYS_TABLE_TITLE}
+      </h2>
       <ApiKeysTableBody apiKeys={apiKeys} isLoading={isLoading} />
     </Card>
   );
@@ -43,13 +45,20 @@ export function ApiKeysTable({ apiKeys, isLoading }: ApiKeysTableProps) {
  *   decision reads as a short list instead of nested ternaries in JSX.
  * @returns the markup of the active state.
  */
-function ApiKeysTableBody({ apiKeys, isLoading }: ApiKeysTableProps): ReactNode {
+function ApiKeysTableBody({
+  apiKeys,
+  isLoading,
+}: ApiKeysTableProps): ReactNode {
   if (isLoading) {
-    return <p className="text-sm text-text-secondary">{API_KEYS_LOADING_MESSAGE}</p>;
+    return (
+      <p className="text-sm text-text-secondary">{API_KEYS_LOADING_MESSAGE}</p>
+    );
   }
 
   if (apiKeys.length === 0) {
-    return <p className="text-sm text-text-secondary">{API_KEYS_EMPTY_MESSAGE}</p>;
+    return (
+      <p className="text-sm text-text-secondary">{API_KEYS_EMPTY_MESSAGE}</p>
+    );
   }
 
   return (
@@ -57,9 +66,15 @@ function ApiKeysTableBody({ apiKeys, isLoading }: ApiKeysTableProps): ReactNode 
       <TableHead>
         <TableRow>
           <TableHeaderCell scope="col">{API_KEY_COLUMNS.name}</TableHeaderCell>
-          <TableHeaderCell scope="col">{API_KEY_COLUMNS.identifier}</TableHeaderCell>
-          <TableHeaderCell scope="col">{API_KEY_COLUMNS.description}</TableHeaderCell>
-          <TableHeaderCell scope="col">{API_KEY_COLUMNS.expiresAt}</TableHeaderCell>
+          <TableHeaderCell scope="col">
+            {API_KEY_COLUMNS.identifier}
+          </TableHeaderCell>
+          <TableHeaderCell scope="col">
+            {API_KEY_COLUMNS.description}
+          </TableHeaderCell>
+          <TableHeaderCell scope="col">
+            {API_KEY_COLUMNS.expiresAt}
+          </TableHeaderCell>
         </TableRow>
       </TableHead>
       <TableBody>

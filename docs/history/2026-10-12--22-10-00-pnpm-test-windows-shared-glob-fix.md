@@ -48,11 +48,11 @@ Quote the directory argument so Node's test runner — not the Windows shell —
 
 ## Verification
 
-* `cd packages/shared && pnpm test` → `tests 10 / pass 10 / fail 0`.
-* Top-level `pnpm test` → exit code 0; `@callback/shared` 10/10 and `@callback/api` 9 suites / 60 tests pass.
+- `cd packages/shared && pnpm test` → `tests 10 / pass 10 / fail 0`.
+- Top-level `pnpm test` → exit code 0; `@callback/shared` 10/10 and `@callback/api` 9 suites / 60 tests pass.
 
 ## Changed files
 
-| File | Change |
-|---|---|
+| File                                                                 | Change                                                                                                                                                              |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`packages/shared/package.json`](../../packages/shared/package.json) | Quoted the `--test` argument (`"test/"` instead of `test/`) so Windows shells forward the path to Node's test runner instead of treating it as a module to require. |

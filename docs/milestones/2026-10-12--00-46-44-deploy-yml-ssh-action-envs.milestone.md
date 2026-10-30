@@ -34,7 +34,7 @@ back to the home directory because `$REMOTE_DIR` was empty.
 > `envs`: Environment variables to pass to the shell script (string,
 > comma-separated list of names).
 
-The step's `env:` block sets the variables in the action's *local*
+The step's `env:` block sets the variables in the action's _local_
 container process environment, but the action does not export them
 to the remote shell unless the variable is named in the `envs:`
 input. This is the documented design and is different from

@@ -99,16 +99,16 @@ docker ps -a --filter 'name=aisztens'      # just our stack
 
 Key status strings to recognise:
 
-| Status | Meaning | Likely cause |
-|---|---|---|
-| `Up X minutes (healthy)` | Running and healthcheck passes | — |
-| `Up X minutes` | Running, no healthcheck defined | — |
-| `Up X minutes (health: starting)` | Still inside `start_period` | normal on cold start (api has 60s grace) |
-| `Restarting (X) Y seconds ago` | Crashed and is being restarted | check `docker logs`, almost always app crash or OOM |
-| `Exited (code) Y seconds ago` | Stopped, will not auto-restart | crash or `docker stop` |
-| `Exited (137)` | SIGKILL — **kernel OOM-killer** | host or cgroup out of memory |
-| `Exited (139)` | SIGSEGV | native crash in the binary |
-| `Exited (143)` | SIGTERM | `docker stop`, `docker compose down` |
+| Status                            | Meaning                         | Likely cause                                        |
+| --------------------------------- | ------------------------------- | --------------------------------------------------- |
+| `Up X minutes (healthy)`          | Running and healthcheck passes  | —                                                   |
+| `Up X minutes`                    | Running, no healthcheck defined | —                                                   |
+| `Up X minutes (health: starting)` | Still inside `start_period`     | normal on cold start (api has 60s grace)            |
+| `Restarting (X) Y seconds ago`    | Crashed and is being restarted  | check `docker logs`, almost always app crash or OOM |
+| `Exited (code) Y seconds ago`     | Stopped, will not auto-restart  | crash or `docker stop`                              |
+| `Exited (137)`                    | SIGKILL — **kernel OOM-killer** | host or cgroup out of memory                        |
+| `Exited (139)`                    | SIGSEGV                         | native crash in the binary                          |
+| `Exited (143)`                    | SIGTERM                         | `docker stop`, `docker compose down`                |
 
 ### Inspect a single container
 
@@ -155,14 +155,14 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f api 2>&
 
 ### Log flags cheat-sheet
 
-| Flag | What it does |
-|---|---|
-| `-f`, `--follow` | Stream new lines (like `tail -f`) |
-| `--tail N` | Only show the last N lines |
+| Flag                 | What it does                           |
+| -------------------- | -------------------------------------- |
+| `-f`, `--follow`     | Stream new lines (like `tail -f`)      |
+| `--tail N`           | Only show the last N lines             |
 | `-t`, `--timestamps` | Prefix each line with an ISO timestamp |
-| `--since 30m` | Lines from the last 30 minutes |
-| `--until 10m` | Lines older than 10 minutes |
-| `--no-log-prefix` | Strip the `service-name-1 \|` prefix |
+| `--since 30m`        | Lines from the last 30 minutes         |
+| `--until 10m`        | Lines older than 10 minutes            |
+| `--no-log-prefix`    | Strip the `service-name-1 \|` prefix   |
 
 ### Filtering tricks
 
@@ -203,8 +203,8 @@ under each service:
 logging:
   driver: json-file
   options:
-    max-size: "10m"
-    max-file: "3"
+    max-size: '10m'
+    max-file: '3'
 ```
 
 ---
@@ -222,7 +222,7 @@ docker stats aisztens-api-1 aisztens-postgres-1   # specific containers
 
 Columns:
 
-- `CPU %` — share of *one* host core. `400%` on a 4-core box means saturated.
+- `CPU %` — share of _one_ host core. `400%` on a 4-core box means saturated.
 - `MEM USAGE / LIMIT` — current RSS, then the `mem_limit` from compose.
 - `MEM %` — `usage / limit`. If it pins near `LIMIT`, the cgroup will OOM.
 - `NET I/O` / `BLOCK I/O` — bytes in/out.
@@ -302,12 +302,12 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml exec admin ls /
 
 The first form opens a shell. Common shells in our images:
 
-| Service | Default shell | Fallback |
-|---|---|---|
-| `api` (Node 20 alpine) | `sh` (alpine ships busybox) | `ash` |
-| `postgres` (alpine) | `sh` | — |
-| `caddy` (alpine) | `sh` | — |
-| `monitor` (alpine) | `sh` | — |
+| Service                | Default shell               | Fallback |
+| ---------------------- | --------------------------- | -------- |
+| `api` (Node 20 alpine) | `sh` (alpine ships busybox) | `ash`    |
+| `postgres` (alpine)    | `sh`                        | —        |
+| `caddy` (alpine)       | `sh`                        | —        |
+| `monitor` (alpine)     | `sh`                        | —        |
 
 ### Run a command without entering
 
@@ -480,9 +480,9 @@ In [`infra/docker-compose.yml`](../../infra/docker-compose.yml) for the `api`
 service, **temporarily** add:
 
 ```yaml
-    ports:
-      - "9229:9229"
-    command: ["node", "--inspect=0.0.0.0:9229", "dist/main.js"]
+ports:
+  - '9229:9229'
+command: ['node', '--inspect=0.0.0.0:9229', 'dist/main.js']
 ```
 
 Then on your dev machine:
@@ -493,13 +493,13 @@ chrome://inspect → "Configure" → add `host:9229`
 
 ### Common Node errors and fixes
 
-| Symptom in logs | Cause | Fix |
-|---|---|---|
-| `JavaScript heap out of memory` | RSS grows until V8 throws | raise `--max-old-space-size` in Dockerfile (we use 384 MB) or find the leak with a heap snapshot |
-| `EADDRINUSE :::3000` | Port 3000 is already bound inside the container | another process (an orphaned `node`) is alive; `ps -ef` and `kill` |
+| Symptom in logs                                    | Cause                                             | Fix                                                                                                                           |
+| -------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `JavaScript heap out of memory`                    | RSS grows until V8 throws                         | raise `--max-old-space-size` in Dockerfile (we use 384 MB) or find the leak with a heap snapshot                              |
+| `EADDRINUSE :::3000`                               | Port 3000 is already bound inside the container   | another process (an orphaned `node`) is alive; `ps -ef` and `kill`                                                            |
 | `ECONNREFUSED 127.0.0.1:5432` from api to postgres | api is reaching `localhost` instead of `postgres` | the `DATABASE_URL` must use `postgres:5432`, not `127.0.0.1:5432` (compose's service name resolves on the `internal` network) |
-| `MODULE_NOT_FOUND` | pnpm workspace symlinks not built | rebuild the image with `docker compose build api` |
-| `FATAL ERROR: Reached heap limit` | Same as OOM, but explicit | increase heap or fix the leak |
+| `MODULE_NOT_FOUND`                                 | pnpm workspace symlinks not built                 | rebuild the image with `docker compose build api`                                                                             |
+| `FATAL ERROR: Reached heap limit`                  | Same as OOM, but explicit                         | increase heap or fix the leak                                                                                                 |
 
 ---
 
@@ -660,14 +660,14 @@ docker inspect aisztens-api-1 \
 
 For our stack:
 
-| Source on host | Destination in container | Purpose |
-|---|---|---|
-| `./caddy/Caddyfile.rendered` | `/etc/caddy/Caddyfile` | rendered reverse-proxy config |
-| `caddy_data` volume | `/data` | TLS certs |
-| `caddy_config` volume | `/config` | Caddy's runtime config |
-| _(image-baked: `ghcr.io/<owner>/aisztens-web`)_ | `/usr/share/nginx/html` | web SPA bundle — built into the image by `images.yml`, no host folder |
-| _(image-baked: `ghcr.io/<owner>/aisztens-admin`)_ | `/usr/share/nginx/html` | admin SPA bundle — built into the image by `images.yml`, no host folder |
-| `pgdata` volume | `/var/lib/postgresql/data` | DB files |
+| Source on host                                    | Destination in container   | Purpose                                                                 |
+| ------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------- |
+| `./caddy/Caddyfile.rendered`                      | `/etc/caddy/Caddyfile`     | rendered reverse-proxy config                                           |
+| `caddy_data` volume                               | `/data`                    | TLS certs                                                               |
+| `caddy_config` volume                             | `/config`                  | Caddy's runtime config                                                  |
+| _(image-baked: `ghcr.io/<owner>/aisztens-web`)_   | `/usr/share/nginx/html`    | web SPA bundle — built into the image by `images.yml`, no host folder   |
+| _(image-baked: `ghcr.io/<owner>/aisztens-admin`)_ | `/usr/share/nginx/html`    | admin SPA bundle — built into the image by `images.yml`, no host folder |
+| `pgdata` volume                                   | `/var/lib/postgresql/data` | DB files                                                                |
 
 The historical host bind mounts (`${WEB_DIST_PATH:-../apps/web/dist}` →
 `/srv/web`, same for `admin`) were removed when the deploy moved to
@@ -744,7 +744,7 @@ Common causes for the api healthcheck (`/healthz`):
 
 `Restarting` means the **main container process** exited. The healthcheck
 isn't even running anymore. Look at `docker logs aisztens-api-1 | tail` —
-the *last* lines are the actual reason.
+the _last_ lines are the actual reason.
 
 For Node specifically, search for:
 

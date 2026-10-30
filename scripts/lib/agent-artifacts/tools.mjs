@@ -39,7 +39,9 @@ export const CLAUDE_TOOLS_BY_GROUP = Object.freeze({
  * @returns {string[]} de-duplicated tool identifiers
  */
 export function toCopilotTools(groups, override) {
-  return dedupe(override ?? groups.flatMap((group) => COPILOT_TOOLS_BY_GROUP[group] ?? []));
+  return dedupe(
+    override ?? groups.flatMap((group) => COPILOT_TOOLS_BY_GROUP[group] ?? []),
+  );
 }
 
 /**
@@ -50,7 +52,9 @@ export function toCopilotTools(groups, override) {
  * @returns {string[]} de-duplicated tool identifiers
  */
 export function toClaudeTools(groups, override) {
-  return dedupe(override ?? groups.flatMap((group) => CLAUDE_TOOLS_BY_GROUP[group] ?? []));
+  return dedupe(
+    override ?? groups.flatMap((group) => CLAUDE_TOOLS_BY_GROUP[group] ?? []),
+  );
 }
 
 /**
@@ -58,5 +62,11 @@ export function toClaudeTools(groups, override) {
  * @returns {string[]}
  */
 function dedupe(values) {
-  return [...new Set(values.filter((value) => typeof value === 'string' && value.trim() !== ''))];
+  return [
+    ...new Set(
+      values.filter(
+        (value) => typeof value === 'string' && value.trim() !== '',
+      ),
+    ),
+  ];
 }

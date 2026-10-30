@@ -19,18 +19,18 @@ unconstrained envelope payload).
 The tree was split by the subtask that actually owns each file, resulting in ten
 commits (oldest first):
 
-| Commit | Subtask | Content |
-|---|---|---|
-| `4901757` | AIS-88 | `createApiKeySchema` is `.strict()`; `successEnvelopeSchema` payload type unconstrained |
-| `1b6afca` | AIS-89 | `ApiEndpointContract`, `API_KEYS_ENDPOINTS`, `API_ENDPOINTS` + `ENVELOPE_EXEMPTIONS`, `findEndpoint`, registry exports and tests |
-| `b40ad63` | AIS-90 | `AppError` hierarchy, `toAppError`, `toApiErrorDetails`, `ZodBodyPipe` / `ZodQueryPipe`, `zod` dependency |
-| `484062e` | AIS-91 | `ApiResponseService`, global `ApiExceptionFilter`, `api-messages.const.ts`, status → code mapper |
-| `2ab0431` | AIS-92 | `request-context.ts`, `request-id.interceptor.ts`, `HttpModule`, `@SkipEnvelope()`, envelope for `GET /` |
-| `54f0c99` | AIS-93 | `api-keys` controller/service/mapper onto the envelope; class-validator DTO and local wire interface deleted |
-| `3b6fba6` | AIS-94 | transport unwraps `{ data, meta }`; `ApiError` gains `code` / `requestId` / `issues[]` |
-| `9cac48f` | AIS-95 | code-first `toErrorMessage()`, conflict mapped onto the `identifier` field, extended test mocks |
-| `48a0ed6` | AIS-97 | e2e suites cover the envelope branches and the exempt routes (CI gate still open) |
-| `d782f26` | AIS-100 | `docs/Specs/API-Convention.md`, the AIS-87 history entry, the milestone |
+| Commit    | Subtask | Content                                                                                                                          |
+| --------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `4901757` | AIS-88  | `createApiKeySchema` is `.strict()`; `successEnvelopeSchema` payload type unconstrained                                          |
+| `1b6afca` | AIS-89  | `ApiEndpointContract`, `API_KEYS_ENDPOINTS`, `API_ENDPOINTS` + `ENVELOPE_EXEMPTIONS`, `findEndpoint`, registry exports and tests |
+| `b40ad63` | AIS-90  | `AppError` hierarchy, `toAppError`, `toApiErrorDetails`, `ZodBodyPipe` / `ZodQueryPipe`, `zod` dependency                        |
+| `484062e` | AIS-91  | `ApiResponseService`, global `ApiExceptionFilter`, `api-messages.const.ts`, status → code mapper                                 |
+| `2ab0431` | AIS-92  | `request-context.ts`, `request-id.interceptor.ts`, `HttpModule`, `@SkipEnvelope()`, envelope for `GET /`                         |
+| `54f0c99` | AIS-93  | `api-keys` controller/service/mapper onto the envelope; class-validator DTO and local wire interface deleted                     |
+| `3b6fba6` | AIS-94  | transport unwraps `{ data, meta }`; `ApiError` gains `code` / `requestId` / `issues[]`                                           |
+| `9cac48f` | AIS-95  | code-first `toErrorMessage()`, conflict mapped onto the `identifier` field, extended test mocks                                  |
+| `48a0ed6` | AIS-97  | e2e suites cover the envelope branches and the exempt routes (CI gate still open)                                                |
+| `d782f26` | AIS-100 | `docs/Specs/API-Convention.md`, the AIS-87 history entry, the milestone                                                          |
 
 ## Verification
 

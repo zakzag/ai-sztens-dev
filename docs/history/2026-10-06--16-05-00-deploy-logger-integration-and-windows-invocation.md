@@ -17,15 +17,15 @@
 
 Reflection list of candidate causes, and their verdict:
 
-| # | Candidate | Verdict | Evidence |
-|---|---|---|---|
-| 1 | CRLF line endings → bad interpreter / `$'\r'` | **ruled out** | `deploy.sh` is CR=0 / LF=404; [`.gitattributes`](../../.gitattributes:22) forces `*.sh text eol=lf` |
-| 2 | Windows `.sh` file association | **confirmed** | `assoc .sh` → `sh_auto_file`; `ftype` → `"C:\Progs\Git\git-bash.exe" --no-cd "%L" %*` |
-| 3 | Missing `deploy/.env` | **confirmed** | `dir /b deploy` has no `.env`; `HOST="${HOST:?…}"` aborts |
-| 4 | Logger never wired in | **confirmed** | zero matches for `logger` / `deploy_log_init` in `deploy.sh` |
-| 5 | `ERR` trap installed long before `log()` is defined | **confirmed (latent)** | trap at former line 52, `log()` at former line 128 |
-| 6 | `exec > >(tee …)` swallowing output | not applicable | the redirect was never executed (see #4) |
-| 7 | PowerShell/cmd cannot execute `.sh` (no PATHEXT) → ShellExecute | **confirmed** | this is the mechanism behind #2 |
+| #   | Candidate                                                       | Verdict                | Evidence                                                                                            |
+| --- | --------------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | CRLF line endings → bad interpreter / `$'\r'`                   | **ruled out**          | `deploy.sh` is CR=0 / LF=404; [`.gitattributes`](../../.gitattributes:22) forces `*.sh text eol=lf` |
+| 2   | Windows `.sh` file association                                  | **confirmed**          | `assoc .sh` → `sh_auto_file`; `ftype` → `"C:\Progs\Git\git-bash.exe" --no-cd "%L" %*`               |
+| 3   | Missing `deploy/.env`                                           | **confirmed**          | `dir /b deploy` has no `.env`; `HOST="${HOST:?…}"` aborts                                           |
+| 4   | Logger never wired in                                           | **confirmed**          | zero matches for `logger` / `deploy_log_init` in `deploy.sh`                                        |
+| 5   | `ERR` trap installed long before `log()` is defined             | **confirmed (latent)** | trap at former line 52, `log()` at former line 128                                                  |
+| 6   | `exec > >(tee …)` swallowing output                             | not applicable         | the redirect was never executed (see #4)                                                            |
+| 7   | PowerShell/cmd cannot execute `.sh` (no PATHEXT) → ShellExecute | **confirmed**          | this is the mechanism behind #2                                                                     |
 
 Micro-tests run with bash directly:
 
@@ -88,13 +88,13 @@ is sourced, and it uses `log_error`, whose `[stage=…]` tag the logger adds aut
 
 The suite was red, which is why none of the above was caught earlier:
 
-| Bug in `deploy/lib/logger.sh` | Consequence | Fix |
-|---|---|---|
-| `DEPLOY_LOG_FILE` / `DEPLOY_LOG_LEVEL` / `DEPLOY_LOG_KEEP` were read only at *source* time | a caller that set them afterwards was silently ignored (the file was written under a different name) | knobs are re-read live in `deploy_log_init` / `deploy_log_prune` |
-| `latest.log` was chosen as the **first** glob match (the oldest file) | "read the last failed deploy in one command" pointed at a stale run | selection by mtime, ties broken by name |
-| `latest.log` was refreshed at *init* time | on Windows `ln -s` degrades to `cp`, so the copy stopped at the header, before the run did anything | refresh moved to `deploy_log_finish`, after the footer |
-| `xargs stat \| sort -nr \| cut \| tail` for retention | on Windows a bare `sort` resolves to `C:\Windows\System32\sort.exe`; `sort -nr` treats `-nr` as a filename → `The system cannot find the file specified.` | replaced with pure bash + a `stat -c`/`stat -f` helper |
-| the footer went through the `tee` pipe | a run that exits from a subshell tears `tee` down before it flushes — the log kept only the header (observed: 381 bytes, header only) | footer appended **directly** to the file; the capture is flushed first and unconditionally (fds 8/9 are parked in `deploy_log_init`) |
+| Bug in `deploy/lib/logger.sh`                                                              | Consequence                                                                                                                                               | Fix                                                                                                                                  |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `DEPLOY_LOG_FILE` / `DEPLOY_LOG_LEVEL` / `DEPLOY_LOG_KEEP` were read only at _source_ time | a caller that set them afterwards was silently ignored (the file was written under a different name)                                                      | knobs are re-read live in `deploy_log_init` / `deploy_log_prune`                                                                     |
+| `latest.log` was chosen as the **first** glob match (the oldest file)                      | "read the last failed deploy in one command" pointed at a stale run                                                                                       | selection by mtime, ties broken by name                                                                                              |
+| `latest.log` was refreshed at _init_ time                                                  | on Windows `ln -s` degrades to `cp`, so the copy stopped at the header, before the run did anything                                                       | refresh moved to `deploy_log_finish`, after the footer                                                                               |
+| `xargs stat \| sort -nr \| cut \| tail` for retention                                      | on Windows a bare `sort` resolves to `C:\Windows\System32\sort.exe`; `sort -nr` treats `-nr` as a filename → `The system cannot find the file specified.` | replaced with pure bash + a `stat -c`/`stat -f` helper                                                                               |
+| the footer went through the `tee` pipe                                                     | a run that exits from a subshell tears `tee` down before it flushes — the log kept only the header (observed: 381 bytes, header only)                     | footer appended **directly** to the file; the capture is flushed first and unconditionally (fds 8/9 are parked in `deploy_log_init`) |
 
 The test itself was also broken: `setup_temp()` `export`ed inside `$( )`, i.e. in a subshell, so the
 variables never reached the parent (`R1 FAIL`, then `DEPLOY_LOG_FILE: unbound variable`). It now
@@ -111,16 +111,16 @@ command with the same text on stderr (so it lands in the log).
 
 ## 4. Changed files
 
-| File | Change |
-|---|---|
-| [`deploy/deploy.sh`](../../deploy/deploy.sh) | sources the logger before the guards; calls `deploy_log_init`; drops the local `log()`/`log_stage()`; logs the resolved (non-secret) config; explicit logged `HOST` guard; `ERR` trap after the logger; bash guard; usage text + `--verbose` |
-| [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh) | live env reads; fd 8/9 capture + guaranteed flush; idempotent footer written directly to the file; mtime-based `latest.log` helper refreshed at the end of a run; sort-free retention |
-| [`deploy/deploy.ps1`](../../deploy/deploy.ps1) | **new** Windows wrapper (see 3.1) |
-| `deploy/.env` | **new** (gitignored), seeded from `.env.example`, `HOST` left for the operator |
-| [`deploy/README.md`](../../deploy/README.md) | "How to run the deploy script on Windows" callout + §10 "Deploy logs" |
-| [`docs/Specs/Production-Runbook.md`](../Specs/Production-Runbook.md) | §6.1 banner format, `deploy/log/` triage, Windows invocation note; header date refreshed |
-| [`scripts/test/_deploy-sh-m1-test.sh`](../../scripts/test/_deploy-sh-m1-test.sh) | rewritten: sources the real logger, asserts the trap ordering, the banner, the log capture and the footer (7 assertions) instead of testing a stale copy |
-| [`scripts/test/_deploy-sh-logger-test.sh`](../../scripts/test/_deploy-sh-logger-test.sh) | fixed the subshell-export bug; now 10/10 green |
+| File                                                                                     | Change                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`deploy/deploy.sh`](../../deploy/deploy.sh)                                             | sources the logger before the guards; calls `deploy_log_init`; drops the local `log()`/`log_stage()`; logs the resolved (non-secret) config; explicit logged `HOST` guard; `ERR` trap after the logger; bash guard; usage text + `--verbose` |
+| [`deploy/lib/logger.sh`](../../deploy/lib/logger.sh)                                     | live env reads; fd 8/9 capture + guaranteed flush; idempotent footer written directly to the file; mtime-based `latest.log` helper refreshed at the end of a run; sort-free retention                                                        |
+| [`deploy/deploy.ps1`](../../deploy/deploy.ps1)                                           | **new** Windows wrapper (see 3.1)                                                                                                                                                                                                            |
+| `deploy/.env`                                                                            | **new** (gitignored), seeded from `.env.example`, `HOST` left for the operator                                                                                                                                                               |
+| [`deploy/README.md`](../../deploy/README.md)                                             | "How to run the deploy script on Windows" callout + §10 "Deploy logs"                                                                                                                                                                        |
+| [`docs/Specs/Production-Runbook.md`](../Specs/Production-Runbook.md)                     | §6.1 banner format, `deploy/log/` triage, Windows invocation note; header date refreshed                                                                                                                                                     |
+| [`scripts/test/_deploy-sh-m1-test.sh`](../../scripts/test/_deploy-sh-m1-test.sh)         | rewritten: sources the real logger, asserts the trap ordering, the banner, the log capture and the footer (7 assertions) instead of testing a stale copy                                                                                     |
+| [`scripts/test/_deploy-sh-logger-test.sh`](../../scripts/test/_deploy-sh-logger-test.sh) | fixed the subshell-export bug; now 10/10 green                                                                                                                                                                                               |
 
 ## 5. Verification
 
@@ -143,13 +143,13 @@ The generated `deploy/log/deploy-*.log` and `latest.log` are gitignored (verifie
 
 ## 6. Follow-ups
 
-* `scripts/test/_deploy-sh-m3-test.sh` is red **independently of this change**: its Test 1 requires
+- `scripts/test/_deploy-sh-m3-test.sh` is red **independently of this change**: its Test 1 requires
   `infra/.env`, which is gitignored and absent from a fresh checkout (only `infra/.env.dev` exists).
   It also still mirrors the pre-three-env resolution logic. Worth rewriting against the current
   `upload()` block the next time `infra/.env*` handling is touched.
-* The `ERR` trap path (remote `ps -a` + `logs` dump on a mid-deploy failure) is verified
+- The `ERR` trap path (remote `ps -a` + `logs` dump on a mid-deploy failure) is verified
   structurally, not dynamically: exercising it requires a reachable droplet. On the next real deploy
   failure, confirm the banner carries `[stage=…]` and that the same lines are in
   `deploy/log/latest.log`.
-* `deploy/lib/logger.sh` is now ready to be shared with [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh)
+- `deploy/lib/logger.sh` is now ready to be shared with [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh)
   and [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh), which still define their own `log()`.

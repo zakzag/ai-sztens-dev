@@ -41,16 +41,16 @@ spikes.
 
 ## 3. Memory budget on the 2 GB droplet
 
-| Component | Current | After | Notes |
-|---|---|---|---|
-| Host OS + systemd-journal + sshd | ~150 MB | ~150 MB | not a container, fixed |
-| `dockerd` + `containerd` | ~190 MB | ~190 MB | not a container, fixed |
-| `do-agent` (pnpm-native) | 615 MB+ | ~600 MB | not configurable, we just live with it |
-| `api` (Node + NestJS + Fastify) | uncapped | **400 MB** | `--max-old-space-size=384` |
-| `postgres` (16-alpine) | uncapped | **400 MB** | `shared_buffers=128`, `effective_cache_size=512`, `work_mem=4` |
-| `caddy` | ~30 MB | **64 MB** | safety headroom for slow TLS / big uploads |
-| `monitor` | ~10 MB | **32 MB** | curl + bash sleep only |
-| **Sum** | unbounded | **~1.84 GB** | fits inside 2 GB, ~160 MB headroom + swap |
+| Component                        | Current   | After        | Notes                                                          |
+| -------------------------------- | --------- | ------------ | -------------------------------------------------------------- |
+| Host OS + systemd-journal + sshd | ~150 MB   | ~150 MB      | not a container, fixed                                         |
+| `dockerd` + `containerd`         | ~190 MB   | ~190 MB      | not a container, fixed                                         |
+| `do-agent` (pnpm-native)         | 615 MB+   | ~600 MB      | not configurable, we just live with it                         |
+| `api` (Node + NestJS + Fastify)  | uncapped  | **400 MB**   | `--max-old-space-size=384`                                     |
+| `postgres` (16-alpine)           | uncapped  | **400 MB**   | `shared_buffers=128`, `effective_cache_size=512`, `work_mem=4` |
+| `caddy`                          | ~30 MB    | **64 MB**    | safety headroom for slow TLS / big uploads                     |
+| `monitor`                        | ~10 MB    | **32 MB**    | curl + bash sleep only                                         |
+| **Sum**                          | unbounded | **~1.84 GB** | fits inside 2 GB, ~160 MB headroom + swap                      |
 
 ## 4. Files to change
 
@@ -73,7 +73,7 @@ unnecessary OOMs. The hard limit is enough.
 ### 4.2 [`infra/app/Dockerfile`](../../infra/app/Dockerfile)
 
 Add `ENV NODE_OPTIONS=--max-old-space-size=384` to the runtime stage so the V8 heap
-gives up *before* the container limit kicks in. Without this, the Node process is happily
+gives up _before_ the container limit kicks in. Without this, the Node process is happily
 allocated up to ~1.5 GB on a 2 GB host, then the kernel OOM-kills it, and the
 `restart: unless-stopped` loop starts a death-spiral.
 

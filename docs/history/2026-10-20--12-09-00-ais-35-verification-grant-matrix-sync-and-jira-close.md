@@ -13,26 +13,26 @@ elmaradtak az AIS-36 delta mögött, és a Jira ticket lezáratlan volt.
 
 ### Ellenőrzési eredmény
 
-| DoD pont | Kód bizonyíték | Állapot |
-|---|---|---|
-| `platform` / `callback` / `email` sémák létrehozása | [`infra/postgres/init/02-schemas.sh`](../../infra/postgres/init/02-schemas.sh:54) | ✅ |
-| `USAGE` mindhárom sémára, 3 role-nak | [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh:61) `\gexec` blokk | ✅ |
-| `CREATE` jog az app role-nak | [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh:71) `callback` + `platform` | ✅ |
-| Grant a `01-roles.sh`-ban is | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh:77) `pg_namespace`-guarddal | ✅ |
-| Idempotencia | [`_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh:187) 2× re-run | ✅ |
-| Smoke ellenőrzés | [`20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh:112) 3 check (`3` / `9` / `2`) | ✅ |
-| Specs frissítve | `Infrastructure-Docker.md` §6.2, `Local-Development.md` §2b, `Database-Local.md` §8 | ✅ |
+| DoD pont                                            | Kód bizonyíték                                                                                      | Állapot |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
+| `platform` / `callback` / `email` sémák létrehozása | [`infra/postgres/init/02-schemas.sh`](../../infra/postgres/init/02-schemas.sh:54)                   | ✅      |
+| `USAGE` mindhárom sémára, 3 role-nak                | [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh:61) `\gexec` blokk                        | ✅      |
+| `CREATE` jog az app role-nak                        | [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh:71) `callback` + `platform`               | ✅      |
+| Grant a `01-roles.sh`-ban is                        | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh:77) `pg_namespace`-guarddal                   | ✅      |
+| Idempotencia                                        | [`_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh:187) 2× re-run | ✅      |
+| Smoke ellenőrzés                                    | [`20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh:112) 3 check (`3` / `9` / `2`)   | ✅      |
+| Specs frissítve                                     | `Infrastructure-Docker.md` §6.2, `Local-Development.md` §2b, `Database-Local.md` §8                 | ✅      |
 
 ### Javított doc-drift
 
-| Fájl | Elavult állítás | Javított |
-|---|---|---|
-| [`milestone`](../../docs/milestones/2026-10-19--21-30-00-postgres-schema-boundary-and-grants.milestone.md:39) | „`CREATE` only in `callback`" | `callback` **és** `platform` (AIS-36 delta), `email` csak `USAGE` |
-| [`milestone`](../../docs/milestones/2026-10-19--21-30-00-postgres-schema-boundary-and-grants.milestone.md:51) | mátrix: `platform \| USAGE` | `platform \| USAGE + CREATE` |
-| [`milestone`](../../docs/milestones/2026-10-19--21-30-00-postgres-schema-boundary-and-grants.milestone.md:62) | `postgres-schema-create (expects 1)` | `expects 2` |
-| [`milestone`](../../docs/milestones/2026-10-19--21-30-00-postgres-schema-boundary-and-grants.milestone.md:77) | `expect PASS: 29` | `PASS: 32` (13 fresh + 8 re-run + 11 post-re-run) |
-| [`history`](../../docs/history/2026-10-19--21-30-00-ais-35-postgres-schemas.md:30) | „`CREATE` a `callback`-re **kizárólag**" | `callback` + `platform`, a `platform` indoklással (könyvelő tábla) |
-| [`history`](../../docs/history/2026-10-19--21-30-00-ais-35-postgres-schemas.md:44) | `PASS: 23` | AIS-36 utáni aktuális érték (`PASS: 32`) is rögzítve |
+| Fájl                                                                                                          | Elavult állítás                          | Javított                                                           |
+| ------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------ |
+| [`milestone`](../../docs/milestones/2026-10-19--21-30-00-postgres-schema-boundary-and-grants.milestone.md:39) | „`CREATE` only in `callback`"            | `callback` **és** `platform` (AIS-36 delta), `email` csak `USAGE`  |
+| [`milestone`](../../docs/milestones/2026-10-19--21-30-00-postgres-schema-boundary-and-grants.milestone.md:51) | mátrix: `platform \| USAGE`              | `platform \| USAGE + CREATE`                                       |
+| [`milestone`](../../docs/milestones/2026-10-19--21-30-00-postgres-schema-boundary-and-grants.milestone.md:62) | `postgres-schema-create (expects 1)`     | `expects 2`                                                        |
+| [`milestone`](../../docs/milestones/2026-10-19--21-30-00-postgres-schema-boundary-and-grants.milestone.md:77) | `expect PASS: 29`                        | `PASS: 32` (13 fresh + 8 re-run + 11 post-re-run)                  |
+| [`history`](../../docs/history/2026-10-19--21-30-00-ais-35-postgres-schemas.md:30)                            | „`CREATE` a `callback`-re **kizárólag**" | `callback` + `platform`, a `platform` indoklással (könyvelő tábla) |
+| [`history`](../../docs/history/2026-10-19--21-30-00-ais-35-postgres-schemas.md:44)                            | `PASS: 23`                               | AIS-36 utáni aktuális érték (`PASS: 32`) is rögzítve               |
 
 ## Jira változások
 

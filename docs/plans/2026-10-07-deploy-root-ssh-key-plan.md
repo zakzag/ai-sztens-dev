@@ -13,39 +13,39 @@
 
 One key file, two login users:
 
-| Path | User | Key | Change needed |
-|---|---|---|---|
-| Local `./deploy/deploy.sh up [dev]` | `root` | `deploy/ssh-keys/root.private.key` | none (already wired) — comment tidy only |
-| GitHub Actions deploy | `deployer` | the **same** key via the `DROPLET_SSH_KEY` secret | no workflow logic change; new secret **value** + the key authorised for `deployer` |
+| Path                                | User       | Key                                               | Change needed                                                                      |
+| ----------------------------------- | ---------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Local `./deploy/deploy.sh up [dev]` | `root`     | `deploy/ssh-keys/root.private.key`                | none (already wired) — comment tidy only                                           |
+| GitHub Actions deploy               | `deployer` | the **same** key via the `DROPLET_SSH_KEY` secret | no workflow logic change; new secret **value** + the key authorised for `deployer` |
 
 ---
 
 ## 2. Verified current state
 
-| Fact | Evidence |
-|---|---|
-| New key is **passphrase-less** (no CI passphrase secret needed) | OpenSSH header `cipher=none`, `kdf=none`; comment `aisztens.hu-root-no-passphrase` |
-| Dedicated key (not one of the four committed `.pub` files) | public half `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINI4k0yp3DLE2O6vwgsGcA4J0OXBDQ2NvPJPPOtsGGf3` |
-| Key stays out of git | `.gitignore:78` `*.private.key` |
-| Local config already uses it as root | [`deploy/.env.dev`](../../deploy/.env.dev:12) `SSH_USER=root`, `SSH_KEY=./deploy/ssh-keys/root.private.key` |
-| CI user/key references (7 steps) | [`deploy.yml`](../../.github/workflows/deploy.yml:128) — `username: deployer` + `key: ${{ secrets.DROPLET_SSH_KEY }}`; **these stay unchanged** |
-| CI header still describes the old key | [`deploy.yml`](../../.github/workflows/deploy.yml:28) lines 28–29 ("matches `deployer.pub`") |
-| Secrets table still describes the old key | [`deploy/README.md`](../../deploy/README.md:168) §8.1 `DROPLET_SSH_KEY` row |
-| `.env` comments still suggest switching to `deployer` | [`deploy/.env.example`](../../deploy/.env.example:27) lines 27–28, `deploy/.env.dev` lines 9–10 |
-| `docs/Specs/*` `deployer@aisztens.hu` examples | **remain correct** — no change needed |
-| Baseline | `6463284`; working tree clean except `.idea/workspace.xml` |
+| Fact                                                            | Evidence                                                                                                                                        |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| New key is **passphrase-less** (no CI passphrase secret needed) | OpenSSH header `cipher=none`, `kdf=none`; comment `aisztens.hu-root-no-passphrase`                                                              |
+| Dedicated key (not one of the four committed `.pub` files)      | public half `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINI4k0yp3DLE2O6vwgsGcA4J0OXBDQ2NvPJPPOtsGGf3`                                                  |
+| Key stays out of git                                            | `.gitignore:78` `*.private.key`                                                                                                                 |
+| Local config already uses it as root                            | [`deploy/.env.dev`](../../deploy/.env.dev:12) `SSH_USER=root`, `SSH_KEY=./deploy/ssh-keys/root.private.key`                                     |
+| CI user/key references (7 steps)                                | [`deploy.yml`](../../.github/workflows/deploy.yml:128) — `username: deployer` + `key: ${{ secrets.DROPLET_SSH_KEY }}`; **these stay unchanged** |
+| CI header still describes the old key                           | [`deploy.yml`](../../.github/workflows/deploy.yml:28) lines 28–29 ("matches `deployer.pub`")                                                    |
+| Secrets table still describes the old key                       | [`deploy/README.md`](../../deploy/README.md:168) §8.1 `DROPLET_SSH_KEY` row                                                                     |
+| `.env` comments still suggest switching to `deployer`           | [`deploy/.env.example`](../../deploy/.env.example:27) lines 27–28, `deploy/.env.dev` lines 9–10                                                 |
+| `docs/Specs/*` `deployer@aisztens.hu` examples                  | **remain correct** — no change needed                                                                                                           |
+| Baseline                                                        | `6463284`; working tree clean except `.idea/workspace.xml`                                                                                      |
 
 ---
 
 ## 3. Changes
 
-| # | File | Change |
-|---|---|---|
-| 1 | [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:28) | **Comments only** (no logic): the secrets block describes `DROPLET_SSH_KEY` as the passphrase-less deploy key whose public half is installed in `deployer`'s `authorized_keys`. `username: deployer` in all 7 steps stays. |
-| 2 | [`deploy/README.md`](../../deploy/README.md:165) | §8.1 secrets table: `DROPLET_SSH_KEY` = the deploy key (`deploy/ssh-keys/root.private.key`), passphrase-less, public half in `/home/deployer/.ssh/authorized_keys`. §1 (line 73–77): mention the key file next to the `SSH_KEY` guidance. |
-| 3 | [`deploy/ssh-keys/README.md`](../../deploy/ssh-keys/README.md:1) | Note that `root.private.key` is the **deploy key** (gitignored): used locally as `root`, in CI as `deployer`. |
-| 4 | [`deploy/.env.example`](../../deploy/.env.example:27) / `deploy/.env.dev` | Comment tidy: the local deploy uses `root` with the pinned key (drop the "switch to `deployer`" hint); example `SSH_KEY` = `./deploy/ssh-keys/root.private.key`. |
-| 5 | docs/history + docs/milestones | New history entry + milestone recording the key switch. |
+| #   | File                                                                      | Change                                                                                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:28)   | **Comments only** (no logic): the secrets block describes `DROPLET_SSH_KEY` as the passphrase-less deploy key whose public half is installed in `deployer`'s `authorized_keys`. `username: deployer` in all 7 steps stays.                |
+| 2   | [`deploy/README.md`](../../deploy/README.md:165)                          | §8.1 secrets table: `DROPLET_SSH_KEY` = the deploy key (`deploy/ssh-keys/root.private.key`), passphrase-less, public half in `/home/deployer/.ssh/authorized_keys`. §1 (line 73–77): mention the key file next to the `SSH_KEY` guidance. |
+| 3   | [`deploy/ssh-keys/README.md`](../../deploy/ssh-keys/README.md:1)          | Note that `root.private.key` is the **deploy key** (gitignored): used locally as `root`, in CI as `deployer`.                                                                                                                             |
+| 4   | [`deploy/.env.example`](../../deploy/.env.example:27) / `deploy/.env.dev` | Comment tidy: the local deploy uses `root` with the pinned key (drop the "switch to `deployer`" hint); example `SSH_KEY` = `./deploy/ssh-keys/root.private.key`.                                                                          |
+| 5   | docs/history + docs/milestones                                            | New history entry + milestone recording the key switch.                                                                                                                                                                                   |
 
 No change to [`deploy/deploy.sh`](../../deploy/deploy.sh:1) (it already resolves `SSH_USER`/`SSH_KEY` from the selected env file) and none to the workflow's SSH logic.
 

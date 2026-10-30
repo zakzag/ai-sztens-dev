@@ -6,23 +6,23 @@ is tracked in [`Plans/05-b2b-merge.md`](Plans/05-b2b-merge.md).
 
 ## 1. Functional Units
 
-| # | Unit | Responsibility |
-|---|---|---|
-| F1 | Call-back Form (UI) | Present the call-back form (name, email, reason) and show results / errors |
-| F2 | Request API | Receive the form submission |
-| F3 | Validation | Reject invalid input (bad email, bad phone, nonsensical reason) |
-| F4 | Request Persistence | Store the validated request with status `queued` |
-| F5 | Work Queue | Two queues: call jobs (dispatch) and action jobs (executor) |
-| F6 | Call Dispatcher | Pick queued requests and start calls through the CallProvider |
-| F7 | Call Provider | Execute the phone call (telephony + STT/TTS/LLM) and emit events |
-| F8 | Webhook Receiver | Receive provider events (status, transcript, summary, tool-calls); delegate in-call actions to the Action Executor |
-| F9 | Call Detail Persistence | Store outcome, summary and events; update request status |
-| F10 | Action Executor | Execute actions — in-call (via tool-calls, synchronous) and post-call (after the call, via the queue) |
-| F11 | Action Registry | Extensible list of actions, each with a uniform interface |
-| F12 | Notification Sender | Deliver messages to owner and caller |
-| F13 | Calendar Scheduler | Create booking proposals |
-| F14 | Admin UI | Owner view of requests, calls, recordings and stats |
-| F15 | Logging / Observability | Correlation ids, metrics, alerts |
+| #   | Unit                    | Responsibility                                                                                                     |
+| --- | ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| F1  | Call-back Form (UI)     | Present the call-back form (name, email, reason) and show results / errors                                         |
+| F2  | Request API             | Receive the form submission                                                                                        |
+| F3  | Validation              | Reject invalid input (bad email, bad phone, nonsensical reason)                                                    |
+| F4  | Request Persistence     | Store the validated request with status `queued`                                                                   |
+| F5  | Work Queue              | Two queues: call jobs (dispatch) and action jobs (executor)                                                        |
+| F6  | Call Dispatcher         | Pick queued requests and start calls through the CallProvider                                                      |
+| F7  | Call Provider           | Execute the phone call (telephony + STT/TTS/LLM) and emit events                                                   |
+| F8  | Webhook Receiver        | Receive provider events (status, transcript, summary, tool-calls); delegate in-call actions to the Action Executor |
+| F9  | Call Detail Persistence | Store outcome, summary and events; update request status                                                           |
+| F10 | Action Executor         | Execute actions — in-call (via tool-calls, synchronous) and post-call (after the call, via the queue)              |
+| F11 | Action Registry         | Extensible list of actions, each with a uniform interface                                                          |
+| F12 | Notification Sender     | Deliver messages to owner and caller                                                                               |
+| F13 | Calendar Scheduler      | Create booking proposals                                                                                           |
+| F14 | Admin UI                | Owner view of requests, calls, recordings and stats                                                                |
+| F15 | Logging / Observability | Correlation ids, metrics, alerts                                                                                   |
 
 ## 2. Ports (Contracts)
 
@@ -156,13 +156,13 @@ then `actions-executing`.
 
 ## 7. In-Call vs Post-Call Actions
 
-| | In-Call (via tool-calls) | Post-Call (via action queue) |
-|---|---|---|
-| Trigger | `tool-calls` webhook during the conversation | action job after the call ends |
-| Timing | Immediate, mid-call | After the call |
+|          | In-Call (via tool-calls)                                  | Post-Call (via action queue)       |
+| -------- | --------------------------------------------------------- | ---------------------------------- |
+| Trigger  | `tool-calls` webhook during the conversation              | action job after the call ends     |
+| Timing   | Immediate, mid-call                                       | After the call                     |
 | Response | Synchronous; the assistant reads the result to the caller | Asynchronous; the result is stored |
-| Retry | Fast path, no queue retry | Queue retry with backoff |
-| Examples | Calendar booking + instant confirmation | Notifications, follow-ups |
+| Retry    | Fast path, no queue retry                                 | Queue retry with backoff           |
+| Examples | Calendar booking + instant confirmation                   | Notifications, follow-ups          |
 
 Both are executed by the same **Action Executor** against the `Action` interface.
 
@@ -174,10 +174,10 @@ Both are executed by the same **Action Executor** against the `Action` interface
 
 Two complementary layers cover the system end-to-end:
 
-| Layer | Where | What it tests |
-|---|---|---|
-| Unit & in-process e2e | `apps/api/src/**/*.spec.ts`, `apps/api/test/` | Business logic in isolation (controllers, services, DTOs) |
-| Stack smoke | [`scripts/test/`](../../../scripts/README.md) | Container-level contracts: every service in `infra/docker-compose.yml` is up, healthy, and can reach the others through the `internal` Docker network |
+| Layer                 | Where                                         | What it tests                                                                                                                                         |
+| --------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit & in-process e2e | `apps/api/src/**/*.spec.ts`, `apps/api/test/` | Business logic in isolation (controllers, services, DTOs)                                                                                             |
+| Stack smoke           | [`scripts/test/`](../../../scripts/README.md) | Container-level contracts: every service in `infra/docker-compose.yml` is up, healthy, and can reach the others through the `internal` Docker network |
 
 Run them in this order on a developer machine before deploying:
 
@@ -196,4 +196,3 @@ The stack smoke suite is read-only with respect to the running stack — it
 does not modify containers, images, or volumes unless `--up` / `--down` are
 explicitly passed. The scripts and their interface (subcommands, flags, exit
 codes) are documented in [`scripts/README.md`](../../../scripts/README.md).
-

@@ -29,15 +29,15 @@ pwsh scripts/env-test/check-env-live.ps1 --dry-run
 
 ## `check-env-syntax.sh` — offline
 
-| Check | What it verifies |
-|---|---|
-| key/value syntax | every non-comment line is `KEY=value` (no spaces around `=`) |
-| duplicates | no key is defined twice in the same file |
-| bash sourcing | the file loads cleanly via `set -a; . file` |
-| CRLF | warns when a file has Windows line endings (bash may keep a stray `\r`) |
-| required keys | each real per-env file has its mandatory keys |
-| placeholders | real dev files (`deploy/.env.dev`, `infra/.env.dev`) contain no `change-me` / `replace-with` / `<...>` values |
-| cross-file | `apps/{web,admin}/.env.dev` `VITE_API_BASE_URL` == `https://api.<DOMAIN>/api` from `infra/.env.dev` |
+| Check            | What it verifies                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------- |
+| key/value syntax | every non-comment line is `KEY=value` (no spaces around `=`)                                                  |
+| duplicates       | no key is defined twice in the same file                                                                      |
+| bash sourcing    | the file loads cleanly via `set -a; . file`                                                                   |
+| CRLF             | warns when a file has Windows line endings (bash may keep a stray `\r`)                                       |
+| required keys    | each real per-env file has its mandatory keys                                                                 |
+| placeholders     | real dev files (`deploy/.env.dev`, `infra/.env.dev`) contain no `change-me` / `replace-with` / `<...>` values |
+| cross-file       | `apps/{web,admin}/.env.dev` `VITE_API_BASE_URL` == `https://api.<DOMAIN>/api` from `infra/.env.dev`           |
 
 The files it inspects (missing ones are reported as `SKIP`):
 
@@ -60,12 +60,12 @@ Exit codes: `0` pass, `1` at least one failure, `2` usage error.
 Reads `deploy/.env.dev` (SSH target) and `infra/.env.dev` (domain, DB,
 secrets) without exporting the values, then:
 
-| Check | What it verifies |
-|---|---|
+| Check            | What it verifies                                                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | static readiness | `HOST`/`DOMAIN` set, VAPI secret not a placeholder, CORS excludes `api.<DOMAIN>`, `SUDO_USERS` includes `deployer`, the four `deploy/ssh-keys/*.pub` files exist |
-| SSH | `ssh -o BatchMode=yes` login to `SSH_USER@HOST` (using `SSH_KEY` when set) |
-| Postgres | `pg_isready` plus a `pg_roles` query (`aisztens`, `tkovari`, `krak`) over the SSH channel |
-| HTTPS | `https://web.<DOMAIN>`, `https://admin.<DOMAIN>`, `https://api.<DOMAIN>` return `200` |
+| SSH              | `ssh -o BatchMode=yes` login to `SSH_USER@HOST` (using `SSH_KEY` when set)                                                                                       |
+| Postgres         | `pg_isready` plus a `pg_roles` query (`aisztens`, `tkovari`, `krak`) over the SSH channel                                                                        |
+| HTTPS            | `https://web.<DOMAIN>`, `https://admin.<DOMAIN>`, `https://api.<DOMAIN>` return `200`                                                                            |
 
 Prerequisites: `ssh` and `curl` on `PATH`, plus network access to the
 droplet. Secrets are never printed — only key names and non-secret values.

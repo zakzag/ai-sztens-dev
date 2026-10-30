@@ -16,7 +16,7 @@ usable and self-checking:
 
 1. a clickable reference (`/api/docs`) plus the generated document
    (`/api/openapi.json`) — no second description of any payload;
-4. a dev/staging **response validator** that fails the request when a controller
+2. a dev/staging **response validator** that fails the request when a controller
    breaks the contract it just claimed to implement.
 
 Baseline (`docs/Specs/openapi.json` + CI drift gate) and the full documentation
@@ -26,30 +26,30 @@ pass stayed out of scope (AIS-99, AIS-100).
 
 ### Generation (`apps/api/src/common/openapi/`)
 
-| File | Role |
-|---|---|
-| [`openapi.config.ts`](../../apps/api/src/common/openapi/openapi.config.ts) | title/version/servers/tags, the bearer scheme (documented, not required), route constants and the two **pure** env predicates |
-| [`zod-openapi.ts`](../../apps/api/src/common/openapi/zod-openapi.ts) | `extendZodWithOpenApi`, the `ApiEnvelope`/`ApiErrorEnvelope`/meta components registered once, `envelopeOf()`, `openApiErrorResponses()`, `toOpenApiPath()`, `pathParameters()`, and the payload **name table** |
-| [`openapi.registry.ts`](../../apps/api/src/common/openapi/openapi.registry.ts) | pure, memoised `buildOpenApiDocument()` over `API_ENDPOINTS` |
-| [`openapi.controller.ts`](../../apps/api/src/common/openapi/openapi.controller.ts) | `@SkipEnvelope() GET /api/openapi.json` |
-| [`openapi.module.ts`](../../apps/api/src/common/openapi/openapi.module.ts) | wiring, conditional plugin registration and the conditional `APP_INTERCEPTOR` |
+| File                                                                               | Role                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`openapi.config.ts`](../../apps/api/src/common/openapi/openapi.config.ts)         | title/version/servers/tags, the bearer scheme (documented, not required), route constants and the two **pure** env predicates                                                                                  |
+| [`zod-openapi.ts`](../../apps/api/src/common/openapi/zod-openapi.ts)               | `extendZodWithOpenApi`, the `ApiEnvelope`/`ApiErrorEnvelope`/meta components registered once, `envelopeOf()`, `openApiErrorResponses()`, `toOpenApiPath()`, `pathParameters()`, and the payload **name table** |
+| [`openapi.registry.ts`](../../apps/api/src/common/openapi/openapi.registry.ts)     | pure, memoised `buildOpenApiDocument()` over `API_ENDPOINTS`                                                                                                                                                   |
+| [`openapi.controller.ts`](../../apps/api/src/common/openapi/openapi.controller.ts) | `@SkipEnvelope() GET /api/openapi.json`                                                                                                                                                                        |
+| [`openapi.module.ts`](../../apps/api/src/common/openapi/openapi.module.ts)         | wiring, conditional plugin registration and the conditional `APP_INTERCEPTOR`                                                                                                                                  |
 
 ### UI + validator
 
-* `@fastify/swagger` runs in **static mode** with the pre-built document;
+- `@fastify/swagger` runs in **static mode** with the pre-built document;
   `@fastify/swagger-ui` mounts `/api/docs` from `OpenApiModule.onModuleInit`
   (via `HttpAdapterHost`) only when `isOpenApiDocsEnabled()` — i.e. never in prod.
-* `ResponseAssertInterceptor` (+ `response-assert.logic.ts`,
+- `ResponseAssertInterceptor` (+ `response-assert.logic.ts`,
   `route-match.logic.ts`, `ContractViolationError`) validates the outgoing body of
   every **registered** route against `successEnvelopeSchema(entry.dataSchema)` in
   local/dev; it never runs in prod and never touches exempt or plugin routes.
 
 ### Shared contract
 
-* `ApiEndpointContract` gained an optional `example`, filled from a new
+- `ApiEndpointContract` gained an optional `example`, filled from a new
   [`api-keys.fixture.ts`](../../packages/shared/src/contract/api-keys/api-keys.fixture.ts)
   that the registry test also parses — one sample, two consumers.
-* `ENVELOPE_EXEMPTIONS` gained `/api/openapi.json` **with its reason**;
+- `ENVELOPE_EXEMPTIONS` gained `/api/openapi.json` **with its reason**;
   `/api/docs` is deliberately not listed (it never reaches the Nest filter).
 
 ## Decisions worth remembering
@@ -79,13 +79,13 @@ pnpm --filter @callback/shared test      # 5 suites green
 
 Manual run (`APP_ENV=dev PORT=3010 pnpm --filter @callback/api start`):
 
-| Request | Result |
-|---|---|
+| Request                 | Result                                                                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/openapi.json` | `200`, `application/json`, `openapi: 3.1.0`, both `api-keys` paths, `ApiEnvelope`/`ApiErrorEnvelope` + 6 more components, `bearerAuth` |
-| `GET /api/docs` | `200`, `text/html` |
-| `GET /api/docs/json` | `200`, the same generated document (the UI reads our spec, not a re-derived one) |
-| `GET /healthz` | `200`, bare `{status, …}` — unchanged |
-| `GET /api` | `200`, enveloped (`{data, meta}`) |
+| `GET /api/docs`         | `200`, `text/html`                                                                                                                     |
+| `GET /api/docs/json`    | `200`, the same generated document (the UI reads our spec, not a re-derived one)                                                       |
+| `GET /healthz`          | `200`, bare `{status, …}` — unchanged                                                                                                  |
+| `GET /api`              | `200`, enveloped (`{data, meta}`)                                                                                                      |
 
 `GET /api/api-keys` returned `500 INTERNAL_ERROR` on that run **only** because no
 local Postgres was running — the log line shows the Drizzle query failure, which
@@ -93,11 +93,11 @@ is the expected behaviour without `pnpm db:up`.
 
 ## Known gaps
 
-* The committed baseline order `docs/Specs/openapi.json` + `openapi:generate` /
+- The committed baseline order `docs/Specs/openapi.json` + `openapi:generate` /
   `openapi:check` and the CI breaking-change gate are **AIS-99**.
-* `/api/docs` is not mounted in prod at all (decision taken for AIS-98); if it is
-  ever wanted there, it needs a Caddy basic-auth rule *and* a new
+- `/api/docs` is not mounted in prod at all (decision taken for AIS-98); if it is
+  ever wanted there, it needs a Caddy basic-auth rule _and_ a new
   `isOpenApiDocsEnabled` rule.
-* `api-keys.e2e-spec.ts`-style DB coverage of the validator was not added: the
+- `api-keys.e2e-spec.ts`-style DB coverage of the validator was not added: the
   validator's behaviour is pinned by unit tests, and its mounting is covered by
   `apps/api/test/openapi.e2e-spec.ts`.

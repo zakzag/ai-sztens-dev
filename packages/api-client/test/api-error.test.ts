@@ -129,7 +129,9 @@ describe('parseErrorBody — legacy and unusable bodies', () => {
       message: 'The request payload does not match the API contract.',
     });
 
-    expect(parsed.message).toBe('The request payload does not match the API contract.');
+    expect(parsed.message).toBe(
+      'The request payload does not match the API contract.',
+    );
     expect(parsed.details).toEqual([
       'The request payload does not match the API contract.',
     ]);
@@ -233,7 +235,9 @@ describe('ApiError guards', () => {
 
   it('detects a validation failure on 400 and 422', () => {
     expect(isValidationError(withStatus(HTTP_STATUS.BAD_REQUEST))).toBe(true);
-    expect(isValidationError(withStatus(HTTP_STATUS.UNPROCESSABLE_ENTITY))).toBe(true);
+    expect(
+      isValidationError(withStatus(HTTP_STATUS.UNPROCESSABLE_ENTITY)),
+    ).toBe(true);
     expect(isValidationError(withStatus(HTTP_STATUS.CONFLICT))).toBe(false);
   });
 
@@ -244,7 +248,9 @@ describe('ApiError guards', () => {
 
   it('detects a network failure by the missing status', () => {
     expect(isNetworkError(withStatus(null))).toBe(true);
-    expect(isNetworkError(withStatus(HTTP_STATUS.INTERNAL_SERVER_ERROR))).toBe(false);
+    expect(isNetworkError(withStatus(HTTP_STATUS.INTERNAL_SERVER_ERROR))).toBe(
+      false,
+    );
   });
 
   it('rejects values that are not an ApiError', () => {

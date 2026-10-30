@@ -24,7 +24,10 @@ describe('Input', () => {
     const input = screen.getByLabelText('Név');
 
     expect(input).toHaveAttribute('aria-describedby', 'name-hint');
-    expect(screen.getByText('Legfeljebb 200 karakter')).toHaveAttribute('id', 'name-hint');
+    expect(screen.getByText('Legfeljebb 200 karakter')).toHaveAttribute(
+      'id',
+      'name-hint',
+    );
   });
 
   it('marks the input invalid and shows the error instead of the hint', () => {
@@ -35,7 +38,10 @@ describe('Input', () => {
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAttribute('aria-describedby', 'name-error');
     expect(input.className).toContain('border-danger');
-    expect(screen.getByText('Kötelező mező')).toHaveAttribute('id', 'name-error');
+    expect(screen.getByText('Kötelező mező')).toHaveAttribute(
+      'id',
+      'name-error',
+    );
     expect(screen.queryByText('Súgó')).not.toBeInTheDocument();
   });
 
@@ -64,7 +70,15 @@ describe('Input', () => {
   });
 
   it('forwards native input attributes', () => {
-    render(<Input id="name" label="Név" type="email" placeholder="pelda@ceg.hu" disabled />);
+    render(
+      <Input
+        id="name"
+        label="Név"
+        type="email"
+        placeholder="pelda@ceg.hu"
+        disabled
+      />,
+    );
 
     const input = screen.getByLabelText('Név');
 

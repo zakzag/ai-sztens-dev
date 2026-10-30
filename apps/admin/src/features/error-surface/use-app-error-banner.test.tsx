@@ -10,7 +10,10 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createServerError, createStatusError } from '../../test/mocks/api-error.mock.js';
+import {
+  createServerError,
+  createStatusError,
+} from '../../test/mocks/api-error.mock.js';
 import {
   emitConnectivityEvent,
   mockOnlineStatus,
@@ -20,7 +23,10 @@ import {
   createTestQueryClient,
   TestQueryProvider,
 } from '../../test/mocks/query-client.mock.js';
-import { clearQueryErrors, seedQueryError } from '../../test/mocks/query-error.mock.js';
+import {
+  clearQueryErrors,
+  seedQueryError,
+} from '../../test/mocks/query-error.mock.js';
 import { useAppErrorBanner } from './use-app-error-banner.js';
 
 /**
@@ -28,7 +34,11 @@ import { useAppErrorBanner } from './use-app-error-banner.js';
  * @returns a `renderHook` wrapper that provides the query context.
  */
 function createWrapper(client: QueryClient) {
-  return function Wrapper({ children }: { readonly children: React.ReactNode }) {
+  return function Wrapper({
+    children,
+  }: {
+    readonly children: React.ReactNode;
+  }) {
     return <TestQueryProvider client={client}>{children}</TestQueryProvider>;
   };
 }
@@ -121,7 +131,11 @@ describe('useAppErrorBanner', () => {
     expect(result.current.model).toBeNull();
 
     act(() => {
-      seedQueryError(client, createStatusError(401, 'UNAUTHENTICATED'), 'second');
+      seedQueryError(
+        client,
+        createStatusError(401, 'UNAUTHENTICATED'),
+        'second',
+      );
     });
 
     expect(result.current.model?.condition).toBe('session-expired');

@@ -14,22 +14,22 @@ store, rendered as bottom-right stacked toasts plus a hidden, arrow-activated li
 
 ## 2. Evidence / current state
 
-| Fact | Consequence |
-|---|---|
-| No toast library, no `zustand` installed | No state model to reuse; the store is ours to define |
-| `ApiKeyForm` reports success via `mutation.isSuccess` + `Alert` | Feedback dies with the component; nothing is logged |
-| `QueryClient` is created in `main.tsx` | One place can observe every mutation/query globally |
-| `services/api-client.ts` is the only composition root | HTTP telemetry can be injected without React in `packages/api-client` |
-| `apps/web` uses raw `slate-*` classes, no token import | It cannot host token-styled UI yet |
+| Fact                                                            | Consequence                                                           |
+| --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| No toast library, no `zustand` installed                        | No state model to reuse; the store is ours to define                  |
+| `ApiKeyForm` reports success via `mutation.isSuccess` + `Alert` | Feedback dies with the component; nothing is logged                   |
+| `QueryClient` is created in `main.tsx`                          | One place can observe every mutation/query globally                   |
+| `services/api-client.ts` is the only composition root           | HTTP telemetry can be injected without React in `packages/api-client` |
+| `apps/web` uses raw `slate-*` classes, no token import          | It cannot host token-styled UI yet                                    |
 
 ## 3. Design rationale (alternatives considered)
 
-| Option | Why rejected / chosen |
-|---|---|
-| **In-house store + in-house UI (chosen)** | The log store is required in every option; a library would add a *second* authoritative toast list that must be reconciled on dismiss/clear. Sonner is itself an observer store plus one subscriber, so the pattern is identical — only animation polish differs |
-| Sonner as renderer | Excellent stacking motion (~11 KB), but mirrored state and markup styled by class overrides instead of `packages/ui` recipes |
-| `react-hot-toast` | Tiny and headless, but linear layout; the stack CSS would be written by us anyway |
-| `react-toastify` | ~42 KB, mandatory CSS import, palette-driven defaults |
+| Option                                    | Why rejected / chosen                                                                                                                                                                                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **In-house store + in-house UI (chosen)** | The log store is required in every option; a library would add a _second_ authoritative toast list that must be reconciled on dismiss/clear. Sonner is itself an observer store plus one subscriber, so the pattern is identical — only animation polish differs |
+| Sonner as renderer                        | Excellent stacking motion (~11 KB), but mirrored state and markup styled by class overrides instead of `packages/ui` recipes                                                                                                                                     |
+| `react-hot-toast`                         | Tiny and headless, but linear layout; the stack CSS would be written by us anyway                                                                                                                                                                                |
+| `react-toastify`                          | ~42 KB, mandatory CSS import, palette-driven defaults                                                                                                                                                                                                            |
 
 Layout: a new framework-free `packages/notifications` package (core + React bindings, React as a
 peer) so the store is importable from non-React code, while `packages/ui` keeps its documented
@@ -48,16 +48,16 @@ secrets (`authorization`, `token`, `password`, `apiKey`, `secret`) are redacted 
 
 ## 4. Implementation (planned work items)
 
-| File / area | Change |
-|---|---|
-| `packages/notifications` | New package: interfaces, consts, pure logic, observer store, injected storage adapter, React provider/hooks/facade/host |
-| `packages/ui/src/components/toast/*`, `.../log-drawer/*` | New presentational `Toast`, `ToastStack`, `LogDrawer`, `LogEntryRow` with CVA variants |
-| `packages/api-client/src/http-client.interface.ts` | Optional `onEvent?: (event: HttpEvent) => void` (no React) |
-| `apps/admin/src/main.tsx` | Provider + `QueryCache`/`MutationCache` callbacks |
-| `apps/admin/src/App.tsx` | `<NotificationHost />` inside `ProtectedLayout` |
-| `apps/admin/src/services/api-client.ts` | Inject `onEvent` into `createHttpClient` |
-| `apps/admin/src/pages/api-keys/ui/ApiKeyForm.tsx` | Emit toasts instead of the inline success `Alert` |
-| `docs/Specs/UI-Architecture.md` | Primitive rows, dependency table, page state plan, notification section |
+| File / area                                              | Change                                                                                                                  |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `packages/notifications`                                 | New package: interfaces, consts, pure logic, observer store, injected storage adapter, React provider/hooks/facade/host |
+| `packages/ui/src/components/toast/*`, `.../log-drawer/*` | New presentational `Toast`, `ToastStack`, `LogDrawer`, `LogEntryRow` with CVA variants                                  |
+| `packages/api-client/src/http-client.interface.ts`       | Optional `onEvent?: (event: HttpEvent) => void` (no React)                                                              |
+| `apps/admin/src/main.tsx`                                | Provider + `QueryCache`/`MutationCache` callbacks                                                                       |
+| `apps/admin/src/App.tsx`                                 | `<NotificationHost />` inside `ProtectedLayout`                                                                         |
+| `apps/admin/src/services/api-client.ts`                  | Inject `onEvent` into `createHttpClient`                                                                                |
+| `apps/admin/src/pages/api-keys/ui/ApiKeyForm.tsx`        | Emit toasts instead of the inline success `Alert`                                                                       |
+| `docs/Specs/UI-Architecture.md`                          | Primitive rows, dependency table, page state plan, notification section                                                 |
 
 ## 5. Outcome and how to verify
 

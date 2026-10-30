@@ -5,14 +5,14 @@
 
 ## 1. Kiindulás (ellenőrizve)
 
-| Tény | Részlet |
-|---|---|
-| A mód projekt-szintű | [`.roomodes`](../../.roomodes:1) a repo gyökerében, `source: project`, 1 mode: `jira-ticket-writer` |
-| Mode mezők | `slug`, `name`, `description`, `roleDefinition`, `whenToUse`, `customInstructions`, `groups: [read, edit, command, mcp]` |
-| Globális példány | még él a JetBrains Zoo Code state-ben → slug-ütközés, törölni kell (P2) |
-| `.roo/rules-jira-ticket-writer/` | nem létezik (nem kötelező) |
-| Root dev deps | `@sonar/scan`, `concurrently`, `prettier` — `yaml` **nincs**, be kell tenni |
-| Meglévő Node-script minta | `scripts/sonar/*.mjs` + `node --test` (ezt követjük) |
+| Tény                             | Részlet                                                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| A mód projekt-szintű             | [`.roomodes`](../../.roomodes:1) a repo gyökerében, `source: project`, 1 mode: `jira-ticket-writer`                      |
+| Mode mezők                       | `slug`, `name`, `description`, `roleDefinition`, `whenToUse`, `customInstructions`, `groups: [read, edit, command, mcp]` |
+| Globális példány                 | még él a JetBrains Zoo Code state-ben → slug-ütközés, törölni kell (P2)                                                  |
+| `.roo/rules-jira-ticket-writer/` | nem létezik (nem kötelező)                                                                                               |
+| Root dev deps                    | `@sonar/scan`, `concurrently`, `prettier` — `yaml` **nincs**, be kell tenni                                              |
+| Meglévő Node-script minta        | `scripts/sonar/*.mjs` + `node --test` (ezt követjük)                                                                     |
 
 ## 2. Döntés
 
@@ -83,30 +83,35 @@ Közös body (minden célra ugyanaz a tartalom, agent-specifikus burokkal):
 <customInstructions>
 ```
 
-| Cél | Fájl | Frontmatter |
-|---|---|---|
-| Copilot chat mode | `.github/chatmodes/<slug>.chatmode.md` | `description: <description>`, `tools: [...]` |
-| Claude subagent | `.claude/agents/<slug>.md` | `name`, `description`, `tools: [...]` |
-| Cursor command | `.cursor/commands/<slug>.md` | nincs (plain prompt, a body + „Act as …" nyitósor) |
-| Cursor rule | `.cursor/rules/<slug>.mdc` | `description`, `globs:` üres, `alwaysApply: false` |
-| Zoo Code | — (a `.roomodes` a forrás, nem generált) | — |
+| Cél               | Fájl                                     | Frontmatter                                        |
+| ----------------- | ---------------------------------------- | -------------------------------------------------- |
+| Copilot chat mode | `.github/chatmodes/<slug>.chatmode.md`   | `description: <description>`, `tools: [...]`       |
+| Claude subagent   | `.claude/agents/<slug>.md`               | `name`, `description`, `tools: [...]`              |
+| Cursor command    | `.cursor/commands/<slug>.md`             | nincs (plain prompt, a body + „Act as …" nyitósor) |
+| Cursor rule       | `.cursor/rules/<slug>.mdc`               | `description`, `globs:` üres, `alwaysApply: false` |
+| Zoo Code          | — (a `.roomodes` a forrás, nem generált) | —                                                  |
 
 Tool-mapping (`tools.mjs`), kezdeti tábla — **implementálás előtt ellenőrizni az adott agent dokumentációjában**, mert a tool-idk verziófüggők:
 
-| Zoo group | Copilot `tools` | Claude `tools` |
-|---|---|---|
-| `read` | `codebase`, `search`, `usages`, `problems` | `Read`, `Grep`, `Glob` |
-| `edit` | `editFiles` | `Edit`, `Write` |
-| `command` | `runCommands`, `runTasks` | `Bash` |
-| `browser` | `fetch` | `WebFetch`, `WebSearch` |
-| `mcp` | `mcpServers` | `mcp__<server>__*` (a konkrét szerverek a felülbírálásban) |
+| Zoo group | Copilot `tools`                            | Claude `tools`                                             |
+| --------- | ------------------------------------------ | ---------------------------------------------------------- |
+| `read`    | `codebase`, `search`, `usages`, `problems` | `Read`, `Grep`, `Glob`                                     |
+| `edit`    | `editFiles`                                | `Edit`, `Write`                                            |
+| `command` | `runCommands`, `runTasks`                  | `Bash`                                                     |
+| `browser` | `fetch`                                    | `WebFetch`, `WebSearch`                                    |
+| `mcp`     | `mcpServers`                               | `mcp__<server>__*` (a konkrét szerverek a felülbírálásban) |
 
 Felülbírálás: `mode-overrides.json`
 
 ```json
 {
   "jira-ticket-writer": {
-    "emit": ["copilot-chatmode", "claude-agent", "cursor-command", "cursor-rule"],
+    "emit": [
+      "copilot-chatmode",
+      "claude-agent",
+      "cursor-command",
+      "cursor-rule"
+    ],
     "copilotTools": ["codebase", "editFiles", "runCommands", "mcpServers"],
     "claudeTools": ["Read", "Grep", "Glob", "Edit", "Write", "Bash"]
   }
@@ -137,7 +142,7 @@ Ismeretlen `emit` érték → hiba; hiányzó override → a `groups`-ból szám
 2. `bash -n scripts/init.sh`, `powershell -File scripts/test-syntax.ps1`.
 3. Kézi füst teszt: `printf '1\n' | bash scripts/init.sh` (Copilot) → `.github/chatmodes/jira-ticket-writer.chatmode.md` létrejön; `2` → Cursor fájlok; `3` → Claude subagent. Második futás → „naprakész".
 4. `.gitignore` ellenőrzés minden futás után: `git status --porcelain` csak a kézzel írt forrásokat mutassa (`.roomodes`, `scripts/lib/agent-artifacts/**`), a generált fájlok **ne** jelenjenek meg; `git check-ignore -v .github/chatmodes/jira-ticket-writer.chatmode.md` adjon találatot; duplikált `.gitignore` sor ne legyen (`grep -c` a bejegyzésre == 1).
-4. A régi byte-identitás ellenőrzés (PS vs bash) a CLI bevezetése után **értelmét veszti** — helyette a CLI egyszer fut, mindkét shellből.
+5. A régi byte-identitás ellenőrzés (PS vs bash) a CLI bevezetése után **értelmét veszti** — helyette a CLI egyszer fut, mindkét shellből.
 
 ### P6 — Dokumentáció
 

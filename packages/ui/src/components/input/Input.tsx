@@ -24,14 +24,20 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="block text-sm font-medium text-text-secondary">
+      <label
+        htmlFor={id}
+        className="block text-sm font-medium text-text-secondary"
+      >
         {label}
       </label>
       <input
         {...rest}
         ref={ref}
         id={id}
-        className={cn(inputVariants({ invalid: hasError || Boolean(invalid) }), className)}
+        className={cn(
+          inputVariants({ invalid: hasError || Boolean(invalid) }),
+          className,
+        )}
         aria-invalid={hasError || undefined}
         aria-describedby={messageId}
       />

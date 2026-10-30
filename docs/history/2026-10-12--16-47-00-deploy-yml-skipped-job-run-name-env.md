@@ -19,13 +19,13 @@ showed as skipped (⊘) with the raw title
 
 ## Fix (option A)
 
-| File | Change |
-|---|---|
-| [`.github/workflows/images.yml`](../../.github/workflows/images.yml) | Added `run-name: "Build and push images (${{ inputs.app_env \|\| 'dev' }})"`. |
-| [`.github/scripts/deploy-plan.sh`](../../.github/scripts/deploy-plan.sh) | `workflow_run` branch now parses `(dev\|prod)` from `WR_TITLE` (`display_title`); any upstream event and branch is accepted; a title without the suffix skips with an explanatory reason. |
-| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) | Passes `WR_TITLE`; deploy job name is now static (`Deploy + smoke-test`); header comment updated. |
-| [`scripts/test/_deploy-plan-test.sh`](../../scripts/test/_deploy-plan-test.sh) | Scenarios updated (dispatch-prod upstream deploys prod; title-less upstream skips). 15/15 pass. |
-| [`scripts/test/_deploy-yml-concurrency-audit.py`](../../scripts/test/_deploy-yml-concurrency-audit.py) | New check: `jobs.deploy.name` must not contain `${{ }}`. |
+| File                                                                                                   | Change                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`.github/workflows/images.yml`](../../.github/workflows/images.yml)                                   | Added `run-name: "Build and push images (${{ inputs.app_env \|\| 'dev' }})"`.                                                                                                             |
+| [`.github/scripts/deploy-plan.sh`](../../.github/scripts/deploy-plan.sh)                               | `workflow_run` branch now parses `(dev\|prod)` from `WR_TITLE` (`display_title`); any upstream event and branch is accepted; a title without the suffix skips with an explanatory reason. |
+| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml)                                   | Passes `WR_TITLE`; deploy job name is now static (`Deploy + smoke-test`); header comment updated.                                                                                         |
+| [`scripts/test/_deploy-plan-test.sh`](../../scripts/test/_deploy-plan-test.sh)                         | Scenarios updated (dispatch-prod upstream deploys prod; title-less upstream skips). 15/15 pass.                                                                                           |
+| [`scripts/test/_deploy-yml-concurrency-audit.py`](../../scripts/test/_deploy-yml-concurrency-audit.py) | New check: `jobs.deploy.name` must not contain `${{ }}`.                                                                                                                                  |
 
 ## Verify
 

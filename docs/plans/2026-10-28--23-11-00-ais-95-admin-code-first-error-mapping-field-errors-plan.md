@@ -11,38 +11,38 @@ decides the input, and the server's own `message` never becomes user text.
 
 ## 2. Already delivered — do not redo
 
-| Ticket item | Evidence |
-|---|---|
-| Decision order `code` → `status` → generic | [`toErrorMessage()`](../../apps/admin/src/lib/error-message.ts:77) |
-| `code → magyar szöveg` map covering every `API_ERROR_CODE` | [`ERROR_CODE_MESSAGE`](../../apps/admin/src/lib/error-message.const.ts:67) |
-| `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT` have their own copy | [`error-message.const.ts`](../../apps/admin/src/lib/error-message.const.ts:40) |
-| Unknown code degrades to the status copy (forward compatibility) | test `falls back to the status copy for an unknown code`, [`error-message.test.ts`](../../apps/admin/src/lib/error-message.test.ts:68) |
-| `ApiError` carries `code` / `requestId` / `issues[]`; details paths are payload-relative | [`ApiError`](../../packages/api-client/src/api-error.ts:27) |
-| Server actually sends `path` for both cases | [`api-keys.service.ts`](../../apps/api/src/api-keys/api-keys.service.ts:86), [`zod-error.mapper.ts`](../../apps/api/src/common/http/zod-error.mapper.ts:17) |
-| `Input` renders `aria-invalid` + message from the `error` prop | [`Input`](../../packages/ui/src/components/input/Input.tsx:22) |
+| Ticket item                                                                              | Evidence                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Decision order `code` → `status` → generic                                               | [`toErrorMessage()`](../../apps/admin/src/lib/error-message.ts:77)                                                                                          |
+| `code → magyar szöveg` map covering every `API_ERROR_CODE`                               | [`ERROR_CODE_MESSAGE`](../../apps/admin/src/lib/error-message.const.ts:67)                                                                                  |
+| `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT` have their own copy                | [`error-message.const.ts`](../../apps/admin/src/lib/error-message.const.ts:40)                                                                              |
+| Unknown code degrades to the status copy (forward compatibility)                         | test `falls back to the status copy for an unknown code`, [`error-message.test.ts`](../../apps/admin/src/lib/error-message.test.ts:68)                      |
+| `ApiError` carries `code` / `requestId` / `issues[]`; details paths are payload-relative | [`ApiError`](../../packages/api-client/src/api-error.ts:27)                                                                                                 |
+| Server actually sends `path` for both cases                                              | [`api-keys.service.ts`](../../apps/api/src/api-keys/api-keys.service.ts:86), [`zod-error.mapper.ts`](../../apps/api/src/common/http/zod-error.mapper.ts:17) |
+| `Input` renders `aria-invalid` + message from the `error` prop                           | [`Input`](../../packages/ui/src/components/input/Input.tsx:22)                                                                                              |
 
 Remaining work is therefore **only the path → field mapping** and the copy source of truth.
 
 ## 3. Gaps
 
-| # | Gap | Why it matters |
-|---|---|---|
-| G1 | [`toIdentifierFieldError()`](../../apps/admin/src/features/api-keys/api-keys.logic.ts:31) keys off `status === 409`, so **any** 409 lands on `identifier`, and `issues[].path` is ignored entirely | a 409 that is not about `identifier` blames the wrong input |
-| G2 | No `toFieldErrors()` pure function, no `_form` channel: a `400` with three bad fields can only produce one page `Alert` | D11 tier 1 is unimplemented; every validation error is a page-level dead end |
-| G3 | [`createConflictError()`](../../apps/admin/src/test/mocks/api-error.mock.ts:48) builds no `issues[]`, and there is no multi-field factory | a path-driven implementation cannot be tested without hand-crafted errors |
-| G4 | [`ApiKeyForm.test.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyForm.test.tsx:171) only asserts “409 → identifier, no page alert” | multi-field, `_form`, and “server text never leaks” cases are unproven |
+| #   | Gap                                                                                                                                                                                                | Why it matters                                                               |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| G1  | [`toIdentifierFieldError()`](../../apps/admin/src/features/api-keys/api-keys.logic.ts:31) keys off `status === 409`, so **any** 409 lands on `identifier`, and `issues[].path` is ignored entirely | a 409 that is not about `identifier` blames the wrong input                  |
+| G2  | No `toFieldErrors()` pure function, no `_form` channel: a `400` with three bad fields can only produce one page `Alert`                                                                            | D11 tier 1 is unimplemented; every validation error is a page-level dead end |
+| G3  | [`createConflictError()`](../../apps/admin/src/test/mocks/api-error.mock.ts:48) builds no `issues[]`, and there is no multi-field factory                                                          | a path-driven implementation cannot be tested without hand-crafted errors    |
+| G4  | [`ApiKeyForm.test.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyForm.test.tsx:171) only asserts “409 → identifier, no page alert”                                                             | multi-field, `_form`, and “server text never leaks” cases are unproven       |
 
 ## 4. Decisions
 
-| # | Decision |
-|---|---|
-| D1 | **Strict code gate.** Only `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT` may feed field errors. Every other code stays a page `Alert`, even if it carries paths. |
-| D2 | **Default path per code** when an allowed code arrives with `issues: []`: `API_KEY_IDENTIFIER_CONFLICT` → `identifier` (keeps today's behaviour without a status check); `VALIDATION_FAILED` → no field, `_form` only. |
-| D3 | **Duplicate path → first issue wins** (server order is validator order, so it is deterministic); later duplicates are dropped. |
-| D4 | **Text is client-owned.** `issue.message` is never rendered; a mapped field gets [`API_KEY_IDENTIFIER_FIELD_MESSAGE`](../../apps/admin/src/lib/error-message.const.ts:40) or a new generic `FIELD_INVALID_MESSAGE`. All Hungarian copy stays in `lib/error-message.const.ts`; the feature constant becomes a re-export. |
-| D5 | Unmappable or absent paths produce **one** form-level message via `toErrorMessage(error)`; when every path mapped, the page `Alert` stays empty. |
-| D6 | `toErrorMessage`'s signature does not change (the notification-capture story builds on it). `details: string[]` stays untouched — `issues[]` is the mapping source. |
-| D7 | `ApiKeyFormFieldName` lives in `features/api-keys/api-keys.interface.ts`; the page derives [`ApiKeyFormValues`](../../apps/admin/src/pages/api-keys/api-keys.interface.ts:19) from it, so features never import a page. |
+| #   | Decision                                                                                                                                                                                                                                                                                                                |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | **Strict code gate.** Only `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT` may feed field errors. Every other code stays a page `Alert`, even if it carries paths.                                                                                                                                                |
+| D2  | **Default path per code** when an allowed code arrives with `issues: []`: `API_KEY_IDENTIFIER_CONFLICT` → `identifier` (keeps today's behaviour without a status check); `VALIDATION_FAILED` → no field, `_form` only.                                                                                                  |
+| D3  | **Duplicate path → first issue wins** (server order is validator order, so it is deterministic); later duplicates are dropped.                                                                                                                                                                                          |
+| D4  | **Text is client-owned.** `issue.message` is never rendered; a mapped field gets [`API_KEY_IDENTIFIER_FIELD_MESSAGE`](../../apps/admin/src/lib/error-message.const.ts:40) or a new generic `FIELD_INVALID_MESSAGE`. All Hungarian copy stays in `lib/error-message.const.ts`; the feature constant becomes a re-export. |
+| D5  | Unmappable or absent paths produce **one** form-level message via `toErrorMessage(error)`; when every path mapped, the page `Alert` stays empty.                                                                                                                                                                        |
+| D6  | `toErrorMessage`'s signature does not change (the notification-capture story builds on it). `details: string[]` stays untouched — `issues[]` is the mapping source.                                                                                                                                                     |
+| D7  | `ApiKeyFormFieldName` lives in `features/api-keys/api-keys.interface.ts`; the page derives [`ApiKeyFormValues`](../../apps/admin/src/pages/api-keys/api-keys.interface.ts:19) from it, so features never import a page.                                                                                                 |
 
 ## 5. Mapping flow
 

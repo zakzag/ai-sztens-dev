@@ -94,7 +94,8 @@ every commit.
 
   const PACKAGE_ROOT = resolve(
     dirname(fileURLToPath(import.meta.url)),
-    '..', '..',          // dist/config -> dist -> packages/mcp-server
+    '..',
+    '..', // dist/config -> dist -> packages/mcp-server
   );
 
   /**
@@ -274,13 +275,13 @@ if absent):
 
 ## Risk assessment
 
-| Risk | Mitigation |
-|------|------------|
-| Breaking change for operators who relied on cwd-relative behaviour | Documented in Step 8; absolute-path override keeps the old behaviour available. |
-| `import.meta.url` not pointing where we expect during tests | Step 4 test #2 asserts the result with `path.resolve(packageRoot, …)`; if vitest ever changes the URL semantics, the test will fail loudly and Step 4 can be revisited. |
-| `LanceDbMemoryStore` opens the data dir at construction time, before any logging | Already true; moving the resolve earlier (in `loadConfig`) keeps the contract intact. |
-| Concurrent MCP server instances sharing the same `logs/` dir | Out of scope — the same risk exists today; PID-suffixed filenames can be a follow-up. |
-| Windows path separator (`\` vs `/`) in tests | Use `path.resolve` everywhere, never string concatenation; the helper already does this. |
+| Risk                                                                             | Mitigation                                                                                                                                                              |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Breaking change for operators who relied on cwd-relative behaviour               | Documented in Step 8; absolute-path override keeps the old behaviour available.                                                                                         |
+| `import.meta.url` not pointing where we expect during tests                      | Step 4 test #2 asserts the result with `path.resolve(packageRoot, …)`; if vitest ever changes the URL semantics, the test will fail loudly and Step 4 can be revisited. |
+| `LanceDbMemoryStore` opens the data dir at construction time, before any logging | Already true; moving the resolve earlier (in `loadConfig`) keeps the contract intact.                                                                                   |
+| Concurrent MCP server instances sharing the same `logs/` dir                     | Out of scope — the same risk exists today; PID-suffixed filenames can be a follow-up.                                                                                   |
+| Windows path separator (`\` vs `/`) in tests                                     | Use `path.resolve` everywhere, never string concatenation; the helper already does this.                                                                                |
 
 ## Acceptance criteria
 

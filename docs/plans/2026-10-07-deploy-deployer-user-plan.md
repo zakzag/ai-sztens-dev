@@ -10,35 +10,35 @@
 
 ## 1. Evidence gathered before writing this plan
 
-| # | Check | Result | Source |
-|---|---|---|---|
-| 1 | Local deploy login user | `SSH_USER=root` with `SSH_KEY=./deploy/ssh-keys/root.private.key` | [`deploy/.env.example:32`](../../deploy/.env.example:32), `deploy/.env.dev` |
-| 2 | `deploy.sh` default when the env file omits it | `SSH_USER="${SSH_USER:-root}"` | [`deploy/deploy.sh:338`](../../deploy/deploy.sh:338) |
-| 3 | Remote compose command built by `deploy.sh` | `--env-file infra/.env.${APP_ENV}` — i.e. `infra/.env.dev`, evaluated **on the droplet** | [`deploy/deploy.sh:385`](../../deploy/deploy.sh:385) |
-| 4 | Reality on the dev droplet | `couldn't find env file: /opt/aisztens/infra/.env.dev` — every remote compose call (`ps`, `logs`, `up`, `down`, `restart`) aborts. Measured live during the key-switch work, recorded in [`docs/history/2026-10-07--15-35-00-deploy-key-root-and-deployer.md`](../history/2026-10-07--15-35-00-deploy-key-root-and-deployer.md:48) | measured |
-| 5 | What the droplet actually has | one file, `/opt/aisztens/infra/.env` (2721 bytes, `755 root:root`) — no per-env name | [`docs/history/2026-10-02--20-42-00-infra-env-restore-and-monitor-watchdog.md`](../history/2026-10-02--20-42-00-infra-env-restore-and-monitor-watchdog.md:51) |
-| 6 | Three independent places that already assume the droplet path is `infra/.env` | smoke suite default ([`scripts/test/lib/00-prelude.sh:54`](../../scripts/test/lib/00-prelude.sh:54)), live env checks ([`scripts/env-test/check-env-live.sh:187`](../../scripts/env-test/check-env-live.sh:187)), README §3 ([`deploy/README.md:122`](../../deploy/README.md:122)) | code |
-| 7 | CI: mirror-image bug | step 4 scp's the rendered file with `target: ${{ env.REMOTE_DIR }}/infra/.env` ([`deploy.yml:169`](../../.github/workflows/deploy.yml:169)) while steps 5/6/8 ask for `--env-file "infra/.env.$APP_ENV"` ([`deploy.yml:248`](../../.github/workflows/deploy.yml:248), [`272`](../../.github/workflows/deploy.yml:272), [`326`](../../.github/workflows/deploy.yml:326)) | code |
-| 8 | Compose host bind mounts | only read-only ones (`./postgres/init:ro`, `./caddy/Caddyfile.rendered:ro`, the two SPA dist dirs `:ro`) plus the named volume `pgdata` — **no** host dir needs root ownership | [`infra/docker-compose.yml:88`](../../infra/docker-compose.yml:88) |
-| 9 | `bootstrap` command needs root | runs `sudo bash deploy/bootstrap.sh` ([`deploy/deploy.sh:643`](../../deploy/deploy.sh:643)); `bootstrap.sh` itself asserts `id -u == 0` ([`deploy/bootstrap.sh:152`](../../deploy/bootstrap.sh:152)) | code |
+| #   | Check                                                                         | Result                                                                                                                                                                                                                                                                                                                                                                  | Source                                                                                                                                                        |
+| --- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Local deploy login user                                                       | `SSH_USER=root` with `SSH_KEY=./deploy/ssh-keys/root.private.key`                                                                                                                                                                                                                                                                                                       | [`deploy/.env.example:32`](../../deploy/.env.example:32), `deploy/.env.dev`                                                                                   |
+| 2   | `deploy.sh` default when the env file omits it                                | `SSH_USER="${SSH_USER:-root}"`                                                                                                                                                                                                                                                                                                                                          | [`deploy/deploy.sh:338`](../../deploy/deploy.sh:338)                                                                                                          |
+| 3   | Remote compose command built by `deploy.sh`                                   | `--env-file infra/.env.${APP_ENV}` — i.e. `infra/.env.dev`, evaluated **on the droplet**                                                                                                                                                                                                                                                                                | [`deploy/deploy.sh:385`](../../deploy/deploy.sh:385)                                                                                                          |
+| 4   | Reality on the dev droplet                                                    | `couldn't find env file: /opt/aisztens/infra/.env.dev` — every remote compose call (`ps`, `logs`, `up`, `down`, `restart`) aborts. Measured live during the key-switch work, recorded in [`docs/history/2026-10-07--15-35-00-deploy-key-root-and-deployer.md`](../history/2026-10-07--15-35-00-deploy-key-root-and-deployer.md:48)                                      | measured                                                                                                                                                      |
+| 5   | What the droplet actually has                                                 | one file, `/opt/aisztens/infra/.env` (2721 bytes, `755 root:root`) — no per-env name                                                                                                                                                                                                                                                                                    | [`docs/history/2026-10-02--20-42-00-infra-env-restore-and-monitor-watchdog.md`](../history/2026-10-02--20-42-00-infra-env-restore-and-monitor-watchdog.md:51) |
+| 6   | Three independent places that already assume the droplet path is `infra/.env` | smoke suite default ([`scripts/test/lib/00-prelude.sh:54`](../../scripts/test/lib/00-prelude.sh:54)), live env checks ([`scripts/env-test/check-env-live.sh:187`](../../scripts/env-test/check-env-live.sh:187)), README §3 ([`deploy/README.md:122`](../../deploy/README.md:122))                                                                                      | code                                                                                                                                                          |
+| 7   | CI: mirror-image bug                                                          | step 4 scp's the rendered file with `target: ${{ env.REMOTE_DIR }}/infra/.env` ([`deploy.yml:169`](../../.github/workflows/deploy.yml:169)) while steps 5/6/8 ask for `--env-file "infra/.env.$APP_ENV"` ([`deploy.yml:248`](../../.github/workflows/deploy.yml:248), [`272`](../../.github/workflows/deploy.yml:272), [`326`](../../.github/workflows/deploy.yml:326)) | code                                                                                                                                                          |
+| 8   | Compose host bind mounts                                                      | only read-only ones (`./postgres/init:ro`, `./caddy/Caddyfile.rendered:ro`, the two SPA dist dirs `:ro`) plus the named volume `pgdata` — **no** host dir needs root ownership                                                                                                                                                                                          | [`infra/docker-compose.yml:88`](../../infra/docker-compose.yml:88)                                                                                            |
+| 9   | `bootstrap` command needs root                                                | runs `sudo bash deploy/bootstrap.sh` ([`deploy/deploy.sh:643`](../../deploy/deploy.sh:643)); `bootstrap.sh` itself asserts `id -u == 0` ([`deploy/bootstrap.sh:152`](../../deploy/bootstrap.sh:152))                                                                                                                                                                    | code                                                                                                                                                          |
 
 Two facts are therefore settled by measurement, not preference:
 
-* the droplet's env file is `infra/.env` (one environment per droplet) — so `deploy.sh`'s remote argument is wrong, not the droplet;
-* the whole-tree write as a non-root user is what the CI has always tried to do, and it needs `/opt/aisztens` owned by that user.
+- the droplet's env file is `infra/.env` (one environment per droplet) — so `deploy.sh`'s remote argument is wrong, not the droplet;
+- the whole-tree write as a non-root user is what the CI has always tried to do, and it needs `/opt/aisztens` owned by that user.
 
 ---
 
 ## 2. Decisions
 
-| # | Decision | Rationale |
-|---|---|---|
-| D1 | The local deploy logs in as **`deployer`** (`deploy/.env.dev`, `.env.example`, and the `deploy.sh` default) | one identity for both deploy paths; least privilege; the key is already authorised for `deployer` |
-| D2 | `/opt/aisztens` is **owned by `deployer`** (one-time `chown` over root SSH) | rsync `--delete`, `mkdir -p` and `scp` all need write access to the tree; the CI has always done exactly this |
-| D3 | `deploy.sh` gains a **remote preflight guard** that fails with the exact remediation command | the failure mode we hit was an opaque remote compose error; the guard turns it into a one-line fix |
-| D4 | `bootstrap` stays a **root-only, run-once** operation, guarded with a clear message | it installs packages and creates users; it is not part of the day-to-day loop |
-| D5 | The droplet keeps **one** env file: `infra/.env`. The **source** stays per-env: `infra/.env.${APP_ENV}` | matches the three existing consumers (item 6) and needs no droplet change, no downtime |
-| D6 | CI keeps `username: deployer` and the same key | already correct; only its env-file path is fixed |
+| #   | Decision                                                                                                    | Rationale                                                                                                     |
+| --- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| D1  | The local deploy logs in as **`deployer`** (`deploy/.env.dev`, `.env.example`, and the `deploy.sh` default) | one identity for both deploy paths; least privilege; the key is already authorised for `deployer`             |
+| D2  | `/opt/aisztens` is **owned by `deployer`** (one-time `chown` over root SSH)                                 | rsync `--delete`, `mkdir -p` and `scp` all need write access to the tree; the CI has always done exactly this |
+| D3  | `deploy.sh` gains a **remote preflight guard** that fails with the exact remediation command                | the failure mode we hit was an opaque remote compose error; the guard turns it into a one-line fix            |
+| D4  | `bootstrap` stays a **root-only, run-once** operation, guarded with a clear message                         | it installs packages and creates users; it is not part of the day-to-day loop                                 |
+| D5  | The droplet keeps **one** env file: `infra/.env`. The **source** stays per-env: `infra/.env.${APP_ENV}`     | matches the three existing consumers (item 6) and needs no droplet change, no downtime                        |
+| D6  | CI keeps `username: deployer` and the same key                                                              | already correct; only its env-file path is fixed                                                              |
 
 ### Target flow
 
@@ -70,7 +70,7 @@ flowchart LR
    COMPOSE_ARGS="--env-file ${COMPOSE_ENV_FILE_REMOTE} -f infra/docker-compose.yml"
    ```
    `COMPOSE_ARGS` is used **only** inside remote commands ([`prune_legacy_stack:620`](../../deploy/deploy.sh:620), the command dispatch at [`683`](../../deploy/deploy.sh:683) onward, and the error trap at [`130`](../../deploy/deploy.sh:130)), so this is a pure fix. Add a `log_debug` line showing both the local source and the remote path.
-3. **New `assert_remote_ready()` preflight**, called at the top of `upload()` ([`deploy.sh:537`](../../deploy/deploy.sh:537)) — before the first rsync. One remote probe that reports: the login name, whether `REMOTE_DIR` exists, whether it is writable by that user (create + remove a dotfile probe), and its `owner:group mode`. On failure it logs, in the established `log_error` house style, *which* check failed and the exact one-time fix, then aborts before touching anything:
+3. **New `assert_remote_ready()` preflight**, called at the top of `upload()` ([`deploy.sh:537`](../../deploy/deploy.sh:537)) — before the first rsync. One remote probe that reports: the login name, whether `REMOTE_DIR` exists, whether it is writable by that user (create + remove a dotfile probe), and its `owner:group mode`. On failure it logs, in the established `log_error` house style, _which_ check failed and the exact one-time fix, then aborts before touching anything:
    ```text
    [deploy] ERROR: the remote user 'deployer' cannot write /opt/aisztens (owner: root, mode 755).
    [deploy] Fix (once, over root SSH):
@@ -96,24 +96,24 @@ flowchart LR
 
 ### 3.3 Configuration and documentation
 
-| File | Change |
-|---|---|
-| [`deploy/.env.example:29-37`](../../deploy/.env.example:29) | `SSH_USER=deployer`; comments describe one identity for both paths and the passphrase-less deploy key |
-| `deploy/.env.dev` (gitignored) | `SSH_USER=deployer` (drop-in change; the key path is already `./deploy/ssh-keys/root.private.key`) |
+| File                                                                                                                                                                                                                                       | Change                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`deploy/.env.example:29-37`](../../deploy/.env.example:29)                                                                                                                                                                                | `SSH_USER=deployer`; comments describe one identity for both paths and the passphrase-less deploy key                                                                                              |
+| `deploy/.env.dev` (gitignored)                                                                                                                                                                                                             | `SSH_USER=deployer` (drop-in change; the key path is already `./deploy/ssh-keys/root.private.key`)                                                                                                 |
 | [`deploy/README.md:79-83`](../../deploy/README.md:79) §1, [`105-111`](../../deploy/README.md:105) §2, [`187-214`](../../deploy/README.md:187) §8.2, [`176`](../../deploy/README.md:176) §8.1, [`222-236`](../../deploy/README.md:222) §8.4 | deployer for local + CI; `bootstrap` documented as the one root-only, run-once command (with the chown step and the preflight guard); the env-file paragraph now reads `infra/.env` on the droplet |
-| [`deploy/ssh-keys/README.md:24-43`](../../deploy/ssh-keys/README.md:24) | "The deploy key" — both paths log in as `deployer`; the key is no longer described as a local root credential |
-| [`docs/Specs/Three-Env-Verification.md:272`](../../docs/Specs/Three-Env-Verification.md:272) §3.2/§3.8, [`493`](../../docs/Specs/Three-Env-Verification.md:493) §7 | `deploy.sh up dev` runs as `deployer`; add the "remote dir not writable" failure mode and its one-line fix |
-| [`docs/Specs/Production-Runbook.md:154`](../../docs/Specs/Production-Runbook.md:154) §4 and the §6 diag matrix | any `root@` example becomes `deployer@`; add the guard's error text to the matrix |
-| [`scripts/README.md`](../../scripts/README.md:1) | only if it names a login user for `deploy.sh` |
+| [`deploy/ssh-keys/README.md:24-43`](../../deploy/ssh-keys/README.md:24)                                                                                                                                                                    | "The deploy key" — both paths log in as `deployer`; the key is no longer described as a local root credential                                                                                      |
+| [`docs/Specs/Three-Env-Verification.md:272`](../../docs/Specs/Three-Env-Verification.md:272) §3.2/§3.8, [`493`](../../docs/Specs/Three-Env-Verification.md:493) §7                                                                         | `deploy.sh up dev` runs as `deployer`; add the "remote dir not writable" failure mode and its one-line fix                                                                                         |
+| [`docs/Specs/Production-Runbook.md:154`](../../docs/Specs/Production-Runbook.md:154) §4 and the §6 diag matrix                                                                                                                             | any `root@` example becomes `deployer@`; add the guard's error text to the matrix                                                                                                                  |
+| [`scripts/README.md`](../../scripts/README.md:1)                                                                                                                                                                                           | only if it names a login user for `deploy.sh`                                                                                                                                                      |
 
 ### 3.4 New offline regression test
 
 `scripts/test/_deploy-sh-remote-compose-path-test.sh` — the bug fixed here was invisible to every existing test. The suite puts **stub `ssh`/`scp`/`rsync`** executables first on `PATH` (they record their argv and exit 0), copies `deploy.sh` + `lib/` into a sandbox like the existing suites do ([`_deploy-sh-env-selection-test.sh:35-39`](../../scripts/test/_deploy-sh-env-selection-test.sh:35)), then runs `deploy.sh ps dev` and asserts:
 
-* the remote command string contains `--env-file infra/.env` and **not** `infra/.env.dev`;
-* the login target is `deployer@…`;
-* the preflight probe ran before the first rsync;
-* with a stub that reports a non-writable `REMOTE_DIR`, the run aborts with the remediation message and exit code 1.
+- the remote command string contains `--env-file infra/.env` and **not** `infra/.env.dev`;
+- the login target is `deployer@…`;
+- the preflight probe ran before the first rsync;
+- with a stub that reports a non-writable `REMOTE_DIR`, the run aborts with the remediation message and exit code 1.
 
 Also refresh `SSH_USER=root` → `deployer` in the sandbox fixtures ([`_deploy-sh-env-selection-test.sh:60`](../../scripts/test/_deploy-sh-env-selection-test.sh:60), [`206`](../../scripts/test/_deploy-sh-env-selection-test.sh:206)) so the fixtures match the new default.
 
@@ -168,21 +168,21 @@ ssh -i deploy/ssh-keys/root.private.key deployer@ssh.aisztens.hu \
 
 ## 6. Risks and rollback
 
-| Risk | Mitigation |
-|---|---|
-| `chown -R` on a tree containing data the containers must own | only read-only bind mounts and the named volume `pgdata` exist (evidence 8); no host directory needs root ownership |
-| `deployer` is not in the `docker` group | measured earlier: `deployer` is in `deployer sudo docker` |
-| A stale `/opt/aisztens/infra/.env` **directory** left by the old CI scp target | explicit check in §3.2.5; remove it if present |
-| CI mutation breaks deploys | steps 2/4/5/6/8 are comment/path changes only; the identity and key are untouched, so a reverted commit restores the old behaviour |
-| `bootstrap` becomes unreachable for a fresh droplet | it stays reachable via `SSH_USER=root ./deploy/deploy.sh bootstrap`, documented in §2 of the README |
+| Risk                                                                           | Mitigation                                                                                                                         |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `chown -R` on a tree containing data the containers must own                   | only read-only bind mounts and the named volume `pgdata` exist (evidence 8); no host directory needs root ownership                |
+| `deployer` is not in the `docker` group                                        | measured earlier: `deployer` is in `deployer sudo docker`                                                                          |
+| A stale `/opt/aisztens/infra/.env` **directory** left by the old CI scp target | explicit check in §3.2.5; remove it if present                                                                                     |
+| CI mutation breaks deploys                                                     | steps 2/4/5/6/8 are comment/path changes only; the identity and key are untouched, so a reverted commit restores the old behaviour |
+| `bootstrap` becomes unreachable for a fresh droplet                            | it stays reachable via `SSH_USER=root ./deploy/deploy.sh bootstrap`, documented in §2 of the README                                |
 
 ---
 
 ## 7. Explicitly out of scope
 
-* No change to `bootstrap.sh` itself, to the droplet's user list, or to the app's runtime user.
-* No change to the compose stack, the Caddyfile, or the droplets' container layout.
-* `docs/history/` and `docs/milestones/` entries describing the older `root` login stay as the historical record; only the living docs in §3.3 are updated.
+- No change to `bootstrap.sh` itself, to the droplet's user list, or to the app's runtime user.
+- No change to the compose stack, the Caddyfile, or the droplets' container layout.
+- `docs/history/` and `docs/milestones/` entries describing the older `root` login stay as the historical record; only the living docs in §3.3 are updated.
 
 ## 8. Approved amendment — the deploy key is renamed
 
@@ -191,7 +191,7 @@ Approved at review: the key is now used **only** as `deployer`, so the original 
 `deploy/ssh-keys/deploy.private.key`, and every living reference is updated
 (`deploy/.env.dev`, `deploy/.env.example`, [`deploy/README.md`](../../deploy/README.md),
 [`deploy/ssh-keys/README.md`](../../deploy/ssh-keys/README.md), the `deploy.yml` header).
-The GitHub secret holds key *material*, so it needs no change; `.gitignore`'s
+The GitHub secret holds key _material_, so it needs no change; `.gitignore`'s
 `*.private.key` still covers the file.
 
 ## 9. Approved amendment — the preflight must demand positive evidence

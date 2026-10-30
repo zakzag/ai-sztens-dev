@@ -20,6 +20,7 @@ defects (D1, D2, D4) plus two open items (D3, D5).
 - **Container is re-created every deploy; data is not.**
 
   Live evidence: `volume aisztens_pgdata -> /var/lib/postgresql/data (rw=true)`.
+
 - **The role/schema bootstrap is one-time.** compose bind-mounts
   `./postgres/init:/docker-entrypoint-initdb.d:ro`; the official entrypoint
   runs those scripts only on the **first initialization of an empty `pgdata`
@@ -30,22 +31,22 @@ So: image/container = redeployed each deploy; init = once per volume lifetime.
 
 ## Defects found (live host evidence)
 
-| ID | Defect | Evidence |
-|---|---|---|
-| **D1** | `infra/postgres/init/**` is **not shipped by any deploy path**, although compose bind-mounts it. It existed on the droplet only as a leftover of the pre-2026-10-08 rsync (the whole old tree is still there: `app/`, `monitor/`, `.env.dev`, `.env.example`, `docker-compose.local.yml`, `docker-compose.yml.prev-build`). | `deploy.yml` scp source list and `deploy.sh upload()` contained only compose/.env/Caddyfile (+smoke tests). |
-| **D2** | The role bootstrap had **never taken effect** on the dev droplet. | `SELECT rolname FROM pg_roles` → only `postgres` + built-in `pg_*` roles; `aisztens`, `tkovari`, `krak` absent. Log: `Skipping initialization`. |
-| **D4** | [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh) was **itself broken**: it wrapped the `CREATE ROLE` logic in `DO $$ … $$` and used `:'var'` inside. psql does not interpolate inside dollar-quoted strings. | Running it: `ERROR: syntax error at or near ":"  LINE 3: …rolname = :'aisztens…` (exit 3). |
-| **D3** *(open)* | DB-name drift: droplet `infra/.env` has `POSTGRES_DB=aisztens_db`; the repo default/example and several docs/scripts use `callback`. | Live DBs: `aisztens_db`, `postgres`, `template0/1`. Probes using `-d callback` fail with `database "callback" does not exist`. |
-| **D5** *(open)* | The smoke suite's Postgres check invocation is malformed: `psql -tAc -U <user> "SQL"` makes `-c` swallow `-U`, so the SQL text is used as the username. | `psql: FATAL: role "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tko" does not exist` (exit 2). Correct form is `psql -U <user> -d <db> -At -c "SQL"`. |
+| ID              | Defect                                                                                                                                                                                                                                                                                                                      | Evidence                                                                                                                                                              |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D1**          | `infra/postgres/init/**` is **not shipped by any deploy path**, although compose bind-mounts it. It existed on the droplet only as a leftover of the pre-2026-10-08 rsync (the whole old tree is still there: `app/`, `monitor/`, `.env.dev`, `.env.example`, `docker-compose.local.yml`, `docker-compose.yml.prev-build`). | `deploy.yml` scp source list and `deploy.sh upload()` contained only compose/.env/Caddyfile (+smoke tests).                                                           |
+| **D2**          | The role bootstrap had **never taken effect** on the dev droplet.                                                                                                                                                                                                                                                           | `SELECT rolname FROM pg_roles` → only `postgres` + built-in `pg_*` roles; `aisztens`, `tkovari`, `krak` absent. Log: `Skipping initialization`.                       |
+| **D4**          | [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh) was **itself broken**: it wrapped the `CREATE ROLE` logic in `DO $$ … $$` and used `:'var'` inside. psql does not interpolate inside dollar-quoted strings.                                                                                      | Running it: `ERROR: syntax error at or near ":"  LINE 3: …rolname = :'aisztens…` (exit 3).                                                                            |
+| **D3** _(open)_ | DB-name drift: droplet `infra/.env` has `POSTGRES_DB=aisztens_db`; the repo default/example and several docs/scripts use `callback`.                                                                                                                                                                                        | Live DBs: `aisztens_db`, `postgres`, `template0/1`. Probes using `-d callback` fail with `database "callback" does not exist`.                                        |
+| **D5** _(open)_ | The smoke suite's Postgres check invocation is malformed: `psql -tAc -U <user> "SQL"` makes `-c` swallow `-U`, so the SQL text is used as the username.                                                                                                                                                                     | `psql: FATAL: role "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tko" does not exist` (exit 2). Correct form is `psql -U <user> -d <db> -At -c "SQL"`. |
 
 ## Fixes applied
 
-| File | Change |
-|---|---|
-| `.github/workflows/deploy.yml` | Added `infra/postgres/init` to the deploy job's `sparse-checkout` **and** to the `appleboy/scp-action` `source` list (with a comment explaining why it is required). |
-| `deploy/deploy.sh` | `upload()` now `scp -r`s `infra/postgres/init` into `$REMOTE_DIR/infra/postgres/` (creates `infra/postgres` first, warns if the source dir is missing); header/usage/wording updated from "3 files" to "the deploy files". |
-| `infra/postgres/init/01-roles.sh` | Rewritten without `DO $$ … $$`: idempotent `SELECT format('CREATE ROLE …') WHERE NOT EXISTS … \gexec` + `ALTER ROLE … WITH LOGIN PASSWORD …`, then the `ALTER DATABASE … OWNER TO …` and `GRANT CONNECT`. Header documents the psql interpolation trap. |
-| `docs/Specs/Infrastructure-Docker.md` | New **§6.2** documenting that Postgres is not our image, is Docker Hub–sourced, is exempt from `IMAGE_TAG`, and that the init script runs once per volume — plus the manual re-apply command and the `DO $$` prohibition. |
+| File                                  | Change                                                                                                                                                                                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/deploy.yml`        | Added `infra/postgres/init` to the deploy job's `sparse-checkout` **and** to the `appleboy/scp-action` `source` list (with a comment explaining why it is required).                                                                                    |
+| `deploy/deploy.sh`                    | `upload()` now `scp -r`s `infra/postgres/init` into `$REMOTE_DIR/infra/postgres/` (creates `infra/postgres` first, warns if the source dir is missing); header/usage/wording updated from "3 files" to "the deploy files".                              |
+| `infra/postgres/init/01-roles.sh`     | Rewritten without `DO $$ … $$`: idempotent `SELECT format('CREATE ROLE …') WHERE NOT EXISTS … \gexec` + `ALTER ROLE … WITH LOGIN PASSWORD …`, then the `ALTER DATABASE … OWNER TO …` and `GRANT CONNECT`. Header documents the psql interpolation trap. |
+| `docs/Specs/Infrastructure-Docker.md` | New **§6.2** documenting that Postgres is not our image, is Docker Hub–sourced, is exempt from `IMAGE_TAG`, and that the init script runs once per volume — plus the manual re-apply command and the `DO $$` prohibition.                               |
 
 ## Verification performed
 
@@ -63,7 +64,7 @@ So: image/container = redeployed each deploy; init = once per volume lifetime.
 
 ## Why D4 mattered for D1
 
-Shipping the init directory *without* fixing the script would have turned a
+Shipping the init directory _without_ fixing the script would have turned a
 silent problem into a hard one: on a fresh droplet the entrypoint would execute
 the broken script during first init, fail, and leave Postgres in a restart
 loop. D1 and D4 had to be fixed together.
@@ -84,19 +85,19 @@ hard-coding is what caused the D3 drift in the first place.
 
 ### D3 — DB-name drift reconciled to `aisztens_db`
 
-| File | Change |
-|---|---|
-| `infra/.env.example` | `POSTGRES_DB=callback` → `aisztens_db` (+ comment naming the owner role) |
-| `infra/docker-compose.yml` | three `${POSTGRES_DB:-callback}` defaults (api `DATABASE_URL`, postgres env, postgres healthcheck) → `aisztens_db` |
-| `scripts/test/lib/10-services.sh` | `pg_isready` check resolves user/DB from `infra/.env`; label no longer hard-codes `-d callback` |
-| `scripts/test/lib/20-cross-service.sh` | roles check resolves user/DB from `infra/.env` |
-| `scripts/env-test/check-env-live.sh` | fallback default → `aisztens_db` |
-| `scripts/dev-stack.sh` | the printed `psql` hint → `-d aisztens_db` |
-| `scripts/test/README.md` | the `postgres` row no longer names `-d callback` |
-| `docs/Specs/Production-Runbook.md` | §4.4 `pg_isready` default and §5 `pg_isready -U aisztens -d callback` → `aisztens_db` |
-| `docs/Specs/Three-Env-Verification.md` | §2.2/§2.7 local `psql -d callback` snippets → `aisztens_db` |
-| `docs/docker-debug-playbook.md` | 3 `psql`/`pg_isready` snippets → `aisztens_db` |
-| `docs/docker-cheatsheet.md` | 6 `psql`/`pg_isready` snippets → `aisztens_db` |
+| File                                   | Change                                                                                                             |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `infra/.env.example`                   | `POSTGRES_DB=callback` → `aisztens_db` (+ comment naming the owner role)                                           |
+| `infra/docker-compose.yml`             | three `${POSTGRES_DB:-callback}` defaults (api `DATABASE_URL`, postgres env, postgres healthcheck) → `aisztens_db` |
+| `scripts/test/lib/10-services.sh`      | `pg_isready` check resolves user/DB from `infra/.env`; label no longer hard-codes `-d callback`                    |
+| `scripts/test/lib/20-cross-service.sh` | roles check resolves user/DB from `infra/.env`                                                                     |
+| `scripts/env-test/check-env-live.sh`   | fallback default → `aisztens_db`                                                                                   |
+| `scripts/dev-stack.sh`                 | the printed `psql` hint → `-d aisztens_db`                                                                         |
+| `scripts/test/README.md`               | the `postgres` row no longer names `-d callback`                                                                   |
+| `docs/Specs/Production-Runbook.md`     | §4.4 `pg_isready` default and §5 `pg_isready -U aisztens -d callback` → `aisztens_db`                              |
+| `docs/Specs/Three-Env-Verification.md` | §2.2/§2.7 local `psql -d callback` snippets → `aisztens_db`                                                        |
+| `docs/docker-debug-playbook.md`        | 3 `psql`/`pg_isready` snippets → `aisztens_db`                                                                     |
+| `docs/docker-cheatsheet.md`            | 6 `psql`/`pg_isready` snippets → `aisztens_db`                                                                     |
 
 ### Verification (suite re-run on the droplet)
 

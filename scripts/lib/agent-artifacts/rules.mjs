@@ -48,7 +48,9 @@ export function isRuleSourceName(name) {
  * @returns {string[]}
  */
 export function orderRuleNames(names) {
-  const sorted = [...names].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  const sorted = [...names].sort((left, right) =>
+    left < right ? -1 : left > right ? 1 : 0,
+  );
   return [
     ...sorted.filter((name) => name === PRIMARY_RULE_FILE),
     ...sorted.filter((name) => name !== PRIMARY_RULE_FILE),
@@ -102,7 +104,9 @@ export async function discoverRuleSources(repoRoot) {
 export async function renderInstructionFile(agent, repoRoot, sources) {
   const spec = AGENT_SPECS[agent];
   if (spec === undefined) {
-    throw new Error(`Unknown agent "${agent}" (known: ${Object.keys(AGENT_SPECS).join(', ')})`);
+    throw new Error(
+      `Unknown agent "${agent}" (known: ${Object.keys(AGENT_SPECS).join(', ')})`,
+    );
   }
 
   /** @type {string[]} */
@@ -110,7 +114,9 @@ export async function renderInstructionFile(agent, repoRoot, sources) {
   for (const source of sources) {
     const content = await readFile(join(repoRoot, source), 'utf8');
     const normalised = content.replace(/\r\n/g, '\n');
-    bodyParts.push(`---\n\n## Source: ${source}\n\n${normalised.endsWith('\n') ? normalised : `${normalised}\n`}`);
+    bodyParts.push(
+      `---\n\n## Source: ${source}\n\n${normalised.endsWith('\n') ? normalised : `${normalised}\n`}`,
+    );
   }
 
   const header = [
@@ -135,6 +141,9 @@ export async function renderInstructionFile(agent, repoRoot, sources) {
         ].join('\n')
       : '';
 
-  const content = `${frontmatter}${header}${bodyParts.join('\n')}`.replace(/\s+$/u, '');
+  const content = `${frontmatter}${header}${bodyParts.join('\n')}`.replace(
+    /\s+$/u,
+    '',
+  );
   return { relativePath: spec.target, content: `${content}\n` };
 }

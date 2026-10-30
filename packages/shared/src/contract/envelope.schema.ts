@@ -61,12 +61,10 @@ export function successEnvelopeSchema<TPayload>(
       data: dataSchema.nullable(),
       meta: responseMetaSchema,
     })
-    .transform(
-      (body): ApiEnvelope<TPayload> => ({
-        data: body.data ?? null,
-        meta: body.meta,
-      }),
-    );
+    .transform((body): ApiEnvelope<TPayload> => ({
+      data: body.data ?? null,
+      meta: body.meta,
+    }));
 }
 
 /**

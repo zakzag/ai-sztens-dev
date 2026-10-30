@@ -30,11 +30,14 @@ describe('Alert', () => {
     ['success', 'border-success'],
     ['warning', 'border-warning'],
     ['danger', 'border-danger'],
-  ] as const)('maps the %s variant to its accent token', (variant, expectedClass) => {
-    const { container } = render(<Alert variant={variant}>{variant}</Alert>);
+  ] as const)(
+    'maps the %s variant to its accent token',
+    (variant, expectedClass) => {
+      const { container } = render(<Alert variant={variant}>{variant}</Alert>);
 
-    expect(container.firstElementChild?.className).toContain(expectedClass);
-  });
+      expect(container.firstElementChild?.className).toContain(expectedClass);
+    },
+  );
 
   it('merges caller class names', () => {
     render(<Alert className="mt-4">Tartalom</Alert>);

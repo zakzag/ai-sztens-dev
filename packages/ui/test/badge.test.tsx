@@ -17,11 +17,14 @@ describe('Badge', () => {
     ['success', 'bg-success'],
     ['warning', 'bg-warning'],
     ['danger', 'bg-danger'],
-  ] as const)('maps the %s variant to its token class', (variant, expectedClass) => {
-    render(<Badge variant={variant}>{variant}</Badge>);
+  ] as const)(
+    'maps the %s variant to its token class',
+    (variant, expectedClass) => {
+      render(<Badge variant={variant}>{variant}</Badge>);
 
-    expect(screen.getByText(variant).className).toContain(expectedClass);
-  });
+      expect(screen.getByText(variant).className).toContain(expectedClass);
+    },
+  );
 
   it('merges caller class names', () => {
     render(<Badge className="ml-2">Aktív</Badge>);
@@ -32,6 +35,8 @@ describe('Badge', () => {
   it('paints its outline with the dark hairline token', () => {
     render(<Badge>Semleges</Badge>);
 
-    expect(screen.getByText('Semleges').className).toContain('border-border-hairline');
+    expect(screen.getByText('Semleges').className).toContain(
+      'border-border-hairline',
+    );
   });
 });

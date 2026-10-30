@@ -14,13 +14,13 @@ privilege); the local deploy keeps `SSH_USER=root`.
 
 ## Changes
 
-| File | Change |
-|---|---|
-| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:26) | Comments only — the required-secrets block now describes `DROPLET_SSH_KEY` as the passphrase-less deploy key whose public half must be in `/home/deployer/.ssh/authorized_keys`; added the note that the same key is used locally as `root`. `username: deployer` unchanged in all 7 SSH/SCP steps. |
-| [`deploy/README.md`](../../deploy/README.md:73) | §1 documents the pinned deploy key; §2 states the local deploy stays on `root`; §8 intro now keys off "the deploy key is authorised for `deployer`"; §8.1 `DROPLET_SSH_KEY` row rewritten (key file + authorized_keys prerequisite); §8.4 documents the root-key trade-off and the optional `authorized_keys` restriction. |
-| [`deploy/ssh-keys/README.md`](../../deploy/ssh-keys/README.md:24) | New "The deploy key" section: what the key is, both login paths, its public half, and the "treat as a root credential" rule. |
-| [`deploy/.env.example`](../../deploy/.env.example:27) | The `HOST`/`SSH_USER`/`SSH_KEY` comments describe the local `root` login and the passphrase-less key. |
-| `deploy/.env.dev` (gitignored) | Same comment tidy. |
+| File                                                                    | Change                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:26) | Comments only — the required-secrets block now describes `DROPLET_SSH_KEY` as the passphrase-less deploy key whose public half must be in `/home/deployer/.ssh/authorized_keys`; added the note that the same key is used locally as `root`. `username: deployer` unchanged in all 7 SSH/SCP steps.                        |
+| [`deploy/README.md`](../../deploy/README.md:73)                         | §1 documents the pinned deploy key; §2 states the local deploy stays on `root`; §8 intro now keys off "the deploy key is authorised for `deployer`"; §8.1 `DROPLET_SSH_KEY` row rewritten (key file + authorized_keys prerequisite); §8.4 documents the root-key trade-off and the optional `authorized_keys` restriction. |
+| [`deploy/ssh-keys/README.md`](../../deploy/ssh-keys/README.md:24)       | New "The deploy key" section: what the key is, both login paths, its public half, and the "treat as a root credential" rule.                                                                                                                                                                                               |
+| [`deploy/.env.example`](../../deploy/.env.example:27)                   | The `HOST`/`SSH_USER`/`SSH_KEY` comments describe the local `root` login and the passphrase-less key.                                                                                                                                                                                                                      |
+| `deploy/.env.dev` (gitignored)                                          | Same comment tidy.                                                                                                                                                                                                                                                                                                         |
 
 ## Operator work performed
 
@@ -29,8 +29,8 @@ privilege); the local deploy keeps `SSH_USER=root`.
    - `ssh-keygen -y -f …` → `Load key …: invalid format` (Windows OpenSSH)
    - `"C:\Progs\Git\usr\bin\ssh-keygen.exe" -y -f …` → `error in libcrypto`
    - after trimming trailing whitespace per line: the key parses and prints its public half.
-   The file was rewritten cleanly (LF, no stray spaces, single trailing newline); the intermediate
-   copies were removed.
+     The file was rewritten cleanly (LF, no stray spaces, single trailing newline); the intermediate
+     copies were removed.
 2. **Windows ACL hardened.** Windows OpenSSH refused the key as "too open"; inheritance was removed
    and only the session user granted: `icacls … /inheritance:r /grant:r "zakzag:F"`.
 3. **Droplet:** `/home/deployer/.ssh/authorized_keys` already contained the key's public half
@@ -54,7 +54,7 @@ bash deploy/deploy.sh ps dev
 ## Findings / follow-ups
 
 - **Pre-existing: `deploy.sh` uses the local per-env filename remotely.** `COMPOSE_ARGS` is computed
-  from the *local* repo, so with `infra/.env.dev` present it runs
+  from the _local_ repo, so with `infra/.env.dev` present it runs
   `--env-file infra/.env.dev` on the droplet — where the deploy copies that file to `infra/.env`.
   Result: `couldn't find env file: /opt/aisztens/infra/.env.dev`. Unrelated to the key change, but it
   currently breaks `deploy/deploy.sh ps|up dev`; fix by resolving the remote name to `infra/.env`

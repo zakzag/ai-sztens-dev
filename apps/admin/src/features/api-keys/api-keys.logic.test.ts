@@ -108,7 +108,10 @@ describe('toFieldErrors — everything else stays page-level', () => {
       issues: [{ path: 'identifier', message: 'generic conflict' }],
     });
 
-    expect(toFieldErrors(error)).toEqual({ fields: {}, form: CONFLICT_MESSAGE });
+    expect(toFieldErrors(error)).toEqual({
+      fields: {},
+      form: CONFLICT_MESSAGE,
+    });
   });
 
   it('reports a 409 without a code page-level', () => {
@@ -158,7 +161,9 @@ describe('toFieldErrors — everything else stays page-level', () => {
 describe('toFieldErrors — the server text never becomes user copy', () => {
   it('does not render the English issue message anywhere', () => {
     const result = toFieldErrors(createValidationError());
-    const rendered = [result.form ?? '', ...Object.values(result.fields)].join(' ');
+    const rendered = [result.form ?? '', ...Object.values(result.fields)].join(
+      ' ',
+    );
 
     expect(rendered).not.toContain(VALIDATION_DETAIL);
   });

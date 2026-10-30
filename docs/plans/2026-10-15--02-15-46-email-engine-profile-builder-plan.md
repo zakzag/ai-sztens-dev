@@ -31,7 +31,7 @@ azok változtatás nélkül ráépülhessenek.
 
 ## Változtatott / létrehozott fájlok
 
-| Fájl | Változás |
-| :--- | :--- |
-| `docs/temp/email-engine-plan-1-deepseek-v4-pro.md` | Új tervezési dokumentum létrehozása |
-| `docs/plans/2026-10-15--02-15-46-email-engine-profile-builder-plan.md` | Ez a history-bejegyzés |
+| Fájl                                                                   | Változás                            |
+| :--------------------------------------------------------------------- | :---------------------------------- |
+| `docs/temp/email-engine-plan-1-deepseek-v4-pro.md`                     | Új tervezési dokumentum létrehozása |
+| `docs/plans/2026-10-15--02-15-46-email-engine-profile-builder-plan.md` | Ez a history-bejegyzés              |

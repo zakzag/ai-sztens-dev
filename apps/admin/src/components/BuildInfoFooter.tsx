@@ -23,7 +23,10 @@ export function BuildInfoFooter() {
   const commitHash = normalizeBuildValue(import.meta.env.VITE_COMMIT_HASH);
 
   return (
-    <p className="pt-6 text-center text-xs text-text-muted" data-testid="build-info">
+    <p
+      className="pt-6 text-center text-xs text-text-muted"
+      data-testid="build-info"
+    >
       <span title={deployDate ?? 'Build idő nem elérhető'}>
         Telepítve: {formatDeployDate(deployDate)}
       </span>

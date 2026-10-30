@@ -7,13 +7,17 @@ describe('Card', () => {
     const { container } = render(<Card>Tartalom</Card>);
 
     expect(screen.getByText('Tartalom')).toBeInTheDocument();
-    expect(container.firstElementChild?.className).toContain('shadow-neu-raised');
+    expect(container.firstElementChild?.className).toContain(
+      'shadow-neu-raised',
+    );
   });
 
   it('renders the title as a heading', () => {
     render(<Card title="API kulcsok">Tartalom</Card>);
 
-    expect(screen.getByRole('heading', { name: 'API kulcsok', level: 2 })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'API kulcsok', level: 2 }),
+    ).toBeInTheDocument();
   });
 
   it('renders the description', () => {

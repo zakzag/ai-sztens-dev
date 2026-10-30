@@ -78,7 +78,10 @@ export interface ErrorResponseInput {
   readonly code: string;
   readonly status: number;
   readonly message: string;
-  readonly details?: readonly { readonly path: string; readonly message: string }[];
+  readonly details?: readonly {
+    readonly path: string;
+    readonly message: string;
+  }[];
   readonly requestId?: string;
   readonly path?: string;
 }

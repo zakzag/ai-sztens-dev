@@ -54,9 +54,9 @@ Alternatives considered:
 
 `.github/workflows/deploy.yml` only:
 
-| Step | Change |
-|---|---|
-| Step 3 | `chmod 600` → `chmod 0644`. Comment expanded to document why. |
+| Step                                     | Change                                                                                                                                                                                             |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Step 3                                   | `chmod 600` → `chmod 0644`. Comment expanded to document why.                                                                                                                                      |
 | New step 5a (between scp and GHCR login) | `appleboy/ssh-action@v1.0.3` that `chmod 600`s `infra/.env` on the droplet, with a `set -euo pipefail` guard that fails the step if the file is missing (indicates the scp step silently lost it). |
 
 No source code, no Docker image, no infra-as-code change. The 12-step
@@ -77,6 +77,7 @@ On the next deploy run:
   `infra/.env on droplet is now mode 600 (was 644 after scp; ...)`.
 - `images.yml` + `deploy.yml` should both go green in ~5 min.
 - After the run:
+
   ```bash
   curl -s https://api.aisztens.hu/healthz
   # expected: {"status":"oks",...}

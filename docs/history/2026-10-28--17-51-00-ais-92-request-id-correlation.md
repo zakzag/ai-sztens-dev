@@ -37,17 +37,17 @@ pattern (`request.routeOptions.url`).
 
 ## What was implemented
 
-| Area | Change |
-|---|---|
-| Filter | exemption = `@SkipEnvelope()` metadata **or** registry route-pattern match; missing/non-function metadata targets are skipped instead of crashing `Reflector` |
-| Correlation | `request-id.const.ts` (max 128 chars, `A-Za-z0-9._:-`), `isValidRequestId`, invalid inbound ids treated as absent |
-| Decorator | `@ReqCtx()` moved to `request-context.decorator.ts` with a testable `resolveRequestContext()`; `request-context.ts` is pure again |
-| Adapter | `create-fastify-adapter.ts` with `genReqId: () => randomUUID()`, used by `main.ts` and all e2e bootstraps |
-| Exemptions | shared test helper `envelope-route.ts`; `envelope-exemptions.spec.ts` (controller inventory) and `envelope-exemptions.e2e-spec.ts` (discovery) enforce two-way agreement **and** registry coverage of every enveloped route (root `/api` probe excepted, with a written reason) |
-| Correlation e2e | `request-id.e2e-spec.ts` (no `AppModule`): `meta.requestId` ⇄ header, inbound `test-123` preserved, invalid id replaced, error envelope, unknown route, `healthz` raw |
-| Per-suite e2e | `api-keys.e2e-spec.ts` (header ⇄ `meta.requestId`, inbound pass-through, error header), `health.e2e-spec.ts` (UUID header, body unchanged), `vapi-webhooks.e2e-spec.ts` (raw body keys, UUID header, now imports the real `HttpModule`) |
-| Mocks | `http-host.mock.ts`: host can omit metadata targets / set URL and route pattern; reflector spy throws like `reflect-metadata` |
-| Docs | `docs/Specs/API-Convention.md` §6, §8, §12 updated; AIS-98 TODO for `/api/openapi.json` + `/api/docs` recorded |
+| Area            | Change                                                                                                                                                                                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Filter          | exemption = `@SkipEnvelope()` metadata **or** registry route-pattern match; missing/non-function metadata targets are skipped instead of crashing `Reflector`                                                                                                                   |
+| Correlation     | `request-id.const.ts` (max 128 chars, `A-Za-z0-9._:-`), `isValidRequestId`, invalid inbound ids treated as absent                                                                                                                                                               |
+| Decorator       | `@ReqCtx()` moved to `request-context.decorator.ts` with a testable `resolveRequestContext()`; `request-context.ts` is pure again                                                                                                                                               |
+| Adapter         | `create-fastify-adapter.ts` with `genReqId: () => randomUUID()`, used by `main.ts` and all e2e bootstraps                                                                                                                                                                       |
+| Exemptions      | shared test helper `envelope-route.ts`; `envelope-exemptions.spec.ts` (controller inventory) and `envelope-exemptions.e2e-spec.ts` (discovery) enforce two-way agreement **and** registry coverage of every enveloped route (root `/api` probe excepted, with a written reason) |
+| Correlation e2e | `request-id.e2e-spec.ts` (no `AppModule`): `meta.requestId` ⇄ header, inbound `test-123` preserved, invalid id replaced, error envelope, unknown route, `healthz` raw                                                                                                           |
+| Per-suite e2e   | `api-keys.e2e-spec.ts` (header ⇄ `meta.requestId`, inbound pass-through, error header), `health.e2e-spec.ts` (UUID header, body unchanged), `vapi-webhooks.e2e-spec.ts` (raw body keys, UUID header, now imports the real `HttpModule`)                                         |
+| Mocks           | `http-host.mock.ts`: host can omit metadata targets / set URL and route pattern; reflector spy throws like `reflect-metadata`                                                                                                                                                   |
+| Docs            | `docs/Specs/API-Convention.md` §6, §8, §12 updated; AIS-98 TODO for `/api/openapi.json` + `/api/docs` recorded                                                                                                                                                                  |
 
 ## Follow-up — `test:e2e` red on a machine without Postgres
 
@@ -74,7 +74,7 @@ pnpm --filter @callback/shared test     # 5 suites, 99 tests passed
 
 ## Notes
 
-* The `api-keys`, `health` and `envelope-exemptions` e2e assertions self-skip on the local
+- The `api-keys`, `health` and `envelope-exemptions` e2e assertions self-skip on the local
   Node 20 runtime; the same mechanics are covered by `request-id.e2e-spec.ts`, which does not
   need `AppModule`.
-* Milestone: `docs/milestones/2026-10-28--17-51-00-ais-92-request-id-and-filter-host-crash.milestone.md`.
+- Milestone: `docs/milestones/2026-10-28--17-51-00-ais-92-request-id-and-filter-host-crash.milestone.md`.

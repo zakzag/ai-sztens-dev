@@ -27,15 +27,26 @@ import { ApiKeysTable } from './ui/ApiKeysTable.js';
  * @returns the page content.
  */
 export function ApiKeysPage() {
-  const { apiKeys, isLoading, isFetching, errorMessage, errorSurface, refetch } = useApiKeysQuery();
+  const {
+    apiKeys,
+    isLoading,
+    isFetching,
+    errorMessage,
+    errorSurface,
+    refetch,
+  } = useApiKeysQuery();
   const viewModels = useMemo(() => toApiKeyViewModels(apiKeys), [apiKeys]);
   const pageErrorMessage = errorSurface === 'page' ? errorMessage : null;
 
   return (
     <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-text-primary">{API_KEYS_PAGE_TITLE}</h1>
-        <p className="mt-2 text-sm text-text-secondary">{API_KEYS_PAGE_SUBTITLE}</p>
+        <h1 className="text-2xl font-bold text-text-primary">
+          {API_KEYS_PAGE_TITLE}
+        </h1>
+        <p className="mt-2 text-sm text-text-secondary">
+          {API_KEYS_PAGE_SUBTITLE}
+        </p>
       </header>
 
       {pageErrorMessage !== null ? (

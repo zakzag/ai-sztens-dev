@@ -105,9 +105,9 @@ describe('createHttpClient — GET', () => {
       fetchImpl: fetchMock.fetchImpl,
     });
 
-    await expect(
-      client.get('/items', z.array(itemSchema)),
-    ).resolves.toEqual([]);
+    await expect(client.get('/items', z.array(itemSchema))).resolves.toEqual(
+      [],
+    );
   });
 
   it('sends no Content-Type on a bodyless request', async () => {
@@ -220,9 +220,7 @@ describe('createHttpClient — error envelope', () => {
     expect((error as ApiError).issues).toEqual([
       { path: 'identifier', message: 'already taken' },
     ]);
-    expect((error as ApiError).details).toEqual([
-      'identifier: already taken',
-    ]);
+    expect((error as ApiError).details).toEqual(['identifier: already taken']);
   });
 
   it('maps a VALIDATION_FAILED envelope onto a validation error', async () => {
@@ -468,7 +466,9 @@ describe('createHttpClient — contract drift', () => {
     expect(apiError.issues).toHaveLength(1);
     expect(apiError.issues[0]?.path).toBe('name');
     expect(apiError.issues[0]?.path.startsWith('data')).toBe(false);
-    expect(apiError.details).toEqual([`name: ${apiError.issues[0]?.message ?? ''}`]);
+    expect(apiError.details).toEqual([
+      `name: ${apiError.issues[0]?.message ?? ''}`,
+    ]);
   });
 
   it('exposes a payload-level issue for a null `data` on a resource schema', async () => {

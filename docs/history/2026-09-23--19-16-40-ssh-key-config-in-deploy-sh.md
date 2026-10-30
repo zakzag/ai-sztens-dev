@@ -43,6 +43,7 @@ Three options, ordered from cleanest to fastest:
 
 1. **Pin the key explicitly** (recommended, especially if the bootstrap
    hasn't run yet on the droplet):
+
    ```bash
    # 1. Upload the matching public key to the droplet's root
    #    via the DigitalOcean recovery console, e.g.:
@@ -80,7 +81,7 @@ The first attempt still failed. Investigation revealed:
 - The file placed at `deploy/ssh-keys/id_aisztens_krak` is a **PuTTY
   Private Key (PPK v2, ed25519, AES-256-CBC encrypted)**, not OpenSSH PEM.
 - `file` confirms: `PuTTY Private Key File, version 2, algorithm
-  ssh-ed25519`.
+ssh-ed25519`.
 - Even with the script pinned to `SSH_KEY=.../id_aisztens_krak` and
   `chmod 600`, OpenSSH cannot load the file → it never offers a public key
   to the server → `Permission denied (publickey)`.

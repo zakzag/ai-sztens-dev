@@ -153,7 +153,10 @@ export function toBannerCondition(
     }
   }
 
-  return BANNER_CONDITION_PRIORITY.find((condition) => present.has(condition)) ?? null;
+  return (
+    BANNER_CONDITION_PRIORITY.find((condition) => present.has(condition)) ??
+    null
+  );
 }
 
 /**

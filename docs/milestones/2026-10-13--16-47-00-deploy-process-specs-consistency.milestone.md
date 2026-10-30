@@ -17,13 +17,13 @@ mismatches for approval, and (c) delete/repair the stale content.
 
 ## 2. Measured data / evidence
 
-| Check | Result |
-|---|---|
-| `deploy/deploy.sh` occurrences of `ensure_spa_env` / `prune_legacy_stack` | **0** (both removed) |
-| `.github/workflows/deploy.yml` triggers | `workflow_dispatch` + `workflow_run` only — **no `push`** |
-| Workflows with a `push` trigger | `images.yml`, `ci.yml` (only `images.yml` publishes images) |
-| Mismatching statements found | **17**, across 4 documents |
-| Documents requiring no change | `Infrastructure-Docker.md`, `Functional-Specification.md`, `Kick-off-Meeting.md`, `Brainstorming.md`, email-microservice plan |
+| Check                                                                     | Result                                                                                                                        |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `deploy/deploy.sh` occurrences of `ensure_spa_env` / `prune_legacy_stack` | **0** (both removed)                                                                                                          |
+| `.github/workflows/deploy.yml` triggers                                   | `workflow_dispatch` + `workflow_run` only — **no `push`**                                                                     |
+| Workflows with a `push` trigger                                           | `images.yml`, `ci.yml` (only `images.yml` publishes images)                                                                   |
+| Mismatching statements found                                              | **17**, across 4 documents                                                                                                    |
+| Documents requiring no change                                             | `Infrastructure-Docker.md`, `Functional-Specification.md`, `Kick-off-Meeting.md`, `Brainstorming.md`, email-microservice plan |
 
 ## 3. Root cause / design rationale
 
@@ -43,12 +43,12 @@ is why the drift accumulated silently.
   `infra/.env`, compose interpolation).
 - Fixed the 17 mismatches in four living specs:
 
-| File | What was corrected |
-|---|---|
-| `docs/Specs/Caddy-Reverse-Proxy.md` | `root * /srv/{web,admin}` diagram edges → `reverse_proxy web:80` / `admin:80`; `rsync` template diagram → `sed` + `scp` of the rendered file; `deploy.yml` `matrix` → `plan` job; `prune_legacy_stack()` → `up -d --remove-orphans`; backup section no longer lists host `dist/` |
-| `docs/Specs/Local-Development.md` | dev row no longer claims a `deploy.yml` push trigger; `ensure_spa_env()` bullet replaced by the `VITE_API_BASE_URL` build-arg explanation; header bumped |
-| `docs/Specs/Production-Runbook.md` | header rewritten (plan job, no matrix); `--build` on the droplet removed from the OOM row; banner sample `[stage=upload_rsync]` → `[stage=upload_files]`; rsync-mirror bullet → 3-file `scp`; §9.1 `deploy.yml` bullet → plan job |
-| `docs/Specs/Three-Env-Verification.md` | §4 prod bootstrap no longer references a matrix; §6 dev timing no longer `pnpm install` / `pnpm build`; §7 SPA-`localhost` and `ensure_spa_env` rows updated |
+| File                                   | What was corrected                                                                                                                                                                                                                                                               |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/Specs/Caddy-Reverse-Proxy.md`    | `root * /srv/{web,admin}` diagram edges → `reverse_proxy web:80` / `admin:80`; `rsync` template diagram → `sed` + `scp` of the rendered file; `deploy.yml` `matrix` → `plan` job; `prune_legacy_stack()` → `up -d --remove-orphans`; backup section no longer lists host `dist/` |
+| `docs/Specs/Local-Development.md`      | dev row no longer claims a `deploy.yml` push trigger; `ensure_spa_env()` bullet replaced by the `VITE_API_BASE_URL` build-arg explanation; header bumped                                                                                                                         |
+| `docs/Specs/Production-Runbook.md`     | header rewritten (plan job, no matrix); `--build` on the droplet removed from the OOM row; banner sample `[stage=upload_rsync]` → `[stage=upload_files]`; rsync-mirror bullet → 3-file `scp`; §9.1 `deploy.yml` bullet → plan job                                                |
+| `docs/Specs/Three-Env-Verification.md` | §4 prod bootstrap no longer references a matrix; §6 dev timing no longer `pnpm install` / `pnpm build`; §7 SPA-`localhost` and `ensure_spa_env` rows updated                                                                                                                     |
 
 ## 5. Outcome and how to verify
 

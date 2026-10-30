@@ -97,10 +97,10 @@ runtime bugs that would have hit the next push:
 4. **Smoke step can't find its script.** Step 9 runs
    `bash scripts/test/stack-smoke.sh` on the droplet, but the scp step
    (step 5) only ships `infra/docker-compose.yml, infra/.env,
-   infra/caddy/Caddyfile.rendered`. The smoke script is in
+infra/caddy/Caddyfile.rendered`. The smoke script is in
    `scripts/test/stack-smoke.sh` and is not in the `sparse-checkout`
    list — the step would fail with `bash: scripts/test/stack-smoke.sh:
-   No such file or directory` on the first deploy.
+No such file or directory` on the first deploy.
 
 ## 4. Fix
 

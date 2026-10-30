@@ -23,7 +23,7 @@ unrelated one-off, not a design intent.
 
 - Initial `pnpm test` failure trace came from
   `node:internal/modules/cjs/loader:1475`, i.e. `Module._resolveFilename`,
-  proving Node was being asked to *load* `test` as a module instead of scanning
+  proving Node was being asked to _load_ `test` as a module instead of scanning
   it for `*.test.*` files.
 - `packages/shared/test/build-info.test.mjs` (78 lines) imports from
   `../dist/lib/build-info.js` and uses `node:assert/strict`, `node:test`,
@@ -49,12 +49,12 @@ keep dodging shell-quoting edge cases.
 
 ## Solution / implementation
 
-| File | Change |
-| --- | --- |
-| [`packages/shared/test/build-info.test.mjs`](packages/shared/test/build-info.test.mjs) | **Deleted.** |
-| [`packages/shared/test/build-info.test.ts`](packages/shared/test/build-info.test.ts) | **Created.** TypeScript port using Jest globals (`describe`, `it`, `expect`, `toBe` / `toBeNull` / `toEqual` / `stringContaining`). Imports from `../src/lib/build-info.js` directly (no `dist/` hop). |
-| [`packages/shared/package.json`](packages/shared/package.json) | `"test"` script now matches the API: `node --experimental-vm-modules node_modules/jest/bin/jest.js`. Added `jest`, `ts-jest`, `@types/jest`, `@types/node` to `devDependencies`. Added a `jest` block mirroring the API's (`preset: ts-jest/presets/default-esm`, `useESM: true`, `rootDir: "."`, `testRegex: "test/.*\\.test\\.ts$"`). |
-| [`packages/shared/tsconfig.json`](packages/shared/tsconfig.json) | **Unchanged.** Still scoped to `src/` with `rootDir: "src"`, so the build artefact layout (`dist/index.js`) is preserved for `@callback/api`, `@callback/web`, `@callback/admin`. `ts-jest` type-checks the spec file on its own. |
+| File                                                                                   | Change                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/shared/test/build-info.test.mjs`](packages/shared/test/build-info.test.mjs) | **Deleted.**                                                                                                                                                                                                                                                                                                                            |
+| [`packages/shared/test/build-info.test.ts`](packages/shared/test/build-info.test.ts)   | **Created.** TypeScript port using Jest globals (`describe`, `it`, `expect`, `toBe` / `toBeNull` / `toEqual` / `stringContaining`). Imports from `../src/lib/build-info.js` directly (no `dist/` hop).                                                                                                                                  |
+| [`packages/shared/package.json`](packages/shared/package.json)                         | `"test"` script now matches the API: `node --experimental-vm-modules node_modules/jest/bin/jest.js`. Added `jest`, `ts-jest`, `@types/jest`, `@types/node` to `devDependencies`. Added a `jest` block mirroring the API's (`preset: ts-jest/presets/default-esm`, `useESM: true`, `rootDir: "."`, `testRegex: "test/.*\\.test\\.ts$"`). |
+| [`packages/shared/tsconfig.json`](packages/shared/tsconfig.json)                       | **Unchanged.** Still scoped to `src/` with `rootDir: "src"`, so the build artefact layout (`dist/index.js`) is preserved for `@callback/api`, `@callback/web`, `@callback/admin`. `ts-jest` type-checks the spec file on its own.                                                                                                       |
 
 ## Outcome and how to verify
 

@@ -8,6 +8,7 @@
 ## Mit tettünk
 
 ### API (AIS-65)
+
 Törölve: `apps/api/src/callback-requests/` (controller, service, module, DTO, spec),
 `apps/api/src/db/callback-requests.{repository,repository.interface,errors,repository.spec}.ts`,
 `schema.spec.ts`, `db/test/mocks/callback-requests.mock.ts`, `db/test/mocks/database.mock.ts`.
@@ -19,6 +20,7 @@ Módosítva: [`schema.ts`](../../apps/api/src/db/schema.ts) (üres séma, magyar
 (a megszűnt `CallbackRequestsService`-re mutató komment).
 
 ### Adatbázis (AIS-66)
+
 - Új migráció: [`drizzle/0001_square_kat_farrell.sql`](../../apps/api/drizzle/0001_square_kat_farrell.sql)
   (`DROP TABLE "callback"."callback_requests" CASCADE`, `DROP TYPE "callback"."call_status"`) + `meta/0001_snapshot.json` + `_journal.json`.
 - [`01-roles.sh`](../../infra/postgres/init/01-roles.sh) és [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh):
@@ -27,17 +29,20 @@ Módosítva: [`schema.ts`](../../apps/api/src/db/schema.ts) (üres séma, magyar
   (3→2 séma, 9→6 USAGE, 2→1 CREATE), [`20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh) ugyanígy.
 
 ### Admin (AIS-67)
+
 Törölve: `apps/admin/src/lib/api.ts`, `DashboardPage.tsx`. Új:
 [`PlaceholderPage.tsx`](../../apps/admin/src/pages/PlaceholderPage.tsx) a `/` route-on,
 a „Kérések” nav link kikerült, a session-kulcs `aisztens-admin-token`-re nevezve.
 
 ### Web + shared (AIS-69)
+
 Törölve: `CallbackFormPage.tsx`, `ThankYouPage.tsx`, `apps/web/src/lib/api.ts`,
 `packages/shared/src/schemas/callback-request.schema.ts`, `packages/shared/src/types/callback-request.ts`;
 a `/callback` és `/thank-you` route, a „Visszahívást kérek” CTA-k, valamint a
 `react-hook-form` / `@hookform/resolvers` / `zod` függőségek a web csomagból.
 
 ### Dokumentáció (AIS-68)
+
 `Three-Env-Verification.md` (a `/api/callback-requests` próbák helyett `/healthz`,
 §2.7 és a fejléc megjegyzés), `Database-Local.md` §9 + fejléc, `Infrastructure-Docker.md`
 §6.2 grant-mátrix, `Local-Development.md`, `Production-Runbook.md` §7 + fejléc.
@@ -60,16 +65,16 @@ Friss volume-on nincs teendő: a `02-schemas.sh` már csak `platform`-ot és `em
 
 ## Verifikáció
 
-| Parancs | Eredmény |
-|---|---|
-| `pnpm --filter @callback/api db:generate` | `drizzle/0001_square_kat_farrell.sql` létrejött |
-| `pnpm --filter @callback/api db:migrate` | OK — `platform.__drizzle_migrations` = 2 sor |
-| DB állapot | `pg_namespace`: `email`, `platform`; `to_regclass('callback.callback_requests')` → null |
-| `pnpm --filter @callback/shared build` / `api build` / `web build` / `admin build` | mind zöld |
-| `pnpm test` | shared 10, api 74 teszt zöld |
-| `pnpm lint` | **8 pre-existing hiba** a `vapi-signature.guard.spec.ts` / `vapi-webhooks.e2e-spec.ts` fájlokban (`jest` globális típus) — nem ehhez a taskhoz tartozik, a HEAD-en is fennáll |
-| `rg -i callback apps/*/src packages/shared/src` | csak `@callback/*` csomagnév és szándékos történeti komment találat |
-| `bash scripts/test/_postgres-init-schemas-test.sh` | **PASS: 23  FAIL: 0** (friss init + kétszeri újrafuttatás, 2 séma / 6 USAGE / 1 CREATE) |
+| Parancs                                                                            | Eredmény                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @callback/api db:generate`                                          | `drizzle/0001_square_kat_farrell.sql` létrejött                                                                                                                               |
+| `pnpm --filter @callback/api db:migrate`                                           | OK — `platform.__drizzle_migrations` = 2 sor                                                                                                                                  |
+| DB állapot                                                                         | `pg_namespace`: `email`, `platform`; `to_regclass('callback.callback_requests')` → null                                                                                       |
+| `pnpm --filter @callback/shared build` / `api build` / `web build` / `admin build` | mind zöld                                                                                                                                                                     |
+| `pnpm test`                                                                        | shared 10, api 74 teszt zöld                                                                                                                                                  |
+| `pnpm lint`                                                                        | **8 pre-existing hiba** a `vapi-signature.guard.spec.ts` / `vapi-webhooks.e2e-spec.ts` fájlokban (`jest` globális típus) — nem ehhez a taskhoz tartozik, a HEAD-en is fennáll |
+| `rg -i callback apps/*/src packages/shared/src`                                    | csak `@callback/*` csomagnév és szándékos történeti komment találat                                                                                                           |
+| `bash scripts/test/_postgres-init-schemas-test.sh`                                 | **PASS: 23 FAIL: 0** (friss init + kétszeri újrafuttatás, 2 séma / 6 USAGE / 1 CREATE)                                                                                        |
 
 Nem futott le: `pnpm test:stack` (a teljes compose-stack image-eit kellene felépíteni;
 a várt értékek 2/6/1-re frissítve, a logika a throwaway-konténeres teszttel igazolva).

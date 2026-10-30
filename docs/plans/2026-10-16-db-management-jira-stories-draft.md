@@ -6,6 +6,7 @@
 mindegyik alá Sub-taskok, úgy hogy a Story + Sub-task önmagában elég legyen egy AI-nak a lefejlesztéshez.
 
 **Konvenciók:**
+
 - Csak a **Summary**, **Issue Type**, **Description** (és a Sub-taskoknál a **Parent**) mezőt töltjük ki.
 - **Nincs** Assignee, **nincs** Priority (a user kérése szerint).
 - A ticket törzse angol (JIRA/AI konvenció), hogy a lefejlesztő AI egyértelműen tudjon belőle dolgozni.
@@ -21,6 +22,7 @@ mindegyik alá Sub-taskok, úgy hogy a Story + Sub-task önmagában elég legyen
 **Description:**
 
 ### Context
+
 The API currently stores callback requests in an in-memory `Map` in
 [`callback-requests.service.ts`](../../apps/api/src/callback-requests/callback-requests.service.ts:12). No
 schema, ORM, or migration tooling exists. The spec
@@ -30,6 +32,7 @@ schema, ORM, or migration tooling exists. The spec
 [`01-roles.sh`](../../infra/postgres/init/01-roles.sh:1), which runs only on an empty `pgdata` volume.
 
 ### What to build
+
 1. Adopt **Drizzle ORM** (`drizzle-orm` + `drizzle-kit`) as the schema-as-code layer. Prisma is excluded
    (see [`2026-10-14-email-module-structural-design-plan.md`](../../docs/plans/2026-10-14-email-module-structural-design-plan.md:454)).
 2. Add `db:generate`, `db:migrate`, `db:check` scripts to [`apps/api/package.json`](../../apps/api/package.json:9).
@@ -40,10 +43,12 @@ schema, ORM, or migration tooling exists. The spec
 5. Replace the in-memory store with a Postgres repository, keeping the existing controller/DTO contract intact.
 
 ### Business value
+
 The callback data becomes durable and survives container restarts, and the schema becomes versioned,
 reviewable code — the foundation every later feature (email engine, CRM hooks) depends on.
 
 ### DoD (Definition of Done)
+
 - `pnpm --filter @callback/api db:generate` produces a SQL migration under `apps/api/drizzle/`.
 - `pnpm --filter @callback/api db:check` passes on a clean tree.
 - Local `db:migrate` against the dev-stack creates `callback.callback_requests` and `__drizzle_migrations`.
@@ -51,11 +56,13 @@ reviewable code — the foundation every later feature (email engine, CRM hooks)
 - Unit and e2e tests pass (`pnpm --filter @callback/api test`, `test:e2e`).
 
 ### Test coverage
+
 - Unit: schema mapping, repository CRUD, migration bookkeeping.
 - E2E: HTTP POST → row in Postgres (replace in-memory map assertion).
 - See §Testing strategy of [`2026-10-16-database-migrations-backup-plan.md`](2026-10-16-database-migrations-backup-plan.md).
 
 ### Out of scope
+
 - Migration execution in the deploy pipeline (Story 3).
 - Backups and restore (Story 4).
 - Rollback policy and docs (Story 5).
@@ -72,6 +79,7 @@ reviewable code — the foundation every later feature (email engine, CRM hooks)
 **Parent:** DB: schema-as-code migration workflow and Postgres-backed callback store
 
 **Description:**
+
 - Add runtime deps `drizzle-orm` and a Postgres driver (`postgres` or `pg`) and dev dep `drizzle-kit`
   to [`apps/api/package.json`](../../apps/api/package.json:23).
 - Add npm scripts: `db:generate` (`drizzle-kit generate`), `db:migrate` (`node dist/migrate.js` placeholder),
@@ -91,6 +99,7 @@ reviewable code — the foundation every later feature (email engine, CRM hooks)
 **Parent:** DB: schema-as-code migration workflow and Postgres-backed callback store
 
 **Description:**
+
 - Add a new idempotent init script (e.g. `infra/postgres/init/02-schemas.sh`) that creates schemas
   `platform`, `callback`, `email` if missing, using the `\gexec` / `CREATE SCHEMA IF NOT EXISTS` pattern
   already established in [`01-roles.sh`](../../infra/postgres/init/01-roles.sh:34).
@@ -110,6 +119,7 @@ reviewable code — the foundation every later feature (email engine, CRM hooks)
 **Parent:** DB: schema-as-code migration workflow and Postgres-backed callback store
 
 **Description:**
+
 - Create [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts) with a `callback` schema and a
   `callbackRequests` table matching the shared type in
   [`packages/shared/src/types/callback-request.ts`](../../packages/shared/src/types/callback-request.ts:1)
@@ -129,6 +139,7 @@ reviewable code — the foundation every later feature (email engine, CRM hooks)
 **Parent:** DB: schema-as-code migration workflow and Postgres-backed callback store
 
 **Description:**
+
 - Create a repository (e.g. `apps/api/src/db/callback-requests.repository.ts`) with `create`, `findAll`, `findOne`.
 - Write unit tests in `apps/api/src/db/` covering: create persists and returns the row, findOne throws on missing id,
   findAll returns inserted rows, and error cases (invalid uuid, DB error propagation).
@@ -145,6 +156,7 @@ reviewable code — the foundation every later feature (email engine, CRM hooks)
 **Parent:** DB: schema-as-code migration workflow and Postgres-backed callback store
 
 **Description:**
+
 - Replace the in-memory `Map` in [`callback-requests.service.ts`](../../apps/api/src/callback-requests/callback-requests.service.ts:12)
   with the repository from sub-task 1.4, keeping the controller and DTO unchanged.
 - Ensure the module wires the repository via DI and the DB client reads `DATABASE_URL`
@@ -165,6 +177,7 @@ reviewable code — the foundation every later feature (email engine, CRM hooks)
 **Description:**
 
 ### Context
+
 The team needs a concrete, minimal walkthrough of how a feature is built in this codebase, while
 also delivering a real capability: an admin page for managing name-value key pairs that hold AI API
 tokens. These tokens will later be consumed by the AI processing flow. This story is the reference
@@ -173,6 +186,7 @@ example that pairs with the schema-as-code foundation from Story 1 — it exerci
 one thin vertical slice.
 
 ### What to build
+
 1. **DB part:** a `platform.api_keys` table via a Drizzle migration with columns: `name`,
    `identifier` (unique — used to look a key up), `description`, `api_key` (the token value),
    `expires_at` (expiry date), plus `id` and timestamps.
@@ -185,10 +199,12 @@ one thin vertical slice.
    migrate locally, run API + admin, use the page).
 
 ### Business value
+
 Gives developers a copy-paste-able template for the standard DB → API → UI flow and delivers the
 actual store that the AI processing flow will read tokens from later.
 
 ### DoD
+
 - `platform.api_keys` exists after `db:migrate`; `identifier` is unique.
 - `GET /api/api-keys` returns the stored keys (200, JSON array); `POST /api/api-keys` creates a key;
   a duplicate `identifier` is rejected (409).
@@ -197,11 +213,13 @@ actual store that the AI processing flow will read tokens from later.
 - The how-to document explains the full loop.
 
 ### Test coverage
+
 - Unit: repository mapping (incl. unique identifier), controller/service, DTO validation.
 - E2E: create + list + lookup-by-identifier + duplicate-identifier rejection.
 - UI: the admin page renders the list and the add form (component test or smoke check).
 
 ### Out of scope
+
 - Update/delete/rotate operations, expiry enforcement, and masking/encryption of the stored token.
 - Admin auth on this page.
 - Pagination/search (can be added later).
@@ -218,6 +236,7 @@ actual store that the AI processing flow will read tokens from later.
 **Parent:** Admin: AI API key store page demonstrating the full-stack development flow
 
 **Description:**
+
 - Extend [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts) with an `api_keys` table in the
   `platform` schema: `id` uuid pk, `name` (text), `identifier` (text, unique — lookup key),
   `description` (text), `api_key` (text — the token value), `expires_at` (date), `created_at`,
@@ -236,6 +255,7 @@ actual store that the AI processing flow will read tokens from later.
 **Parent:** Admin: AI API key store page demonstrating the full-stack development flow
 
 **Description:**
+
 - Create an `api-keys` module in [`apps/api/src/`](../../apps/api/src/) with repository, service and
   controller.
 - Expose `GET /api/api-keys` (list all), `GET /api/api-keys/:identifier` (lookup by unique
@@ -256,6 +276,7 @@ actual store that the AI processing flow will read tokens from later.
 **Parent:** Admin: AI API key store page demonstrating the full-stack development flow
 
 **Description:**
+
 - Add an API keys page in [`apps/admin/src/pages/`](../../apps/admin/src/pages/) that fetches
   `GET /api/api-keys` via the existing [`apps/admin/src/lib/api.ts`](../../apps/admin/src/lib/api.ts:1)
   and renders a table (name, identifier, description, expiry) plus a form to add a new key
@@ -275,6 +296,7 @@ actual store that the AI processing flow will read tokens from later.
 **Parent:** Admin: AI API key store page demonstrating the full-stack development flow
 
 **Description:**
+
 - Add a short how-to (e.g. in [`apps/admin/README.md`](../../apps/admin/README.md:1) or
   [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md:1)) describing the full loop:
   change schema → `db:generate` → `db:migrate` → run API + admin locally → open the API keys page.
@@ -293,12 +315,14 @@ actual store that the AI processing flow will read tokens from later.
 **Description:**
 
 ### Context
+
 The deploy model is image-based: [`images.yml`](../../.github/workflows/images.yml:1) builds 4 images,
 [`deploy.yml`](../../.github/workflows/deploy.yml:353) ships small files and runs `pull && up -d --force-recreate`
 on the droplet (no build, no source). Migrations must therefore ship **inside the api image** and run as a
 one-shot step **between `pull` and `up -d`**, so the app never starts against an un-migrated schema.
 
 ### What to build
+
 1. An advisory-locked migration runner `dist/migrate.js` in the api image.
 2. A one-shot `migrate` compose service pinned to the same `IMAGE_TAG`.
 3. Wiring in [`deploy.yml`](../../.github/workflows/deploy.yml:353) and a mirror `migrate` command in [`deploy.sh`](../../deploy/deploy.sh:1).
@@ -306,21 +330,25 @@ one-shot step **between `pull` and `up -d`**, so the app never starts against an
 5. DB smoke checks in the existing stack smoke suite.
 
 ### Business value
+
 Schema changes become a first-class, gated step of every deploy, eliminating the class of failure where the
 app starts against a stale schema; a failed migration aborts the deploy before the app flips.
 
 ### DoD
+
 - A full CI deploy runs `docker compose run --rm migrate` between `pull` and `up -d`; a non-zero exit aborts the deploy.
 - `migrate` is excluded from the `Verify every service is running IMAGE_TAG` step.
 - Drift (schema changed without a migration) and unflagged destructive DDL both fail the PR.
 - `pnpm test:stack` passes the new DB checks on the live stack.
 
 ### Test coverage
+
 - Unit: migration runner lock/timeout behavior (sub-task 3.1).
 - Smoke: migration at head, idempotent re-run, expected tables, CRUD round-trip (sub-task 3.6).
 - CI lint: drift + destructive DDL (sub-task 3.5).
 
 ### Out of scope
+
 - Backup/restore (Story 4), rollback policy and docs (Story 5).
 
 ### Sub-tasks
@@ -335,6 +363,7 @@ app starts against a stale schema; a failed migration aborts the deploy before t
 **Parent:** DB: run migrations in the deploy pipeline via a one-shot service
 
 **Description:**
+
 - Create [`apps/api/src/db/migrate.ts`](../../apps/api/src/db/migrate.ts), compiled to `dist/migrate.js` by the Nest build:
   - acquire `pg_advisory_lock(<fixed key>)`;
   - `SET lock_timeout = '5s'` and `SET statement_timeout = '60s'`;
@@ -354,6 +383,7 @@ app starts against a stale schema; a failed migration aborts the deploy before t
 **Parent:** DB: run migrations in the deploy pipeline via a one-shot service
 
 **Description:**
+
 - Update [`infra/app/Dockerfile`](../../infra/app/Dockerfile:1) so the final image contains `apps/api/drizzle/`
   and `apps/api/dist/migrate.js` alongside the built app.
 - DoD: `docker run <image> node apps/api/dist/migrate.js` executes (against a reachable DB) or prints usage/dry-run.
@@ -369,6 +399,7 @@ app starts against a stale schema; a failed migration aborts the deploy before t
 **Parent:** DB: run migrations in the deploy pipeline via a one-shot service
 
 **Description:**
+
 - Add a `migrate` service to [`infra/docker-compose.yml`](../../infra/docker-compose.yml:27):
   - same api image `${REGISTRY:-ghcr.io}/${GHCR_OWNER:-local}/aisztens-api:${IMAGE_TAG:-latest}`;
   - `restart: "no"`, `mem_limit: 256m`;
@@ -388,6 +419,7 @@ app starts against a stale schema; a failed migration aborts the deploy before t
 **Parent:** DB: run migrations in the deploy pipeline via a one-shot service
 
 **Description:**
+
 - In [`deploy.yml`](../../.github/workflows/deploy.yml:353), insert a step between `pull` and `up -d` that runs
   `docker compose ... run --rm migrate` and fails the workflow on non-zero exit.
 - Exclude `migrate` from the `Verify every service is running IMAGE_TAG` step (one-shot service, alongside postgres/caddy).
@@ -406,6 +438,7 @@ app starts against a stale schema; a failed migration aborts the deploy before t
 **Parent:** DB: run migrations in the deploy pipeline via a one-shot service
 
 **Description:**
+
 - Add a CI step in [`ci.yml`](../../.github/workflows/ci.yml:1) running `db:check` so a schema change without a
   committed migration fails the PR.
 - Add a lint step scanning `apps/api/drizzle/*.sql` for destructive statements (`DROP COLUMN`, `DROP TABLE`,
@@ -423,6 +456,7 @@ app starts against a stale schema; a failed migration aborts the deploy before t
 **Parent:** DB: run migrations in the deploy pipeline via a one-shot service
 
 **Description:**
+
 - Create [`scripts/test/lib/30-db.sh`](../../scripts/test/lib/30-db.sh) with checks:
   - postgres reachable (`pg_isready`, existing);
   - migration bookkeeping table exists and is at head;
@@ -444,6 +478,7 @@ app starts against a stale schema; a failed migration aborts the deploy before t
 **Description:**
 
 ### Context
+
 There is no backup/restore flow today — explicitly flagged in
 [`Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md:309) §7 and
 [`snapshot-2026-10-01.md`](../../docs/snapshot-2026-10-01.md:260). A single `pgdata` volume on a single droplet
@@ -451,27 +486,32 @@ is the only copy of the data. Backups must be off-host (DO Spaces), encrypted, w
 exercised by a restore drill — an unrestored backup is not a backup.
 
 ### What to build
+
 1. Pre-migration snapshot in the deploy path.
 2. Nightly `pg_dump -Fc` → encrypt → upload to DO Spaces → retention → alert.
 3. `pg_restore`-based restore script with sanity checks.
 4. A restore drill into a throwaway `postgres:16-alpine` container, scheduled monthly.
 
 ### Business value
+
 Data durability and recoverability with a known RPO (24h nightly, 0 for pre-migration snapshots) and a
 measured RTO (~15 min), protecting against droplet loss, bad migrations and operator mistakes.
 
 ### DoD
+
 - Nightly backup lands an encrypted dump in DO Spaces; failure triggers the existing alert webhook.
 - Retention keeps 7 daily / 4 weekly / 6 monthly.
 - Pre-migration snapshots are produced before non-additive migrations.
 - The restore drill restores the newest artifact into a throwaway container and row counts match.
 
 ### Test coverage
+
 - Restore drill (the primary "test" of backups).
 - Shell tests for retention/pruning and alert-on-failure branches.
 - Smoke: backup script runs on the live stack and produces a non-empty dump.
 
 ### Out of scope
+
 - WAL archiving / PITR (`wal-g`/`pgBackRest`) — follow-up.
 - Whole-volume `pgdata` snapshots — follow-up.
 
@@ -487,6 +527,7 @@ measured RTO (~15 min), protecting against droplet loss, bad migrations and oper
 **Parent:** DB: nightly off-host backups, pre-migration snapshots and restore drills
 
 **Description:**
+
 - In the deploy path (deploy.yml and deploy.sh), before running a **non-additive** migration, take a
   `pg_dump -Fc` snapshot named `pre-migrate-<migration>-<short-sha>.dump`, stored under `/opt/aisztens/backups/`.
 - Additive migrations may skip the snapshot (configurable); destructive migrations must never skip it.
@@ -503,6 +544,7 @@ measured RTO (~15 min), protecting against droplet loss, bad migrations and oper
 **Parent:** DB: nightly off-host backups, pre-migration snapshots and restore drills
 
 **Description:**
+
 - Create [`scripts/db/backup.sh`](../../scripts/db/backup.sh):
   - `docker exec postgres pg_dump -Fc -U <user> -d aisztens_db` to a temp file;
   - encrypt with `age`/`gpg` (private key off-host);
@@ -523,6 +565,7 @@ measured RTO (~15 min), protecting against droplet loss, bad migrations and oper
 **Parent:** DB: nightly off-host backups, pre-migration snapshots and restore drills
 
 **Description:**
+
 - Create [`scripts/db/restore.sh`](../../scripts/db/restore.sh):
   - decrypt + `pg_restore --clean --if-exists -d aisztens_db <dump>`;
   - pre-restore confirmation for destructive restore;
@@ -540,6 +583,7 @@ measured RTO (~15 min), protecting against droplet loss, bad migrations and oper
 **Parent:** DB: nightly off-host backups, pre-migration snapshots and restore drills
 
 **Description:**
+
 - Create [`scripts/db/restore-drill.sh`](../../scripts/db/restore-drill.sh):
   - download newest artifact from Spaces;
   - start a throwaway `postgres:16-alpine` container on a scratch port;
@@ -561,29 +605,35 @@ measured RTO (~15 min), protecting against droplet loss, bad migrations and oper
 **Description:**
 
 ### Context
+
 Image rollback exists (`IMAGE_TAG` re-dispatch), but there is no DB rollback story and no documented policy.
 Schema cannot roll back cleanly; the mature pattern is expand/contract + image rollback, with destructive DDL
 treated as a separate backup-gated operation.
 
 ### What to build
+
 1. A documented expand/contract rollback policy.
 2. Documented image-rollback and snapshot-restore runbook procedures with RPO/RTO.
 3. A new living spec and updates to the affected existing specs (per the repo's spec-maintenance rule).
 
 ### Business value
+
 Operators get a deterministic recovery path with agreed RPO/RTO instead of improvising during an incident;
 future contributors understand why destructive DDL is never mixed into a feature deploy.
 
 ### DoD
+
 - The runbook contains: image rollback via `IMAGE_TAG`, expand/contract rules, snapshot restore, RPO/RTO.
 - [`Database-Migrations-and-Backup.md`](../../docs/Specs/Database-Migrations-and-Backup.md) exists and the
   affected specs (Production-Runbook, Infrastructure-Docker, Caddy-Reverse-Proxy §7) are updated in sync.
 - A documented drill is runnable end-to-end.
 
 ### Test coverage
+
 - No code tests; the acceptance criteria are the documented, runnable commands (verified manually).
 
 ### Out of scope
+
 - Automated rollback orchestration (manual procedures documented only).
 
 ### Sub-tasks
@@ -598,6 +648,7 @@ future contributors understand why destructive DDL is never mixed into a feature
 **Parent:** DB: rollback policy, RPO/RTO and living documentation
 
 **Description:**
+
 - Write the expand/contract rules (N: add nullable/dual-write; N+1: app reads new shape; N+2: drop old only after
   a verified backup) into the runbook and the new spec.
 - Document the image rollback: `IMAGE_TAG=sha-<old>` + `up -d --force-recreate`, or `deploy.yml` `workflow_dispatch`
@@ -614,6 +665,7 @@ future contributors understand why destructive DDL is never mixed into a feature
 **Parent:** DB: rollback policy, RPO/RTO and living documentation
 
 **Description:**
+
 - Document the snapshot restore path ([`restore.sh`](../../scripts/db/restore.sh)) as the data-rollback lever,
   including pre-conditions and post-restore verification.
 - Record RPO (24h nightly; 0 for pre-migration snapshots) and RTO (~15 min restore + stack restart).
@@ -629,6 +681,7 @@ future contributors understand why destructive DDL is never mixed into a feature
 **Parent:** DB: rollback policy, RPO/RTO and living documentation
 
 **Description:**
+
 - Create [`docs/Specs/Database-Migrations-and-Backup.md`](../../docs/Specs/Database-Migrations-and-Backup.md)
   as the living spec for schema, migrations, backup and restore.
 - Update [`Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:1),

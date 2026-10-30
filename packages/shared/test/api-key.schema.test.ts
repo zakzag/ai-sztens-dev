@@ -62,7 +62,10 @@ describe('apiKeySchema', () => {
 
   it('rejects a timestamp without a timezone', () => {
     expect(() =>
-      apiKeySchema.parse({ ...VALID_RESPONSE, updatedAt: '2026-10-21T15:00:00' }),
+      apiKeySchema.parse({
+        ...VALID_RESPONSE,
+        updatedAt: '2026-10-21T15:00:00',
+      }),
     ).toThrow();
   });
 

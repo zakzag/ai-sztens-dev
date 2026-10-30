@@ -29,22 +29,22 @@ business logic in isolation. This new suite tests the **container graph**.
 
 The runtime stack has exactly four services:
 
-| Service | Contract to verify | Source of truth |
-|---|---|---|
-| `api`      | `GET http://api:3000/api` returns 200 (Fastify/NestJS)         | [`infra/docker-compose.yml:36-43`](../../infra/docker-compose.yml:36) healthcheck |
-| `postgres` | `pg_isready` returns 0 inside the `postgres` container         | [`infra/docker-compose.yml:63`](../../infra/docker-compose.yml:63) healthcheck |
-| `caddy`    | admin endpoint on `:2019` is reachable inside the container    | Caddy's runtime API |
-| `monitor`  | `watch.sh` is running and has logged at least one tick          | [`infra/monitor/watch.sh`](../../infra/monitor/watch.sh:1) |
+| Service    | Contract to verify                                          | Source of truth                                                                   |
+| ---------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `api`      | `GET http://api:3000/api` returns 200 (Fastify/NestJS)      | [`infra/docker-compose.yml:36-43`](../../infra/docker-compose.yml:36) healthcheck |
+| `postgres` | `pg_isready` returns 0 inside the `postgres` container      | [`infra/docker-compose.yml:63`](../../infra/docker-compose.yml:63) healthcheck    |
+| `caddy`    | admin endpoint on `:2019` is reachable inside the container | Caddy's runtime API                                                               |
+| `monitor`  | `watch.sh` is running and has logged at least one tick      | [`infra/monitor/watch.sh`](../../infra/monitor/watch.sh:1)                        |
 
 Cross-service contracts to verify (the "see each other" requirement):
 
-| Direction | Contract | Tool |
-|---|---|---|
-| `caddy → api`        | `GET http://api:3000/api` from inside `caddy` returns 200 | `docker compose exec caddy wget` |
-| `api → postgres`     | TCP connect to `postgres:5432` succeeds from `api`        | `docker compose exec api node -e "net.createConnection(...)"` |
-| `monitor → api`      | `watch.sh` already exercises this on every tick           | inspect `monitor` container logs |
-| `api → api (loopback)`| `GET http://127.0.0.1:3000/api` from inside `api` returns 200 | matches the existing healthcheck |
-| `postgres` init       | The `aisztens`, `tkovari`, `krak` roles exist             | `psql` from inside `postgres` |
+| Direction              | Contract                                                      | Tool                                                          |
+| ---------------------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
+| `caddy → api`          | `GET http://api:3000/api` from inside `caddy` returns 200     | `docker compose exec caddy wget`                              |
+| `api → postgres`       | TCP connect to `postgres:5432` succeeds from `api`            | `docker compose exec api node -e "net.createConnection(...)"` |
+| `monitor → api`        | `watch.sh` already exercises this on every tick               | inspect `monitor` container logs                              |
+| `api → api (loopback)` | `GET http://127.0.0.1:3000/api` from inside `api` returns 200 | matches the existing healthcheck                              |
+| `postgres` init        | The `aisztens`, `tkovari`, `krak` roles exist                 | `psql` from inside `postgres`                                 |
 
 ## 3. Deliverables
 
@@ -140,12 +140,12 @@ A companion helper script (`scripts/test/stack-up.sh`, wired to
 
 ### 5.3 Per-service checks (in `10-services.sh`)
 
-| # | Service | Command | Expected | Failure message |
-|---|---|---|---|---|
-| 1 | `api`      | `docker compose exec -T api node -e "fetch('http://127.0.0.1:3000/api').then(r=>process.exit(r.ok?0:1))"` | exit 0 | "API health endpoint did not return 200" |
-| 2 | `postgres` | `docker compose exec -T postgres pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}` | exit 0 | "Postgres is not accepting connections" |
-| 3 | `caddy`    | `docker compose exec -T caddy wget -q -O- http://127.0.0.1:2019/config/` | non-empty body | "Caddy admin API is unreachable" |
-| 4 | `monitor`  | `docker compose logs --tail=50 monitor \| grep -q "API check"` | match found | "Monitor did not log a check yet (wait ~30s)" |
+| #   | Service    | Command                                                                                                   | Expected       | Failure message                               |
+| --- | ---------- | --------------------------------------------------------------------------------------------------------- | -------------- | --------------------------------------------- |
+| 1   | `api`      | `docker compose exec -T api node -e "fetch('http://127.0.0.1:3000/api').then(r=>process.exit(r.ok?0:1))"` | exit 0         | "API health endpoint did not return 200"      |
+| 2   | `postgres` | `docker compose exec -T postgres pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}`                        | exit 0         | "Postgres is not accepting connections"       |
+| 3   | `caddy`    | `docker compose exec -T caddy wget -q -O- http://127.0.0.1:2019/config/`                                  | non-empty body | "Caddy admin API is unreachable"              |
+| 4   | `monitor`  | `docker compose logs --tail=50 monitor \| grep -q "API check"`                                            | match found    | "Monitor did not log a check yet (wait ~30s)" |
 
 Each check is wrapped by the `assert_service` helper defined in
 `00-prelude.sh`:
@@ -160,14 +160,14 @@ increments a pass/fail counter, and on failure prints the captured stderr.
 
 ### 5.4 Cross-service checks (in `20-cross-service.sh`)
 
-| # | Check | Command (executed via docker compose exec) | Expected |
-|---|---|---|---|
-| 1 | DNS: `api` resolves from inside `caddy` | `caddy: getent hosts api` | non-empty output containing `api` |
-| 2 | DNS: `postgres` resolves from inside `api` | `api: getent hosts postgres` | non-empty output containing `postgres` |
-| 3 | `caddy → api`: proxied request works | `caddy: wget -qO- http://api:3000/api` | HTTP 200 body `Hello World!` |
-| 4 | `api → postgres`: TCP connect | `api: node -e "require('net').createConnection({host:'postgres',port:5432},()=>process.exit(0)).on('error',()=>process.exit(1))"` | exit 0 |
-| 5 | `postgres` roles | `postgres: psql -tAc "SELECT 1 FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak')"` | exactly 3 rows |
-| 6 | `monitor → api`: logs show a check tick | `docker compose logs --tail=100 monitor \| grep -c "API check"` | `>= 1` |
+| #   | Check                                      | Command (executed via docker compose exec)                                                                                        | Expected                               |
+| --- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1   | DNS: `api` resolves from inside `caddy`    | `caddy: getent hosts api`                                                                                                         | non-empty output containing `api`      |
+| 2   | DNS: `postgres` resolves from inside `api` | `api: getent hosts postgres`                                                                                                      | non-empty output containing `postgres` |
+| 3   | `caddy → api`: proxied request works       | `caddy: wget -qO- http://api:3000/api`                                                                                            | HTTP 200 body `Hello World!`           |
+| 4   | `api → postgres`: TCP connect              | `api: node -e "require('net').createConnection({host:'postgres',port:5432},()=>process.exit(0)).on('error',()=>process.exit(1))"` | exit 0                                 |
+| 5   | `postgres` roles                           | `postgres: psql -tAc "SELECT 1 FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak')"`                                     | exactly 3 rows                         |
+| 6   | `monitor → api`: logs show a check tick    | `docker compose logs --tail=100 monitor \| grep -c "API check"`                                                                   | `>= 1`                                 |
 
 These checks answer the user's "see each other" requirement concretely:
 they run **inside the relevant containers**, addressing each other by service
@@ -203,11 +203,11 @@ script remains CI-friendly.
 - Calls preflight, then `10-services.sh`, then `20-cross-service.sh`.
 - Prints the summary and exits with the aggregate result code.
 - Accepts optional flags:
-  - `--up`   — also runs `docker compose up -d --build` before testing.
+  - `--up` — also runs `docker compose up -d --build` before testing.
   - `--down` — runs `docker compose down` after testing (only on success).
   - `--compose-file <path>` — override which compose file to use (defaults to
     `infra/docker-compose.yml`).
-  - `--env-file <path>`     — override env file (defaults to `infra/.env`).
+  - `--env-file <path>` — override env file (defaults to `infra/.env`).
 
 ### 6.2 `scripts/test/lib/00-prelude.sh`
 

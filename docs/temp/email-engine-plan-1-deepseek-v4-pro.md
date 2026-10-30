@@ -53,14 +53,14 @@ lépést futtat.
 
 ## 2. Tervezési elvek
 
-| Elv | Mit jelent itt |
-| :--- | :--- |
-| **Egy felelősség (SRP)** | A letöltés, a normalizálás, az AI-kinyerés, az aggregálás és a perzisztálás külön komponens. |
-| **Absztrakciókra építés (DIP)** | A komponensek interfészeken keresztül beszélnek egymással; a Gmail-kliens és az LLM-kliens cserélhető. |
-| **Determinisztikus kód vs. AI** | A mechanikus lépések (fetch, tisztítás, tárolás) determinisztikus kód; az LLM csak a *megértést* (kinyerés, összegzés) végzi. |
-| **Idempotencia + folytathatóság** | Az onboarding félbeszakadhat (hiba, újraindítás); a futás állapota mentett, a már elemzett levelek nem dolgozódnak fel újra. |
-| **Tenant-izoláció** | Minden adat a postafiókhoz (`mailbox`) kötődik; a fiók és a postafiók külön entitás (D45). |
-| **Nyílt a bővítésre, zárt a módosításra (OCP)** | Új kinyerési szabály vagy új postafiók-provider hozzáadása új komponens, nem meglévő kód átírása. |
+| Elv                                             | Mit jelent itt                                                                                                                |
+| :---------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
+| **Egy felelősség (SRP)**                        | A letöltés, a normalizálás, az AI-kinyerés, az aggregálás és a perzisztálás külön komponens.                                  |
+| **Absztrakciókra építés (DIP)**                 | A komponensek interfészeken keresztül beszélnek egymással; a Gmail-kliens és az LLM-kliens cserélhető.                        |
+| **Determinisztikus kód vs. AI**                 | A mechanikus lépések (fetch, tisztítás, tárolás) determinisztikus kód; az LLM csak a _megértést_ (kinyerés, összegzés) végzi. |
+| **Idempotencia + folytathatóság**               | Az onboarding félbeszakadhat (hiba, újraindítás); a futás állapota mentett, a már elemzett levelek nem dolgozódnak fel újra.  |
+| **Tenant-izoláció**                             | Minden adat a postafiókhoz (`mailbox`) kötődik; a fiók és a postafiók külön entitás (D45).                                    |
+| **Nyílt a bővítésre, zárt a módosításra (OCP)** | Új kinyerési szabály vagy új postafiók-provider hozzáadása új komponens, nem meglévő kód átírása.                             |
 
 ---
 
@@ -151,7 +151,7 @@ incremental modul újra tudja használni őket.
   → `ProfileRepository`.
 - Az **adatáramlás egyirányú**: minden komponens a kimenetét adja át a
   következőnek, és nem nyúl vissza az előző belső állapotához.
-- A **repository** az egyetlen írási pont; az aggregátor csak *memóriában*
+- A **repository** az egyetlen írási pont; az aggregátor csak _memóriában_
   épít `ProfileSnapshot`-ot, és a repositoryra bízza a tranzakcionális mentést.
 - Az **LLM** és a **Gmail** külső rendszerként jelennek meg, adapterek mögött.
 - A **későbbi modulok** ugyanazt a négy feldolgozó komponenst hívják egyesével
@@ -170,9 +170,15 @@ pipeline köztes típusaival, ezért a komponensek változtatás nélkül újrah
 ```ts
 interface IEmailSource {
   // Onboarding: a teljes múlt feltérképezése (A12/D50)
-  fetchHistorical(mailbox: Mailbox, window: TimeWindow): AsyncIterable<RawEmail>;
+  fetchHistorical(
+    mailbox: Mailbox,
+    window: TimeWindow,
+  ): AsyncIterable<RawEmail>;
   // Későbbi modul: inkrementális letöltés a historyId-től
-  fetchIncremental(mailbox: Mailbox, sinceHistoryId: string): AsyncIterable<RawEmail>;
+  fetchIncremental(
+    mailbox: Mailbox,
+    sinceHistoryId: string,
+  ): AsyncIterable<RawEmail>;
 }
 
 interface IEmailNormalizer {
@@ -180,7 +186,10 @@ interface IEmailNormalizer {
 }
 
 interface IInformationExtractor {
-  extract(email: NormalizedEmail, context?: ProfileContext): Promise<ExtractedInformation>;
+  extract(
+    email: NormalizedEmail,
+    context?: ProfileContext,
+  ): Promise<ExtractedInformation>;
 }
 
 interface IProfileAggregator {
@@ -201,7 +210,10 @@ interface IProfileProvider {
 
 interface IProfileUpdater {
   upsertContact(contact: Contact): Promise<void>;
-  updateStyleProfile(contactId: string, patch: Partial<ContactStyleProfile>): Promise<void>;
+  updateStyleProfile(
+    contactId: string,
+    patch: Partial<ContactStyleProfile>,
+  ): Promise<void>;
   addKnowledgeEntry(entry: KnowledgeEntry): Promise<void>;
   upsertRule(rule: ClassificationRule): Promise<void>;
   applyProfileSnapshot(snapshot: ProfileSnapshot): Promise<void>; // tranzakcionális mentés
@@ -209,7 +221,11 @@ interface IProfileUpdater {
 
 interface IEmailStore {
   saveEmail(email: EmailRecord, analysis: EmailAnalysis): Promise<void>;
-  getRecentContext(mailboxId: string, contactId: string, limit: number): Promise<EmailSummary[]>;
+  getRecentContext(
+    mailboxId: string,
+    contactId: string,
+    limit: number,
+  ): Promise<EmailSummary[]>;
 }
 ```
 
@@ -237,144 +253,144 @@ táblát. A kapcsolat: `account 1—N mailbox 1—N minden_más`.
 
 ### 6.1 `mailboxes` — bekötött postafiók
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `account_id` | UUID FK → `accounts` | Tulajdonos fiók (D45) |
-| `provider` | enum (`gmail`) | Csak Gmail az MVP-ben (A1) |
-| `email_address` | text | A postafiók címe |
-| `oauth_ref` | text | Tárolt hozzáférés referenciája (leválasztáskor törlődik) |
-| `status` | enum | `connected` / `paused` / `disconnected` |
-| `history_id` | bigint | Gmail `historyId` az inkrementális letöltéshez (későbbi modul) |
-| `created_at`, `updated_at` | timestamptz | |
+| Oszlop                     | Típus                | Leírás                                                         |
+| :------------------------- | :------------------- | :------------------------------------------------------------- |
+| `id`                       | UUID                 | PK                                                             |
+| `account_id`               | UUID FK → `accounts` | Tulajdonos fiók (D45)                                          |
+| `provider`                 | enum (`gmail`)       | Csak Gmail az MVP-ben (A1)                                     |
+| `email_address`            | text                 | A postafiók címe                                               |
+| `oauth_ref`                | text                 | Tárolt hozzáférés referenciája (leválasztáskor törlődik)       |
+| `status`                   | enum                 | `connected` / `paused` / `disconnected`                        |
+| `history_id`               | bigint               | Gmail `historyId` az inkrementális letöltéshez (későbbi modul) |
+| `created_at`, `updated_at` | timestamptz          |                                                                |
 
 ### 6.2 `mailbox_settings` — postafiók-beállítások
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `mailbox_id` | UUID FK → `mailboxes` | |
-| `key` | text | pl. `urgency_threshold_hours` (A10), `history_window_days` (A12), `quiet_hours` (A8) |
-| `value` | jsonb | A beállítás értéke |
-| `updated_at` | timestamptz | |
+| Oszlop       | Típus                 | Leírás                                                                               |
+| :----------- | :-------------------- | :----------------------------------------------------------------------------------- |
+| `id`         | UUID                  | PK                                                                                   |
+| `mailbox_id` | UUID FK → `mailboxes` |                                                                                      |
+| `key`        | text                  | pl. `urgency_threshold_hours` (A10), `history_window_days` (A12), `quiet_hours` (A8) |
+| `value`      | jsonb                 | A beállítás értéke                                                                   |
+| `updated_at` | timestamptz           |                                                                                      |
 
 ### 6.3 `contacts` — kapcsolati profilok
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `mailbox_id` | UUID FK → `mailboxes` | Tenant-izoláció |
-| `email` | citext | Egyedi a mailbox-on belül |
-| `display_name` | text | |
-| `company_name` | text | |
-| `domain` | text | |
-| `role` | text | Szerepkör, ha kiderül |
-| `is_vip` | boolean | Kiemelt feladó (A11/U17b) |
-| `source` | enum (`ai`,`user`,`feedback`) | Ki vette fel (D47) |
-| `message_count` | int | |
-| `first_seen_at`, `last_seen_at` | timestamptz | |
+| Oszlop                          | Típus                         | Leírás                    |
+| :------------------------------ | :---------------------------- | :------------------------ |
+| `id`                            | UUID                          | PK                        |
+| `mailbox_id`                    | UUID FK → `mailboxes`         | Tenant-izoláció           |
+| `email`                         | citext                        | Egyedi a mailbox-on belül |
+| `display_name`                  | text                          |                           |
+| `company_name`                  | text                          |                           |
+| `domain`                        | text                          |                           |
+| `role`                          | text                          | Szerepkör, ha kiderül     |
+| `is_vip`                        | boolean                       | Kiemelt feladó (A11/U17b) |
+| `source`                        | enum (`ai`,`user`,`feedback`) | Ki vette fel (D47)        |
+| `message_count`                 | int                           |                           |
+| `first_seen_at`, `last_seen_at` | timestamptz                   |                           |
 
 ### 6.4 `contact_style_profiles` — feladónkénti stílusprofil (U13)
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `contact_id` | UUID FK → `contacts` | |
-| `formality` | enum | `formal` / `neutral` / `informal` |
-| `tone` | text | Hangnem (pl. udvarias, közvetlen) |
-| `salutation` | text | Megszólítás |
-| `closing` | text | Zárás |
-| `preferred_length` | enum | `short` / `medium` / `long` |
-| `language_register` | enum | `tegezes` / `magazas` |
-| `confidence` | numeric | A becslés megbízhatósága |
-| `updated_at` | timestamptz | |
+| Oszlop              | Típus                | Leírás                            |
+| :------------------ | :------------------- | :-------------------------------- |
+| `id`                | UUID                 | PK                                |
+| `contact_id`        | UUID FK → `contacts` |                                   |
+| `formality`         | enum                 | `formal` / `neutral` / `informal` |
+| `tone`              | text                 | Hangnem (pl. udvarias, közvetlen) |
+| `salutation`        | text                 | Megszólítás                       |
+| `closing`           | text                 | Zárás                             |
+| `preferred_length`  | enum                 | `short` / `medium` / `long`       |
+| `language_register` | enum                 | `tegezes` / `magazas`             |
+| `confidence`        | numeric              | A becslés megbízhatósága          |
+| `updated_at`        | timestamptz          |                                   |
 
 ### 6.5 `owner_style_profiles` — a tulajdonos saját stílusa (A6)
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `mailbox_id` | UUID FK → `mailboxes` | |
-| `formality`, `tone`, `salutation`, `closing`, `preferred_length`, `language_register` | mint a 6.4-ben | |
-| `confidence` | numeric | |
-| `updated_at` | timestamptz | |
+| Oszlop                                                                                | Típus                 | Leírás |
+| :------------------------------------------------------------------------------------ | :-------------------- | :----- |
+| `id`                                                                                  | UUID                  | PK     |
+| `mailbox_id`                                                                          | UUID FK → `mailboxes` |        |
+| `formality`, `tone`, `salutation`, `closing`, `preferred_length`, `language_register` | mint a 6.4-ben        |        |
+| `confidence`                                                                          | numeric               |        |
+| `updated_at`                                                                          | timestamptz           |        |
 
 ### 6.6 `knowledge_entries` — cég-tudásbázis (U2 kontextus)
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `mailbox_id` | UUID FK → `mailboxes` | |
-| `entity_type` | enum | `client` / `vendor` / `project` / `topic` / `service` |
-| `name` | text | |
-| `description` | text | Rövid leírás/kontextus |
-| `keywords` | text[] | Kereshető kulcsszavak |
-| `metadata` | jsonb | Egyéb (pl. kapcsolattartó, összeg) |
-| `confidence` | numeric | |
-| `source` | enum (`ai`,`user`,`feedback`) | |
-| `created_at` | timestamptz | |
+| Oszlop        | Típus                         | Leírás                                                |
+| :------------ | :---------------------------- | :---------------------------------------------------- |
+| `id`          | UUID                          | PK                                                    |
+| `mailbox_id`  | UUID FK → `mailboxes`         |                                                       |
+| `entity_type` | enum                          | `client` / `vendor` / `project` / `topic` / `service` |
+| `name`        | text                          |                                                       |
+| `description` | text                          | Rövid leírás/kontextus                                |
+| `keywords`    | text[]                        | Kereshető kulcsszavak                                 |
+| `metadata`    | jsonb                         | Egyéb (pl. kapcsolattartó, összeg)                    |
+| `confidence`  | numeric                       |                                                       |
+| `source`      | enum (`ai`,`user`,`feedback`) |                                                       |
+| `created_at`  | timestamptz                   |                                                       |
 
 ### 6.7 `emails` — normalizált levelek + összefoglalók
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `mailbox_id` | UUID FK → `mailboxes` | |
-| `external_id` | text | Gmail message id (egyedi a mailbox-on belül) |
-| `thread_id` | text | |
-| `subject` | text | |
-| `snippet` | text | |
-| `summary` | text | AI-összefoglaló (U5) |
-| `body_text` | text | Teljes szöveg — a 14 napos megőrzés szerint kezelendő (R3) |
-| `received_at` | timestamptz | |
-| `direction` | enum | `inbound` / `outbound` |
-| `labels` | text[] | Gmail-címkék |
+| Oszlop        | Típus                 | Leírás                                                     |
+| :------------ | :-------------------- | :--------------------------------------------------------- |
+| `id`          | UUID                  | PK                                                         |
+| `mailbox_id`  | UUID FK → `mailboxes` |                                                            |
+| `external_id` | text                  | Gmail message id (egyedi a mailbox-on belül)               |
+| `thread_id`   | text                  |                                                            |
+| `subject`     | text                  |                                                            |
+| `snippet`     | text                  |                                                            |
+| `summary`     | text                  | AI-összefoglaló (U5)                                       |
+| `body_text`   | text                  | Teljes szöveg — a 14 napos megőrzés szerint kezelendő (R3) |
+| `received_at` | timestamptz           |                                                            |
+| `direction`   | enum                  | `inbound` / `outbound`                                     |
+| `labels`      | text[]                | Gmail-címkék                                               |
 
 ### 6.8 `email_contacts` — levél ↔ kapcsolat kapcsolótábla
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `email_id` | UUID FK → `emails` | |
-| `contact_id` | UUID FK → `contacts` | |
-| `role` | enum | `from` / `to` / `cc` / `bcc` |
+| Oszlop       | Típus                | Leírás                       |
+| :----------- | :------------------- | :--------------------------- |
+| `email_id`   | UUID FK → `emails`   |                              |
+| `contact_id` | UUID FK → `contacts` |                              |
+| `role`       | enum                 | `from` / `to` / `cc` / `bcc` |
 
 ### 6.9 `email_analyses` — kinyert jellemzők levélenként
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `email_id` | UUID FK → `emails` | |
-| `extraction` | jsonb | Entitások, stílusjegyek, témák |
-| `suggested_classification` | enum | `urgent` / `important` / `maybe_interesting` / `newsletter` / `spam` |
-| `urgency_indicators` | jsonb | Határidő, összeg, kérés (U6) |
-| `ai_model` | text | Melyik modell elemezte |
-| `created_at` | timestamptz | |
+| Oszlop                     | Típus              | Leírás                                                               |
+| :------------------------- | :----------------- | :------------------------------------------------------------------- |
+| `id`                       | UUID               | PK                                                                   |
+| `email_id`                 | UUID FK → `emails` |                                                                      |
+| `extraction`               | jsonb              | Entitások, stílusjegyek, témák                                       |
+| `suggested_classification` | enum               | `urgent` / `important` / `maybe_interesting` / `newsletter` / `spam` |
+| `urgency_indicators`       | jsonb              | Határidő, összeg, kérés (U6)                                         |
+| `ai_model`                 | text               | Melyik modell elemezte                                               |
+| `created_at`               | timestamptz        |                                                                      |
 
 ### 6.10 `classification_rules` — besorolási szabályok (A5, A11)
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `mailbox_id` | UUID FK → `mailboxes` | |
-| `rule_type` | enum | `vip_sender` / `blocked_sender` / `always_urgent_topic` / `domain_rule` |
-| `pattern` | text | E-mail cím / domain / téma |
-| `source` | enum (`ai`,`user`,`feedback`) | D47 |
-| `is_active` | boolean | |
-| `created_at` | timestamptz | |
+| Oszlop       | Típus                         | Leírás                                                                  |
+| :----------- | :---------------------------- | :---------------------------------------------------------------------- |
+| `id`         | UUID                          | PK                                                                      |
+| `mailbox_id` | UUID FK → `mailboxes`         |                                                                         |
+| `rule_type`  | enum                          | `vip_sender` / `blocked_sender` / `always_urgent_topic` / `domain_rule` |
+| `pattern`    | text                          | E-mail cím / domain / téma                                              |
+| `source`     | enum (`ai`,`user`,`feedback`) | D47                                                                     |
+| `is_active`  | boolean                       |                                                                         |
+| `created_at` | timestamptz                   |                                                                         |
 
 ### 6.11 `profile_build_runs` — az orchestrátor futásállapota
 
-| Oszlop | Típus | Leírás |
-| :--- | :--- | :--- |
-| `id` | UUID | PK |
-| `mailbox_id` | UUID FK → `mailboxes` | |
-| `status` | enum | `running` / `completed` / `failed` |
-| `window_start`, `window_end` | timestamptz | Az elemzett időablak |
-| `emails_fetched` | int | |
-| `emails_processed` | int | |
-| `last_history_id` | bigint | A folytatáshoz / későbbi inkrementális fetch-hez |
-| `error` | jsonb | Hiba esetén |
-| `started_at`, `finished_at` | timestamptz | |
+| Oszlop                       | Típus                 | Leírás                                           |
+| :--------------------------- | :-------------------- | :----------------------------------------------- |
+| `id`                         | UUID                  | PK                                               |
+| `mailbox_id`                 | UUID FK → `mailboxes` |                                                  |
+| `status`                     | enum                  | `running` / `completed` / `failed`               |
+| `window_start`, `window_end` | timestamptz           | Az elemzett időablak                             |
+| `emails_fetched`             | int                   |                                                  |
+| `emails_processed`           | int                   |                                                  |
+| `last_history_id`            | bigint                | A folytatáshoz / későbbi inkrementális fetch-hez |
+| `error`                      | jsonb                 | Hiba esetén                                      |
+| `started_at`, `finished_at`  | timestamptz           |                                                  |
 
 ---
 
@@ -487,14 +503,14 @@ sequenceDiagram
 
 ## 10. Kapcsolat az MVP adatmegőrzési táblájával
 
-| Adat | Tábla | Megőrzés (MVP) |
-| :--- | :--- | :--- |
-| Aktív levélváltások teljes szövege | `emails.body_text` | 14 nap, utána csak `summary` |
-| Összefoglalók, besorolások | `emails.summary`, `email_analyses` | 90 nap |
-| Feladónkénti stílusprofil | `contact_style_profiles` | előfizetés végéig |
-| Tulajdonosi stílusprofil | `owner_style_profiles` | előfizetés végéig |
-| Beállítások, szabályok, VIP | `mailbox_settings`, `classification_rules`, `contacts.is_vip` | előfizetés végéig |
-| Mellékletek | nem tároljuk (csak metaadat) | — |
+| Adat                               | Tábla                                                         | Megőrzés (MVP)               |
+| :--------------------------------- | :------------------------------------------------------------ | :--------------------------- |
+| Aktív levélváltások teljes szövege | `emails.body_text`                                            | 14 nap, utána csak `summary` |
+| Összefoglalók, besorolások         | `emails.summary`, `email_analyses`                            | 90 nap                       |
+| Feladónkénti stílusprofil          | `contact_style_profiles`                                      | előfizetés végéig            |
+| Tulajdonosi stílusprofil           | `owner_style_profiles`                                        | előfizetés végéig            |
+| Beállítások, szabályok, VIP        | `mailbox_settings`, `classification_rules`, `contacts.is_vip` | előfizetés végéig            |
+| Mellékletek                        | nem tároljuk (csak metaadat)                                  | —                            |
 
 ---
 

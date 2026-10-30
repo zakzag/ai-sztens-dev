@@ -13,14 +13,14 @@ architecture, the repository layout, the data flow, the current state and the co
 
 ## 2. Sources Used
 
-| Source | What was taken from it |
-|---|---|
-| [`README.md`](../../README.md) | Purpose, monorepo layout, prerequisites, scripts, frontend/backend wiring, current state, open items |
-| [`docs/01-aisztens.md`](../Specs/outdated/01-aisztens.md) | Architecture decision, components, sequence flow, call lifecycle state machine, error handling, action engine |
-| [`docs/Specs/Functional-Specification.md`](../../docs/Specs/Functional-Specification.md) | Functional spec role (single source of truth for WHAT, `MVP?` + priority columns) |
-| [`docs/plans/2026-09-21--16-46-20-documentation-structure-plan.md`](2026-09-21--16-46-20-documentation-structure-plan.md) | Documentation chain and plan storage convention |
-| [`package.json`](../../package.json) | Workspace names (`@callback/*`) and root scripts |
-| [`packages/shared/src/schemas/callback-request.schema.ts`](../../packages/shared/src/schemas/callback-request.schema.ts) | Shared Zod contract (Hungarian messages, code in English) |
+| Source                                                                                                                    | What was taken from it                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [`README.md`](../../README.md)                                                                                            | Purpose, monorepo layout, prerequisites, scripts, frontend/backend wiring, current state, open items          |
+| [`docs/01-aisztens.md`](../Specs/outdated/01-aisztens.md)                                                                 | Architecture decision, components, sequence flow, call lifecycle state machine, error handling, action engine |
+| [`docs/Specs/Functional-Specification.md`](../../docs/Specs/Functional-Specification.md)                                  | Functional spec role (single source of truth for WHAT, `MVP?` + priority columns)                             |
+| [`docs/plans/2026-09-21--16-46-20-documentation-structure-plan.md`](2026-09-21--16-46-20-documentation-structure-plan.md) | Documentation chain and plan storage convention                                                               |
+| [`package.json`](../../package.json)                                                                                      | Workspace names (`@callback/*`) and root scripts                                                              |
+| [`packages/shared/src/schemas/callback-request.schema.ts`](../../packages/shared/src/schemas/callback-request.schema.ts)  | Shared Zod contract (Hungarian messages, code in English)                                                     |
 
 ## 3. Content Structure of the Filled File
 

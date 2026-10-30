@@ -9,16 +9,16 @@
 Felmérésre került, hogy mi hiányzik ahhoz, hogy az admin app DB-ig érő oldalakat lehessen fejleszteni,
 majd a hiányzó részekhez a Jirába a következő ticketek készültek (a terv jóváhagyása után):
 
-| Ticket | Típus | Szülő | Tartalom |
-|---|---|---|---|
-| AIS-56 | Subtask | AIS-29 | Újrafelhasználható `DatabaseModule` (`DATABASE` provider + connection lifecycle) |
-| AIS-57 | Story | AIS-1 | Admin: fejlesztői alap a DB-t elérő admin oldalakhoz (api-client, UI kit, teszt harness) |
-| AIS-58 | Subtask | AIS-57 | Megosztott response sémák a `packages/shared`-ben |
-| AIS-59 | Subtask | AIS-57 | `packages/api-client` csomag (http-client, ApiError, service + interfész) |
-| AIS-60 | Subtask | AIS-57 | Admin feature hook minta (use-callback-requests + query keys) |
-| AIS-61 | Subtask | AIS-57 | `packages/ui` token primitívek (Button, Input, Card, Table, Badge, Alert) |
-| AIS-62 | Subtask | AIS-57 | Admin tooling: vitest + RTL, test/mocks, eslint, valódi test/lint scriptek |
-| AIS-63 | Subtask | AIS-57 | `docs/Specs/UI-Architecture.md` létrehozása |
+| Ticket | Típus   | Szülő  | Tartalom                                                                                 |
+| ------ | ------- | ------ | ---------------------------------------------------------------------------------------- |
+| AIS-56 | Subtask | AIS-29 | Újrafelhasználható `DatabaseModule` (`DATABASE` provider + connection lifecycle)         |
+| AIS-57 | Story   | AIS-1  | Admin: fejlesztői alap a DB-t elérő admin oldalakhoz (api-client, UI kit, teszt harness) |
+| AIS-58 | Subtask | AIS-57 | Megosztott response sémák a `packages/shared`-ben                                        |
+| AIS-59 | Subtask | AIS-57 | `packages/api-client` csomag (http-client, ApiError, service + interfész)                |
+| AIS-60 | Subtask | AIS-57 | Admin feature hook minta (use-callback-requests + query keys)                            |
+| AIS-61 | Subtask | AIS-57 | `packages/ui` token primitívek (Button, Input, Card, Table, Badge, Alert)                |
+| AIS-62 | Subtask | AIS-57 | Admin tooling: vitest + RTL, test/mocks, eslint, valódi test/lint scriptek               |
+| AIS-63 | Subtask | AIS-57 | `docs/Specs/UI-Architecture.md` létrehozása                                              |
 
 Módosítva: **AIS-41** leírása — a „meglévő `apps/admin/src/lib/api.ts`-n keresztül” minta helyett
 a `packages/api-client` service + `features/` hook + `packages/ui` primitívek használata, függőséggel

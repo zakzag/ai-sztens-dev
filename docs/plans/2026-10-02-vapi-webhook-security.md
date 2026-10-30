@@ -25,17 +25,20 @@ A terv csak az első két pontra szól; a harmadik dokumentálva lesz mint tudat
 ## 1. Célok (S, M, K)
 
 ### Funkcionális célok
+
 - **F1.** A VAPI kizárólag a `POST https://api.aisztens.hu/api/vapi/webhooks/...` útvonalon éri el az API-t, és kizárólag érvényes `X-Vapi-Signature` HMAC-SHA256 aláírással.
 - **F2.** A Caddy **nem proxyzik tovább** más forrásból (pl. böngésző cross-origin) jövő kérést ezen az útvonalon: minden más forrást 405-tel (vagy 404-gyel) utasítson vissza.
 - **F3.** A böngészős CORS allow-list csak a tényleges SPA-origineket tartalmazza (`https://web.aisztens.hu`, `https://admin.aisztens.hu`); az `https://api.aisztens.hu` elem kikerül.
 
 ### Nem-funkcionális célok
+
 - **N1.** Meglévő nyilvános végpontok (`POST /api/callback-requests`, `GET /api/callback-requests`, `GET /api/callback-requests/:id`) **változatlanul** működjenek a publikus űrlap és admin-oldal felől.
 - **N2.** A `/healthz` healthcheck **változatlanul** elérhető maradjon a Docker healthcheck + monitor watchdog számára.
 - **N3.** A titokforgatás üzemeltethető legyen **image-rebuild nélkül** (env mount, compose `secrets:` későbbi fázis).
 - **N4.** A szabály **tesztelhető** legyen: unit + e2e + smoke tesztek.
 
 ### Anti-célok (szándékosan nem tesszük)
+
 - Nem írunk IP-allowlistet (Caddy szinten), mert a VAPI nem publikál fix IP-tartományt; ez holnap változhat.
 - Nem tesszük a VAPI-t a `CORS_ORIGINS` listába — ez hatástalan a szerver-szerver hívásra, és rontja a biztonságot (böngészős JS-t engedne a vapi.com-ról).
 
@@ -43,16 +46,16 @@ A terv csak az első két pontra szól; a harmadik dokumentálva lesz mint tudat
 
 ## 2. Az aktuális állapot — mért bizonyítékok
 
-| # | Ellenőrzés | Eredmény |
-|---|---|---|
-| 1 | Droplet `/opt/aisztens/infra/.env` `CORS_ORIGINS` (csak origin-értékek) | `https://api.aisztens.hu`, `https://web.aisztens.hu`, `https://admin.aisztens.hu` |
-| 2 | `apps/api/src/` — VAPI/webhook keresés | **0 találat** — webhook controller nem létezik |
-| 3 | [`infra/caddy/Caddyfile:43`](../../infra/caddy/Caddyfile:43) — `api.<DOMAIN>` block | egyetlen `reverse_proxy api:3000`, nincs útvonal-szűkítés, nincs forrás-ellenőrzés |
-| 4 | [`infra/caddy/Caddyfile:53`](../../infra/caddy/Caddyfile:53) — `web.<DOMAIN>` block | tartalmaz `handle /api/*` safety-net proxy-t; a webhook útvonal ide is beesik, ha a VAPI oda hívna (nem fog, mert a VAPI az `api.*` hostot használja, de védendő) |
-| 5 | [`infra/caddy/Caddyfile:67`](../../infra/caddy/Caddyfile:67) — `admin.<DOMAIN>` block | ugyanaz a safety-net; kockázat csak elméleti, de érdemes blokkolni |
-| 6 | `apps/api/src/main.ts:23` CORS logika | `(process.env.CORS_ORIGINS ?? '').split(',').map(...).filter(Boolean)` — üres lista → `origin: true` (legmegengedőbb) |
-| 7 | [`apps/api/src/app.module.ts:10`](../../apps/api/src/app.module.ts:10) | `ConfigModule.forRoot({ isGlobal: true })` — default `process.cwd()/.env`, prodban nem érhető el, mert `**/.env` ki van zárva az image-ből ([`infra/app/.dockerignore:2`](../../infra/app/.dockerignore:2)) |
-| 8 | `VAPI_WEBHOOK_SECRET` | `infra/.env.example:17` definiálja, de sehol nem olvasva; a dropleten jelenleg is be van állítva (az `infra/.env` kulcslistája tartalmazza) |
+| #   | Ellenőrzés                                                                            | Eredmény                                                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Droplet `/opt/aisztens/infra/.env` `CORS_ORIGINS` (csak origin-értékek)               | `https://api.aisztens.hu`, `https://web.aisztens.hu`, `https://admin.aisztens.hu`                                                                                                                           |
+| 2   | `apps/api/src/` — VAPI/webhook keresés                                                | **0 találat** — webhook controller nem létezik                                                                                                                                                              |
+| 3   | [`infra/caddy/Caddyfile:43`](../../infra/caddy/Caddyfile:43) — `api.<DOMAIN>` block   | egyetlen `reverse_proxy api:3000`, nincs útvonal-szűkítés, nincs forrás-ellenőrzés                                                                                                                          |
+| 4   | [`infra/caddy/Caddyfile:53`](../../infra/caddy/Caddyfile:53) — `web.<DOMAIN>` block   | tartalmaz `handle /api/*` safety-net proxy-t; a webhook útvonal ide is beesik, ha a VAPI oda hívna (nem fog, mert a VAPI az `api.*` hostot használja, de védendő)                                           |
+| 5   | [`infra/caddy/Caddyfile:67`](../../infra/caddy/Caddyfile:67) — `admin.<DOMAIN>` block | ugyanaz a safety-net; kockázat csak elméleti, de érdemes blokkolni                                                                                                                                          |
+| 6   | `apps/api/src/main.ts:23` CORS logika                                                 | `(process.env.CORS_ORIGINS ?? '').split(',').map(...).filter(Boolean)` — üres lista → `origin: true` (legmegengedőbb)                                                                                       |
+| 7   | [`apps/api/src/app.module.ts:10`](../../apps/api/src/app.module.ts:10)                | `ConfigModule.forRoot({ isGlobal: true })` — default `process.cwd()/.env`, prodban nem érhető el, mert `**/.env` ki van zárva az image-ből ([`infra/app/.dockerignore:2`](../../infra/app/.dockerignore:2)) |
+| 8   | `VAPI_WEBHOOK_SECRET`                                                                 | `infra/.env.example:17` definiálja, de sehol nem olvasva; a dropleten jelenleg is be van állítva (az `infra/.env` kulcslistája tartalmazza)                                                                 |
 
 ---
 
@@ -85,6 +88,7 @@ Három, egymásra épülő védelmi vonal:
 ```
 
 A három védelmi vonal **egymást erősíti**:
+
 1. **CORS** megakadályozza, hogy egy **böngésző** cross-origin weboldal JS-e olvassa a válaszokat.
 2. **Caddy útvonal-szűkítés** megakadályozza, hogy a VAPI-n kívül bármely más forrás a `/api/vapi/*` útvonalra küldjön POST-ot (405-öt ad vissza nem-VAPI user-agentnek / hiányzó headernek).
 3. **NestJS HMAC-guard** elfogadja a kérést, ha az aláírás érvényes, és visszadobja (401), ha nem.
@@ -98,6 +102,7 @@ A három védelmi vonal **egymást erősíti**:
 Új module: [`apps/api/src/vapi-webhooks/`](../../apps/api/src/vapi-webhooks/) (a `callback-requests` testvér-bounded context mintájára).
 
 **Fájlok:**
+
 - `apps/api/src/vapi-webhooks/vapi-webhooks.module.ts`
 - `apps/api/src/vapi-webhooks/vapi-webhooks.controller.ts`
 - `apps/api/src/vapi-webhooks/vapi-webhooks.service.ts`
@@ -126,6 +131,7 @@ A három védelmi vonal **egymást erősíti**:
 **HMAC specifikáció:** a VAPI jelenlegi ajánlása `X-Vapi-Signature: sha256=<hex>` formátumú headert küld, ahol a számítás: `HMAC_SHA256(secret, body)` (a timestamp-et egyes rendszerekben külön headerben küldik). A pontos specifikáció a VAPI doksiból ellenőrizendő implementációkor; a guard támogatja a konfigurálható séma-verziót.
 
 **Controller végpontok (kezdeti scope):**
+
 - `POST /api/vapi/webhooks/tool-calls` — a VAPI assistant tool-kérései
 - `POST /api/vapi/webhooks/end-of-call-report` — hívás végén kapott jelentés
 - A jövőben bővíthető: `assistant-request`, `status-update`, `transcript`, stb.
@@ -133,6 +139,7 @@ A három védelmi vonal **egymást erősíti**:
 A tényleges feldolgozás most **csak a service-szintig** megy: a service eltárolja az eseményt (in-memory Map, később Postgres) és 200-zal válaszol. A tényleges üzleti logika (assistant indítás, stb.) egy későbbi fázis.
 
 **Config:**
+
 - `VAPI_WEBHOOK_SECRET` env-ből (már létezik az `infra/.env.example:17`-ben).
 - Opcionális `VAPI_WEBHOOK_TIMESTAMP_TOLERANCE_SEC=300` (alap: 300).
 
@@ -190,25 +197,26 @@ Az `https://api.aisztens.hu` elem kikerül, mert nincs olyan böngészős SPA, a
 
 ### 4.4 Tesztek
 
-| Szint | Fájl | Mit tesztel |
-|---|---|---|
-| Unit | [`vapi-signature.guard.spec.ts`](../../apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts) | helyes HMAC → 200, helytelen → 401, lejárt timestamp → 401, hiányzó secret → 500 (fail-closed) |
-| Unit | [`vapi-webhooks.service.spec.ts`](../../apps/api/src/vapi-webhooks/vapi-webhooks.service.spec.ts) | event eltárolódik, idempotens (ugyanaz a `message.id` kétszer → 1 rekord) |
-| E2E | [`apps/api/test/vapi-webhooks.e2e-spec.ts`](../../apps/api/test/vapi-webhooks.e2e-spec.ts) | teljes POST flow: app `/api/vapi/webhooks/end-of-call-report` helyes signature-rel → 200, helytelen signature-rel → 401, érvényes signature de lejárt timestamp → 401 |
-| Smoke | [`scripts/test/lib/10-services.sh`](../../scripts/test/lib/10-services.sh) | bővítés: `curl -X POST` az `/api/vapi/webhooks/test` végpontra helyes signature-rel → 200; Caddy 405-öt ad, ha `X-Vapi-Signature` header nélkül próbálkozunk |
+| Szint | Fájl                                                                                              | Mit tesztel                                                                                                                                                           |
+| ----- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit  | [`vapi-signature.guard.spec.ts`](../../apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts)   | helyes HMAC → 200, helytelen → 401, lejárt timestamp → 401, hiányzó secret → 500 (fail-closed)                                                                        |
+| Unit  | [`vapi-webhooks.service.spec.ts`](../../apps/api/src/vapi-webhooks/vapi-webhooks.service.spec.ts) | event eltárolódik, idempotens (ugyanaz a `message.id` kétszer → 1 rekord)                                                                                             |
+| E2E   | [`apps/api/test/vapi-webhooks.e2e-spec.ts`](../../apps/api/test/vapi-webhooks.e2e-spec.ts)        | teljes POST flow: app `/api/vapi/webhooks/end-of-call-report` helyes signature-rel → 200, helytelen signature-rel → 401, érvényes signature de lejárt timestamp → 401 |
+| Smoke | [`scripts/test/lib/10-services.sh`](../../scripts/test/lib/10-services.sh)                        | bővítés: `curl -X POST` az `/api/vapi/webhooks/test` végpontra helyes signature-rel → 200; Caddy 405-öt ad, ha `X-Vapi-Signature` header nélkül próbálkozunk          |
 
 ### 4.5 Dokumentáció frissítések
 
-| Fájl | Frissítés |
-|---|---|
-| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md) | §4.4 „Belső service-ek” bővítése: `curl -X POST` HMAC fejléccel, hogy az üzemeltető lássa, hogyan kell helyes webhookot küldeni |
-| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md) | §4 „Reverse proxy rules” bővítése: a `/api/vapi/*` blokk dokumentálása |
-| [`infra/.env.example`](../../infra/.env.example) | `VAPI_WEBHOOK_SECRET` komment kiegészítése: „HMAC-SHA256 kulcs a VAPI webhook hitelesítéshez, lásd [link a tervre]” |
-| `apps/api/src/vapi-webhooks/README.md` | új fájl: hogyan teszteljünk helyes + aloadott signature-rel |
+| Fájl                                                                           | Frissítés                                                                                                                       |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md)   | §4.4 „Belső service-ek” bővítése: `curl -X POST` HMAC fejléccel, hogy az üzemeltető lássa, hogyan kell helyes webhookot küldeni |
+| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md) | §4 „Reverse proxy rules” bővítése: a `/api/vapi/*` blokk dokumentálása                                                          |
+| [`infra/.env.example`](../../infra/.env.example)                               | `VAPI_WEBHOOK_SECRET` komment kiegészítése: „HMAC-SHA256 kulcs a VAPI webhook hitelesítéshez, lásd [link a tervre]”             |
+| `apps/api/src/vapi-webhooks/README.md`                                         | új fájl: hogyan teszteljünk helyes + aloadott signature-rel                                                                     |
 
 ### 4.6 Konfiguráció rotáció
 
 A `VAPI_WEBHOOK_SECRET` rotációja:
+
 - **Cél:** container-rebuild nélkül cserélhető legyen.
 - **Mechanizmus:** a secret a compose `environment:`-ből jön ([`infra/docker-compose.yml:33`](../../infra/docker-compose.yml:33)) → `docker compose up -d --no-build api` frissíti.
 - **Dokumentáció:** a runbook §4.4 „Titok-rotáció” alpontba bekerül.
@@ -218,6 +226,7 @@ A `VAPI_WEBHOOK_SECRET` rotációja:
 ## 5. Implementációs lépések (PR-ekre bontva)
 
 ### PR #1 — `vapi-signature-guard-skeleton` (kis, önálló)
+
 1. `apps/api/src/vapi-webhooks/` mappa + module/controller/service/guard skeleton.
 2. `VAPI_WEBHOOK_SECRET` olvasása `ConfigService.get`-szel.
 3. **Raw body** bekapcsolása a Fastify adapteren (`rawBody: true` flag).
@@ -225,6 +234,7 @@ A `VAPI_WEBHOOK_SECRET` rotációja:
 5. **Nincs route engedélyezve** — csak a védelmi mechanizmus és a tesztek.
 
 ### PR #2 — `vapi-webhook-controller-and-route` (közepes)
+
 1. `VapiWebhookController` a `POST /api/vapi/webhooks/:eventType` végponttal.
 2. `VapiWebhooksService` in-memory tárolóval (a callback-requests mintára).
 3. Fastify `rawBody` hook regisztrálása a guardhoz.
@@ -233,6 +243,7 @@ A `VAPI_WEBHOOK_SECRET` rotációja:
 6. `render_caddyfile` placeholder-szinkron ellenőrzés.
 
 ### PR #3 — `prod-cors-cleanup-and-docs` (kis)
+
 1. `infra/.env.example:15` CORS sor rövidítése.
 2. Droplet `infra/.env` `CORS_ORIGINS` frissítése (rotáció dokumentálva).
 3. `docs/Specs/Production-Runbook.md` §4.4 + §4.5 frissítés.
@@ -242,14 +253,14 @@ A `VAPI_WEBHOOK_SECRET` rotációja:
 
 ## 6. Kockázatok és mitigáció
 
-| Kockázat | Valószínűség | Hatás | Mitigáció |
-|---|---|---|---|
-| A VAPI HMAC séma megváltozik | közepes | közepes | guard konfigurálható séma-verziót támogat; VAPI doksi figyelése |
-| Raw body bekapcsolása lassítja a többi endpointot | alacsony | alacsony | Fastify-nél minimális overhead; csak a JSON parserként string-ként kapja, nem buffer-ik duplán |
-| Caddy 405-öt ad, ha a VAPI user-agentje megváltozik | alacsony | magas | a Caddy csak a `X-Vapi-Signature` HEADert ellenőrzi, nem a User-Agentet — stabilitás |
-| Nyilvános űrlap (`POST /api/callback-requests`) letiltása | alacsony | magas | a `handle /api/vapi/*` blokk **csak a vapi útvonalra** hat; minden más marad |
-| Secret kikerül a konténer logjába | alacsony | magas | a guard NEM logolja a secretet, csak a "valid/invalid" státuszt + a `message.id`-t |
-| CORS kiürítése → SPA-k elveszítik a hozzáférést | alacsony | magas | smoke teszt a CI-ban: `curl -H "Origin: https://web.aisztens.hu" -i` → 200 + `access-control-allow-origin` fejléc |
+| Kockázat                                                  | Valószínűség | Hatás    | Mitigáció                                                                                                         |
+| --------------------------------------------------------- | ------------ | -------- | ----------------------------------------------------------------------------------------------------------------- |
+| A VAPI HMAC séma megváltozik                              | közepes      | közepes  | guard konfigurálható séma-verziót támogat; VAPI doksi figyelése                                                   |
+| Raw body bekapcsolása lassítja a többi endpointot         | alacsony     | alacsony | Fastify-nél minimális overhead; csak a JSON parserként string-ként kapja, nem buffer-ik duplán                    |
+| Caddy 405-öt ad, ha a VAPI user-agentje megváltozik       | alacsony     | magas    | a Caddy csak a `X-Vapi-Signature` HEADert ellenőrzi, nem a User-Agentet — stabilitás                              |
+| Nyilvános űrlap (`POST /api/callback-requests`) letiltása | alacsony     | magas    | a `handle /api/vapi/*` blokk **csak a vapi útvonalra** hat; minden más marad                                      |
+| Secret kikerül a konténer logjába                         | alacsony     | magas    | a guard NEM logolja a secretet, csak a "valid/invalid" státuszt + a `message.id`-t                                |
+| CORS kiürítése → SPA-k elveszítik a hozzáférést           | alacsony     | magas    | smoke teszt a CI-ban: `curl -H "Origin: https://web.aisztens.hu" -i` → 200 + `access-control-allow-origin` fejléc |
 
 ---
 

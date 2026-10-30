@@ -15,30 +15,30 @@ into the application.
 
 ## Design rationale
 
-| Decision | Alternative | Why this one |
-|---|---|---|
-| Repository returns rows (`CallbackRequestRow`) | Return the shared `CallbackRequest` view model | Row → JSON mapping (`Date` → ISO string) is a service concern; the DB layer must not know the HTTP contract |
-| `findOne` throws `CallbackRequestNotFoundError` | Return `null` | Explicit failure at every call site; `null` is easy to ignore. The DB layer still never throws a Nest `NotFoundException` |
-| Invalid UUID rejected locally (`InvalidCallbackRequestIdError`) | Let Postgres answer with `22P02` | Deterministic, free, and no confusing driver error in the logs |
-| Driver errors propagate untouched | Wrap into a `PersistenceError` with `cause` | Callers (AIS-38) must still be able to classify driver errors; wrapping would hide them |
-| `findAll` is `created_at DESC` by contract | Leave ordering to callers | Paging/listing in later stories starts from a deterministic sequence |
-| Depend on a `Database` type alias + `DATABASE` token | Inject a concrete `drizzle(...)` result | Enables a mock handle in tests and one provider in AIS-38 (dependency inversion) |
+| Decision                                                        | Alternative                                    | Why this one                                                                                                              |
+| --------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Repository returns rows (`CallbackRequestRow`)                  | Return the shared `CallbackRequest` view model | Row → JSON mapping (`Date` → ISO string) is a service concern; the DB layer must not know the HTTP contract               |
+| `findOne` throws `CallbackRequestNotFoundError`                 | Return `null`                                  | Explicit failure at every call site; `null` is easy to ignore. The DB layer still never throws a Nest `NotFoundException` |
+| Invalid UUID rejected locally (`InvalidCallbackRequestIdError`) | Let Postgres answer with `22P02`               | Deterministic, free, and no confusing driver error in the logs                                                            |
+| Driver errors propagate untouched                               | Wrap into a `PersistenceError` with `cause`    | Callers (AIS-38) must still be able to classify driver errors; wrapping would hide them                                   |
+| `findAll` is `created_at DESC` by contract                      | Leave ordering to callers                      | Paging/listing in later stories starts from a deterministic sequence                                                      |
+| Depend on a `Database` type alias + `DATABASE` token            | Inject a concrete `drizzle(...)` result        | Enables a mock handle in tests and one provider in AIS-38 (dependency inversion)                                          |
 
 ## Implementation
 
-| File | One-line change |
-|---|---|
-| `apps/api/src/db/database.interface.ts` | `Database` type over the schema (the injected abstraction) |
-| `apps/api/src/db/database.const.ts` | `DATABASE` injection token |
-| `apps/api/src/db/callback-requests.errors.ts` | `NotFound` / `InvalidId` / `NotPersisted` custom errors |
-| `apps/api/src/db/uuid.ts` | Pure `isUuid()` guard |
-| `apps/api/src/db/callback-requests.repository.interface.ts` | `CallbackRequestsRepository` contract |
-| `apps/api/src/db/callback-requests.repository.ts` | Drizzle implementation (`create`, `findAll`, `findOne`) |
-| `apps/api/src/db/test/mocks/*.mock.ts` | Row fixtures + scripted Drizzle handle |
-| `apps/api/src/db/callback-requests.repository.spec.ts`, `uuid.spec.ts` | 14 + 18 unit tests, no database |
-| `apps/api/package.json` | `@jest/globals` devDependency (ESM Jest has no `jest` global) |
-| `apps/api/tsconfig.build.json` | Exclude `**/test/**` from the production build |
-| `docs/Specs/Database-Local.md` | §9 status tables + last-updated date |
+| File                                                                   | One-line change                                               |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `apps/api/src/db/database.interface.ts`                                | `Database` type over the schema (the injected abstraction)    |
+| `apps/api/src/db/database.const.ts`                                    | `DATABASE` injection token                                    |
+| `apps/api/src/db/callback-requests.errors.ts`                          | `NotFound` / `InvalidId` / `NotPersisted` custom errors       |
+| `apps/api/src/db/uuid.ts`                                              | Pure `isUuid()` guard                                         |
+| `apps/api/src/db/callback-requests.repository.interface.ts`            | `CallbackRequestsRepository` contract                         |
+| `apps/api/src/db/callback-requests.repository.ts`                      | Drizzle implementation (`create`, `findAll`, `findOne`)       |
+| `apps/api/src/db/test/mocks/*.mock.ts`                                 | Row fixtures + scripted Drizzle handle                        |
+| `apps/api/src/db/callback-requests.repository.spec.ts`, `uuid.spec.ts` | 14 + 18 unit tests, no database                               |
+| `apps/api/package.json`                                                | `@jest/globals` devDependency (ESM Jest has no `jest` global) |
+| `apps/api/tsconfig.build.json`                                         | Exclude `**/test/**` from the production build                |
+| `docs/Specs/Database-Local.md`                                         | §9 status tables + last-updated date                          |
 
 ## Outcome and how to verify
 

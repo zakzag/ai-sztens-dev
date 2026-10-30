@@ -16,7 +16,8 @@ export const NETWORK_ERROR_USER_MESSAGE =
   'Nem sikerült elérni a szervert. Ellenőrizd az internetkapcsolatot, majd próbáld újra.';
 
 /** 401 — the token is missing or expired. */
-export const SESSION_EXPIRED_MESSAGE = 'Lejárt a munkamenet. Jelentkezz be újra.';
+export const SESSION_EXPIRED_MESSAGE =
+  'Lejárt a munkamenet. Jelentkezz be újra.';
 
 /** 403 — authenticated but not allowed. */
 export const FORBIDDEN_MESSAGE = 'Nincs jogosultságod ehhez a művelethez.';
@@ -31,7 +32,8 @@ export const CONFLICT_MESSAGE = 'A művelet ütközik egy már létező elemmel.
 export const VALIDATION_MESSAGE = 'A megadott adatok érvénytelenek.';
 
 /** 5xx — the backend itself failed. */
-export const SERVER_ERROR_MESSAGE = 'A szerver hibát jelzett. Próbáld újra később.';
+export const SERVER_ERROR_MESSAGE =
+  'A szerver hibát jelzett. Próbáld újra később.';
 
 /** Anything that is not an `ApiError`, or a status with no dedicated text. */
 export const UNKNOWN_ERROR_MESSAGE = 'Váratlan hiba történt. Próbáld újra.';

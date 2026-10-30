@@ -23,11 +23,11 @@ the earlier fixes did not address.
 
 Three live probes run on the droplet before touching any code:
 
-| Probe | Command | Result |
-|---|---|---|
-| 1 | `docker compose exec caddy cat /etc/caddy/Caddyfile` | Apex block present and rendered: `aisztens.hu { redir https://web.aisztens.hu{uri} 307 }`. Three other site blocks (`api.`, `web.`, `admin.`) also present. |
-| 2 | `dig +short aisztens.hu A` | **`185.80.48.2`** (NOT the droplet). `api./web./admin.` → `164.92.248.194` (droplet). Droplet eth0 = `164.92.248.194/20`. |
-| 3 | `docker compose logs --tail=300 caddy \| grep identifier:\"aisztens.hu\"` | `http-01` challenge details literally: `"185.80.48.2: Invalid response from http://aisztens.hu/.well-known/acme-challenge/...: 404"`. Caddy then retries against ZeroSSL. |
+| Probe | Command                                                                   | Result                                                                                                                                                                    |
+| ----- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | `docker compose exec caddy cat /etc/caddy/Caddyfile`                      | Apex block present and rendered: `aisztens.hu { redir https://web.aisztens.hu{uri} 307 }`. Three other site blocks (`api.`, `web.`, `admin.`) also present.               |
+| 2     | `dig +short aisztens.hu A`                                                | **`185.80.48.2`** (NOT the droplet). `api./web./admin.` → `164.92.248.194` (droplet). Droplet eth0 = `164.92.248.194/20`.                                                 |
+| 3     | `docker compose logs --tail=300 caddy \| grep identifier:\"aisztens.hu\"` | `http-01` challenge details literally: `"185.80.48.2: Invalid response from http://aisztens.hu/.well-known/acme-challenge/...: 404"`. Caddy then retries against ZeroSSL. |
 
 The three subdomains' certs were issued and renew normally (`got renewal info`
 lines present for all three). Only the apex is unreachable from this droplet.
@@ -64,25 +64,25 @@ the template file plus a doc update.
 
 **Alternatives considered:**
 
-- *Add a `servers` block that excludes the apex from ACME.* More moving
+- _Add a `servers` block that excludes the apex from ACME._ More moving
   parts; depends on Caddy version-specific directives; Caddy still logs a
   warning that it ignored the apex site address.
-- *Set the apex A record to the droplet.* Out of scope (the WordPress
+- _Set the apex A record to the droplet._ Out of scope (the WordPress
   site is the apex on purpose; changing DNS is a separate decision).
-- *Drop the rendered Caddyfile from git and patch the docker-compose
-  entry to mount the template directly.* The sed-rendering exists so the
+- _Drop the rendered Caddyfile from git and patch the docker-compose
+  entry to mount the template directly._ The sed-rendering exists so the
   file is inspectable and the `{{DOMAIN}}` token convention is enforced,
   so this would be a regression in operability.
 
 ## 4. Solution / implementation
 
-| File | Change |
-|---|---|
-| [`infra/caddy/Caddyfile`](../infra/caddy/Caddyfile) | Replaced the 5-line apex block (lines 100–104 in the previous revision) with a 17-line comment that states why the apex is absent, points at the two existing docs that record the intent, and includes the commented-out apex block as a copy-paste target. The three subdomain site blocks (`api.<DOMAIN>`, `web.<DOMAIN>`, `admin.<DOMAIN>`) are unchanged. The `<DOMAIN>` / `<ACME_EMAIL>` placeholder convention is unchanged. |
-| [`docs/Specs/Caddy-Reverse-Proxy.md` §A](../Specs/Caddy-Reverse-Proxy.md) | Updated the "Apex" section: the old text claimed the block "kikerül a Caddy-ból — sosem fut le" (a hope, not reality). The new text states the block is removed from the template and describes the two-step process (DNS A-record change + uncomment the block) that would be needed to migrate the apex. The "Utolsó frissítés" header at the top of the spec was extended with a new dated entry pointing at the new history file, per the specs-maintenance rule. |
-| [`docs/history/2026-10-12--10-52-00-caddyfile-apex-block-removed.md`](../history/2026-10-12--10-52-00-caddyfile-apex-block-removed.md) | New day-to-day narrative (the five-step debug walk-through, all three probe outputs, the user-confirmation exchange, the before/after verification commands). |
-| `infra/caddy/Caddyfile.rendered` | **Not committed** (gitignored). The next `deploy.yml` run will re-render the template and SCP the new file to the droplet. |
-| `deploy/deploy.sh:render_caddyfile()`, `.github/workflows/deploy.yml:Render Caddyfile` | **Unchanged.** Their `sed` substitution still runs; it just no longer has an apex block to substitute. |
+| File                                                                                                                                   | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`infra/caddy/Caddyfile`](../infra/caddy/Caddyfile)                                                                                    | Replaced the 5-line apex block (lines 100–104 in the previous revision) with a 17-line comment that states why the apex is absent, points at the two existing docs that record the intent, and includes the commented-out apex block as a copy-paste target. The three subdomain site blocks (`api.<DOMAIN>`, `web.<DOMAIN>`, `admin.<DOMAIN>`) are unchanged. The `<DOMAIN>` / `<ACME_EMAIL>` placeholder convention is unchanged.                                   |
+| [`docs/Specs/Caddy-Reverse-Proxy.md` §A](../Specs/Caddy-Reverse-Proxy.md)                                                              | Updated the "Apex" section: the old text claimed the block "kikerül a Caddy-ból — sosem fut le" (a hope, not reality). The new text states the block is removed from the template and describes the two-step process (DNS A-record change + uncomment the block) that would be needed to migrate the apex. The "Utolsó frissítés" header at the top of the spec was extended with a new dated entry pointing at the new history file, per the specs-maintenance rule. |
+| [`docs/history/2026-10-12--10-52-00-caddyfile-apex-block-removed.md`](../history/2026-10-12--10-52-00-caddyfile-apex-block-removed.md) | New day-to-day narrative (the five-step debug walk-through, all three probe outputs, the user-confirmation exchange, the before/after verification commands).                                                                                                                                                                                                                                                                                                         |
+| `infra/caddy/Caddyfile.rendered`                                                                                                       | **Not committed** (gitignored). The next `deploy.yml` run will re-render the template and SCP the new file to the droplet.                                                                                                                                                                                                                                                                                                                                            |
+| `deploy/deploy.sh:render_caddyfile()`, `.github/workflows/deploy.yml:Render Caddyfile`                                                 | **Unchanged.** Their `sed` substitution still runs; it just no longer has an apex block to substitute.                                                                                                                                                                                                                                                                                                                                                                |
 
 No source code, compose, or Caddy service config was changed.
 

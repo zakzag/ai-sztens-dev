@@ -45,7 +45,9 @@ describe('ApiKeysTable', () => {
   it('renders one row per key with the column headers', () => {
     render(<ApiKeysTable apiKeys={VIEW_MODELS} isLoading={false} />);
 
-    expect(screen.getByRole('columnheader', { name: API_KEY_COLUMNS.name })).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: API_KEY_COLUMNS.name }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', { name: API_KEY_COLUMNS.identifier }),
     ).toBeInTheDocument();
@@ -59,7 +61,9 @@ describe('ApiKeysTable', () => {
     expect(screen.getAllByRole('row')).toHaveLength(VIEW_MODELS.length + 1);
     expect(screen.getByText(API_KEY_FIXTURE.name)).toBeInTheDocument();
     expect(screen.getByText(API_KEY_FIXTURE.identifier)).toBeInTheDocument();
-    expect(screen.getByText(SECOND_API_KEY_FIXTURE.identifier)).toBeInTheDocument();
+    expect(
+      screen.getByText(SECOND_API_KEY_FIXTURE.identifier),
+    ).toBeInTheDocument();
   });
 
   it('renders the fallback for a key without description and without expiry', () => {
@@ -70,7 +74,9 @@ describe('ApiKeysTable', () => {
   });
 
   it('never renders the apiKey token value', () => {
-    const { container } = render(<ApiKeysTable apiKeys={VIEW_MODELS} isLoading={false} />);
+    const { container } = render(
+      <ApiKeysTable apiKeys={VIEW_MODELS} isLoading={false} />,
+    );
 
     expect(container.textContent).not.toContain(API_KEY_FIXTURE.apiKey);
     expect(container.textContent).not.toContain(SECOND_API_KEY_FIXTURE.apiKey);

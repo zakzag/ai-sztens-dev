@@ -7,31 +7,31 @@
 
 ## Kiinduló állapot (pre-flight)
 
-| Ellenőrzés | Eredmény |
-|---|---|
-| DB-only stack | `infra-postgres-1 Up (healthy)`, `5432` |
-| `\dn` | `callback`, `email`, `platform`, `public` |
-| USAGE mátrix | `9` |
+| Ellenőrzés                            | Eredmény                                             |
+| ------------------------------------- | ---------------------------------------------------- |
+| DB-only stack                         | `infra-postgres-1 Up (healthy)`, `5432`              |
+| `\dn`                                 | `callback`, `email`, `platform`, `public`            |
+| USAGE mátrix                          | `9`                                                  |
 | `has_schema_privilege('aisztens', …)` | `callback` CREATE = `t`, `platform` CREATE = **`f`** |
-| `db:check` / `build` | zöld / zöld |
-| `apps/api/.env.local` | csak `PORT=3000`, **nincs `DATABASE_URL`** |
-| Node | `v20.19.2` → `process.loadEnvFile` elérhető |
+| `db:check` / `build`                  | zöld / zöld                                          |
+| `apps/api/.env.local`                 | csak `PORT=3000`, **nincs `DATABASE_URL`**           |
+| Node                                  | `v20.19.2` → `process.loadEnvFile` elérhető          |
 
 ## Változások
 
-| Fájl | Változás |
-|---|---|
-| [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts) | valódi séma: `callbackSchema`, `CALL_STATUS_VALUES` (`satisfies readonly CallStatus[]`), `callStatusEnum`, `callbackRequests` (7 oszlop), `CallbackRequestRow` / `NewCallbackRequestRow` |
-| [`apps/api/src/db/database-url.ts`](../../apps/api/src/db/database-url.ts) | `DATABASE_URL` feloldás: env → `apps/api/.env.local` → `infra/.env.local`-ból komponálva → hiba; `tryResolve` (offline toolokhoz) és `resolve` (csatlakozó processekhez) |
-| [`apps/api/drizzle.config.ts`](../../apps/api/drizzle.config.ts) | a fenti resolvert használja, `migrations: { schema: 'platform', table: '__drizzle_migrations' }`, `strict`, `verbose`; némán nem csatlakozik rossz URL-re |
-| [`apps/api/drizzle/0000_pretty_bromley.sql`](../../apps/api/drizzle/0000_pretty_bromley.sql) | generált migráció; a `CREATE SCHEMA "callback"` **kézzel `IF NOT EXISTS`-re javítva** (a séma AIS-35 óta létezik) |
-| `apps/api/drizzle/meta/0000_snapshot.json`, `meta/_journal.json` | generált snapshot + journal (commitolva) |
-| [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) | valódi runner: `postgres` kliens (`max: 1`, `onnotice` elnyelve), `drizzle-orm/postgres-js/migrator`, `./drizzle` + `platform.__drizzle_migrations`, `try/finally` `end()`, hiba → exit 1 |
-| [`apps/api/src/db/schema.spec.ts`](../../apps/api/src/db/schema.spec.ts) | új unit teszt: séma/tábla név, 7 oszlop sorrendje, típusok/widthök, nullability, PK, defaultok, enum-értékek egyezése a shared unióval |
-| [`infra/postgres/init/02-schemas.sh`](../../infra/postgres/init/02-schemas.sh), [`01-roles.sh`](../../infra/postgres/init/01-roles.sh) | **AIS-35 delta:** `GRANT CREATE ON SCHEMA platform` az `aisztens` role-nak (a könyvelő táblához) |
-| [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh) | `platform` CREATE assertek + a smoke CREATE query elvárása 2 |
-| [`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh) | `postgres-schema-create` elvárás 1 → 2 |
-| [`docs/Specs/Database-Local.md`](../Specs/Database-Local.md), [`Infrastructure-Docker.md`](../Specs/Infrastructure-Docker.md), [`Local-Development.md`](../Specs/Local-Development.md) | grant-mátrix, §9 „mi van / mi nincs”, verifikációs számok |
+| Fájl                                                                                                                                                                                   | Változás                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts)                                                                                                                         | valódi séma: `callbackSchema`, `CALL_STATUS_VALUES` (`satisfies readonly CallStatus[]`), `callStatusEnum`, `callbackRequests` (7 oszlop), `CallbackRequestRow` / `NewCallbackRequestRow`  |
+| [`apps/api/src/db/database-url.ts`](../../apps/api/src/db/database-url.ts)                                                                                                             | `DATABASE_URL` feloldás: env → `apps/api/.env.local` → `infra/.env.local`-ból komponálva → hiba; `tryResolve` (offline toolokhoz) és `resolve` (csatlakozó processekhez)                  |
+| [`apps/api/drizzle.config.ts`](../../apps/api/drizzle.config.ts)                                                                                                                       | a fenti resolvert használja, `migrations: { schema: 'platform', table: '__drizzle_migrations' }`, `strict`, `verbose`; némán nem csatlakozik rossz URL-re                                 |
+| [`apps/api/drizzle/0000_pretty_bromley.sql`](../../apps/api/drizzle/0000_pretty_bromley.sql)                                                                                           | generált migráció; a `CREATE SCHEMA "callback"` **kézzel `IF NOT EXISTS`-re javítva** (a séma AIS-35 óta létezik)                                                                         |
+| `apps/api/drizzle/meta/0000_snapshot.json`, `meta/_journal.json`                                                                                                                       | generált snapshot + journal (commitolva)                                                                                                                                                  |
+| [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts)                                                                                                                             | valódi runner: `postgres` kliens (`max: 1`, `onnotice` elnyelve), `drizzle-orm/postgres-js/migrator`, `./drizzle` + `platform.__drizzle_migrations`, `try/finally` `end()`, hiba → exit 1 |
+| [`apps/api/src/db/schema.spec.ts`](../../apps/api/src/db/schema.spec.ts)                                                                                                               | új unit teszt: séma/tábla név, 7 oszlop sorrendje, típusok/widthök, nullability, PK, defaultok, enum-értékek egyezése a shared unióval                                                    |
+| [`infra/postgres/init/02-schemas.sh`](../../infra/postgres/init/02-schemas.sh), [`01-roles.sh`](../../infra/postgres/init/01-roles.sh)                                                 | **AIS-35 delta:** `GRANT CREATE ON SCHEMA platform` az `aisztens` role-nak (a könyvelő táblához)                                                                                          |
+| [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh)                                                                                     | `platform` CREATE assertek + a smoke CREATE query elvárása 2                                                                                                                              |
+| [`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh)                                                                                                   | `postgres-schema-create` elvárás 1 → 2                                                                                                                                                    |
+| [`docs/Specs/Database-Local.md`](../Specs/Database-Local.md), [`Infrastructure-Docker.md`](../Specs/Infrastructure-Docker.md), [`Local-Development.md`](../Specs/Local-Development.md) | grant-mátrix, §9 „mi van / mi nincs”, verifikációs számok                                                                                                                                 |
 
 ## Döntések
 

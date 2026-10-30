@@ -52,6 +52,7 @@ the right key name in an older action version).
    `persist-credentials: false` to the checkout step.
 
 Plus:
+
 - `docs/Specs/Production-Runbook.md` and
   `docs/Specs/Caddy-Reverse-Proxy.md` headers updated with the new
   `Utolsó frissítés` (last updated) entry referencing this work, per
@@ -69,6 +70,7 @@ git push origin dev
 ```
 
 Expected on the next deploy run:
+
 - `concurrency.group` reads `deploy-dev` (unchanged behaviour today).
 - `Render infra/.env` step succeeds; if any of the four
   pre-write keys were in the secret, it would now fail loudly with

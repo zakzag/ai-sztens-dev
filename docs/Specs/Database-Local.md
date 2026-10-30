@@ -7,7 +7,7 @@
 **Kapcsolódik:** [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2, [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml), [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml), [`infra/postgres/init/`](../../infra/postgres/init/), [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh), [`scripts/README.md`](../../scripts/README.md)
 
 > **Hatókör.** Ez a doksi a **fejlesztői gépen** futó PostgreSQL-ről szól: hogyan
-> bootstrappeled, ellenőrzöd, reseteled, és mi az, ami még *nincs* benne. A droplet
+> bootstrappeled, ellenőrzöd, reseteled, és mi az, ami még _nincs_ benne. A droplet
 > oldali üzemeltetés a [`Production-Runbook.md`](Production-Runbook.md) és az
 > [`Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2 hatóköre.
 
@@ -15,16 +15,16 @@
 
 ## 1. Kétféle lokális Postgres — ne futtasd egyszerre
 
-| | **DB-only stack** | **Teljes lokális stack** |
-|---|---|---|
-| Compose | [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) | [`infra/docker-compose.yml`](../../infra/docker-compose.yml) + [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) |
-| Indítás | `pnpm db:up` | `scripts/dev-stack.sh up` |
-| Volume (compose kulcs) | `pgdata_local` (külön!) | `pgdata` |
-| Tényleges Docker volume | `infra_pgdata_local` | `aisztens_pgdata` |
-| Konténer neve | `infra-postgres-1` | `aisztens-postgres-1` |
-| Host port | `5432` | `5432` |
-| Mire való | csak az API fut a hoston (`pnpm --filter @callback/api start:dev`) | api + web + admin konténerben, Caddy kikapcsolva |
-| Init scriptek | ugyanaz a bind mount | ugyanaz a bind mount |
+|                         | **DB-only stack**                                                  | **Teljes lokális stack**                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Compose                 | [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) | [`infra/docker-compose.yml`](../../infra/docker-compose.yml) + [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) |
+| Indítás                 | `pnpm db:up`                                                       | `scripts/dev-stack.sh up`                                                                                                               |
+| Volume (compose kulcs)  | `pgdata_local` (külön!)                                            | `pgdata`                                                                                                                                |
+| Tényleges Docker volume | `infra_pgdata_local`                                               | `aisztens_pgdata`                                                                                                                       |
+| Konténer neve           | `infra-postgres-1`                                                 | `aisztens-postgres-1`                                                                                                                   |
+| Host port               | `5432`                                                             | `5432`                                                                                                                                  |
+| Mire való               | csak az API fut a hoston (`pnpm --filter @callback/api start:dev`) | api + web + admin konténerben, Caddy kikapcsolva                                                                                        |
+| Init scriptek           | ugyanaz a bind mount                                               | ugyanaz a bind mount                                                                                                                    |
 
 A **tényleges** volume- és konténernevek a compose projektnévből jönnek: a
 [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) nem ad `name:`-et,
@@ -63,15 +63,15 @@ cp infra/.env.example infra/.env.local
 
 A Postgres bootstrap **kizárólag** ezeket a kulcsokat olvassa:
 
-| Kulcs | Default (ha hiányzik) | Ki használja |
-|---|---|---|
-| `POSTGRES_DB` | `aisztens_db` | compose + init scriptek |
-| `POSTGRES_USER` | `postgres` | compose + init scriptek (superuser, ő futtatja az initet) |
-| `POSTGRES_PASSWORD` | — (**kötelező**) | compose |
-| `AISZTENS_DB_USER` | `aisztens` | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh), [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) |
-| `AISZTENS_DB_PASSWORD` | — (**kötelező**) | `01-roles.sh` |
-| `TKOVARI_DB_PASSWORD` | — (**kötelező**) | `01-roles.sh` |
-| `KRAK_DB_PASSWORD` | — (**kötelező**) | `01-roles.sh` |
+| Kulcs                  | Default (ha hiányzik) | Ki használja                                                                                                       |
+| ---------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `POSTGRES_DB`          | `aisztens_db`         | compose + init scriptek                                                                                            |
+| `POSTGRES_USER`        | `postgres`            | compose + init scriptek (superuser, ő futtatja az initet)                                                          |
+| `POSTGRES_PASSWORD`    | — (**kötelező**)      | compose                                                                                                            |
+| `AISZTENS_DB_USER`     | `aisztens`            | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh), [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) |
+| `AISZTENS_DB_PASSWORD` | — (**kötelező**)      | `01-roles.sh`                                                                                                      |
+| `TKOVARI_DB_PASSWORD`  | — (**kötelező**)      | `01-roles.sh`                                                                                                      |
+| `KRAK_DB_PASSWORD`     | — (**kötelező**)      | `01-roles.sh`                                                                                                      |
 
 `scripts/dev-stack.sh up` első futáskor magától seedeli a fájlt az
 `infra/.env.example`-ből (chmod 600) és figyelmeztet a placeholder jelszavakra —
@@ -107,12 +107,12 @@ docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml \
 
 Gyakori okok:
 
-| Tünet | Ok | Megoldás |
-|---|---|---|
-| `DATABASE_URL is not set or blank`, a kulcs **hiányzik** az `apps/api/.env.local`-ból | a fájlt csak `PORT` / `CORS_ORIGINS` sorokkal hozták létre | írd be a §3 szerinti sort, a jelszót az `infra/.env.local` `AISZTENS_DB_PASSWORD` értékéből |
-| Ugyanez, a kulcs **ott van** | üres érték (`DATABASE_URL=`) vagy `.env`-be írt, nem process env-be tett `APP_ENV` | töltsd ki az értéket; az `APP_ENV`-et a shell exportálja (a `app-env.ts` importkor olvassa, a `.env` fájl már későn töltődne) |
-| Bootol, de a böngésző CORS-hibát kap | `APP_ENV` nélkül `dev` módban fut, a `CORS_ORIGINS` a dropletről jön | `set "APP_ENV=local"` (cmd) / `$env:APP_ENV='local'` (PowerShell) — lásd [`Local-Development.md`](Local-Development.md) §5 |
-| Bootol, de `ECONNREFUSED` / `password authentication failed` | konténer áll, vagy a jelszó nem egyezik az `infra/.env.local`-lal | `pnpm db:up`, illetve a két jelszó szinkronizálása |
+| Tünet                                                                                 | Ok                                                                                 | Megoldás                                                                                                                      |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL is not set or blank`, a kulcs **hiányzik** az `apps/api/.env.local`-ból | a fájlt csak `PORT` / `CORS_ORIGINS` sorokkal hozták létre                         | írd be a §3 szerinti sort, a jelszót az `infra/.env.local` `AISZTENS_DB_PASSWORD` értékéből                                   |
+| Ugyanez, a kulcs **ott van**                                                          | üres érték (`DATABASE_URL=`) vagy `.env`-be írt, nem process env-be tett `APP_ENV` | töltsd ki az értéket; az `APP_ENV`-et a shell exportálja (a `app-env.ts` importkor olvassa, a `.env` fájl már későn töltődne) |
+| Bootol, de a böngésző CORS-hibát kap                                                  | `APP_ENV` nélkül `dev` módban fut, a `CORS_ORIGINS` a dropletről jön               | `set "APP_ENV=local"` (cmd) / `$env:APP_ENV='local'` (PowerShell) — lásd [`Local-Development.md`](Local-Development.md) §5    |
+| Bootol, de `ECONNREFUSED` / `password authentication failed`                          | konténer áll, vagy a jelszó nem egyezik az `infra/.env.local`-lal                  | `pnpm db:up`, illetve a két jelszó szinkronizálása                                                                            |
 
 A teljes fejlesztői ciklus — séma módosítás → `db:generate` → `db:migrate` → API + admin indítás →
 API-kulcs felvétele az admin oldalon — a [`Local-Development.md`](Local-Development.md) **§6**-ában
@@ -129,18 +129,18 @@ bind-mountolva. A hivatalos `postgres:16-alpine` entrypoint **csak üres adatkö
 első inicializálásakor** futtatja a benne lévő scripteket, **lexikografikus
 sorrendben**:
 
-| Script | Mit hoz létre |
-|---|---|
-| [`01-roles.sh`](../../infra/postgres/init/01-roles.sh) | `aisztens` (app), `tkovari` (owner), `krak` (operátor) role; a database tulajdonosa `aisztens`; `GRANT CONNECT` az operátoroknak; séma-szintű grantok `\gexec`-guarddal (friss initen no-op, mert a sémák ekkor még nem léteznek) |
-| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `platform`, `callback`, `email` sémák (`CREATE SCHEMA IF NOT EXISTS`) + a grant-mátrix |
+| Script                                                     | Mit hoz létre                                                                                                                                                                                                                     |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`01-roles.sh`](../../infra/postgres/init/01-roles.sh)     | `aisztens` (app), `tkovari` (owner), `krak` (operátor) role; a database tulajdonosa `aisztens`; `GRANT CONNECT` az operátoroknak; séma-szintű grantok `\gexec`-guarddal (friss initen no-op, mert a sémák ekkor még nem léteznek) |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `platform`, `callback`, `email` sémák (`CREATE SCHEMA IF NOT EXISTS`) + a grant-mátrix                                                                                                                                            |
 
 Grant-mátrix (a két script és az [`Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2
 ugyanezt írja le):
 
-| Séma | `aisztens` (app) | `tkovari` (owner) | `krak` (operátor) |
-|---|---|---|---|
-| `platform` | USAGE + **CREATE** | USAGE | USAGE |
-| `email` | USAGE | USAGE | USAGE |
+| Séma       | `aisztens` (app)   | `tkovari` (owner) | `krak` (operátor) |
+| ---------- | ------------------ | ----------------- | ----------------- |
+| `platform` | USAGE + **CREATE** | USAGE             | USAGE             |
+| `email`    | USAGE              | USAGE             | USAGE             |
 
 - A `CREATE` jog azért kell, mert a Drizzle migrációs runner (`aisztens` kapcsolattal)
   a `platform` sémában tartja a könyvelő tábláját (`platform.__drizzle_migrations`) és
@@ -254,12 +254,12 @@ Ugyanezt a mátrixot ellenőrzi a `pnpm test:stack` is a `postgres-schemas`,
 
 ## 7. Kapcsolódás
 
-| Honnan | Hogyan |
-|---|---|
-| Konténerből (ajánlott) | `docker compose ... exec -T postgres psql -U <role> -d aisztens_db` |
-| Hostról, `psql` klienssel | `psql "postgres://aisztens:<AISZTENS_DB_PASSWORD>@localhost:5432/aisztens_db"` |
-| Hostról, GUI-val (DataGrip, DBeaver) | host `localhost`, port `5432`, DB `aisztens_db`, user `aisztens` |
-| Hoston futó API | `DATABASE_URL` a [`apps/api/.env.local`](../../apps/api/.env.example) fájlban |
+| Honnan                               | Hogyan                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------ |
+| Konténerből (ajánlott)               | `docker compose ... exec -T postgres psql -U <role> -d aisztens_db`            |
+| Hostról, `psql` klienssel            | `psql "postgres://aisztens:<AISZTENS_DB_PASSWORD>@localhost:5432/aisztens_db"` |
+| Hostról, GUI-val (DataGrip, DBeaver) | host `localhost`, port `5432`, DB `aisztens_db`, user `aisztens`               |
+| Hoston futó API                      | `DATABASE_URL` a [`apps/api/.env.local`](../../apps/api/.env.example) fájlban  |
 
 Megjegyzés: a `postgres` superuser csak a bootstraphez és a diagnosztikához kell; az
 alkalmazás **mindig** az `aisztens` role-lal kapcsolódik. A `postgres` role
@@ -295,19 +295,19 @@ admin oldal, a publikus web űrlap, a `callback.callback_requests` tábla, a
 
 **Megvan** — a `pnpm --filter @callback/api db:migrate` után:
 
-| Dolog | Hol / hogyan |
-|---|---|
-| `platform` és `email` séma | [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh), első initkor |
-| `platform.__drizzle_migrations` könyvelő tábla | `drizzle.config.ts` `migrations` beállítás + a runner |
-| `0000` migráció (callback tábla — történeti) | [`drizzle/0000_pretty_bromley.sql`](../../apps/api/drizzle/0000_pretty_bromley.sql) |
-| `0001` migráció (drop table + drop enum) | [`drizzle/0001_square_kat_farrell.sql`](../../apps/api/drizzle/0001_square_kat_farrell.sql) |
-| `0002` migráció (`platform.api_keys` tábla + `api_keys_identifier_key`) | [`drizzle/0002_minor_domino.sql`](../../apps/api/drizzle/0002_minor_domino.sql) |
-| működő `db:migrate` | [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) (lock nélkül) |
-| `DATABASE` / `DATABASE_CLIENT` token + `Database` típus | [`database.const.ts`](../../apps/api/src/db/database.const.ts), [`database.interface.ts`](../../apps/api/src/db/database.interface.ts) |
+| Dolog                                                                                                      | Hol / hogyan                                                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `platform` és `email` séma                                                                                 | [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh), első initkor                                                                                                                                                            |
+| `platform.__drizzle_migrations` könyvelő tábla                                                             | `drizzle.config.ts` `migrations` beállítás + a runner                                                                                                                                                                               |
+| `0000` migráció (callback tábla — történeti)                                                               | [`drizzle/0000_pretty_bromley.sql`](../../apps/api/drizzle/0000_pretty_bromley.sql)                                                                                                                                                 |
+| `0001` migráció (drop table + drop enum)                                                                   | [`drizzle/0001_square_kat_farrell.sql`](../../apps/api/drizzle/0001_square_kat_farrell.sql)                                                                                                                                         |
+| `0002` migráció (`platform.api_keys` tábla + `api_keys_identifier_key`)                                    | [`drizzle/0002_minor_domino.sql`](../../apps/api/drizzle/0002_minor_domino.sql)                                                                                                                                                     |
+| működő `db:migrate`                                                                                        | [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) (lock nélkül)                                                                                                                                                            |
+| `DATABASE` / `DATABASE_CLIENT` token + `Database` típus                                                    | [`database.const.ts`](../../apps/api/src/db/database.const.ts), [`database.interface.ts`](../../apps/api/src/db/database.interface.ts)                                                                                              |
 | **`DatabaseModule`** — Drizzle handle a `DATABASE` tokenhez, `DATABASE_URL` a `ConfigService`-ből (AIS-56) | [`database.module.ts`](../../apps/api/src/db/database.module.ts), factory-k: [`database.factory.ts`](../../apps/api/src/db/database.factory.ts), providerek: [`database.providers.ts`](../../apps/api/src/db/database.providers.ts) |
-| Kliens-lezárás leállításkor (`client.end({ timeout: 5 })`) | [`database-lifecycle.service.ts`](../../apps/api/src/db/database-lifecycle.service.ts) |
-| `isUuid()` guard (az `api-keys` fogja használni) | [`uuid.ts`](../../apps/api/src/db/uuid.ts) + [`uuid.spec.ts`](../../apps/api/src/db/uuid.spec.ts) |
-| **`platform.api_keys`** tábla + `api_keys_identifier_key` egyedi constraint (AIS-39) | [`schema.ts`](../../apps/api/src/db/schema.ts), [`schema.spec.ts`](../../apps/api/src/db/schema.spec.ts) |
+| Kliens-lezárás leállításkor (`client.end({ timeout: 5 })`)                                                 | [`database-lifecycle.service.ts`](../../apps/api/src/db/database-lifecycle.service.ts)                                                                                                                                              |
+| `isUuid()` guard (az `api-keys` fogja használni)                                                           | [`uuid.ts`](../../apps/api/src/db/uuid.ts) + [`uuid.spec.ts`](../../apps/api/src/db/uuid.spec.ts)                                                                                                                                   |
+| **`platform.api_keys`** tábla + `api_keys_identifier_key` egyedi constraint (AIS-39)                       | [`schema.ts`](../../apps/api/src/db/schema.ts), [`schema.spec.ts`](../../apps/api/src/db/schema.spec.ts)                                                                                                                            |
 
 > **AIS-56 (2026-10-21):** az API **nem indul el** `DATABASE_URL` nélkül — a
 > `DatabaseModule` provider-factory-ja `DatabaseConfigurationError`-t dob
@@ -334,10 +334,10 @@ Friss volume-on erre nincs szükség: a `02-schemas.sh` már csak `platform`-ot 
 
 **Még nincs** — ezeket ne keresd:
 
-| Hiányzó dolog | Miért | Mikor jön |
-|---|---|---|
+| Hiányzó dolog                                             | Miért                                                                                                             | Mikor jön                              |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | tábla-szintű grantok (`SELECT`/`INSERT`) az operátoroknak | a táblákat az `aisztens` hozza létre, tehát ő a tulajdonos; a `tkovari`/`krak` csak séma-szintű `USAGE`-ot kapott | későbbi read-only operátori hozzáférés |
-| migrációs lock, `lock_timeout`, `statement_timeout` | a runner egyelőre lock nélkül fut | Story 3 |
+| migrációs lock, `lock_timeout`, `statement_timeout`       | a runner egyelőre lock nélkül fut                                                                                 | Story 3                                |
 
 Ebből következik, hogy a lokális DB-ben **ma** a `platform.api_keys` tábla (és a
 vele járó egyedi constraint) az, amit érdemes ellenőrizni a séma-szintű eredmények
@@ -351,25 +351,25 @@ constraint nem esztétikai döntés: a HTTP-viselkedés függ tőle.
 
 Két ismert korlát tartozik ide:
 
-| Korlát | Következmény |
-|---|---|
-| a végpontok **autentikáció nélkül** futnak | az `api_key` érték a válaszban szerepel; éles forgalom előtt az auth story-nak meg kell jelennie |
-| a tábla egyelőre **nagyon kevés** sort tartalmaz, ezért nincs lapozás | a lista `created_at DESC` sorrendben, teljes egészében jön vissza |
+| Korlát                                                                | Következmény                                                                                     |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| a végpontok **autentikáció nélkül** futnak                            | az `api_key` érték a válaszban szerepel; éles forgalom előtt az auth story-nak meg kell jelennie |
+| a tábla egyelőre **nagyon kevés** sort tartalmaz, ezért nincs lapozás | a lista `created_at DESC` sorrendben, teljes egészében jön vissza                                |
 
 ---
 
 ## 10. Hibadiagnosztika
 
-| Tünet | Ok | Megoldás |
-|---|---|---|
-| `port is already allocated` a 5432-n | a másik lokális stack (teljes vagy DB-only) már fut | állítsd le a másikat (`pnpm db:down` / `scripts/dev-stack.sh down`) |
-| `FATAL: password authentication failed for user "aisztens"` | az `AISZTENS_DB_PASSWORD` az `infra/.env.local`-ban más, mint amivel kapcsolódsz — vagy a role-t egy korábbi, más jelszóval inicializált volume hozta létre | `$DC exec -T postgres bash /docker-entrypoint-initdb.d/01-roles.sh` (a script `ALTER ROLE … PASSWORD`-öt is futtat), vagy `down -v` + `pnpm db:up` |
-| `FATAL: role "aisztens" does not exist` | az init nem futott le (nem üres volume), vagy `01-roles.sh` hibával elhalt | nézd a `logs postgres`-t; futtasd kézzel a `01-roles.sh`-t |
-| `Skipping initialization` a logban | a volume már inicializált | ez nem hiba; új scripthez lásd §8 |
-| `permission denied for schema callback` | hiányzik a `CREATE` grant (AIS-35 előtt inicializált volume) | §8 a) vagy b) |
-| `FATAL: the database system is shutting down` | az entrypoint **ideiglenes** init-szervere áll le, miközben te már kérdezel | várj a `PostgreSQL init process complete` markerre, utána kérdezz |
-| a `db:migrate` „lefut”, de a tábla nem jelenik meg | a runner a `drizzle/` mappát a **cwd**-hez képest keresi, tehát `pnpm --filter @callback/api db:migrate`-tel (cwd = `apps/api`) kell futtatni; közvetlen `node dist/migrate.js` máshonnan a repó gyökeréből nézve nem találja | futtasd `pnpm --filter @callback/api db:migrate`-tel |
-| `password authentication failed for user "aisztens"` a `db:migrate`-nél | a `DATABASE_URL` nem oldható fel, és a config az `infra/.env.local`-ból komponál — de az `AISZTENS_DB_PASSWORD` más, mint amivel a volume inicializálódott | lásd a fenti sort: `01-roles.sh` újrafuttatás vagy `down -v` |
+| Tünet                                                                   | Ok                                                                                                                                                                                                                            | Megoldás                                                                                                                                           |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `port is already allocated` a 5432-n                                    | a másik lokális stack (teljes vagy DB-only) már fut                                                                                                                                                                           | állítsd le a másikat (`pnpm db:down` / `scripts/dev-stack.sh down`)                                                                                |
+| `FATAL: password authentication failed for user "aisztens"`             | az `AISZTENS_DB_PASSWORD` az `infra/.env.local`-ban más, mint amivel kapcsolódsz — vagy a role-t egy korábbi, más jelszóval inicializált volume hozta létre                                                                   | `$DC exec -T postgres bash /docker-entrypoint-initdb.d/01-roles.sh` (a script `ALTER ROLE … PASSWORD`-öt is futtat), vagy `down -v` + `pnpm db:up` |
+| `FATAL: role "aisztens" does not exist`                                 | az init nem futott le (nem üres volume), vagy `01-roles.sh` hibával elhalt                                                                                                                                                    | nézd a `logs postgres`-t; futtasd kézzel a `01-roles.sh`-t                                                                                         |
+| `Skipping initialization` a logban                                      | a volume már inicializált                                                                                                                                                                                                     | ez nem hiba; új scripthez lásd §8                                                                                                                  |
+| `permission denied for schema callback`                                 | hiányzik a `CREATE` grant (AIS-35 előtt inicializált volume)                                                                                                                                                                  | §8 a) vagy b)                                                                                                                                      |
+| `FATAL: the database system is shutting down`                           | az entrypoint **ideiglenes** init-szervere áll le, miközben te már kérdezel                                                                                                                                                   | várj a `PostgreSQL init process complete` markerre, utána kérdezz                                                                                  |
+| a `db:migrate` „lefut”, de a tábla nem jelenik meg                      | a runner a `drizzle/` mappát a **cwd**-hez képest keresi, tehát `pnpm --filter @callback/api db:migrate`-tel (cwd = `apps/api`) kell futtatni; közvetlen `node dist/migrate.js` máshonnan a repó gyökeréből nézve nem találja | futtasd `pnpm --filter @callback/api db:migrate`-tel                                                                                               |
+| `password authentication failed for user "aisztens"` a `db:migrate`-nél | a `DATABASE_URL` nem oldható fel, és a config az `infra/.env.local`-ból komponál — de az `AISZTENS_DB_PASSWORD` más, mint amivel a volume inicializálódott                                                                    | lásd a fenti sort: `01-roles.sh` újrafuttatás vagy `down -v`                                                                                       |
 
 ---
 

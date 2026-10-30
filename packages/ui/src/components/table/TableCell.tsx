@@ -8,7 +8,10 @@ import { cn } from '../../lib/cn.js';
  */
 export function TableCell({ className, children, ...rest }: TableCellProps) {
   return (
-    <td {...rest} className={cn('px-4 py-3 align-top text-text-secondary', className)}>
+    <td
+      {...rest}
+      className={cn('px-4 py-3 align-top text-text-secondary', className)}
+    >
       {children}
     </td>
   );

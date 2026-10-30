@@ -24,16 +24,16 @@ GitHub Copilot, Cursor, Claude Code) receive their instructions from
 Recorded in the ticket (AIS-101), not implemented here — this chat only produced
 the ticket.
 
-| # | Decision |
-| --- | --- |
-| D1 | The rule lives in the global `.roo/rules/instructions.md` (new `# Git commit üzenetek` section), not in per-mode `customInstructions` in `.roomodes` — `.roo/rules/*.md` is the only authored source (`docs/Specs/AI-Agent-Artifacts.md` §7). |
-| D2 | The Jira key is a **prefix**, not a suffix: `AIS-42: feat(admin): add API keys page`, so `git log --grep=AIS-42` works and the type survives. |
-| D3 | Without a ticket the title starts with a Conventional Commit type (`feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `build`, `ci`, `style`, `revert`) — the vocabulary the history already uses — not literal `feature:` / `bugfix:`. |
-| D4 | Key resolution chain: the ticket handled in the session → the key found in the branch name (`[A-Z][A-Z0-9]{1,9}-\d+`) → no key. Inventing a key is forbidden. |
-| D5 | Instructions only. No commitlint config, no husky hook, no CI commit-title gate in this ticket — separate follow-up. |
-| D6 | Generated artefacts stay gitignored; after the source edit run `scripts/init.ps1` / `scripts/init.sh` (or `node scripts/lib/agent-artifacts/generate.mjs --agent <copilot\|cursor\|claude>`), and only `.roo/rules/instructions.md` is committed. |
-| D7 | The rule applies to PR titles and squash-merge titles too, otherwise the key is lost on `main`. |
-| D8 | No milestone: the decisions live in the ticket; a `docs/history/` entry is still required. |
+| #   | Decision                                                                                                                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | The rule lives in the global `.roo/rules/instructions.md` (new `# Git commit üzenetek` section), not in per-mode `customInstructions` in `.roomodes` — `.roo/rules/*.md` is the only authored source (`docs/Specs/AI-Agent-Artifacts.md` §7).     |
+| D2  | The Jira key is a **prefix**, not a suffix: `AIS-42: feat(admin): add API keys page`, so `git log --grep=AIS-42` works and the type survives.                                                                                                     |
+| D3  | Without a ticket the title starts with a Conventional Commit type (`feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `build`, `ci`, `style`, `revert`) — the vocabulary the history already uses — not literal `feature:` / `bugfix:`.  |
+| D4  | Key resolution chain: the ticket handled in the session → the key found in the branch name (`[A-Z][A-Z0-9]{1,9}-\d+`) → no key. Inventing a key is forbidden.                                                                                     |
+| D5  | Instructions only. No commitlint config, no husky hook, no CI commit-title gate in this ticket — separate follow-up.                                                                                                                              |
+| D6  | Generated artefacts stay gitignored; after the source edit run `scripts/init.ps1` / `scripts/init.sh` (or `node scripts/lib/agent-artifacts/generate.mjs --agent <copilot\|cursor\|claude>`), and only `.roo/rules/instructions.md` is committed. |
+| D7  | The rule applies to PR titles and squash-merge titles too, otherwise the key is lost on `main`.                                                                                                                                                   |
+| D8  | No milestone: the decisions live in the ticket; a `docs/history/` entry is still required.                                                                                                                                                        |
 
 Format that the rule must mandate:
 

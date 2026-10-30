@@ -12,22 +12,22 @@ learn how to project it onto the other agents.
 
 ## What changed
 
-| File | Change |
-|---|---|
-| `scripts/lib/agent-artifacts/generate.mjs` | New CLI (`--agent copilot\|cursor\|claude`, `--check`, `--dry-run`, `--root`): renders the instruction file plus the mode artefacts of the selected agent and writes them. Exit codes `0` / `1` / `2` (stale in `--check`). |
-| `scripts/lib/agent-artifacts/yaml-lite.mjs` | Dependency-free YAML subset parser (maps, sequences, block scalars `\|`/`>`/`-`, flow lists, quotes, comments) with line-numbered errors. |
-| `scripts/lib/agent-artifacts/roomodes.mjs` | `.roomodes` loader + validation (required fields, known tool groups, duplicate slugs). |
-| `scripts/lib/agent-artifacts/tools.mjs` | Zoo `groups` → Copilot / Claude tool identifiers. |
-| `scripts/lib/agent-artifacts/render-copilot.mjs` | `.github/chatmodes/<slug>.chatmode.md`. |
-| `scripts/lib/agent-artifacts/render-claude.mjs` | `.claude/agents/<slug>.md`. |
-| `scripts/lib/agent-artifacts/render-cursor.mjs` | `.cursor/commands/<slug>.md` + `.cursor/rules/<slug>.mdc` (`alwaysApply: false`). |
-| `scripts/lib/agent-artifacts/render-body.mjs` | Shared `## Role` / `## When to use` / `## Workflow` body and helpers. |
-| `scripts/lib/agent-artifacts/writer.mjs` | Idempotent writer (UTF-8 no BOM, LF, one trailing newline, `.bak`) + `.gitignore` synchroniser. |
-| `scripts/lib/agent-artifacts/overrides.mjs` + `mode-overrides.json` | Per-mode `emit` and tool-list overrides (kept out of `.roomodes`, which must stay valid Zoo Code schema). |
-| `scripts/init.sh`, `scripts/init.ps1` | Reduced to thin wrappers: repo-root resolution, `node` pre-flight, agent menu, then `node generate.mjs --agent <choice>`. All duplicated rendering/writing/gitignore code removed (~250 lines of shell). |
-| `package.json` | `test:agents` → `node --test scripts/lib/agent-artifacts/`. |
-| `scripts/README.md` | New layout entry + rewritten init section (sources, outputs, CLI, exit codes, gitignore contract). |
-| `docs/Specs/AI-Agent-Artifacts.md` | New living spec for the pipeline. |
+| File                                                                | Change                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/lib/agent-artifacts/generate.mjs`                          | New CLI (`--agent copilot\|cursor\|claude`, `--check`, `--dry-run`, `--root`): renders the instruction file plus the mode artefacts of the selected agent and writes them. Exit codes `0` / `1` / `2` (stale in `--check`). |
+| `scripts/lib/agent-artifacts/yaml-lite.mjs`                         | Dependency-free YAML subset parser (maps, sequences, block scalars `\|`/`>`/`-`, flow lists, quotes, comments) with line-numbered errors.                                                                                   |
+| `scripts/lib/agent-artifacts/roomodes.mjs`                          | `.roomodes` loader + validation (required fields, known tool groups, duplicate slugs).                                                                                                                                      |
+| `scripts/lib/agent-artifacts/tools.mjs`                             | Zoo `groups` → Copilot / Claude tool identifiers.                                                                                                                                                                           |
+| `scripts/lib/agent-artifacts/render-copilot.mjs`                    | `.github/chatmodes/<slug>.chatmode.md`.                                                                                                                                                                                     |
+| `scripts/lib/agent-artifacts/render-claude.mjs`                     | `.claude/agents/<slug>.md`.                                                                                                                                                                                                 |
+| `scripts/lib/agent-artifacts/render-cursor.mjs`                     | `.cursor/commands/<slug>.md` + `.cursor/rules/<slug>.mdc` (`alwaysApply: false`).                                                                                                                                           |
+| `scripts/lib/agent-artifacts/render-body.mjs`                       | Shared `## Role` / `## When to use` / `## Workflow` body and helpers.                                                                                                                                                       |
+| `scripts/lib/agent-artifacts/writer.mjs`                            | Idempotent writer (UTF-8 no BOM, LF, one trailing newline, `.bak`) + `.gitignore` synchroniser.                                                                                                                             |
+| `scripts/lib/agent-artifacts/overrides.mjs` + `mode-overrides.json` | Per-mode `emit` and tool-list overrides (kept out of `.roomodes`, which must stay valid Zoo Code schema).                                                                                                                   |
+| `scripts/init.sh`, `scripts/init.ps1`                               | Reduced to thin wrappers: repo-root resolution, `node` pre-flight, agent menu, then `node generate.mjs --agent <choice>`. All duplicated rendering/writing/gitignore code removed (~250 lines of shell).                    |
+| `package.json`                                                      | `test:agents` → `node --test scripts/lib/agent-artifacts/`.                                                                                                                                                                 |
+| `scripts/README.md`                                                 | New layout entry + rewritten init section (sources, outputs, CLI, exit codes, gitignore contract).                                                                                                                          |
+| `docs/Specs/AI-Agent-Artifacts.md`                                  | New living spec for the pipeline.                                                                                                                                                                                           |
 
 ## Deviations from the plan
 

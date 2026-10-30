@@ -19,26 +19,26 @@
 
 ### 2.1 Current repo (new structure)
 
-| File | State | Content summary |
-|---|---|---|
-| [`deploy/.env.dev`](../../deploy/.env.dev:1) | present | HOST=ssh.aisztens.hu, SSH_USER=root, SSH_KEY=./deploy/ssh-keys/root.private.key, REMOTE_DIR, SUDO_USERS=tkovari,krak, APP_USER, UFW_ENABLE=0, DEPLOY_LOG_LEVEL/KEEP |
-| `deploy/.env.prod` | missing | dormant by design |
-| [`infra/.env.dev`](../../infra/.env.dev:1) | present | full stack config with real dev secrets; CORS=web+admin only |
-| `infra/.env.local` | missing | auto-seeded by dev-stack.sh |
-| `infra/.env.prod` | missing | dormant by design |
-| [`apps/api/.env.local`](../../apps/api/.env.local:1), `.env.dev`, `.env.prod` | present | PORT + CORS; `.env.dev` VAPI secret is a placeholder |
-| [`apps/web/.env.local`](../../apps/web/.env.local:1), `.env.dev`, `.env.prod` | present | VITE_API_BASE_URL per env |
-| [`apps/admin/.env.local`](../../apps/admin/.env.local:1), `.env.dev`, `.env.prod` | present | VITE_API_BASE_URL per env |
-| `deploy/ssh-keys/*.pub` | missing | only README + .gitignore committed |
+| File                                                                              | State   | Content summary                                                                                                                                                     |
+| --------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`deploy/.env.dev`](../../deploy/.env.dev:1)                                      | present | HOST=ssh.aisztens.hu, SSH_USER=root, SSH_KEY=./deploy/ssh-keys/root.private.key, REMOTE_DIR, SUDO_USERS=tkovari,krak, APP_USER, UFW_ENABLE=0, DEPLOY_LOG_LEVEL/KEEP |
+| `deploy/.env.prod`                                                                | missing | dormant by design                                                                                                                                                   |
+| [`infra/.env.dev`](../../infra/.env.dev:1)                                        | present | full stack config with real dev secrets; CORS=web+admin only                                                                                                        |
+| `infra/.env.local`                                                                | missing | auto-seeded by dev-stack.sh                                                                                                                                         |
+| `infra/.env.prod`                                                                 | missing | dormant by design                                                                                                                                                   |
+| [`apps/api/.env.local`](../../apps/api/.env.local:1), `.env.dev`, `.env.prod`     | present | PORT + CORS; `.env.dev` VAPI secret is a placeholder                                                                                                                |
+| [`apps/web/.env.local`](../../apps/web/.env.local:1), `.env.dev`, `.env.prod`     | present | VITE_API_BASE_URL per env                                                                                                                                           |
+| [`apps/admin/.env.local`](../../apps/admin/.env.local:1), `.env.dev`, `.env.prod` | present | VITE_API_BASE_URL per env                                                                                                                                           |
+| `deploy/ssh-keys/*.pub`                                                           | missing | only README + .gitignore committed                                                                                                                                  |
 
 ### 2.2 Old repo (single-env layout)
 
-| File | State | Content summary |
-|---|---|---|
-| `deploy/.env` | present | HOST=ssh.aisztens.hu, SSH_KEY=/home/tkovari/.ssh/kalman-ssh-key-20260916.openssh.private.key, SUDO_USERS=tkovari,krak,deployer |
-| `infra/.env` | present | same real secrets as new infra/.env.dev, but CORS includes https://api.aisztens.hu |
-| `apps/api/.env`, `apps/web/.env`, `apps/admin` env | absent | old admin app was Angular; no apps-level env data |
-| `deploy/ssh-keys/*.pub` | present | tkovari.pub, krak.pub, aisztens.pub, deployer.pub |
+| File                                               | State   | Content summary                                                                                                                |
+| -------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `deploy/.env`                                      | present | HOST=ssh.aisztens.hu, SSH_KEY=/home/tkovari/.ssh/kalman-ssh-key-20260916.openssh.private.key, SUDO_USERS=tkovari,krak,deployer |
+| `infra/.env`                                       | present | same real secrets as new infra/.env.dev, but CORS includes https://api.aisztens.hu                                             |
+| `apps/api/.env`, `apps/web/.env`, `apps/admin` env | absent  | old admin app was Angular; no apps-level env data                                                                              |
+| `deploy/ssh-keys/*.pub`                            | present | tkovari.pub, krak.pub, aisztens.pub, deployer.pub                                                                              |
 
 ---
 
@@ -46,14 +46,14 @@
 
 The new structure is the source of truth. Decisions confirmed with the requester:
 
-| # | Field / file | Old value | New value | Decision |
-|---|---|---|---|---|
-| 1 | `infra/.env.dev` CORS_ORIGINS | includes https://api.aisztens.hu | web + admin only | keep new (do NOT re-add api origin) |
-| 2 | `deploy/.env.dev` SSH_KEY | /home/tkovari/.ssh/... (WSL) | ./deploy/ssh-keys/root.private.key | keep new repo-local path |
-| 3 | `deploy/.env.dev` SUDO_USERS | tkovari,krak,deployer | tkovari,krak | restore deployer → tkovari,krak,deployer |
-| 4 | `apps/api/.env.dev` VAPI_WEBHOOK_SECRET | (real in infra/.env.dev) | placeholder | keep placeholder (compose injects real secret) |
-| 5 | `deploy/ssh-keys/*.pub` | 4 files present | none | copy all four .pub files |
-| 6 | prod + local env files | — | missing | leave as-is (prod dormant, local auto-seeded) |
+| #   | Field / file                            | Old value                        | New value                          | Decision                                       |
+| --- | --------------------------------------- | -------------------------------- | ---------------------------------- | ---------------------------------------------- |
+| 1   | `infra/.env.dev` CORS_ORIGINS           | includes https://api.aisztens.hu | web + admin only                   | keep new (do NOT re-add api origin)            |
+| 2   | `deploy/.env.dev` SSH_KEY               | /home/tkovari/.ssh/... (WSL)     | ./deploy/ssh-keys/root.private.key | keep new repo-local path                       |
+| 3   | `deploy/.env.dev` SUDO_USERS            | tkovari,krak,deployer            | tkovari,krak                       | restore deployer → tkovari,krak,deployer       |
+| 4   | `apps/api/.env.dev` VAPI_WEBHOOK_SECRET | (real in infra/.env.dev)         | placeholder                        | keep placeholder (compose injects real secret) |
+| 5   | `deploy/ssh-keys/*.pub`                 | 4 files present                  | none                               | copy all four .pub files                       |
+| 6   | prod + local env files                  | —                                | missing                            | leave as-is (prod dormant, local auto-seeded)  |
 
 ---
 

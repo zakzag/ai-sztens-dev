@@ -46,14 +46,14 @@ containers (`web`, `admin`) that the smoke suite must also probe. The
 list below reflects the current `infra/docker-compose.yml` (image-based
 build, no `build:` blocks):
 
-| Service  | Check                                                       |
-|----------|-------------------------------------------------------------|
-| api      | `GET /api` returns 200 with the `Hello Beautiful World!` body |
-| web      | `GET /` returns 200 + `text/html` (nginx serves the SPA)     |
+| Service   | Check                                                              |
+| --------- | ------------------------------------------------------------------ |
+| api       | `GET /api` returns 200 with the `Hello Beautiful World!` body      |
+| web       | `GET /` returns 200 + `text/html` (nginx serves the SPA)           |
 | web-admin | `GET /` returns 200 + `text/html` (nginx serves the dashboard SPA) |
-| postgres | `pg_isready` exits 0 (user/DB resolved from `infra/.env`)    |
-| caddy    | `GET https://api.<DOMAIN>/healthz` returns the prod-shaped     |
-| monitor  | At least one `API check`/`API is reachable` line in the log  |
+| postgres  | `pg_isready` exits 0 (user/DB resolved from `infra/.env`)          |
+| caddy     | `GET https://api.<DOMAIN>/healthz` returns the prod-shaped         |
+| monitor   | At least one `API check`/`API is reachable` line in the log        |
 
 The suite **does NOT** probe the Caddy admin API (`:2019/config/`).
 That endpoint is intentionally disabled (`admin off` in
@@ -65,14 +65,14 @@ watchdog both call.
 
 ### Cross-service — do they see each other? (6 checks)
 
-| Check                         | Command (from inside the source container)                       |
-|-------------------------------|------------------------------------------------------------------|
-| `caddy` resolves `api`        | `getent hosts api`                                               |
-| `api` resolves `postgres`     | `getent hosts postgres`                                          |
-| `caddy → api` HTTP request    | `wget http://api:3000/healthz` → expects `{"status":"ok",...}`   |
-| `api → postgres` TCP connect  | `bash -c "exec 3<>/dev/tcp/postgres/5432"`                        |
-| Postgres roles exist          | `psql -tAc "... WHERE rolname IN ('aisztens','tkovari','krak')"` |
-| `monitor` ticked              | log scan inside the monitor container                             |
+| Check                        | Command (from inside the source container)                       |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `caddy` resolves `api`       | `getent hosts api`                                               |
+| `api` resolves `postgres`    | `getent hosts postgres`                                          |
+| `caddy → api` HTTP request   | `wget http://api:3000/healthz` → expects `{"status":"ok",...}`   |
+| `api → postgres` TCP connect | `bash -c "exec 3<>/dev/tcp/postgres/5432"`                       |
+| Postgres roles exist         | `psql -tAc "... WHERE rolname IN ('aisztens','tkovari','krak')"` |
+| `monitor` ticked             | log scan inside the monitor container                            |
 
 The 6th and 7th checks (VAPI webhook pre-filter and HMAC accept) live
 in the **live** stack smoke suite ([`scripts/test/stack-smoke.sh`](scripts/test/stack-smoke.sh))
@@ -81,11 +81,11 @@ from `infra/.env`, which the local suite does not always have.
 
 ## Exit codes
 
-| Code | Meaning                                                       |
-|------|---------------------------------------------------------------|
-| 0    | every check passed                                            |
-| 1    | at least one check failed (stack was up but something broke)  |
-| 2    | the stack was not running and `--up` was not supplied         |
+| Code | Meaning                                                      |
+| ---- | ------------------------------------------------------------ |
+| 0    | every check passed                                           |
+| 1    | at least one check failed (stack was up but something broke) |
+| 2    | the stack was not running and `--up` was not supplied        |
 
 ## Flags
 
@@ -127,12 +127,12 @@ copies `deploy/deploy.sh` into a throwaway "repo" together with `deploy/lib/`, a
 against fixtures, so they are safe to run anywhere (including CI) and are a cheap guard
 after touching the deploy script:
 
-| Script | What it locks down |
-|---|---|
-| `_deploy-sh-env-selection-test.sh` | the `[dev\|prod]` target argument: selection precedence, usage errors (exit 2), the legacy `deploy/.env` migration hint |
-| `_deploy-sh-m1-test.sh` | the guard breadcrumbs (stage tags, exit codes, the logged `HOST` check) |
-| `_deploy-sh-m3-test.sh` | the local `infra/.env` path-resolution chain (self-contained copy of the old logic) |
-| `_deploy-sh-logger-test.sh` | `deploy/lib/logger.sh`: header/footer, level tagging, subprocess capture, retention, `latest.log` |
+| Script                                   | What it locks down                                                                                                                                                                                               |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_deploy-sh-env-selection-test.sh`       | the `[dev\|prod]` target argument: selection precedence, usage errors (exit 2), the legacy `deploy/.env` migration hint                                                                                          |
+| `_deploy-sh-m1-test.sh`                  | the guard breadcrumbs (stage tags, exit codes, the logged `HOST` check)                                                                                                                                          |
+| `_deploy-sh-m3-test.sh`                  | the local `infra/.env` path-resolution chain (self-contained copy of the old logic)                                                                                                                              |
+| `_deploy-sh-logger-test.sh`              | `deploy/lib/logger.sh`: header/footer, level tagging, subprocess capture, retention, `latest.log`                                                                                                                |
 | `_deploy-sh-remote-compose-path-test.sh` | the **remote identity** (`deployer`, never `root`) and the **remote env-file path** (`infra/.env`, never the local per-env name) plus the writability preflight, using stub `ssh`/`scp`/`rsync`/`pnpm` on `PATH` |
 
 ```bash
@@ -184,8 +184,8 @@ expression-language semantics of the `if:` chain (the matrix
 `matrix.app_env == …` selector) is easier to mirror in pure Python than
 in bash:
 
-| Script | What it locks down |
-|---|---|
+| Script                            | What it locks down                                                                                                                                                                                                                             |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `_deploy-yml-matrix-pick-test.py` | the deploy.yml job-level `if:` that picks the right matrix entry (`dev` or `prod`) for each trigger shape (push to dev, workflow_dispatch dev/prod, workflow_run from a dev push / prod dispatch, upstream-failure, …) — 14 scenarios in total |
 
 ```bash
@@ -222,7 +222,7 @@ live-access checks.
   defines as the api healthcheck, so the suite cannot drift from what
   compose considers healthy.
 - **Network proof, not just liveness.** Every cross-service check uses the
-  *service name* (e.g. `http://api:3000/api`) and runs inside the source
+  _service name_ (e.g. `http://api:3000/api`) and runs inside the source
   container, proving that docker compose's embedded DNS resolves names and
   that the `internal` network actually routes traffic.
 

@@ -22,11 +22,11 @@ run, so fixing the secret by hand would have taken several round-trips.
 
 ## Fix (option B: strip and warn)
 
-| File | Change |
-|---|---|
-| [`.github/scripts/render-infra-env.sh`](../../.github/scripts/render-infra-env.sh) | **New.** Writes `infra/.env` from `INFRA_ENV`; drops lines defining the four owned keys (also indented, `export `, CRLF variants; comments and lookalike keys such as `IMAGE_TAG_PREFIX` are kept); emits one `::warning::` naming the removed keys (never values); appends the authoritative values; `chmod 0644` (scp-action tar needs it, step 5a re-tightens to 600). |
-| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) | The step now runs the script; `.github/scripts` added to the deploy job's sparse-checkout. |
-| [`scripts/test/_render-infra-env-test.sh`](../../scripts/test/_render-infra-env-test.sh) | **New.** 10 offline cases (clean secret, all four keys, whitespace/export/CRLF, lookalikes, commented key, REGISTRY override, empty secret, bad APP_ENV, empty IMAGE_TAG, file mode). |
+| File                                                                                     | Change                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`.github/scripts/render-infra-env.sh`](../../.github/scripts/render-infra-env.sh)       | **New.** Writes `infra/.env` from `INFRA_ENV`; drops lines defining the four owned keys (also indented, `export `, CRLF variants; comments and lookalike keys such as `IMAGE_TAG_PREFIX` are kept); emits one `::warning::` naming the removed keys (never values); appends the authoritative values; `chmod 0644` (scp-action tar needs it, step 5a re-tightens to 600). |
+| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml)                     | The step now runs the script; `.github/scripts` added to the deploy job's sparse-checkout.                                                                                                                                                                                                                                                                                |
+| [`scripts/test/_render-infra-env-test.sh`](../../scripts/test/_render-infra-env-test.sh) | **New.** 10 offline cases (clean secret, all four keys, whitespace/export/CRLF, lookalikes, commented key, REGISTRY override, empty secret, bad APP_ENV, empty IMAGE_TAG, file mode).                                                                                                                                                                                     |
 
 ## Verify
 

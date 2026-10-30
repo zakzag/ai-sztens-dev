@@ -78,7 +78,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/dev-stack.ps1 up
 ```
 
 On this machine the new error path proceeds into the WSL branch and
-hits a *different* downstream error (`wslpath: E:projectsAI…` — Windows
+hits a _different_ downstream error (`wslpath: E:projectsAI…` — Windows
 path's backslashes were lost when passing the string to a native
 command). That's a separate, environment-specific issue (no real WSL
 distro with a bash binary is installed) and is **not** the bug this
@@ -109,3 +109,4 @@ $null) and add an explicit null-guard with a FATAL diagnostic that
 exits 1 instead of continuing with a bad path.
 
 Bisected and fixed after a user report on 2026-10-05.
+```

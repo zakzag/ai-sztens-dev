@@ -8,17 +8,17 @@ handling) even though **all 24 suites and 212 tests passed**.
 
 ## Diagnosis
 
-The lines were not failures — they are the *production* log calls of the very
+The lines were not failures — they are the _production_ log calls of the very
 branches those specs exercise on purpose. Nothing was broken; the test run simply
 shared the console with the application logger.
 
 ## Change
 
-| File | Change |
-|---|---|
-| `apps/api/src/test/setup/silence-nest-logger.ts` (new) | `Logger.overrideLogger(false)` installs Nest's `NoopLogger`; documented why the calls stay observable for spies |
-| `apps/api/package.json` | `jest.setupFiles` → `<rootDir>/test/setup/silence-nest-logger.ts` (unit config only; the e2e config is untouched) |
-| `apps/api/src/db/database-lifecycle.service.spec.ts` | the two failure tests now assert the `Logger.error` call (message text + call count) instead of relying on console noise, using a local `captureLogMessages()` recorder — no spy typing, no casts |
+| File                                                   | Change                                                                                                                                                                                            |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/test/setup/silence-nest-logger.ts` (new) | `Logger.overrideLogger(false)` installs Nest's `NoopLogger`; documented why the calls stay observable for spies                                                                                   |
+| `apps/api/package.json`                                | `jest.setupFiles` → `<rootDir>/test/setup/silence-nest-logger.ts` (unit config only; the e2e config is untouched)                                                                                 |
+| `apps/api/src/db/database-lifecycle.service.spec.ts`   | the two failure tests now assert the `Logger.error` call (message text + call count) instead of relying on console noise, using a local `captureLogMessages()` recorder — no spy typing, no casts |
 
 ## Verification
 
@@ -32,8 +32,8 @@ Remaining output is intentional: the `console.warn` notice that
 
 ## Notes
 
-* A failing assertion still fails: no test asserts console text, and the logger
+- A failing assertion still fails: no test asserts console text, and the logger
   interceptor sits in front of the no-op logger, so `Logger.prototype` spies keep
   working (the pattern already used in `vapi-signature.guard.spec.ts`).
-* Kept the production logging untouched — silencing belongs to the test harness,
+- Kept the production logging untouched — silencing belongs to the test harness,
   not to `ApiExceptionFilter` or `DatabaseLifecycleService`.

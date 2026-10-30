@@ -4,14 +4,14 @@ The `monitor` service is a lightweight **API liveness watchdog** — an Alpine +
 
 ### Behaviour
 
-| Step | Detail |
-|---|---|
-| Target | `MONITOR_TARGET_URL`, default `http://api:3000/healthz` ([`watch.sh:14`](infra/monitor/watch.sh:14)) — the dedicated liveness route from [`apps/api/src/health/health.controller.ts`](apps/api/src/health/health.controller.ts:12), outside the NestJS `api` prefix |
-| Poll | `curl -fsS --max-time 10`, every `INTERVAL_SECONDS` (30 s) |
-| Failure path | counter increments, log `API check failed (n/FAIL_THRESHOLD)`; at `FAIL_THRESHOLD` (2) consecutive failures with prior state `up` → state `down` + webhook POST ([`watch.sh:47`](infra/monitor/watch.sh:47)) |
-| Recovery path | counter reset; if state was `down` → log `API is reachable again` + `up` webhook ([`watch.sh:38`](infra/monitor/watch.sh:38)) |
-| Never exits | infinite `while true` loop → the container stays `Up`; probe failures never terminate it |
-| Payload | `{"event":"down\|up","url":...,"state":...,"checked_at":...}` ([`watch.sh:29`](infra/monitor/watch.sh:29)); webhook errors swallowed via `|| true` ([`watch.sh:33`](infra/monitor/watch.sh:33)) |
+| Step          | Detail                                                                                                                                                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Target        | `MONITOR_TARGET_URL`, default `http://api:3000/healthz` ([`watch.sh:14`](infra/monitor/watch.sh:14)) — the dedicated liveness route from [`apps/api/src/health/health.controller.ts`](apps/api/src/health/health.controller.ts:12), outside the NestJS `api` prefix |
+| Poll          | `curl -fsS --max-time 10`, every `INTERVAL_SECONDS` (30 s)                                                                                                                                                                                                          |
+| Failure path  | counter increments, log `API check failed (n/FAIL_THRESHOLD)`; at `FAIL_THRESHOLD` (2) consecutive failures with prior state `up` → state `down` + webhook POST ([`watch.sh:47`](infra/monitor/watch.sh:47))                                                        |
+| Recovery path | counter reset; if state was `down` → log `API is reachable again` + `up` webhook ([`watch.sh:38`](infra/monitor/watch.sh:38))                                                                                                                                       |
+| Never exits   | infinite `while true` loop → the container stays `Up`; probe failures never terminate it                                                                                                                                                                            |
+| Payload       | `{"event":"down\|up","url":...,"state":...,"checked_at":...}` ([`watch.sh:29`](infra/monitor/watch.sh:29)); webhook errors swallowed via `                                                                                                                          |     | true` ([`watch.sh:33`](infra/monitor/watch.sh:33)) |
 
 **Key caveat:** `MONITOR_ALERT_WEBHOOK_URL` is empty by default ([`infra/.env.example`](infra/.env.example:42)), so out of the box the watchdog is **log-only** — set it to a Healthchecks.io ping URL or a Slack/Discord incoming webhook to actually receive alerts.
 

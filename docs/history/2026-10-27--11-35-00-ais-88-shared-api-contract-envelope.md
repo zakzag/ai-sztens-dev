@@ -9,17 +9,17 @@ response envelope). Plan: `docs/plans/2026-10-26--17-21-00-unified-api-contract-
 `packages/shared/src/contract/` is now the **only** place where a request or response shape is
 written down. Nothing in the server or the client may keep a second copy.
 
-| File | Content |
-|---|---|
-| [`http-status.const.ts`](../../packages/shared/src/contract/http-status.const.ts:1) | `HTTP_STATUS` + `HttpStatus` — one table for server and client (D5) |
-| [`error-code.const.ts`](../../packages/shared/src/contract/error-code.const.ts:1) | `API_ERROR_CODE`, `ApiErrorCode`, `API_ERROR_CODE_STATUS`, `UNKNOWN_API_ERROR_CODE_STATUS` (D8) |
-| [`datetime.schema.ts`](../../packages/shared/src/contract/datetime.schema.ts:1) | `isoDateTimeSchema` — the single ISO 8601 (offset required) schema |
-| [`envelope.interface.ts`](../../packages/shared/src/contract/envelope.interface.ts:1) | `ApiEnvelope<T>`, `ResponseMeta`, `PaginationMeta` (D2) |
-| [`envelope.schema.ts`](../../packages/shared/src/contract/envelope.schema.ts:1) | `responseMetaSchema`, `paginationMetaSchema`, `successEnvelopeSchema()`, `toSuccessEnvelope()` |
-| [`error-envelope.interface.ts`](../../packages/shared/src/contract/error-envelope.interface.ts:1) | `ApiErrorEnvelope`, `ApiErrorBody`, `ApiErrorDetail`, `AppErrorShape`, `ErrorContext` |
-| [`error-envelope.ts`](../../packages/shared/src/contract/error-envelope.ts:1) | `apiErrorEnvelopeSchema`, `apiErrorDetailSchema`, `apiErrorBodySchema`, `resolveApiErrorStatus()`, `toErrorEnvelope()` |
-| [`api-keys/`](../../packages/shared/src/contract/api-keys/api-keys.schema.ts:1) | the former `src/schemas/api-key.*` trio, moved (`git mv`, content unchanged apart from imports) |
-| [`index.ts`](../../packages/shared/src/contract/index.ts:1) | explicit re-exports (no `export *`) |
+| File                                                                                              | Content                                                                                                                |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [`http-status.const.ts`](../../packages/shared/src/contract/http-status.const.ts:1)               | `HTTP_STATUS` + `HttpStatus` — one table for server and client (D5)                                                    |
+| [`error-code.const.ts`](../../packages/shared/src/contract/error-code.const.ts:1)                 | `API_ERROR_CODE`, `ApiErrorCode`, `API_ERROR_CODE_STATUS`, `UNKNOWN_API_ERROR_CODE_STATUS` (D8)                        |
+| [`datetime.schema.ts`](../../packages/shared/src/contract/datetime.schema.ts:1)                   | `isoDateTimeSchema` — the single ISO 8601 (offset required) schema                                                     |
+| [`envelope.interface.ts`](../../packages/shared/src/contract/envelope.interface.ts:1)             | `ApiEnvelope<T>`, `ResponseMeta`, `PaginationMeta` (D2)                                                                |
+| [`envelope.schema.ts`](../../packages/shared/src/contract/envelope.schema.ts:1)                   | `responseMetaSchema`, `paginationMetaSchema`, `successEnvelopeSchema()`, `toSuccessEnvelope()`                         |
+| [`error-envelope.interface.ts`](../../packages/shared/src/contract/error-envelope.interface.ts:1) | `ApiErrorEnvelope`, `ApiErrorBody`, `ApiErrorDetail`, `AppErrorShape`, `ErrorContext`                                  |
+| [`error-envelope.ts`](../../packages/shared/src/contract/error-envelope.ts:1)                     | `apiErrorEnvelopeSchema`, `apiErrorDetailSchema`, `apiErrorBodySchema`, `resolveApiErrorStatus()`, `toErrorEnvelope()` |
+| [`api-keys/`](../../packages/shared/src/contract/api-keys/api-keys.schema.ts:1)                   | the former `src/schemas/api-key.*` trio, moved (`git mv`, content unchanged apart from imports)                        |
+| [`index.ts`](../../packages/shared/src/contract/index.ts:1)                                       | explicit re-exports (no `export *`)                                                                                    |
 
 Public surface: [`packages/shared/src/index.ts`](../../packages/shared/src/index.ts:1) re-exports the
 contract explicitly; the old `packages/shared/src/schemas/` folder is gone.
@@ -31,10 +31,10 @@ between the two packages is gone (decision 6 of the subtask).
 ## Decisions taken while implementing
 
 1. **The status is derived from the code**, never passed in (`toErrorEnvelope(error, ctx)`); the
-   catalogue maps `API_KEY_IDENTIFIER_CONFLICT → 409` etc. A service says *what* went wrong only.
+   catalogue maps `API_KEY_IDENTIFIER_CONFLICT → 409` etc. A service says _what_ went wrong only.
 2. **An unknown code stays on the wire and gets `500`.** `code` in the schema is therefore a free
    string, not an enum: a code from a newer server must still parse on an older client (D8), and
-   `resolveApiErrorStatus` only honours *own* keys of the catalogue (`toString` must not resolve).
+   `resolveApiErrorStatus` only honours _own_ keys of the catalogue (`toString` must not resolve).
 3. **`details` is always present**, `[]` when no field is at fault — same rule as `data`/`meta`.
 4. **`meta` is always `requestId` + `timestamp`**, `pagination` is absent (never `null`) when the
    endpoint does not paginate. The factories take these as arguments: no clock, no `randomUUID`, so

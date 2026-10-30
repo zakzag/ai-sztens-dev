@@ -13,14 +13,14 @@ runner `permission denied for schema callback`-dal állt volna meg.
 
 ## Változások
 
-| Fájl | Változás |
-|---|---|
-| [`infra/postgres/init/02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | Új, idempotens init script: `CREATE SCHEMA IF NOT EXISTS` a `platform`, `callback`, `email` sémákra, majd `\gexec`-alapú grantok. Fejléc: `DO $$` tilalom, first-run-only viselkedés, manuális újrafuttatás, grant-mátrix, role-név literálok |
-| [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh) | `pg_namespace`-re guardolt `GRANT USAGE` (3 séma × 3 role) és `GRANT CREATE ON SCHEMA callback` blokk, plusz fejléc-magyarázat arról, miért no-op ez friss initen |
-| [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh) | Új teszt: eldobható `postgres:16-alpine` konténer az init könyvtárral bind-mountolva; friss init ellenőrzés, majd a két script kétszeri újrafuttatása és újraellenőrzés |
-| [`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh) | Három új smoke check: `postgres-schemas`, `postgres-schema-usage` (9 sor = 3 séma × 3 role), `postgres-schema-create` (csak `aisztens`) |
-| [`docs/Specs/Infrastructure-Docker.md`](../../docs/Specs/Infrastructure-Docker.md) | §6.2: mindkét init script, séma↔kontextus mapping, grant-mátrix, manuális újrafuttatás, a tesztek hivatkozása; service-tábla és `Utolsó frissítés` frissítve |
-| [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md) | §2b: a két init script táblázata, a meglévő `pgdata_local` volume következménye, re-apply és `down -v` recept |
+| Fájl                                                                                               | Változás                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`infra/postgres/init/02-schemas.sh`](../../infra/postgres/init/02-schemas.sh)                     | Új, idempotens init script: `CREATE SCHEMA IF NOT EXISTS` a `platform`, `callback`, `email` sémákra, majd `\gexec`-alapú grantok. Fejléc: `DO $$` tilalom, first-run-only viselkedés, manuális újrafuttatás, grant-mátrix, role-név literálok |
+| [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh)                         | `pg_namespace`-re guardolt `GRANT USAGE` (3 séma × 3 role) és `GRANT CREATE ON SCHEMA callback` blokk, plusz fejléc-magyarázat arról, miért no-op ez friss initen                                                                             |
+| [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh) | Új teszt: eldobható `postgres:16-alpine` konténer az init könyvtárral bind-mountolva; friss init ellenőrzés, majd a két script kétszeri újrafuttatása és újraellenőrzés                                                                       |
+| [`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh)               | Három új smoke check: `postgres-schemas`, `postgres-schema-usage` (9 sor = 3 séma × 3 role), `postgres-schema-create` (csak `aisztens`)                                                                                                       |
+| [`docs/Specs/Infrastructure-Docker.md`](../../docs/Specs/Infrastructure-Docker.md)                 | §6.2: mindkét init script, séma↔kontextus mapping, grant-mátrix, manuális újrafuttatás, a tesztek hivatkozása; service-tábla és `Utolsó frissítés` frissítve                                                                                  |
+| [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md)                         | §2b: a két init script táblázata, a meglévő `pgdata_local` volume következménye, re-apply és `down -v` recept                                                                                                                                 |
 
 ## Döntések
 
@@ -41,7 +41,7 @@ runner `permission denied for schema callback`-dal állt volna meg.
 
 ## Bizonyíték / verifikáció
 
-`bash scripts/test/_postgres-init-schemas-test.sh` → **PASS: 23  FAIL: 0** (AIS-36 után, a `platform` CREATE assertekkel együtt: **PASS: 32  FAIL: 0**)
+`bash scripts/test/_postgres-init-schemas-test.sh` → **PASS: 23 FAIL: 0** (AIS-36 után, a `platform` CREATE assertekkel együtt: **PASS: 32 FAIL: 0**)
 
 - friss init (entrypoint futtatta a `01`-et és `02`-t): 3 séma, `aisztens`
   USAGE ×3 + CREATE a `callback`-re, `tkovari`/`krak` USAGE ×3 és CREATE nélkül;

@@ -1,7 +1,4 @@
-import {
-  API_KEYS_PATH,
-  createApiKeysService,
-} from '../src/index.js';
+import { API_KEYS_PATH, createApiKeysService } from '../src/index.js';
 import { ApiError, isConflict } from '../src/api-error.js';
 import { createHttpClient } from '../src/http-client.js';
 import type { RecordedCall } from './mocks/fetch.mock.js';
@@ -106,11 +103,7 @@ describe('createApiKeysService — create', () => {
 
     const body = readBody(fetchMock.calls[0]) as Record<string, unknown>;
 
-    expect(Object.keys(body).sort()).toEqual([
-      'apiKey',
-      'identifier',
-      'name',
-    ]);
+    expect(Object.keys(body).sort()).toEqual(['apiKey', 'identifier', 'name']);
   });
 
   it('sends the optional fields when they are present', async () => {

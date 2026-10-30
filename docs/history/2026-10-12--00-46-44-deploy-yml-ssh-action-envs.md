@@ -42,15 +42,15 @@ empty env didn't matter).
 step, listing exactly the variables that step's `script:` references.
 Seven occurrences, one per step:
 
-| Step | envs: |
-|---|---|
-| Tighten infra/.env permissions on the droplet | `REMOTE_DIR` |
-| docker login ghcr.io (when GHCR_PAT is set) | `REMOTE_DIR,GHCR_PAT,GITHUB_ACTOR` |
-| Pull and start the stack | `REMOTE_DIR,APP_ENV` |
-| Verify every service is running IMAGE_TAG | `REMOTE_DIR,IMAGE_TAG` |
-| Wait for api healthcheck | `REMOTE_DIR,APP_ENV` |
-| Run stack smoke tests against live deployment | `REMOTE_DIR` |
-| Dump container logs on failure | `REMOTE_DIR,APP_ENV` |
+| Step                                          | envs:                              |
+| --------------------------------------------- | ---------------------------------- |
+| Tighten infra/.env permissions on the droplet | `REMOTE_DIR`                       |
+| docker login ghcr.io (when GHCR_PAT is set)   | `REMOTE_DIR,GHCR_PAT,GITHUB_ACTOR` |
+| Pull and start the stack                      | `REMOTE_DIR,APP_ENV`               |
+| Verify every service is running IMAGE_TAG     | `REMOTE_DIR,IMAGE_TAG`             |
+| Wait for api healthcheck                      | `REMOTE_DIR,APP_ENV`               |
+| Run stack smoke tests against live deployment | `REMOTE_DIR`                       |
+| Dump container logs on failure                | `REMOTE_DIR,APP_ENV`               |
 
 YAML re-validated with `python -c "yaml.safe_load(...)"` — clean. The
 total diff is 7 added lines and zero changes to any other content.

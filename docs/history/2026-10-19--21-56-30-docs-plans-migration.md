@@ -13,12 +13,12 @@ references to plan documents must be updated so that labels and link targets mat
 
 ## 2. Starting state (measured)
 
-| Item | Quantity |
-|---|---|
-| Plan documents already in `docs/plans/` | 15 |
-| Plan documents still in `docs/history/` (`*-plan.md`) | 21 |
-| Files containing plan references | 41 (before the rewrite), 15 (after) |
-| Duplicates with the same filename in both folders | 0 (previous staged deletions had already removed them) |
+| Item                                                  | Quantity                                               |
+| ----------------------------------------------------- | ------------------------------------------------------ |
+| Plan documents already in `docs/plans/`               | 15                                                     |
+| Plan documents still in `docs/history/` (`*-plan.md`) | 21                                                     |
+| Files containing plan references                      | 41 (before the rewrite), 15 (after)                    |
+| Duplicates with the same filename in both folders     | 0 (previous staged deletions had already removed them) |
 
 A partially executed manual migration left several links with a **label saying `docs/history/…`**
 while the **target pointed at `../plans/…`**, and left a set of links with shorthand filenames that

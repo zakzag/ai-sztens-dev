@@ -47,7 +47,9 @@ export const API_KEY_FORM_ERROR_TITLE = 'Az API kulcs mentése nem sikerült.';
  * be rendered without an id, and a renamed one breaks the build instead of the
  * accessibility wiring.
  */
-export const API_KEY_FORM_FIELD_IDS: Readonly<Record<ApiKeyFormFieldName, string>> = {
+export const API_KEY_FORM_FIELD_IDS: Readonly<
+  Record<ApiKeyFormFieldName, string>
+> = {
   name: 'api-key-name',
   identifier: 'api-key-identifier',
   description: 'api-key-description',
@@ -56,7 +58,9 @@ export const API_KEY_FORM_FIELD_IDS: Readonly<Record<ApiKeyFormFieldName, string
 };
 
 /** Visible labels, one per form field. */
-export const API_KEY_FORM_LABELS: Readonly<Record<ApiKeyFormFieldName, string>> = {
+export const API_KEY_FORM_LABELS: Readonly<
+  Record<ApiKeyFormFieldName, string>
+> = {
   name: 'Név',
   identifier: 'Azonosító',
   description: 'Leírás',
@@ -65,13 +69,15 @@ export const API_KEY_FORM_LABELS: Readonly<Record<ApiKeyFormFieldName, string>> 
 };
 
 /** Helper texts under the fields. */
-export const API_KEY_FORM_HINTS: Readonly<Record<ApiKeyFormFieldName, string>> = {
-  name: 'Emberi olvasásra szánt név, legfeljebb 200 karakter.',
-  identifier: 'Egyedi, URL-biztos azonosító: betű, szám, pont, kötőjel, aláhúzás.',
-  description: 'Opcionális, legfeljebb 2000 karakter.',
-  apiKey: 'A szolgáltatótól kapott token értéke.',
-  expiresAt: 'Opcionális. Üresen hagyva a kulcs nem jár le.',
-};
+export const API_KEY_FORM_HINTS: Readonly<Record<ApiKeyFormFieldName, string>> =
+  {
+    name: 'Emberi olvasásra szánt név, legfeljebb 200 karakter.',
+    identifier:
+      'Egyedi, URL-biztos azonosító: betű, szám, pont, kötőjel, aláhúzás.',
+    description: 'Opcionális, legfeljebb 2000 karakter.',
+    apiKey: 'A szolgáltatótól kapott token értéke.',
+    expiresAt: 'Opcionális. Üresen hagyva a kulcs nem jár le.',
+  };
 
 /**
  * Initial (and post-success) form values.

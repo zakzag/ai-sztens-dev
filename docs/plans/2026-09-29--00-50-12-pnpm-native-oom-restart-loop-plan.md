@@ -28,16 +28,16 @@ A `top` magas **user CPU** (43.5%), **system CPU** (29.1%) és **I/O wait** (23.
 
 ## 2. A dropleten mért tények
 
-| Forrás | Mért érték | Jelentés |
-|---|---|---|
-| `docker ps` | `aisztens-api-1` státusza `Restarting (1) Less than a second ago` | Az api konténer most is restart-loopban van |
-| `docker inspect aisztens-api-1` | `State.ExitCode: 1`, `OOMKilled: false`, `StartedAt: 2026-09-28T23:03:29.953377626Z` | A konténer nem OOM-kill miatt halt meg (a cgroup szintű OOM külön esemény) |
-| `journalctl -u docker --since '-12h'` `grep restartCount` | `restartCount=226`, ~8–60 másodperc/ciklus | Az elmúlt ~1 órában 226-szor indult újra |
-| `dmesg --since '-12h' \| grep oom` | `oom-kill: ... task=pnpm-native,pid=63879/64232/64587/64987,...` ismétlődve, `anon-rss: 380116kB`, `cgroup: docker-46e301dbfc4cf7aa...scope` | A kernel OOM-killer **belül a 400 MB cgroup-ban** öli a `pnpm-native` folyamatot, mielőtt a Node elindulhatna |
-| `docker image inspect aisztens/api:latest` | `Created: 2026-09-28T19:01:38`, `Cmd: ["pnpm","--filter","@callback/api","start:prod"]` | A futó image 6 órája készült, és a `pnpm` wrapperen keresztül indítja a Node-ot |
-| `docker logs aisztens-api-1 --tail 200` | Folyamatosan ismétlődik: `Scope: all 3 workspace projects` / `Verifying lockfile against supply-chain policies (741 entries)...` / `Progress: resolved 0, reused N, downloaded 0, added 0` / `apps/api \| [WARN] deprecated eslint@9.39.5...` | A Node **soha** indul el; a pnpm `pnpm-native` segédprocessze a lockfile-ellenőrzésnél meghal |
-| `/opt/aisztens/infra/.env` a dropleten | `MONITOR_TARGET_URL=http://api:3000/api` (a régi érték) | A korábbi healthcheck-fail javítás csak lokálban lett commitolva, a dropleten **nem futott le a deploy** |
-| `apps/api/src/main.ts:20` lokálban | `app.setGlobalPrefix('api', { exclude: ['healthz'] })` | A `/healthz` dedikált endpoint a lokálban már létezik, de a dropleten futó image-ban még nincs benne |
+| Forrás                                                    | Mért érték                                                                                                                                                                                                                                    | Jelentés                                                                                                      |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `docker ps`                                               | `aisztens-api-1` státusza `Restarting (1) Less than a second ago`                                                                                                                                                                             | Az api konténer most is restart-loopban van                                                                   |
+| `docker inspect aisztens-api-1`                           | `State.ExitCode: 1`, `OOMKilled: false`, `StartedAt: 2026-09-28T23:03:29.953377626Z`                                                                                                                                                          | A konténer nem OOM-kill miatt halt meg (a cgroup szintű OOM külön esemény)                                    |
+| `journalctl -u docker --since '-12h'` `grep restartCount` | `restartCount=226`, ~8–60 másodperc/ciklus                                                                                                                                                                                                    | Az elmúlt ~1 órában 226-szor indult újra                                                                      |
+| `dmesg --since '-12h' \| grep oom`                        | `oom-kill: ... task=pnpm-native,pid=63879/64232/64587/64987,...` ismétlődve, `anon-rss: 380116kB`, `cgroup: docker-46e301dbfc4cf7aa...scope`                                                                                                  | A kernel OOM-killer **belül a 400 MB cgroup-ban** öli a `pnpm-native` folyamatot, mielőtt a Node elindulhatna |
+| `docker image inspect aisztens/api:latest`                | `Created: 2026-09-28T19:01:38`, `Cmd: ["pnpm","--filter","@callback/api","start:prod"]`                                                                                                                                                       | A futó image 6 órája készült, és a `pnpm` wrapperen keresztül indítja a Node-ot                               |
+| `docker logs aisztens-api-1 --tail 200`                   | Folyamatosan ismétlődik: `Scope: all 3 workspace projects` / `Verifying lockfile against supply-chain policies (741 entries)...` / `Progress: resolved 0, reused N, downloaded 0, added 0` / `apps/api \| [WARN] deprecated eslint@9.39.5...` | A Node **soha** indul el; a pnpm `pnpm-native` segédprocessze a lockfile-ellenőrzésnél meghal                 |
+| `/opt/aisztens/infra/.env` a dropleten                    | `MONITOR_TARGET_URL=http://api:3000/api` (a régi érték)                                                                                                                                                                                       | A korábbi healthcheck-fail javítás csak lokálban lett commitolva, a dropleten **nem futott le a deploy**      |
+| `apps/api/src/main.ts:20` lokálban                        | `app.setGlobalPrefix('api', { exclude: ['healthz'] })`                                                                                                                                                                                        | A `/healthz` dedikált endpoint a lokálban már létezik, de a dropleten futó image-ban még nincs benne          |
 
 ---
 
@@ -94,15 +94,15 @@ A [`infra/app/Dockerfile`](../../infra/app/Dockerfile) utolsó `CMD` sorát át�
 
 **Előnyök:**
 
-* A runtime image **nem tartja életben a pnpm wrappert**, így a `pnpm-native` lockfile-verify sosem fut le induláskor. A Node indulás memóriaigénye messze a `mem_limit: 400m` alatt marad (cold start ~80–120 MB RSS, steady state ~150–200 MB, a `--max-old-space-size=384` V8 kupak véd a runaway heap ellen).
-* Visszaállíthatatlan kockázat nincs: ha a `start:prod` scriptet a jövőben bármi másra cserélné a csapat (pl. `node --inspect dist/main`), a Dockerfile CMD-et is frissíteni kell — ez ugyanaz a fegyelmezettség, mint eddig.
-* A `pnpm install --frozen-lockfile` és a workspace symlink-ek a **build stage**-ben maradnak (azok futnak a `pnpm install` és `pnpm --filter @callback/api build` sorokban, lásd Dockerfile 27–48. sor). A runtime stage csak a kész `node_modules`-t és a lefordított `dist/`-t kapja meg.
-* Minimális lokális kódváltoztatás: 1 sor Dockerfile + 1 deploy a dropletre.
+- A runtime image **nem tartja életben a pnpm wrappert**, így a `pnpm-native` lockfile-verify sosem fut le induláskor. A Node indulás memóriaigénye messze a `mem_limit: 400m` alatt marad (cold start ~80–120 MB RSS, steady state ~150–200 MB, a `--max-old-space-size=384` V8 kupak véd a runaway heap ellen).
+- Visszaállíthatatlan kockázat nincs: ha a `start:prod` scriptet a jövőben bármi másra cserélné a csapat (pl. `node --inspect dist/main`), a Dockerfile CMD-et is frissíteni kell — ez ugyanaz a fegyelmezettség, mint eddig.
+- A `pnpm install --frozen-lockfile` és a workspace symlink-ek a **build stage**-ben maradnak (azok futnak a `pnpm install` és `pnpm --filter @callback/api build` sorokban, lásd Dockerfile 27–48. sor). A runtime stage csak a kész `node_modules`-t és a lefordított `dist/`-t kapja meg.
+- Minimális lokális kódváltoztatás: 1 sor Dockerfile + 1 deploy a dropletre.
 
 **Hátrányok / kockázatok:**
 
-* Ha valaki a jövőben hozzáad egy `apps/api/package.json`-beli lifecycle scriptet (pl. `prebuild`, `postinstall`), a runtime image-be az nem kerül be — ez eddig is így volt (csak a `dist/main.js` van a runtime stage-ben).
-* A `pnpm --filter … start:prod` élményét a `deploy/deploy.sh` `up` szkriptje lokálban továbbra is használja (a CI-ban, nem a dropleten). A Dockerfile CMD csak a **runtime** viselkedését írja le.
+- Ha valaki a jövőben hozzáad egy `apps/api/package.json`-beli lifecycle scriptet (pl. `prebuild`, `postinstall`), a runtime image-be az nem kerül be — ez eddig is így volt (csak a `dist/main.js` van a runtime stage-ben).
+- A `pnpm --filter … start:prod` élményét a `deploy/deploy.sh` `up` szkriptje lokálban továbbra is használja (a CI-ban, nem a dropleten). A Dockerfile CMD csak a **runtime** viselkedését írja le.
 
 ### 4.2 „B" opció: a `mem_limit` megemelése 700 MB-ra
 
@@ -112,8 +112,8 @@ A [`infra/docker-compose.yml:28`](../../infra/docker-compose.yml) értékét `40
 
 **Hátrányok:**
 
-* A droplet összesen 961 MB RAM, és a többi konténer (postgres 400 MB + caddy 64 MB + monitor 32 MB + do-agent ~600 MB a host névtérben) már most is szűkös. +300 MB az api-nak garantáltan elfogyasztja a host teljes fizikai memóriáját, és elindul a `kswapd0` swap-thrash, ami a 2026-09-27-es esethez hasonló tüneteket produkál.
-* A korábbi mem_limit-terv ([`2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md)) konkrétan az ellenkezőjét javasolta: „hard cap so a runaway heap cannot starve the host". Ezt az elvet nem szabad megszegni anélkül, hogy a dropletet ne egy magasabb szintű tier-re upgrade-elnénk.
+- A droplet összesen 961 MB RAM, és a többi konténer (postgres 400 MB + caddy 64 MB + monitor 32 MB + do-agent ~600 MB a host névtérben) már most is szűkös. +300 MB az api-nak garantáltan elfogyasztja a host teljes fizikai memóriáját, és elindul a `kswapd0` swap-thrash, ami a 2026-09-27-es esethez hasonló tüneteket produkál.
+- A korábbi mem_limit-terv ([`2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md)) konkrétan az ellenkezőjét javasolta: „hard cap so a runaway heap cannot starve the host". Ezt az elvet nem szabad megszegni anélkül, hogy a dropletet ne egy magasabb szintű tier-re upgrade-elnénk.
 
 ### 4.3 „C" opció: `pnpm_config_*` env-ekkel kikapcsolni a verify-t
 
@@ -123,17 +123,17 @@ A Dockerfile-ban `ENV pnpm_config_verify_deps_before_run=false` és hasonlókat 
 
 **Hátrányok:**
 
-* A pnpm 9 dokumentációja szerint ezek a config-kulcsok instabilnak minősülnek (a 9.x minor release-ekben többször átnevezték őket); egy pnpm frissítés után a környezeti változók hatástalanná válhatnak.
-* A lockfile-verify kikapcsolása ellentmond a projekt kifejezetten dokumentált döntésének: a supply-chain hardening a pnpm 9 beépített funkciója, és a `2026-09-29--00-30-10-api-healthcheck-fail-plan.md` §1 is hivatkozik rá, mint a `Verifying lockfile against supply-chain policies (741 entries)...` üzenet forrására.
-* Nem oldja meg a „pnpm wrapper feleslegesen indul a runtime-ban" koncepcionális problémát — csak elnyomja a tünetet.
+- A pnpm 9 dokumentációja szerint ezek a config-kulcsok instabilnak minősülnek (a 9.x minor release-ekben többször átnevezték őket); egy pnpm frissítés után a környezeti változók hatástalanná válhatnak.
+- A lockfile-verify kikapcsolása ellentmond a projekt kifejezetten dokumentált döntésének: a supply-chain hardening a pnpm 9 beépített funkciója, és a `2026-09-29--00-30-10-api-healthcheck-fail-plan.md` §1 is hivatkozik rá, mint a `Verifying lockfile against supply-chain policies (741 entries)...` üzenet forrására.
+- Nem oldja meg a „pnpm wrapper feleslegesen indul a runtime-ban" koncepcionális problémát — csak elnyomja a tünetet.
 
 ### 4.4 Döntés: az „A" opció + a korábban commitolt `/healthz` javítás együttes deploy-ja
 
 A legkisebb kockázatú, leginkrobb „a gyökeret célozza" megoldás az „A" opció. Mivel a korábbi healthcheck-fail javítás (`/healthz` endpoint, `setGlobalPrefix` exclude, healthcheck-parancs) **lokálban már commitolva van**, egyetlen deploy két problémát is megold:
 
 1. A pnpm-wrapper eltávolítása megszünteti a `pnpm-native` OOM-loopot.
-3. A `/healthz` endpoint aktiválódik, és a Docker healthcheck sikeres lesz.
-4. A `MONITOR_TARGET_URL` a `infra/.env`-ben `/healthz`-re vált, így a monitor watchdog is a helyes endpointot hívja.
+2. A `/healthz` endpoint aktiválódik, és a Docker healthcheck sikeres lesz.
+3. A `MONITOR_TARGET_URL` a `infra/.env`-ben `/healthz`-re vált, így a monitor watchdog is a helyes endpointot hívja.
 
 ---
 
@@ -142,19 +142,23 @@ A legkisebb kockázatú, leginkrobb „a gyökeret célozza" megoldás az „A" 
 ### 5.1 Kód-módosítások (lokálban)
 
 1. **[`infra/app/Dockerfile`](../../infra/app/Dockerfile)** – a runtime stage utolsó sora:
+
    ```diff
    -CMD ["pnpm", "--filter", "@callback/api", "start:prod"]
    +CMD ["node", "apps/api/dist/main.js"]
    ```
+
    A `WORKDIR /workspace` már beállítja a munkakönyvtárat, így a relatív útvonal helyes.
 
 2. **[`infra/app/Dockerfile`](../../infra/app/Dockerfile)** – kiegészítő megjegyzés a CMD fölött: „The runtime stage intentionally bypasses the pnpm wrapper. Pnpm 9 spawns a `pnpm-native` helper for lockfile verification that consumes ~380 MB RSS on cold start, which breaches the 400 MB container `mem_limit` and triggers an OOM-kill death-spiral. Since the build stage has already produced a complete `node_modules` and compiled `dist/`, we can run Node directly."
 
 3. **[`infra/docker-compose.yml:149`](../../infra/docker-compose.yml)** – a `MONITOR_TARGET_URL` alapértékének szinkronizálása a `.env.example`-lel:
+
    ```diff
    -      TARGET_URL: ${MONITOR_TARGET_URL:-http://api:3000/api}
    +      TARGET_URL: ${MONITOR_TARGET_URL:-http://api:3000/healthz}
    ```
+
    Ez csak a fallback érték — a tényleges konfiguráció a `/opt/aisztens/infra/.env`-ben van, és azt a deploy szkript frissíti (lásd 5.3).
 
 4. **Nincs szükség** a [`apps/api/src/main.ts`](../../apps/api/src/main.ts), [`apps/api/src/health/health.controller.ts`](../../apps/api/src/health/health.controller.ts), [`apps/api/src/health/health.module.ts`](../../apps/api/src/health/health.module.ts), [`apps/api/src/app.module.ts`](../../apps/api/src/app.module.ts) módosítására — ezek a korábbi impl-ből már rendben vannak.
@@ -176,11 +180,11 @@ A legkisebb kockázatú, leginkrobb „a gyökeret célozza" megoldás az „A" 
 ### 5.3 Deploy a dropletre
 
 8. A [`deploy/deploy.sh up`](../../deploy/deploy.sh) parancsot futtatni lokálban. Ez:
-   * rsync-eli a forrást a dropletre,
-   * lefuttatja a `pnpm install --frozen-lockfile`-t a dropleten (vagy a CI build-ben),
-   * újraépíti az `aisztens/api:latest` image-et,
-   * újraindítja a `compose` stack-et,
-   * a renderelt Caddyfile-t feltolja.
+   - rsync-eli a forrást a dropletre,
+   - lefuttatja a `pnpm install --frozen-lockfile`-t a dropleten (vagy a CI build-ben),
+   - újraépíti az `aisztens/api:latest` image-et,
+   - újraindítja a `compose` stack-et,
+   - a renderelt Caddyfile-t feltolja.
 
 9. **A `/opt/aisztens/infra/.env` frissítése a dropleten** (a deploy szkript ezt megteszi, ha az `infra/.env` template-ben a `MONITOR_TARGET_URL` értéke `/healthz`):
    ```
@@ -208,35 +212,35 @@ Nincs szükség visszavonásra — a [`2026-09-29--00-34-28-api-healthcheck-fail
 
 ## 6. Nem változtatunk
 
-* **`apps/api/package.json` `start:prod` script** – marad (`node dist/main`). A Dockerfile CMD mostantár közvetlenül hívja a `node apps/api/dist/main.js`-t, ami tartalmilag ugyanaz.
-* **`apps/api/src/app.controller.ts` Hello World route** – marad (frontend smoke tesztek).
-* **`mem_limit: 400m` az api konténeren** – marad. A `--max-old-space-size=384` V8 kupak is marad. A pnpm-wrapper eltávolításával a konténer hidegindítása ~80–120 MB, steady state ~150–200 MB, messze a limit alatt.
-* **A Caddy, postgres, monitor service-ek mem_limitje** – változatlan.
-* **`POSTGRES_SHARED_BUFFERS=128MB`, `effective_cache_size=512MB`, `work_mem=4MB`** – változatlan.
+- **`apps/api/package.json` `start:prod` script** – marad (`node dist/main`). A Dockerfile CMD mostantár közvetlenül hívja a `node apps/api/dist/main.js`-t, ami tartalmilag ugyanaz.
+- **`apps/api/src/app.controller.ts` Hello World route** – marad (frontend smoke tesztek).
+- **`mem_limit: 400m` az api konténeren** – marad. A `--max-old-space-size=384` V8 kupak is marad. A pnpm-wrapper eltávolításával a konténer hidegindítása ~80–120 MB, steady state ~150–200 MB, messze a limit alatt.
+- **A Caddy, postgres, monitor service-ek mem_limitje** – változatlan.
+- **`POSTGRES_SHARED_BUFFERS=128MB`, `effective_cache_size=512MB`, `work_mem=4MB`** – változatlan.
 
 ---
 
 ## 7. Siker-kritériumok
 
-| Kritérium | Hogyan ellenőrizzük |
-|---|---|
-| `aisztens-api-1` státusza `Up X minutes (healthy)` | `docker compose --env-file infra/.env -f infra/docker-compose.yml ps -a` |
-| `journalctl -u docker --since '-1h' \| grep restartCount` számossága a deploy után nem nő 1 fölé | `journalctl -u docker --since '-1h' \| grep -c "restarting container.*46e301"` |
-| `dmesg` az api konténer scope-jában nem mutat újabb OOM-kill-t | `dmesg --since '-1h' \| grep "docker-46e301"` üres |
-| `curl http://127.0.0.1:3000/healthz` a konténerből `{"status":"ok",...}` | `docker compose exec api wget -qO- http://127.0.0.1:3000/healthz` |
-| A monitor watchdog nem jelez hibát | `docker compose logs --tail=20 monitor` – nincs „API check failed" sor |
-| A `top`-ban a `pnpm-native` és a `do-agent` userhez tartozó folyamatok CPU-ja <5% | `top -bn1 \| head -20` |
-| A Caddy-n át `https://api.aisztens.hu/healthz` és `https://api.aisztens.hu/api` is 200 | `curl -fsS https://api.aisztens.hu/healthz` és `curl -fsS https://api.aisztens.hu/api` |
-| A CI `apps/api` e2e + unit tesztek zöldek | `pnpm --filter @callback/api test` és `pnpm --filter @callback/api test:e2e` |
+| Kritérium                                                                                        | Hogyan ellenőrizzük                                                                    |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `aisztens-api-1` státusza `Up X minutes (healthy)`                                               | `docker compose --env-file infra/.env -f infra/docker-compose.yml ps -a`               |
+| `journalctl -u docker --since '-1h' \| grep restartCount` számossága a deploy után nem nő 1 fölé | `journalctl -u docker --since '-1h' \| grep -c "restarting container.*46e301"`         |
+| `dmesg` az api konténer scope-jában nem mutat újabb OOM-kill-t                                   | `dmesg --since '-1h' \| grep "docker-46e301"` üres                                     |
+| `curl http://127.0.0.1:3000/healthz` a konténerből `{"status":"ok",...}`                         | `docker compose exec api wget -qO- http://127.0.0.1:3000/healthz`                      |
+| A monitor watchdog nem jelez hibát                                                               | `docker compose logs --tail=20 monitor` – nincs „API check failed" sor                 |
+| A `top`-ban a `pnpm-native` és a `do-agent` userhez tartozó folyamatok CPU-ja <5%                | `top -bn1 \| head -20`                                                                 |
+| A Caddy-n át `https://api.aisztens.hu/healthz` és `https://api.aisztens.hu/api` is 200           | `curl -fsS https://api.aisztens.hu/healthz` és `curl -fsS https://api.aisztens.hu/api` |
+| A CI `apps/api` e2e + unit tesztek zöldek                                                        | `pnpm --filter @callback/api test` és `pnpm --filter @callback/api test:e2e`           |
 
 ---
 
 ## 8. Kockázatok / visszafordíthatóság
 
-* **A CMD-változtatás** egyetlen Dockerfile sor, és ha bármi elromlana (pl. egy jövőbeli `apps/api/dist/main.js` útvonal-változtatás), a rollback a CMD visszaírásával azonnal megoldható. A korábbi `pnpm --filter …` forma a `git log`-ban megmarad.
-* **A `deploy/deploy.sh up` rizikója**: a deploy szkript az utolsó működő állapothoz képest mindig újraépíti az image-et. Ha a build valamiért elszáll (pl. lockfile drift), a korábbi `aisztens/api:latest` image a `docker image tag`-gel megmarad, és a dropleten manuálisan visszaállítható (`docker compose down && docker tag aisztens/api:backup aisztens/api:latest && docker compose up -d`).
-* **A `MONITOR_TARGET_URL` váltás**: ha a `/healthz` endpoint valamiért nem érhető el, a monitor `down` alertet küld, ami operatívan azonnal látszik (nem okoz adatvesztést, csak zajt).
-* **A CI futásideje**: nincs új teszt, nincs új build-lépés; a deploy idő ~3-5 perc (image build + push + dropleten restart), mint eddig.
+- **A CMD-változtatás** egyetlen Dockerfile sor, és ha bármi elromlana (pl. egy jövőbeli `apps/api/dist/main.js` útvonal-változtatás), a rollback a CMD visszaírásával azonnal megoldható. A korábbi `pnpm --filter …` forma a `git log`-ban megmarad.
+- **A `deploy/deploy.sh up` rizikója**: a deploy szkript az utolsó működő állapothoz képest mindig újraépíti az image-et. Ha a build valamiért elszáll (pl. lockfile drift), a korábbi `aisztens/api:latest` image a `docker image tag`-gel megmarad, és a dropleten manuálisan visszaállítható (`docker compose down && docker tag aisztens/api:backup aisztens/api:latest && docker compose up -d`).
+- **A `MONITOR_TARGET_URL` váltás**: ha a `/healthz` endpoint valamiért nem érhető el, a monitor `down` alertet küld, ami operatívan azonnal látszik (nem okoz adatvesztést, csak zajt).
+- **A CI futásideje**: nincs új teszt, nincs új build-lépés; a deploy idő ~3-5 perc (image build + push + dropleten restart), mint eddig.
 
 ---
 

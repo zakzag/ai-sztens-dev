@@ -11,30 +11,30 @@ both individual service health and cross-service reachability.
 
 ## Files created
 
-| Path | Purpose |
-|---|---|
-| `scripts/test/stack-smoke.sh`   | Entrypoint — parses flags, runs preflight, sources check modules |
-| `scripts/test/stack-up.sh`      | Convenience wrapper around `docker compose up -d --build` |
-| `scripts/test/stack-down.sh`    | Convenience wrapper around `docker compose down` |
-| `scripts/test/lib/00-prelude.sh` | Helpers (path resolution, docker compose wrappers, assertion functions, preflight, summary) |
-| `scripts/test/lib/10-services.sh` | 4 per-service liveness checks |
-| `scripts/test/lib/20-cross-service.sh` | 6 cross-service "do they see each other?" checks |
-| `scripts/test/lib/99-teardown.sh` | Optional teardown helper (sourced only with `--down`) |
-| `scripts/test/README.md`        | Operator-facing docs |
+| Path                                   | Purpose                                                                                     |
+| -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `scripts/test/stack-smoke.sh`          | Entrypoint — parses flags, runs preflight, sources check modules                            |
+| `scripts/test/stack-up.sh`             | Convenience wrapper around `docker compose up -d --build`                                   |
+| `scripts/test/stack-down.sh`           | Convenience wrapper around `docker compose down`                                            |
+| `scripts/test/lib/00-prelude.sh`       | Helpers (path resolution, docker compose wrappers, assertion functions, preflight, summary) |
+| `scripts/test/lib/10-services.sh`      | 4 per-service liveness checks                                                               |
+| `scripts/test/lib/20-cross-service.sh` | 6 cross-service "do they see each other?" checks                                            |
+| `scripts/test/lib/99-teardown.sh`      | Optional teardown helper (sourced only with `--down`)                                       |
+| `scripts/test/README.md`               | Operator-facing docs                                                                        |
 
 ## Files modified
 
-| Path | Change |
-|---|---|
-| [`package.json`](../../package.json) | Added `test:stack`, `test:stack:up`, `test:stack:down` scripts |
-| [`docs/03-implementation-general.md`](../Specs/outdated/03-implementation-general.md) | Added §9 "Testing" describing the two-layer test model |
+| Path                                                                                  | Change                                                         |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [`package.json`](../../package.json)                                                  | Added `test:stack`, `test:stack:up`, `test:stack:down` scripts |
+| [`docs/03-implementation-general.md`](../Specs/outdated/03-implementation-general.md) | Added §9 "Testing" describing the two-layer test model         |
 
 ## What it checks
 
 ### Per-service liveness (4 checks)
 
 | Service  | Check                                                         |
-|----------|---------------------------------------------------------------|
+| -------- | ------------------------------------------------------------- |
 | api      | `GET /api` returns 200 with the `Hello World!` body           |
 | postgres | `pg_isready -U postgres -d callback` exits 0                  |
 | caddy    | `GET http://127.0.0.1:2019/config/` returns a non-empty body  |
@@ -42,14 +42,14 @@ both individual service health and cross-service reachability.
 
 ### Cross-service (6 checks)
 
-| Check                          | Mechanism                                                  |
-|--------------------------------|------------------------------------------------------------|
-| `caddy` resolves `api`         | `getent hosts api` inside the caddy container              |
-| `api` resolves `postgres`      | `getent hosts postgres` inside the api container           |
-| `caddy → api` HTTP             | `wget http://api:3000/api` inside caddy, body check       |
-| `api → postgres` TCP           | `bash -c "exec 3<>/dev/tcp/postgres/5432"` inside api      |
-| Postgres roles                 | `psql -tAc "SELECT count(*) FROM pg_roles WHERE ..."`     |
-| `monitor` tick in logs         | log scan for `API check` / `API is reachable`              |
+| Check                     | Mechanism                                             |
+| ------------------------- | ----------------------------------------------------- |
+| `caddy` resolves `api`    | `getent hosts api` inside the caddy container         |
+| `api` resolves `postgres` | `getent hosts postgres` inside the api container      |
+| `caddy → api` HTTP        | `wget http://api:3000/api` inside caddy, body check   |
+| `api → postgres` TCP      | `bash -c "exec 3<>/dev/tcp/postgres/5432"` inside api |
+| Postgres roles            | `psql -tAc "SELECT count(*) FROM pg_roles WHERE ..."` |
+| `monitor` tick in logs    | log scan for `API check` / `API is reachable`         |
 
 ## How to use it
 

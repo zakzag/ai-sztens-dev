@@ -38,7 +38,9 @@ export function parseYamlSubset(source) {
   const value = parseNode(state, indent);
   skipInsignificant(state);
   if (state.index < lines.length) {
-    throw new Error(`Unexpected content at line ${state.index + 1}: "${lines[state.index].trim()}"`);
+    throw new Error(
+      `Unexpected content at line ${state.index + 1}: "${lines[state.index].trim()}"`,
+    );
   }
   return value;
 }
@@ -51,7 +53,9 @@ export function parseYamlSubset(source) {
 function parseNode(state, indent) {
   const line = state.lines[state.index];
   const content = line.trim();
-  return isSequenceItem(content) ? parseSequence(state, indent) : parseMapping(state, indent);
+  return isSequenceItem(content)
+    ? parseSequence(state, indent)
+    : parseMapping(state, indent);
 }
 
 /**
@@ -74,7 +78,9 @@ function parseMapping(state, indent) {
     }
     const content = line.trim();
     if (currentIndent > indent) {
-      throw new Error(`Unexpected indentation at line ${state.index + 1}: "${content}"`);
+      throw new Error(
+        `Unexpected indentation at line ${state.index + 1}: "${content}"`,
+      );
     }
     if (isSequenceItem(content)) {
       return map;
@@ -105,7 +111,9 @@ function parseSequence(state, indent) {
       return items;
     }
     if (currentIndent > indent) {
-      throw new Error(`Unexpected indentation at line ${state.index + 1}: "${content}"`);
+      throw new Error(
+        `Unexpected indentation at line ${state.index + 1}: "${content}"`,
+      );
     }
     items.push(parseSequenceItem(state, indent, content.slice(1).trim()));
   }
@@ -130,7 +138,9 @@ function parseSequenceItem(state, indent, inline) {
 
   if (!looksLikeKeyValue(inline)) {
     state.index += 1;
-    return isBlockScalarHeader(inline) ? readBlockScalar(state, indent, inline) : unquote(inline);
+    return isBlockScalarHeader(inline)
+      ? readBlockScalar(state, indent, inline)
+      : unquote(inline);
   }
 
   // `- key: value` starts a mapping whose remaining keys sit at a deeper indent.
@@ -186,7 +196,11 @@ function parseValue(state, indent, rest) {
  */
 function readBlockScalar(state, parentIndent, header) {
   const literal = header.startsWith('|');
-  const chomp = header.includes('-') ? 'strip' : header.includes('+') ? 'keep' : 'clip';
+  const chomp = header.includes('-')
+    ? 'strip'
+    : header.includes('+')
+      ? 'keep'
+      : 'clip';
   /** @type {string[]} */
   const collected = [];
   let bodyIndent = -1;
@@ -316,7 +330,9 @@ function isBlockScalarHeader(header) {
 function splitKeyValue(content, lineNumber) {
   const separator = findSeparator(content);
   if (separator === -1) {
-    throw new Error(`Expected "key: value" at line ${lineNumber}: "${content}"`);
+    throw new Error(
+      `Expected "key: value" at line ${lineNumber}: "${content}"`,
+    );
   }
   const key = unquote(content.slice(0, separator).trim());
   return { key, rest: content.slice(separator + 1).trim() };
@@ -343,7 +359,10 @@ function findSeparator(content) {
       quote = char;
       continue;
     }
-    if (char === ':' && (index + 1 === content.length || content[index + 1] === ' ')) {
+    if (
+      char === ':' &&
+      (index + 1 === content.length || content[index + 1] === ' ')
+    ) {
       return index;
     }
   }
@@ -366,7 +385,11 @@ function unquote(rawValue) {
     return inner.split(',').map((item) => String(unquote(item)));
   }
   if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1).replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+    return value
+      .slice(1, -1)
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, '\n')
+      .replace(/\\\\/g, '\\');
   }
   if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
     return value.slice(1, -1).replace(/''/g, "'");

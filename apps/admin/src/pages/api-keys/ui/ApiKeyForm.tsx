@@ -94,9 +94,13 @@ export function ApiKeyForm() {
 
   return (
     <Card className="space-y-4">
-      <h2 className="text-lg font-semibold text-text-primary">{API_KEY_FORM_TITLE}</h2>
+      <h2 className="text-lg font-semibold text-text-primary">
+        {API_KEY_FORM_TITLE}
+      </h2>
 
-      {isSuccess ? <Alert variant="success">{API_KEY_FORM_SUCCESS_MESSAGE}</Alert> : null}
+      {isSuccess ? (
+        <Alert variant="success">{API_KEY_FORM_SUCCESS_MESSAGE}</Alert>
+      ) : null}
 
       {pageError !== null ? (
         <Alert variant="danger" title={API_KEY_FORM_ERROR_TITLE}>

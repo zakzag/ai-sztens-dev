@@ -68,7 +68,9 @@ export function useCreateApiKeyMutation(
   const mutation = useMutation<ApiKey, unknown, CreateApiKeyInput>({
     mutationFn: (input: CreateApiKeyInput) => apiKeysService.create(input),
     onSuccess: async (created: ApiKey) => {
-      await queryClient.invalidateQueries({ queryKey: API_KEYS_QUERY_KEYS.all });
+      await queryClient.invalidateQueries({
+        queryKey: API_KEYS_QUERY_KEYS.all,
+      });
       onCreated?.(created);
     },
   });

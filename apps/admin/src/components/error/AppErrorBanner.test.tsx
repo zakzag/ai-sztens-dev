@@ -9,7 +9,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createNetworkError, createServerError, createStatusError } from '../../test/mocks/api-error.mock.js';
+import {
+  createNetworkError,
+  createServerError,
+  createStatusError,
+} from '../../test/mocks/api-error.mock.js';
 import {
   emitConnectivityEvent,
   mockOnlineStatus,
@@ -19,7 +23,10 @@ import {
   createTestQueryClient,
   TestQueryProvider,
 } from '../../test/mocks/query-client.mock.js';
-import { clearQueryErrors, seedQueryError } from '../../test/mocks/query-error.mock.js';
+import {
+  clearQueryErrors,
+  seedQueryError,
+} from '../../test/mocks/query-error.mock.js';
 import {
   BANNER_DISMISS_LABEL,
   NETWORK_OFFLINE_BANNER_MESSAGE,
@@ -59,24 +66,25 @@ describe('AppErrorBanner', () => {
     );
 
     expect(screen.getByText(NETWORK_OFFLINE_BANNER_TITLE)).toBeInTheDocument();
-    expect(screen.getByText(NETWORK_OFFLINE_BANNER_MESSAGE)).toBeInTheDocument();
+    expect(
+      screen.getByText(NETWORK_OFFLINE_BANNER_MESSAGE),
+    ).toBeInTheDocument();
 
     act(() => {
       mockOnlineStatus(true);
       emitConnectivityEvent('online');
     });
 
-    expect(screen.queryByText(NETWORK_OFFLINE_BANNER_TITLE)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(NETWORK_OFFLINE_BANNER_TITLE),
+    ).not.toBeInTheDocument();
   });
 
   it('shows the session banner with a login CTA for a cached 401', () => {
     const onLogin = vi.fn();
     const client = createTestQueryClient();
 
-    seedQueryError(
-      client,
-      createStatusError(401, 'UNAUTHENTICATED'),
-    );
+    seedQueryError(client, createStatusError(401, 'UNAUTHENTICATED'));
 
     render(
       <TestQueryProvider client={client}>
@@ -84,7 +92,9 @@ describe('AppErrorBanner', () => {
       </TestQueryProvider>,
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent(SESSION_EXPIRED_BANNER_TITLE);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      SESSION_EXPIRED_BANNER_TITLE,
+    );
 
     // `fireEvent` on purpose: what this case asserts is the *wiring* of the CTA
     // (the only user-triggered transition of the banner), and jsdom's pointer
@@ -107,9 +117,13 @@ describe('AppErrorBanner', () => {
       </TestQueryProvider>,
     );
 
-    expect(screen.getByText(SERVICE_UNAVAILABLE_BANNER_TITLE)).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: SESSION_EXPIRED_BANNER_ACTION_LABEL }),
+      screen.getByText(SERVICE_UNAVAILABLE_BANNER_TITLE),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: SESSION_EXPIRED_BANNER_ACTION_LABEL,
+      }),
     ).not.toBeInTheDocument();
   });
 
@@ -153,7 +167,9 @@ describe('AppErrorBanner', () => {
       </TestQueryProvider>,
     );
 
-    await userEvent.setup().click(screen.getByRole('button', { name: BANNER_DISMISS_LABEL }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: BANNER_DISMISS_LABEL }));
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -169,7 +185,9 @@ describe('AppErrorBanner', () => {
       </TestQueryProvider>,
     );
 
-    await userEvent.setup().click(screen.getByRole('button', { name: BANNER_DISMISS_LABEL }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: BANNER_DISMISS_LABEL }));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
     act(() => {
@@ -178,9 +196,15 @@ describe('AppErrorBanner', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
     act(() => {
-      seedQueryError(client, createStatusError(401, 'UNAUTHENTICATED'), 'second');
+      seedQueryError(
+        client,
+        createStatusError(401, 'UNAUTHENTICATED'),
+        'second',
+      );
     });
 
-    expect(screen.getByRole('alert')).toHaveTextContent(SESSION_EXPIRED_BANNER_TITLE);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      SESSION_EXPIRED_BANNER_TITLE,
+    );
   });
 });

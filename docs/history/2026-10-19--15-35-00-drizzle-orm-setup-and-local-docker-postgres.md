@@ -12,17 +12,17 @@ local development.
 
 ## Changes
 
-| File | Change |
-|---|---|
-| [`apps/api/package.json`](../../apps/api/package.json) | Added `drizzle-orm` + `postgres` runtime deps and `drizzle-kit` dev dep; added `db:generate`, `db:migrate`, `db:check` scripts |
-| [`apps/api/drizzle.config.ts`](../../apps/api/drizzle.config.ts) | Drizzle Kit config: postgresql dialect, schema `src/db/schema.ts`, out `drizzle/` |
-| [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts) | Placeholder schema (filled in by AIS-36) |
-| [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) | Placeholder migration runner → `dist/migrate.js` |
-| [`apps/api/tsconfig.build.json`](../../apps/api/tsconfig.build.json) | Excluded `drizzle.config.ts` from the Nest build |
-| [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) | Standalone Postgres-only compose file (host 5432, `pgdata_local` volume, init scripts, healthcheck) |
-| [`package.json`](../../package.json) | Root `db:up` / `db:down` scripts |
-| [`apps/api/.env.example`](../../apps/api/.env.example) | Documented local `DATABASE_URL` (localhost:5432) |
-| [`apps/api/drizzle/meta/_journal.json`](../../apps/api/drizzle/meta/_journal.json) | Empty Drizzle migration journal (created by `db:generate`) |
+| File                                                                               | Change                                                                                                                         |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| [`apps/api/package.json`](../../apps/api/package.json)                             | Added `drizzle-orm` + `postgres` runtime deps and `drizzle-kit` dev dep; added `db:generate`, `db:migrate`, `db:check` scripts |
+| [`apps/api/drizzle.config.ts`](../../apps/api/drizzle.config.ts)                   | Drizzle Kit config: postgresql dialect, schema `src/db/schema.ts`, out `drizzle/`                                              |
+| [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts)                     | Placeholder schema (filled in by AIS-36)                                                                                       |
+| [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts)                         | Placeholder migration runner → `dist/migrate.js`                                                                               |
+| [`apps/api/tsconfig.build.json`](../../apps/api/tsconfig.build.json)               | Excluded `drizzle.config.ts` from the Nest build                                                                               |
+| [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml)                 | Standalone Postgres-only compose file (host 5432, `pgdata_local` volume, init scripts, healthcheck)                            |
+| [`package.json`](../../package.json)                                               | Root `db:up` / `db:down` scripts                                                                                               |
+| [`apps/api/.env.example`](../../apps/api/.env.example)                             | Documented local `DATABASE_URL` (localhost:5432)                                                                               |
+| [`apps/api/drizzle/meta/_journal.json`](../../apps/api/drizzle/meta/_journal.json) | Empty Drizzle migration journal (created by `db:generate`)                                                                     |
 
 ## Verification
 

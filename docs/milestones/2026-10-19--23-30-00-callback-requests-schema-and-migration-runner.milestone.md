@@ -13,13 +13,13 @@ code, generate a reviewable SQL migration, and make `db:migrate` actually apply 
 
 ## 2. Measured data / evidence
 
-| Observation | How |
-|---|---|
-| Postgres was up, `platform` / `callback` / `email` existed | `\dn` on `infra-postgres-1` |
-| USAGE matrix correct (9 rows), `callback` CREATE = `t` | `has_schema_privilege` queries |
-| **`platform` CREATE = `f`** | same — the bookkeeping table could not have been created |
-| `apps/api/.env.local` contained only `PORT`, no `DATABASE_URL` | file inspection |
-| `drizzle-kit` generated `CREATE SCHEMA "callback";` (not `IF NOT EXISTS`) | first `db:generate` output |
+| Observation                                                               | How                                                      |
+| ------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Postgres was up, `platform` / `callback` / `email` existed                | `\dn` on `infra-postgres-1`                              |
+| USAGE matrix correct (9 rows), `callback` CREATE = `t`                    | `has_schema_privilege` queries                           |
+| **`platform` CREATE = `f`**                                               | same — the bookkeeping table could not have been created |
+| `apps/api/.env.local` contained only `PORT`, no `DATABASE_URL`            | file inspection                                          |
+| `drizzle-kit` generated `CREATE SCHEMA "callback";` (not `IF NOT EXISTS`) | first `db:generate` output                               |
 
 ## 3. Root cause / design rationale
 
@@ -48,15 +48,15 @@ code, generate a reviewable SQL migration, and make `db:migrate` actually apply 
 
 ## 4. Solution / implementation
 
-| File | Change |
-|---|---|
-| [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts) | `callbackSchema`, `CALL_STATUS_VALUES`, `callStatusEnum`, `callbackRequests(id uuid pk default gen_random_uuid, name 120, email 254, phone 20, reason 1000, status enum default 'queued', created_at timestamptz default now())`, row types |
-| [`apps/api/src/db/database-url.ts`](../../apps/api/src/db/database-url.ts) | `tryResolveDatabaseUrl()` (offline-safe) and `resolveDatabaseUrl()` (throws, actionable) |
-| [`apps/api/drizzle.config.ts`](../../apps/api/drizzle.config.ts) | uses the resolver, pins `migrations.schema = platform`, `strict`, `verbose` |
-| `apps/api/drizzle/0000_pretty_bromley.sql` | generated migration, `CREATE SCHEMA` patched to `IF NOT EXISTS` |
-| [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) | real runner: single postgres.js connection, `migrate()` from drizzle, `onnotice` silenced, `finally` close, exit 1 on failure |
-| [`apps/api/src/db/schema.spec.ts`](../../apps/api/src/db/schema.spec.ts) | 13 metadata assertions (no DB needed) |
-| init scripts + shell/smoke tests | `GRANT CREATE ON SCHEMA platform` for the app role; expectations 1 → 2 |
+| File                                                                       | Change                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts)             | `callbackSchema`, `CALL_STATUS_VALUES`, `callStatusEnum`, `callbackRequests(id uuid pk default gen_random_uuid, name 120, email 254, phone 20, reason 1000, status enum default 'queued', created_at timestamptz default now())`, row types |
+| [`apps/api/src/db/database-url.ts`](../../apps/api/src/db/database-url.ts) | `tryResolveDatabaseUrl()` (offline-safe) and `resolveDatabaseUrl()` (throws, actionable)                                                                                                                                                    |
+| [`apps/api/drizzle.config.ts`](../../apps/api/drizzle.config.ts)           | uses the resolver, pins `migrations.schema = platform`, `strict`, `verbose`                                                                                                                                                                 |
+| `apps/api/drizzle/0000_pretty_bromley.sql`                                 | generated migration, `CREATE SCHEMA` patched to `IF NOT EXISTS`                                                                                                                                                                             |
+| [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts)                 | real runner: single postgres.js connection, `migrate()` from drizzle, `onnotice` silenced, `finally` close, exit 1 on failure                                                                                                               |
+| [`apps/api/src/db/schema.spec.ts`](../../apps/api/src/db/schema.spec.ts)   | 13 metadata assertions (no DB needed)                                                                                                                                                                                                       |
+| init scripts + shell/smoke tests                                           | `GRANT CREATE ON SCHEMA platform` for the app role; expectations 1 → 2                                                                                                                                                                      |
 
 ## 5. Outcome and how to verify
 

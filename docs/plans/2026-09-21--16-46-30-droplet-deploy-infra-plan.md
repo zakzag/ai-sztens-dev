@@ -23,35 +23,35 @@ needed to run the project on a single DigitalOcean droplet (Ubuntu) where:
 
 ## 2. Directory Split
 
-| Directory | Responsibility |
-|---|---|
-| `infra/` | The runtime stack: Docker images, Compose file, Caddy config, Postgres init, monitor. |
+| Directory | Responsibility                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------- |
+| `infra/`  | The runtime stack: Docker images, Compose file, Caddy config, Postgres init, monitor.                   |
 | `deploy/` | Host bootstrap + deployment: user/SSH setup, Docker installation, env template, deploy script, runbook. |
 
 ## 3. File Set
 
 ### `infra/`
 
-| File | Purpose |
-|---|---|
-| `infra/docker-compose.yml` | Services: `api`, `postgres`, `caddy`, `monitor`; healthchecks, restart policies, volumes, secrets |
-| `infra/.env.example` | All environment variables consumed by Compose (domain, DB credentials, CORS, alert webhook) |
-| `infra/app/Dockerfile` | Multi-stage build of the pnpm monorepo API (`@callback/api`) using the exact `start:prod` script |
-| `infra/app/.dockerignore` | Keeps build context small and avoids sending `node_modules`, `dist`, `.env` |
-| `infra/caddy/Caddyfile` | Reverse proxy + TLS: exposes the API origin and (optionally) static frontends |
-| `infra/postgres/init/01-roles.sql` | Idempotent role/database creation for `tkovari`, `krak`, `aisztens` with password from env |
-| `infra/monitor/Dockerfile` | Minimal image for the watchdog |
-| `infra/monitor/watch.sh` | Loops over `GET /api`; on failure (or recovery) sends a webhook notification |
+| File                               | Purpose                                                                                           |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `infra/docker-compose.yml`         | Services: `api`, `postgres`, `caddy`, `monitor`; healthchecks, restart policies, volumes, secrets |
+| `infra/.env.example`               | All environment variables consumed by Compose (domain, DB credentials, CORS, alert webhook)       |
+| `infra/app/Dockerfile`             | Multi-stage build of the pnpm monorepo API (`@callback/api`) using the exact `start:prod` script  |
+| `infra/app/.dockerignore`          | Keeps build context small and avoids sending `node_modules`, `dist`, `.env`                       |
+| `infra/caddy/Caddyfile`            | Reverse proxy + TLS: exposes the API origin and (optionally) static frontends                     |
+| `infra/postgres/init/01-roles.sql` | Idempotent role/database creation for `tkovari`, `krak`, `aisztens` with password from env        |
+| `infra/monitor/Dockerfile`         | Minimal image for the watchdog                                                                    |
+| `infra/monitor/watch.sh`           | Loops over `GET /api`; on failure (or recovery) sends a webhook notification                      |
 
 ### `deploy/`
 
-| File | Purpose |
-|---|---|
+| File                  | Purpose                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `deploy/bootstrap.sh` | Run once as root on the empty droplet: install Docker + Compose plugin, create users, install SSH keys, create data dirs, configure UFW |
-| `deploy/deploy.sh` | Run as `deployer`: upload `infra/`, build and start the stack via `docker compose` |
-| `deploy/.env.example` | Deployment-specific variables (host, users, SSH key paths, postgres passwords) |
-| `deploy/ssh-keys/` | One `.pub.example` placeholder per user + README; real keys are gitignored |
-| `deploy/README.md` | Step-by-step runbook from fresh droplet to running app |
+| `deploy/deploy.sh`    | Run as `deployer`: upload `infra/`, build and start the stack via `docker compose`                                                      |
+| `deploy/.env.example` | Deployment-specific variables (host, users, SSH key paths, postgres passwords)                                                          |
+| `deploy/ssh-keys/`    | One `.pub.example` placeholder per user + README; real keys are gitignored                                                              |
+| `deploy/README.md`    | Step-by-step runbook from fresh droplet to running app                                                                                  |
 
 ## 4. Key Design Decisions
 

@@ -16,12 +16,12 @@ so a credential problem was ruled out early.
 
 Runtime facts established with read-only checks:
 
-| Check | Result |
-|---|---|
-| `docker ps` | `infra-postgres-1` — `Up 12 hours (healthy)`, `0.0.0.0:5432->5432/tcp` |
-| `psql` from a container to `localhost:5432` | `Connection refused` (tried `::1` then `127.0.0.1`) |
-| `psql` from a container to `host.docker.internal:5432` | Success — `current_user = aisztens`, `current_database = aisztens_db` |
-| `docker pull mcp/postgres` | `pull access denied … repository does not exist` |
+| Check                                                  | Result                                                                 |
+| ------------------------------------------------------ | ---------------------------------------------------------------------- |
+| `docker ps`                                            | `infra-postgres-1` — `Up 12 hours (healthy)`, `0.0.0.0:5432->5432/tcp` |
+| `psql` from a container to `localhost:5432`            | `Connection refused` (tried `::1` then `127.0.0.1`)                    |
+| `psql` from a container to `host.docker.internal:5432` | Success — `current_user = aisztens`, `current_database = aisztens_db`  |
+| `docker pull mcp/postgres`                             | `pull access denied … repository does not exist`                       |
 
 ## Root cause
 
@@ -30,7 +30,7 @@ Two independent defects in the same `postgres` entry:
 1. **Wrong image reference.** `mcp/postgres` does not exist on Docker Hub, so the
    container was never started at all.
 2. **Wrong network address.** The entry passed the connection string positionally
-   to `docker run`, so the MCP process ran *inside a container*, where `localhost`
+   to `docker run`, so the MCP process ran _inside a container_, where `localhost`
    resolves to that container — not to the Docker host that publishes port 5432.
    Even with a valid image the connection would have been refused.
 

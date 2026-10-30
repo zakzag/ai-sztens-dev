@@ -10,14 +10,14 @@ been merged into `dev` via PR #6. Users saw stale UI/API on
 
 ## 2. Measured data / evidence
 
-| Probe | Result | Meaning |
-|---|---|---|
-| `curl https://api.aisztens.hu/healthz` | `{"status":"ok"}` | Live API has the old code. |
-| `docker compose ps` on droplet | All 4 app services on `sha-3a8f5b6` | Old SHA, never updated. |
-| `ghcr.io/zakzag/aisztens-*:sha-c0d7293` | Image exists in GHCR | Build **did** succeed. |
-| `images.yml` run #11 (push c0d7293) | `success` (3m 8s) | Image push OK. |
-| `deploy.yml` run #13 (push c0d7293) | `failure` (instant) | **Workflow file parse error.** |
-| GitHub error message | "Line 220: Unrecognized named-value 'secrets'; Line 232: 'env' is already defined; Line 279: Required property missing: `uses`" | Three concrete YAML issues. |
+| Probe                                   | Result                                                                                                                          | Meaning                        |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `curl https://api.aisztens.hu/healthz`  | `{"status":"ok"}`                                                                                                               | Live API has the old code.     |
+| `docker compose ps` on droplet          | All 4 app services on `sha-3a8f5b6`                                                                                             | Old SHA, never updated.        |
+| `ghcr.io/zakzag/aisztens-*:sha-c0d7293` | Image exists in GHCR                                                                                                            | Build **did** succeed.         |
+| `images.yml` run #11 (push c0d7293)     | `success` (3m 8s)                                                                                                               | Image push OK.                 |
+| `deploy.yml` run #13 (push c0d7293)     | `failure` (instant)                                                                                                             | **Workflow file parse error.** |
+| GitHub error message                    | "Line 220: Unrecognized named-value 'secrets'; Line 232: 'env' is already defined; Line 279: Required property missing: `uses`" | Three concrete YAML issues.    |
 
 ## 3. Root cause
 
@@ -35,11 +35,11 @@ images that no deploy job was ever going to consume.
 
 Single file edited: `.github/workflows/deploy.yml`. Three minimal edits:
 
-| Bug | Old | New |
-|---|---|---|
-| L220 invalid `if: secrets.*` | `if: ${{ secrets.GHCR_PAT != '' }}` | Removed; conditional moved into the step's `command:` shell as `if [ -z "${GHCR_PAT:-}" ]; then exit 0; fi`. |
-| L222+L232 duplicate `env:` | Two `env:` blocks (REMOTE_DIR; then GHCR_PAT, GITHUB_ACTOR) | One merged `env:` block with REMOTE_DIR, GHCR_PAT, GITHUB_ACTOR. |
-| L279 missing `uses:` | Step has `id`, `env:`, `with:` but no `uses:` | Added `uses: appleboy/ssh-action@v1.0.3`. |
+| Bug                          | Old                                                         | New                                                                                                          |
+| ---------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| L220 invalid `if: secrets.*` | `if: ${{ secrets.GHCR_PAT != '' }}`                         | Removed; conditional moved into the step's `command:` shell as `if [ -z "${GHCR_PAT:-}" ]; then exit 0; fi`. |
+| L222+L232 duplicate `env:`   | Two `env:` blocks (REMOTE_DIR; then GHCR_PAT, GITHUB_ACTOR) | One merged `env:` block with REMOTE_DIR, GHCR_PAT, GITHUB_ACTOR.                                             |
+| L279 missing `uses:`         | Step has `id`, `env:`, `with:` but no `uses:`               | Added `uses: appleboy/ssh-action@v1.0.3`.                                                                    |
 
 File now parses with `python -c "yaml.safe_load(...)"`. No source code,
 no Docker image, no infra-as-code changed — this is a pure CI definition

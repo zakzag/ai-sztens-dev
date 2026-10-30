@@ -22,14 +22,14 @@ Root cause: **`apps/api/.env.local` did not contain `DATABASE_URL`** — it only
 
 Candidates that were ruled out with evidence:
 
-| Candidate | Evidence against |
-|---|---|
-| Postgres not running | `docker compose … ps` → `infra-postgres-1`, `Up 32 hours (healthy)`, `0.0.0.0:5432->5432` |
-| Role / database / table missing | `psql -U aisztens -d aisztens_db` → `aisztens | aisztens_db`, `platform.__drizzle_migrations` + `platform.api_keys` exist |
-| Blank value instead of a missing key | `findstr "^DATABASE_URL" apps/api/.env.local` → no match at all |
-| Wrong env file selected | `APP_ENV` is unset → `normaliseAppEnv` falls back to `dev` → `envFilePath = ['.env.dev', '.env.local']`; `.env.dev` has no `DATABASE_URL` either, so the fallback file cannot mask the miss |
-| cwd mismatch (`node dist/main` from the repo root) | the trace came from `nest start --watch`, whose cwd is `apps/api` |
-| Prod `ignoreEnvFile: true` | only active when `APP_ENV=prod` |
+| Candidate                                          | Evidence against                                                                                                                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Postgres not running                               | `docker compose … ps` → `infra-postgres-1`, `Up 32 hours (healthy)`, `0.0.0.0:5432->5432`                                                                                                   |
+| Role / database / table missing                    | `psql -U aisztens -d aisztens_db` → `aisztens                                                                                                                                               | aisztens_db`, `platform.__drizzle_migrations`+`platform.api_keys` exist |
+| Blank value instead of a missing key               | `findstr "^DATABASE_URL" apps/api/.env.local` → no match at all                                                                                                                             |
+| Wrong env file selected                            | `APP_ENV` is unset → `normaliseAppEnv` falls back to `dev` → `envFilePath = ['.env.dev', '.env.local']`; `.env.dev` has no `DATABASE_URL` either, so the fallback file cannot mask the miss |
+| cwd mismatch (`node dist/main` from the repo root) | the trace came from `nest start --watch`, whose cwd is `apps/api`                                                                                                                           |
+| Prod `ignoreEnvFile: true`                         | only active when `APP_ENV=prod`                                                                                                                                                             |
 
 Second, hidden defect found while verifying: with `APP_ENV` unset the API boots in **`dev`**
 mode, so `.env.dev` wins and the CORS allow-list is the **droplet's**
@@ -79,19 +79,19 @@ the fix is independent of `APP_ENV`; only CORS depends on it.
 
 ## Docs updated
 
-| File | Change |
-|---|---|
-| [`docs/Specs/Local-Development.md`](../Specs/Local-Development.md:4) | header date; §3 `.env.local` row now explains the `envFilePath` precedence; §5 gained the `pnpm dev` / `APP_ENV` pitfall with the three verification curls |
-| [`docs/Specs/Database-Local.md`](../Specs/Database-Local.md:87) | new §3.1: `DATABASE_URL is not set or blank` diagnosis steps and a symptom → cause → fix table |
-| [`docs/milestones/2026-10-21--22-35-00-api-local-boot-database-url-and-cors.milestone.md`](../milestones/2026-10-21--22-35-00-api-local-boot-database-url-and-cors.milestone.md) | decision-grade summary |
+| File                                                                                                                                                                             | Change                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`docs/Specs/Local-Development.md`](../Specs/Local-Development.md:4)                                                                                                             | header date; §3 `.env.local` row now explains the `envFilePath` precedence; §5 gained the `pnpm dev` / `APP_ENV` pitfall with the three verification curls |
+| [`docs/Specs/Database-Local.md`](../Specs/Database-Local.md:87)                                                                                                                  | new §3.1: `DATABASE_URL is not set or blank` diagnosis steps and a symptom → cause → fix table                                                             |
+| [`docs/milestones/2026-10-21--22-35-00-api-local-boot-database-url-and-cors.milestone.md`](../milestones/2026-10-21--22-35-00-api-local-boot-database-url-and-cors.milestone.md) | decision-grade summary                                                                                                                                     |
 
 ## Follow-ups
 
-* `pnpm dev` still leaves `APP_ENV` unset, so every developer must remember the export. The
+- `pnpm dev` still leaves `APP_ENV` unset, so every developer must remember the export. The
   documented fix candidates: (a) set `APP_ENV=local` in the root `dev` script via `cross-env`
-  (new dev dependency), or (b) change the `normaliseAppEnv` *unset* fallback from `dev` to
+  (new dev dependency), or (b) change the `normaliseAppEnv` _unset_ fallback from `dev` to
   `local`. (b) touches a deploy-adjacent default (a container without `APP_ENV` would then serve
   localhost CORS), so it needs a decision, not a silent commit. Until then the banner
   (`APP_ENV=…`) is the check: on a developer machine it must say `local`.
-* The stale `nest start --watch` processes from the first attempt were killed; nothing is left
+- The stale `nest start --watch` processes from the first attempt were killed; nothing is left
   listening on `:3000`.

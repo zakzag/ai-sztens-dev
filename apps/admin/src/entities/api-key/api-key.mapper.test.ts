@@ -60,7 +60,10 @@ describe('toApiKeyViewModel', () => {
 
 describe('toApiKeyViewModels', () => {
   it('preserves the input order and maps every row', () => {
-    const viewModels = toApiKeyViewModels([API_KEY_FIXTURE, SECOND_API_KEY_FIXTURE]);
+    const viewModels = toApiKeyViewModels([
+      API_KEY_FIXTURE,
+      SECOND_API_KEY_FIXTURE,
+    ]);
 
     expect(viewModels.map((viewModel) => viewModel.identifier)).toEqual([
       API_KEY_FIXTURE.identifier,

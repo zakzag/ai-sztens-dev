@@ -19,16 +19,16 @@ Once the MCP SSH tunnel was available (the previous handshake timeouts were
 transient network errors, NOT a wrong host — `ssh.aisztens.hu` IS the
 DigitalOcean droplet), the real numbers were:
 
-| Metric | Plan's assumption | Reality |
-|---|---|---|
-| Total RAM | "1 GB Basic, OOM-ing" | **961 MB total, 469 MB used, 491 MB available** |
-| Swap | (not configured) | **0 B (none)** |
-| `vmstat 1 3` swap in/out | "high si/so" | **si=0, so=0, swpd=0 — no swapping at all** |
+| Metric                     | Plan's assumption         | Reality                                                                                                                       |
+| -------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Total RAM                  | "1 GB Basic, OOM-ing"     | **961 MB total, 469 MB used, 491 MB available**                                                                               |
+| Swap                       | (not configured)          | **0 B (none)**                                                                                                                |
+| `vmstat 1 3` swap in/out   | "high si/so"              | **si=0, so=0, swpd=0 — no swapping at all**                                                                                   |
 | `do-agent` / `pnpm-native` | "memory leak on the host" | **process not present on the droplet** — the `pnpm-native` in `top` belongs to the GitHub Actions deploy runner, not the host |
-| `api` container | "probably leaking" | **81.7 MB used** (well under any reasonable limit) |
-| `postgres` container | "probably leaking" | **28.6 MB used** |
-| `monitor` container | — | **5.3 MB used** |
-| **`caddy` container** | "fine" | **`Restarting (1) 8 seconds ago`, 0 B RAM** — **crash-looping every ~8 s** |
+| `api` container            | "probably leaking"        | **81.7 MB used** (well under any reasonable limit)                                                                            |
+| `postgres` container       | "probably leaking"        | **28.6 MB used**                                                                                                              |
+| `monitor` container        | —                         | **5.3 MB used**                                                                                                               |
+| **`caddy` container**      | "fine"                    | **`Restarting (1) 8 seconds ago`, 0 B RAM** — **crash-looping every ~8 s**                                                    |
 
 The Caddy logs made the root cause unambiguous:
 
@@ -45,7 +45,7 @@ like memory pressure in `top`.
 The previous fix
 ([`2026-09-25-caddyfile-env-substitution-fix.md`](2026-09-25-caddyfile-env-substitution-fix.md))
 believed Caddy resolves `{env.DOMAIN}` in site addresses. It does not — that
-syntax only works inside certain Caddy *modules* (e.g. `root`, `header`),
+syntax only works inside certain Caddy _modules_ (e.g. `root`, `header`),
 not in the site-address slot itself. The TLS handshake error was masked by
 the (then still functioning) single-subdomain `api.{$DOMAIN}` → `api.{env.DOMAIN}`
 swap; adding the admin subdomain in the three-subdomain routing change

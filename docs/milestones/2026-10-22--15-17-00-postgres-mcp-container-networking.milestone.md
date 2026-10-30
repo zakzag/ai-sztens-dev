@@ -12,20 +12,20 @@ no `postgres` MCP tools were available in the editor at all.
 
 ## Measured data / evidence
 
-| Check | Result |
-|---|---|
-| MCP DSN vs `infra/.env.local` | identical (`aisztens` / `aisztens.l238!`) → credentials not the issue |
-| `docker ps` | `infra-postgres-1` `Up 12 hours (healthy)`, `0.0.0.0:5432->5432/tcp` |
-| `psql` in container → `localhost:5432` | `Connection refused` (`::1`, then `127.0.0.1`) |
-| `psql` in container → `host.docker.internal:5432` | success — `current_user = aisztens`, `db = aisztens_db` |
-| `docker pull mcp/postgres` | `pull access denied … repository does not exist` |
+| Check                                             | Result                                                                |
+| ------------------------------------------------- | --------------------------------------------------------------------- |
+| MCP DSN vs `infra/.env.local`                     | identical (`aisztens` / `aisztens.l238!`) → credentials not the issue |
+| `docker ps`                                       | `infra-postgres-1` `Up 12 hours (healthy)`, `0.0.0.0:5432->5432/tcp`  |
+| `psql` in container → `localhost:5432`            | `Connection refused` (`::1`, then `127.0.0.1`)                        |
+| `psql` in container → `host.docker.internal:5432` | success — `current_user = aisztens`, `db = aisztens_db`               |
+| `docker pull mcp/postgres`                        | `pull access denied … repository does not exist`                      |
 
 ## Root cause
 
 1. **Nonexistent image.** `mcp/postgres` is not published on Docker Hub, so
    `docker run` failed before any connection attempt.
 2. **Container-local `localhost`.** The DSN pointed at `localhost:5432`, but the
-   MCP server executes *inside* a container: `localhost` is that container's own
+   MCP server executes _inside_ a container: `localhost` is that container's own
    loopback, not the Docker host that publishes 5432.
 3. **Wrong DSN channel.** The chosen image (`crystaldba/postgres-mcp`) reads the
    DSN from `DATABASE_URI`, so a positional argument is ignored.
@@ -48,13 +48,13 @@ the global `mcp_settings.json`:
 }
 ```
 
-| Change | Reason |
-|---|---|
-| `mcp/postgres` → `crystaldba/postgres-mcp:latest` | original image does not exist |
-| `localhost` → `host.docker.internal` | reach the host-published port from inside the container |
-| `--add-host=host.docker.internal:host-gateway` | portable to native Linux hosts |
-| DSN into `-e DATABASE_URI=` | image's documented configuration channel |
-| `--access-mode=restricted` | read-only default for DB inspection |
+| Change                                            | Reason                                                  |
+| ------------------------------------------------- | ------------------------------------------------------- |
+| `mcp/postgres` → `crystaldba/postgres-mcp:latest` | original image does not exist                           |
+| `localhost` → `host.docker.internal`              | reach the host-published port from inside the container |
+| `--add-host=host.docker.internal:host-gateway`    | portable to native Linux hosts                          |
+| DSN into `-e DATABASE_URI=`                       | image's documented configuration channel                |
+| `--access-mode=restricted`                        | read-only default for DB inspection                     |
 
 Docs added: this milestone and
 [`docs/history/2026-10-22--15-17-00-postgres-mcp-server-container-networking-fix.md`](../history/2026-10-22--15-17-00-postgres-mcp-server-container-networking-fix.md).

@@ -32,9 +32,12 @@ import {
 } from './error-surface.logic.js';
 
 describe('isAbortLike', () => {
-  it.each(['AbortError', 'CancelledError'])('treats %s as a cancellation', (name) => {
-    expect(isAbortLike({ name })).toBe(true);
-  });
+  it.each(['AbortError', 'CancelledError'])(
+    'treats %s as a cancellation',
+    (name) => {
+      expect(isAbortLike({ name })).toBe(true);
+    },
+  );
 
   it('ignores values that cannot be a cancellation', () => {
     expect(isAbortLike(null)).toBe(false);
@@ -52,7 +55,9 @@ describe('toErrorSurface', () => {
   });
 
   it('sends a non-ApiError throwable to the page', () => {
-    expect(toErrorSurface(new TypeError('Cannot read properties of undefined'))).toBe('page');
+    expect(
+      toErrorSurface(new TypeError('Cannot read properties of undefined')),
+    ).toBe('page');
     expect(toErrorSurface('boom')).toBe('page');
   });
 
@@ -61,10 +66,14 @@ describe('toErrorSurface', () => {
   });
 
   it('sends 401 and 503 to the banner', () => {
-    expect(toErrorSurface(createStatusError(HTTP_STATUS.UNAUTHORIZED, 'UNAUTHENTICATED'))).toBe(
-      'banner',
-    );
-    expect(toErrorSurface(createServerError(HTTP_STATUS.SERVICE_UNAVAILABLE))).toBe('banner');
+    expect(
+      toErrorSurface(
+        createStatusError(HTTP_STATUS.UNAUTHORIZED, 'UNAUTHENTICATED'),
+      ),
+    ).toBe('banner');
+    expect(
+      toErrorSurface(createServerError(HTTP_STATUS.SERVICE_UNAVAILABLE)),
+    ).toBe('banner');
   });
 
   it('sends an addressable validation failure to the field tier', () => {
@@ -74,9 +83,11 @@ describe('toErrorSurface', () => {
   });
 
   it('sends an allowed code without issues to the page', () => {
-    expect(toErrorSurface(createStatusError(HTTP_STATUS.BAD_REQUEST, 'VALIDATION_FAILED'))).toBe(
-      'page',
-    );
+    expect(
+      toErrorSurface(
+        createStatusError(HTTP_STATUS.BAD_REQUEST, 'VALIDATION_FAILED'),
+      ),
+    ).toBe('page');
   });
 
   it.each([
@@ -109,7 +120,11 @@ describe('toBannerCondition', () => {
 
   it('reports nothing while online and without a banner-classified error', () => {
     expect(toBannerCondition(true, [])).toBeNull();
-    expect(toBannerCondition(true, [createServerError(HTTP_STATUS.INTERNAL_SERVER_ERROR)])).toBeNull();
+    expect(
+      toBannerCondition(true, [
+        createServerError(HTTP_STATUS.INTERNAL_SERVER_ERROR),
+      ]),
+    ).toBeNull();
     expect(toBannerCondition(true, [createValidationError()])).toBeNull();
   });
 
@@ -118,21 +133,29 @@ describe('toBannerCondition', () => {
   });
 
   it('maps 401 to the session condition and 503 to the outage condition', () => {
-    expect(toBannerCondition(true, [createStatusError(HTTP_STATUS.UNAUTHORIZED)])).toBe(
-      'session-expired',
-    );
-    expect(toBannerCondition(true, [createServerError(HTTP_STATUS.SERVICE_UNAVAILABLE)])).toBe(
-      'unavailable',
-    );
+    expect(
+      toBannerCondition(true, [createStatusError(HTTP_STATUS.UNAUTHORIZED)]),
+    ).toBe('session-expired');
+    expect(
+      toBannerCondition(true, [
+        createServerError(HTTP_STATUS.SERVICE_UNAVAILABLE),
+      ]),
+    ).toBe('unavailable');
   });
 
   it('prefers offline over a stale 401 and a 401 over an outage, in any order', () => {
     const unauthorized = createStatusError(HTTP_STATUS.UNAUTHORIZED);
     const unavailable = createServerError(HTTP_STATUS.SERVICE_UNAVAILABLE);
 
-    expect(toBannerCondition(true, [unauthorized, unavailable])).toBe('session-expired');
-    expect(toBannerCondition(true, [unavailable, unauthorized])).toBe('session-expired');
-    expect(toBannerCondition(true, [createNetworkError(), unauthorized])).toBe('offline');
+    expect(toBannerCondition(true, [unauthorized, unavailable])).toBe(
+      'session-expired',
+    );
+    expect(toBannerCondition(true, [unavailable, unauthorized])).toBe(
+      'session-expired',
+    );
+    expect(toBannerCondition(true, [createNetworkError(), unauthorized])).toBe(
+      'offline',
+    );
   });
 });
 

@@ -9,7 +9,13 @@ import { cn } from '../../lib/cn.js';
  *
  * @param props - see {@link CardProps}.
  */
-export function Card({ title, description, className, children, ...rest }: CardProps) {
+export function Card({
+  title,
+  description,
+  className,
+  children,
+  ...rest
+}: CardProps) {
   const hasHeader = Boolean(title) || Boolean(description);
 
   return (
@@ -20,9 +26,15 @@ export function Card({ title, description, className, children, ...rest }: CardP
         className,
       )}
     >
-      {title ? <h2 className="text-lg font-semibold text-text-primary">{title}</h2> : null}
-      {description ? <p className="mt-1 text-sm text-text-muted">{description}</p> : null}
-      {children ? <div className={hasHeader ? 'mt-4' : undefined}>{children}</div> : null}
+      {title ? (
+        <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
+      ) : null}
+      {description ? (
+        <p className="mt-1 text-sm text-text-muted">{description}</p>
+      ) : null}
+      {children ? (
+        <div className={hasHeader ? 'mt-4' : undefined}>{children}</div>
+      ) : null}
     </div>
   );
 }

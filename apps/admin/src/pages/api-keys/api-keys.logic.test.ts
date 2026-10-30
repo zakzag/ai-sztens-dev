@@ -34,7 +34,10 @@ function withValues(patch: Partial<ApiKeyFormValues>): ApiKeyFormValues {
  * @param values - form values to validate.
  * @returns the error message of the given field, or `undefined` when valid.
  */
-function fieldError(values: ApiKeyFormValues, field: keyof ApiKeyFormValues): string | undefined {
+function fieldError(
+  values: ApiKeyFormValues,
+  field: keyof ApiKeyFormValues,
+): string | undefined {
   const result = apiKeyFormSchema.safeParse(values);
 
   if (result.success) {
@@ -76,7 +79,9 @@ describe('apiKeyFormSchema', () => {
   });
 
   it('accepts a name of exactly 200 characters', () => {
-    expect(apiKeyFormSchema.safeParse(withValues({ name: 'a'.repeat(200) })).success).toBe(true);
+    expect(
+      apiKeyFormSchema.safeParse(withValues({ name: 'a'.repeat(200) })).success,
+    ).toBe(true);
   });
 
   it('rejects a missing identifier', () => {
@@ -86,27 +91,28 @@ describe('apiKeyFormSchema', () => {
   });
 
   it('rejects an identifier with a space', () => {
-    expect(fieldError(withValues({ identifier: 'vapi prod' }), 'identifier')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid,
-    );
+    expect(
+      fieldError(withValues({ identifier: 'vapi prod' }), 'identifier'),
+    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid);
   });
 
   it('rejects an identifier with a slash', () => {
-    expect(fieldError(withValues({ identifier: 'vapi/prod' }), 'identifier')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid,
-    );
+    expect(
+      fieldError(withValues({ identifier: 'vapi/prod' }), 'identifier'),
+    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid);
   });
 
   it('accepts dots, dashes and underscores in the identifier', () => {
     expect(
-      apiKeyFormSchema.safeParse(withValues({ identifier: 'Vapi.prod_1-x' })).success,
+      apiKeyFormSchema.safeParse(withValues({ identifier: 'Vapi.prod_1-x' }))
+        .success,
     ).toBe(true);
   });
 
   it('rejects a description longer than 2000 characters', () => {
-    expect(fieldError(withValues({ description: 'a'.repeat(2001) }), 'description')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.descriptionTooLong,
-    );
+    expect(
+      fieldError(withValues({ description: 'a'.repeat(2001) }), 'description'),
+    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.descriptionTooLong);
   });
 
   it('rejects a missing api key value', () => {
@@ -122,22 +128,26 @@ describe('apiKeyFormSchema', () => {
   });
 
   it('rejects a malformed expiry date', () => {
-    expect(fieldError(withValues({ expiresAt: '2027.01.31' }), 'expiresAt')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.expiresAtInvalid,
-    );
+    expect(
+      fieldError(withValues({ expiresAt: '2027.01.31' }), 'expiresAt'),
+    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.expiresAtInvalid);
   });
 
   it('rejects a calendar day that does not exist', () => {
-    expect(fieldError(withValues({ expiresAt: '2027-02-29' }), 'expiresAt')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.expiresAtInvalid,
-    );
+    expect(
+      fieldError(withValues({ expiresAt: '2027-02-29' }), 'expiresAt'),
+    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.expiresAtInvalid);
   });
 });
 
 describe('toCreateApiKeyInput', () => {
   it('trims the text fields', () => {
     const input = toCreateApiKeyInput(
-      withValues({ name: '  Vapi prod  ', identifier: ' vapi-prod ', apiKey: ' sk-live ' }),
+      withValues({
+        name: '  Vapi prod  ',
+        identifier: ' vapi-prod ',
+        apiKey: ' sk-live ',
+      }),
     );
 
     expect(input).toEqual({
@@ -148,7 +158,9 @@ describe('toCreateApiKeyInput', () => {
   });
 
   it('omits empty optional fields instead of sending "" or null', () => {
-    const input = toCreateApiKeyInput(withValues({ description: '', expiresAt: '' }));
+    const input = toCreateApiKeyInput(
+      withValues({ description: '', expiresAt: '' }),
+    );
 
     expect(input).not.toHaveProperty('description');
     expect(input).not.toHaveProperty('expiresAt');
@@ -162,7 +174,9 @@ describe('toCreateApiKeyInput', () => {
   });
 
   it('keeps a filled description', () => {
-    const input = toCreateApiKeyInput(withValues({ description: ' Éles kulcs ' }));
+    const input = toCreateApiKeyInput(
+      withValues({ description: ' Éles kulcs ' }),
+    );
 
     expect(input.description).toBe('Éles kulcs');
   });
@@ -179,6 +193,8 @@ describe('toCreateApiKeyInput', () => {
   });
 
   it('throws when an unvalidated malformed date reaches the mapping', () => {
-    expect(() => toCreateApiKeyInput(withValues({ expiresAt: '2027-13-01' }))).toThrow(RangeError);
+    expect(() =>
+      toCreateApiKeyInput(withValues({ expiresAt: '2027-13-01' })),
+    ).toThrow(RangeError);
   });
 });

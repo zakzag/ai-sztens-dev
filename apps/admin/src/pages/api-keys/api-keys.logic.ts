@@ -75,10 +75,16 @@ export const apiKeyFormSchema = z.object({
     .string()
     .trim()
     .min(1, API_KEY_FORM_VALIDATION_MESSAGES.apiKeyRequired)
-    .max(API_KEY_VALUE_MAX_LENGTH, API_KEY_FORM_VALIDATION_MESSAGES.apiKeyTooLong),
+    .max(
+      API_KEY_VALUE_MAX_LENGTH,
+      API_KEY_FORM_VALIDATION_MESSAGES.apiKeyTooLong,
+    ),
   expiresAt: z
     .string()
-    .refine(isExpiryInputAccepted, API_KEY_FORM_VALIDATION_MESSAGES.expiresAtInvalid),
+    .refine(
+      isExpiryInputAccepted,
+      API_KEY_FORM_VALIDATION_MESSAGES.expiresAtInvalid,
+    ),
 });
 
 /**
@@ -90,7 +96,9 @@ export const apiKeyFormSchema = z.object({
  * @throws {RangeError} when `expiresAt` is not a calendar date — unreachable
  *   behind {@link apiKeyFormSchema}, and deliberately loud if it happens.
  */
-export function toCreateApiKeyInput(values: ApiKeyFormValues): CreateApiKeyInput {
+export function toCreateApiKeyInput(
+  values: ApiKeyFormValues,
+): CreateApiKeyInput {
   const description = values.description.trim();
   const expiresAt = toExpiryIso(values.expiresAt);
 

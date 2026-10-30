@@ -125,14 +125,14 @@ dmesg --since '-1h' | grep -i 'killed process' | tail -40
 
 **Most common causes in this stack:**
 
-| Service | Typical root cause | Jump to |
-|---|---|---|
-| `aisztens-api-1` | NestJS not yet listening + short `start_period`; or `/healthz` route missing | [§2.9](#29-healthcheck-logs-show-exitcode-1-continuously) |
-| `aisztens-api-1` | `pnpm-native` lockfile-verify OOM at cold start | [§2.3](#23-pnpm-native-dominates-top-at-60--cpu) |
-| `aisztens-caddy-1` | Unrendered `<DOMAIN>` placeholder in Caddyfile | [§2.4](#24-caddy-container-is-in-a-restart-loop) |
-| `aisztens-caddy-1` | Two Caddy containers fighting over 80/443 | [§2.4b](#two-caddy-containers-fight-over-80443) |
-| `aisztens-caddy-1` | ACME challenge failed (firewall / DNS) | [§2.13](#213-acme-logs-timeout-during-connect-likely-firewall-problem) |
-| `aisztens-monitor-1` | `wget` returns non-zero on first probe before `api` is up | [§2.16](#216-monitor-container-restarting-255-after-deploy) |
+| Service              | Typical root cause                                                           | Jump to                                                                |
+| -------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `aisztens-api-1`     | NestJS not yet listening + short `start_period`; or `/healthz` route missing | [§2.9](#29-healthcheck-logs-show-exitcode-1-continuously)              |
+| `aisztens-api-1`     | `pnpm-native` lockfile-verify OOM at cold start                              | [§2.3](#23-pnpm-native-dominates-top-at-60--cpu)                       |
+| `aisztens-caddy-1`   | Unrendered `<DOMAIN>` placeholder in Caddyfile                               | [§2.4](#24-caddy-container-is-in-a-restart-loop)                       |
+| `aisztens-caddy-1`   | Two Caddy containers fighting over 80/443                                    | [§2.4b](#two-caddy-containers-fight-over-80443)                        |
+| `aisztens-caddy-1`   | ACME challenge failed (firewall / DNS)                                       | [§2.13](#213-acme-logs-timeout-during-connect-likely-firewall-problem) |
+| `aisztens-monitor-1` | `wget` returns non-zero on first probe before `api` is up                    | [§2.16](#216-monitor-container-restarting-255-after-deploy)            |
 
 Source incidents: [`plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](../plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md), [`history/2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28--13-35-06-caddy-restart-loop-and-mem-limits.milestone.md).
 
@@ -188,7 +188,7 @@ Source: [`plans/2026-09-29--00-50-12-pnpm-native-oom-restart-loop-plan.md`](../p
 
 **What it means:** almost certainly **not** a host process. On DigitalOcean
 droplets the `do-agent` user owns a Rust helper called `pnpm-native`. In
-`top` it is the *container's* PID namespace, not the host's. (The actual
+`top` it is the _container's_ PID namespace, not the host's. (The actual
 GitHub-Actions runner that produced `pnpm-native` lives on a different
 machine.)
 
@@ -394,12 +394,12 @@ docker compose exec api env | grep -E 'DATABASE_URL|POSTGRES'
 
 **Common root causes:**
 
-| Root cause | Symptom | Fix |
-|---|---|---|
-| `DATABASE_URL=postgres://...@localhost:5432/...` in `infra/.env` | `ECONNREFUSED 127.0.0.1:5432` | Change to `@postgres:5432`, redeploy. |
-| `AISZTENS_DB_PASSWORD` empty / placeholder in `infra/.env` | `password authentication failed for user "aisztens"` | Fill in the password; rerun `postgres/init/01-roles.sh` only on a fresh volume. |
-| `depends_on: postgres: condition: service_healthy` failed | api never gets `service_started` until postgres is `healthy` | Wait for `pg_isready` to return; if it loops, check the password envs. |
-| Two api replicas, one healthcheck-race | Random `ECONNREFUSED` during deploy | This stack has 1 replica per service — if you scale it, stop. |
+| Root cause                                                       | Symptom                                                      | Fix                                                                             |
+| ---------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `DATABASE_URL=postgres://...@localhost:5432/...` in `infra/.env` | `ECONNREFUSED 127.0.0.1:5432`                                | Change to `@postgres:5432`, redeploy.                                           |
+| `AISZTENS_DB_PASSWORD` empty / placeholder in `infra/.env`       | `password authentication failed for user "aisztens"`         | Fill in the password; rerun `postgres/init/01-roles.sh` only on a fresh volume. |
+| `depends_on: postgres: condition: service_healthy` failed        | api never gets `service_started` until postgres is `healthy` | Wait for `pg_isready` to return; if it loops, check the password envs.          |
+| Two api replicas, one healthcheck-race                           | Random `ECONNREFUSED` during deploy                          | This stack has 1 replica per service — if you scale it, stop.                   |
 
 Source: [`docker-compose.yml`](../../infra/docker-compose.yml) (DATABASE_URL), [`plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md`](../plans/2026-09-29--00-30-10-api-healthcheck-fail-plan.md) §3.
 
@@ -454,12 +454,12 @@ network (compose DNS name), but NOT from the host. That is **by design**
 for `api` and `postgres` — they use `expose:` not `ports:` in
 [`infra/docker-compose.yml`](../../infra/docker-compose.yml).
 
-| Service | Host port published? | How to reach from the host |
-|---|---|---|
-| `caddy` | **Yes** — `80:80`, `443:443` | `curl http://127.0.0.1/` (HTTP→HTTPS) |
-| `api` | No (`expose: 3000`) | only via Caddy. For debugging: `docker compose exec caddy wget -qO- http://api:3000/healthz` |
-| `postgres` | No (`expose: 5432`) | only from api/monitor. For debugging: `docker compose exec postgres psql ...` |
-| `monitor` | No | only via its own log |
+| Service    | Host port published?         | How to reach from the host                                                                   |
+| ---------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
+| `caddy`    | **Yes** — `80:80`, `443:443` | `curl http://127.0.0.1/` (HTTP→HTTPS)                                                        |
+| `api`      | No (`expose: 3000`)          | only via Caddy. For debugging: `docker compose exec caddy wget -qO- http://api:3000/healthz` |
+| `postgres` | No (`expose: 5432`)          | only from api/monitor. For debugging: `docker compose exec postgres psql ...`                |
+| `monitor`  | No                           | only via its own log                                                                         |
 
 **If you genuinely need a host port** (e.g. running psql from your dev
 machine against the droplet), do this **only temporarily**:
@@ -661,17 +661,17 @@ preserved at
 
 ### 2.15 `dmesg` shows `Memory cgroup out of memory: Killed process ...`
 
-This is the *symptom* the playbook treats as a category. Match the
+This is the _symptom_ the playbook treats as a category. Match the
 **process name** in the `dmesg` line to the playbook entry:
 
-| `dmesg` process name | Most likely cause | Jump to |
-|---|---|---|
-| `pnpm-native` (inside api) | lockfile-verify OOM | [§2.3](#23-pnpm-native-dominates-top-at-60--cpu) |
-| `node` (api) | V8 heap exhausted | [§2.2](#22-api-exits-with-exited-137-oom-killed) |
-| `postgres` | `shared_buffers` too high or query spilling to disk | [§2.6](#26-api-container-cannot-reach-postgres) + lower `shared_buffers` |
-| `caddy` | TLS handshake spike; raise limit or check for DDoS | bump `mem_limit: 64m` → `128m` |
-| `containerd-shim` | A container exceeds its reservation but not its limit | investigate per-container `docker stats` |
-| any host process (`kswapd0`, `systemd-journal`) | the host itself is under memory pressure | [§2.17](#217-disk-fills-up-no-space-left-on-device-in-buildpull) + bump droplet tier |
+| `dmesg` process name                            | Most likely cause                                     | Jump to                                                                              |
+| ----------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `pnpm-native` (inside api)                      | lockfile-verify OOM                                   | [§2.3](#23-pnpm-native-dominates-top-at-60--cpu)                                     |
+| `node` (api)                                    | V8 heap exhausted                                     | [§2.2](#22-api-exits-with-exited-137-oom-killed)                                     |
+| `postgres`                                      | `shared_buffers` too high or query spilling to disk   | [§2.6](#26-api-container-cannot-reach-postgres) + lower `shared_buffers`             |
+| `caddy`                                         | TLS handshake spike; raise limit or check for DDoS    | bump `mem_limit: 64m` → `128m`                                                       |
+| `containerd-shim`                               | A container exceeds its reservation but not its limit | investigate per-container `docker stats`                                             |
+| any host process (`kswapd0`, `systemd-journal`) | the host itself is under memory pressure              | [§2.17](#217-disk-fills-up-no-space-left-on-device-in-buildpull) + bump droplet tier |
 
 Source: [`plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md`](../plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md).
 
@@ -973,7 +973,7 @@ and attach it. The bundle removes ~90 % of the back-and-forth.
   - [`2026-09-24-…-deploy-sh-rsync-host-bug-fix.md`](../history/2026-09-24--20-02-39-deploy-sh-rsync-host-bug-fix.md)
   - [`2026-09-24-…-deploy-sh-scp-env-after-upload.md`](../history/2026-09-24--20-06-55-deploy-sh-scp-env-after-upload.md)
   - [`2026-09-24-…-api-dockerfile-uid-warning-fix.md`](../history/2026-09-24--20-20-24-api-dockerfile-uid-warning-fix.md)
-  - [`2026-09-25-…-caddyfile-env-substitution-fix.md`](../history/2026-09-25--14-10-10-caddyfile-env-substitution-fix.md) *(SUPERSEDED — see header)*
+  - [`2026-09-25-…-caddyfile-env-substitution-fix.md`](../history/2026-09-25--14-10-10-caddyfile-env-substitution-fix.md) _(SUPERSEDED — see header)_
   - [`2026-09-25-…-three-subdomain-routing-impl.md`](../history/2026-09-25--14-43-32-three-subdomain-routing-impl.md)
   - [`2026-09-25-…-deploy-yml-spa-build-fix.md`](../history/2026-09-25--14-56-56-deploy-yml-spa-build-fix.md)
   - [`2026-09-27-…-container-mem-limits-after-oom-plan.md`](../plans/2026-09-27--01-17-25-container-mem-limits-after-oom-plan.md)

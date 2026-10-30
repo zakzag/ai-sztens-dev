@@ -2,7 +2,7 @@
 
 ## Task
 
-Audit every document in `docs/Specs/` against the *actual* current CI/CD
+Audit every document in `docs/Specs/` against the _actual_ current CI/CD
 pipeline, document that pipeline, and remove/repair anything that still
 described the retired host-build method.
 
@@ -30,7 +30,7 @@ described the retired host-build method.
 3. **The droplet never builds and never receives source.** `deploy.yml`
    scp's exactly four items (compose, rendered `infra/.env`, rendered
    Caddyfile, smoke suite) and runs `docker compose pull && up -d
-   --remove-orphans --force-recreate`.
+--remove-orphans --force-recreate`.
 4. `render-infra-env.sh` strips four workflow-owned keys
    (`APP_ENV`, `IMAGE_TAG`, `GHCR_OWNER`, `REGISTRY`) from the
    `INFRA_ENV_*` secret and appends the authoritative values last.
@@ -50,12 +50,12 @@ in a `problem | description | solution` table and approved by the user.
 
 ### Changed files
 
-| File | Change |
-|---|---|
-| `docs/Specs/Caddy-Reverse-Proxy.md` | §3.1 diagram `root * /srv/web` → `reverse_proxy web:80`; §4.2 diagram `rsync` → `sed`+`scp`; §6.2 items 2 & 7 updated (CI pipeline, no host `dist/`); §7.1 `deploy.yml` matrix → `plan` job; §8.1 `prune_legacy_stack()` → `up -d --remove-orphans` |
-| `docs/Specs/Local-Development.md` | header bumped; dev row no longer claims a `deploy.yml` push trigger; §5 `ensure_spa_env()` bullet replaced by the `VITE_API_BASE_URL` build-arg explanation |
-| `docs/Specs/Production-Runbook.md` | header rewritten (plan job, no matrix); §6 pnpm-native row no longer recommends `--build` on the droplet; §6.1 banner sample `upload_rsync` → `upload_files`; log-capture line drops `rsync`/`pnpm`; rsync-mirror bullet replaced by the 3-file `scp` description; §9.1 `deploy.yml` bullet → plan job |
-| `docs/Specs/Three-Env-Verification.md` | header note added; §4 prod bootstrap no longer describes a matrix; §6 dev timing no longer `pnpm install`/`pnpm build`; §7 SPA-`localhost` and `ensure_spa_env` failure rows updated; rsync mention replaced |
+| File                                   | Change                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `docs/Specs/Caddy-Reverse-Proxy.md`    | §3.1 diagram `root * /srv/web` → `reverse_proxy web:80`; §4.2 diagram `rsync` → `sed`+`scp`; §6.2 items 2 & 7 updated (CI pipeline, no host `dist/`); §7.1 `deploy.yml` matrix → `plan` job; §8.1 `prune_legacy_stack()` → `up -d --remove-orphans`                                                    |
+| `docs/Specs/Local-Development.md`      | header bumped; dev row no longer claims a `deploy.yml` push trigger; §5 `ensure_spa_env()` bullet replaced by the `VITE_API_BASE_URL` build-arg explanation                                                                                                                                            |
+| `docs/Specs/Production-Runbook.md`     | header rewritten (plan job, no matrix); §6 pnpm-native row no longer recommends `--build` on the droplet; §6.1 banner sample `upload_rsync` → `upload_files`; log-capture line drops `rsync`/`pnpm`; rsync-mirror bullet replaced by the 3-file `scp` description; §9.1 `deploy.yml` bullet → plan job |
+| `docs/Specs/Three-Env-Verification.md` | header note added; §4 prod bootstrap no longer describes a matrix; §6 dev timing no longer `pnpm install`/`pnpm build`; §7 SPA-`localhost` and `ensure_spa_env` failure rows updated; rsync mention replaced                                                                                           |
 
 No change was needed in `Infrastructure-Docker.md` (already image-based),
 `Functional-Specification.md`, `Kick-off-Meeting.md`, `Brainstorming.md`, or

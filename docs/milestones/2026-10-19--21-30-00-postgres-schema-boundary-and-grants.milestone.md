@@ -18,12 +18,12 @@ inside the init scripts that the official Postgres image runs.
 
 ## 2. Measured data / evidence
 
-| Observation | How it was established |
-|---|---|
-| Only roles were created; `\dn` showed no `platform` / `callback` / `email` | read of `01-roles.sh` before the change |
+| Observation                                                                           | How it was established                                                                   |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Only roles were created; `\dn` showed no `platform` / `callback` / `email`            | read of `01-roles.sh` before the change                                                  |
 | init runs **only** on an empty `pgdata` volume (`Skipping initialization` afterwards) | documented in `docs/Specs/Infrastructure-Docker.md` §6.2 and confirmed in container logs |
-| the whole init directory is bind-mounted, so a new file is picked up automatically | `./postgres/init:/docker-entrypoint-initdb.d:ro` in both compose files |
-| `pg_isready` returns success during the **temporary** init server | first test run: `FATAL: the database system is shutting down` on the first assertion |
+| the whole init directory is bind-mounted, so a new file is picked up automatically    | `./postgres/init:/docker-entrypoint-initdb.d:ro` in both compose files                   |
+| `pg_isready` returns success during the **temporary** init server                     | first test run: `FATAL: the database system is shutting down` on the first assertion     |
 
 ## 3. Root cause / design rationale
 
@@ -48,25 +48,25 @@ inside the init scripts that the official Postgres image runs.
 
 Grant matrix:
 
-| Schema | `aisztens` (app) | `tkovari` (owner) | `krak` (operator) |
-|---|---|---|---|
-| `platform` | USAGE + **CREATE** | USAGE | USAGE |
-| `callback` | USAGE + **CREATE** | USAGE | USAGE |
-| `email` | USAGE | USAGE | USAGE |
+| Schema     | `aisztens` (app)   | `tkovari` (owner) | `krak` (operator) |
+| ---------- | ------------------ | ----------------- | ----------------- |
+| `platform` | USAGE + **CREATE** | USAGE             | USAGE             |
+| `callback` | USAGE + **CREATE** | USAGE             | USAGE             |
+| `email`    | USAGE              | USAGE             | USAGE             |
 
 (`platform` carries the `CREATE` grant since AIS-36: the Drizzle bookkeeping table lives
 there. See `docs/Specs/Infrastructure-Docker.md` §6.2 for the authoritative matrix.)
 
 ## 4. Solution / implementation
 
-| File | Change |
-|---|---|
-| [`infra/postgres/init/02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | new idempotent script: `CREATE SCHEMA IF NOT EXISTS` for `platform`, `callback`, `email`, then `\gexec`-driven `GRANT USAGE` (3 schemas × 3 roles) and `GRANT CREATE ON SCHEMA callback` for `aisztens` |
-| [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh) | same grants as a `pg_namespace`-guarded `\gexec` block, plus a header explaining why it is a no-op on first init |
+| File                                                                                               | Change                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`infra/postgres/init/02-schemas.sh`](../../infra/postgres/init/02-schemas.sh)                     | new idempotent script: `CREATE SCHEMA IF NOT EXISTS` for `platform`, `callback`, `email`, then `\gexec`-driven `GRANT USAGE` (3 schemas × 3 roles) and `GRANT CREATE ON SCHEMA callback` for `aisztens`         |
+| [`infra/postgres/init/01-roles.sh`](../../infra/postgres/init/01-roles.sh)                         | same grants as a `pg_namespace`-guarded `\gexec` block, plus a header explaining why it is a no-op on first init                                                                                                |
 | [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh) | throwaway `postgres:16-alpine` container with the init dir bind-mounted: asserts the fresh-init matrix, then re-runs both scripts twice and re-asserts. Updated in AIS-36 with the `platform` CREATE assertions |
-| [`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh) | three new smoke checks: `postgres-schemas` (3), `postgres-schema-usage` (9), `postgres-schema-create` (2, updated in AIS-36 when `platform` gained CREATE) |
-| [`docs/Specs/Infrastructure-Docker.md`](../../docs/Specs/Infrastructure-Docker.md) | §6.2 documents both scripts, the schema→context mapping, the grant matrix and the manual re-apply command |
-| [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md) | §2b documents the fresh-volume requirement and the re-apply / `down -v` recipes |
+| [`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh)               | three new smoke checks: `postgres-schemas` (3), `postgres-schema-usage` (9), `postgres-schema-create` (2, updated in AIS-36 when `platform` gained CREATE)                                                      |
+| [`docs/Specs/Infrastructure-Docker.md`](../../docs/Specs/Infrastructure-Docker.md)                 | §6.2 documents both scripts, the schema→context mapping, the grant matrix and the manual re-apply command                                                                                                       |
+| [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md)                         | §2b documents the fresh-volume requirement and the re-apply / `down -v` recipes                                                                                                                                 |
 
 ## 5. Outcome and how to verify
 

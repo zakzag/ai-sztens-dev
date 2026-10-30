@@ -30,7 +30,10 @@ function collectQueryErrors(queryClient: QueryClient): readonly unknown[] {
  * @param next - the freshly collected errors.
  * @returns `true` when both hold the same errors in the same order.
  */
-function hasSameErrors(current: readonly unknown[], next: readonly unknown[]): boolean {
+function hasSameErrors(
+  current: readonly unknown[],
+  next: readonly unknown[],
+): boolean {
   if (current.length !== next.length) {
     return false;
   }
@@ -44,7 +47,9 @@ function hasSameErrors(current: readonly unknown[], next: readonly unknown[]): b
  * @param queryClient - the client to observe.
  * @returns the store; call `dispose()` when the owning component unmounts.
  */
-export function createQueryErrorStore(queryClient: QueryClient): QueryErrorStore {
+export function createQueryErrorStore(
+  queryClient: QueryClient,
+): QueryErrorStore {
   let snapshot = collectQueryErrors(queryClient);
   const listeners = new Set<() => void>();
 

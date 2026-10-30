@@ -28,7 +28,7 @@ local pre-deploy check now sources `infra/.env.dev` (per-env, not legacy
 `Pulling and starting the stack ... pull && up -d --remove-orphans`
 (the droplet never builds, the CI workflow `images.yml` pushes the
 GHCR images); §3.6 SPA bundle checks now read from
-`/usr/share/nginx/html/assets/*.js` *inside* the `web`/`admin`
+`/usr/share/nginx/html/assets/*.js` _inside_ the `web`/`admin`
 containers (the bundles are image-baked; there is no
 `/srv/{web,admin}` host folder any more); §5.5 CI workflow check
 replaced from `grep 'build:${APP_ENV}' .github/workflows/deploy.yml`
@@ -618,13 +618,13 @@ grep -B 1 -A 4 'docker compose \\$' .github/workflows/deploy.yml
 
 For a fresh repo state on a developer machine with a fast SSD:
 
-| Section | Estimated wall time |
-|---|---|
-| §1 Repo checks | 30 s |
-| §2 Local (full down/up cycle + curl probes) | 5–10 min (dominated by the first `docker compose up -d --build` cold-start) |
-| §3 Dev (deploy + smoke + curl) | 2–5 min (dominated by the GHCR image pull — the droplet no longer runs `pnpm install` / `pnpm build:dev`; the SPA/API images are built in CI) |
-| §4 Prod | same as §3, only on the prod host |
-| §5 CI | 30 s |
+| Section                                     | Estimated wall time                                                                                                                           |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| §1 Repo checks                              | 30 s                                                                                                                                          |
+| §2 Local (full down/up cycle + curl probes) | 5–10 min (dominated by the first `docker compose up -d --build` cold-start)                                                                   |
+| §3 Dev (deploy + smoke + curl)              | 2–5 min (dominated by the GHCR image pull — the droplet no longer runs `pnpm install` / `pnpm build:dev`; the SPA/API images are built in CI) |
+| §4 Prod                                     | same as §3, only on the prod host                                                                                                             |
+| §5 CI                                       | 30 s                                                                                                                                          |
 
 For an incremental change on the dev droplet (no SPAs rebuilt, just
 env + secrets), §3 takes ~2 min.
@@ -633,23 +633,23 @@ env + secrets), §3 takes ~2 min.
 
 ## 7. Common failure modes
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| §1b: any per-env file is committed | The gitignore patterns are missing | Re-run `git check-ignore -v infra/.env.local` to see which pattern matches; if none, the Step 0 commit was lost — re-apply. |
-| §2.3: banner reports `dev` or unset instead of `local` | `APP_ENV` is leaking from the shell | `unset APP_ENV` then re-run `scripts/dev-stack.sh up`. |
-| §2.5.1: CORS preflight returns 200 instead of 204 | Wrong FastifyAdapter CORS setup | The `main.ts:34` block uses `credentials: true` with an explicit allow-list — should be fine; check `apps/api/.env.local`. |
-| §2.7.1: `role "aisztens" does not exist` | The init scripts never ran on this volume (it was created before `01-roles.sh` was shipped/fixed) | Re-apply the init scripts or recreate the volume — [`Database-Local.md`](Database-Local.md) §8. |
-| §2.7.2: `platform` / `callback` / `email` missing | Same cause as above, specifically the `02-schemas.sh` half (AIS-35) | `exec -T postgres bash /docker-entrypoint-initdb.d/02-schemas.sh` or `down -v` — [`Database-Local.md`](Database-Local.md) §8. |
-| §3.3: banner reports `local` or unset on the dev droplet | deploy.yml didn't pass APP_ENV, or a local shell exported `APP_ENV=local`. Since 2026-10-06 the target comes from the argument (default `dev`) and an invalid `APP_ENV` is rejected with exit 2 | Check the run's `config:` log line (`DEPLOY_ENV=… env_file=… APP_ENV=…`) in `deploy/log/latest.log`, and the `local_infra_env` block. Re-run `deploy.sh up dev`. |
-| §3.5.3: CORS DOES allow `https://api.aisztens.hu` | The CORS list in `infra/.env.dev` was edited incorrectly | Verify with `ssh deployer@aisztens.hu "grep ^CORS_ORIGINS /opt/aisztens/infra/.env"` — must NOT have `api.aisztens.hu`. |
-| §3.6.3: SPA also references `localhost` | The image was built with the wrong `VITE_API_BASE_URL` (the `web`/`admin` bundles are baked at CI build time; there is no droplet-side `apps/*/.env.dev`) | Verify in `images.yml` that `VITE_API_BASE_URL=https://api.<DOMAIN>/api` is passed, then rebuild + push the `web`/`admin` images and re-pull on the droplet. |
-| §4.1.2: the api boot does NOT refuse with empty CORS | `apps/api/src/main.ts:42` isProd check is missing | The Step 2 commit `a054d0e` was lost — re-apply. |
-| §5.4: a remote command names the local per-env file | The per-env name is a LOCAL source name; a droplet has one env file | Use `--env-file infra/.env` remotely, `infra/.env.${APP_ENV}` locally. Guard: `bash scripts/test/_deploy-sh-remote-compose-path-test.sh`. |
-| §3.2: `the remote user cannot write /opt/aisztens` | That directory is not writable by `deployer` (`scp` and `mkdir` need it; the image-based deploy no longer rsyncs the repo) | Run the fix the error prints: `ssh -i <deploy key> root@<HOST> 'mkdir -p /opt/aisztens && chown -R deployer:deployer /opt/aisztens'`. |
-| §3.2: `'bootstrap' must run as root` | `bootstrap` was attempted as `deployer`, which has no passwordless sudo on this droplet | `SSH_USER=root ./deploy/deploy.sh bootstrap` (one-off, hand-run). |
-| §3.2: `app: unbound variable` | A `local a="$1" b="$a"` declaration — bash expands all words before the builtin runs, so `$a` is unset and `set -u` aborts | One `local` per line (historical fix from 2026-10-07; the helper that hit it no longer exists — `deploy.sh` does not build SPAs any more). |
+| Symptom                                                            | Likely cause                                                                                                                                                                                         | Fix                                                                                                                                                                 |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §1b: any per-env file is committed                                 | The gitignore patterns are missing                                                                                                                                                                   | Re-run `git check-ignore -v infra/.env.local` to see which pattern matches; if none, the Step 0 commit was lost — re-apply.                                         |
+| §2.3: banner reports `dev` or unset instead of `local`             | `APP_ENV` is leaking from the shell                                                                                                                                                                  | `unset APP_ENV` then re-run `scripts/dev-stack.sh up`.                                                                                                              |
+| §2.5.1: CORS preflight returns 200 instead of 204                  | Wrong FastifyAdapter CORS setup                                                                                                                                                                      | The `main.ts:34` block uses `credentials: true` with an explicit allow-list — should be fine; check `apps/api/.env.local`.                                          |
+| §2.7.1: `role "aisztens" does not exist`                           | The init scripts never ran on this volume (it was created before `01-roles.sh` was shipped/fixed)                                                                                                    | Re-apply the init scripts or recreate the volume — [`Database-Local.md`](Database-Local.md) §8.                                                                     |
+| §2.7.2: `platform` / `callback` / `email` missing                  | Same cause as above, specifically the `02-schemas.sh` half (AIS-35)                                                                                                                                  | `exec -T postgres bash /docker-entrypoint-initdb.d/02-schemas.sh` or `down -v` — [`Database-Local.md`](Database-Local.md) §8.                                       |
+| §3.3: banner reports `local` or unset on the dev droplet           | deploy.yml didn't pass APP_ENV, or a local shell exported `APP_ENV=local`. Since 2026-10-06 the target comes from the argument (default `dev`) and an invalid `APP_ENV` is rejected with exit 2      | Check the run's `config:` log line (`DEPLOY_ENV=… env_file=… APP_ENV=…`) in `deploy/log/latest.log`, and the `local_infra_env` block. Re-run `deploy.sh up dev`.    |
+| §3.5.3: CORS DOES allow `https://api.aisztens.hu`                  | The CORS list in `infra/.env.dev` was edited incorrectly                                                                                                                                             | Verify with `ssh deployer@aisztens.hu "grep ^CORS_ORIGINS /opt/aisztens/infra/.env"` — must NOT have `api.aisztens.hu`.                                             |
+| §3.6.3: SPA also references `localhost`                            | The image was built with the wrong `VITE_API_BASE_URL` (the `web`/`admin` bundles are baked at CI build time; there is no droplet-side `apps/*/.env.dev`)                                            | Verify in `images.yml` that `VITE_API_BASE_URL=https://api.<DOMAIN>/api` is passed, then rebuild + push the `web`/`admin` images and re-pull on the droplet.        |
+| §4.1.2: the api boot does NOT refuse with empty CORS               | `apps/api/src/main.ts:42` isProd check is missing                                                                                                                                                    | The Step 2 commit `a054d0e` was lost — re-apply.                                                                                                                    |
+| §5.4: a remote command names the local per-env file                | The per-env name is a LOCAL source name; a droplet has one env file                                                                                                                                  | Use `--env-file infra/.env` remotely, `infra/.env.${APP_ENV}` locally. Guard: `bash scripts/test/_deploy-sh-remote-compose-path-test.sh`.                           |
+| §3.2: `the remote user cannot write /opt/aisztens`                 | That directory is not writable by `deployer` (`scp` and `mkdir` need it; the image-based deploy no longer rsyncs the repo)                                                                           | Run the fix the error prints: `ssh -i <deploy key> root@<HOST> 'mkdir -p /opt/aisztens && chown -R deployer:deployer /opt/aisztens'`.                               |
+| §3.2: `'bootstrap' must run as root`                               | `bootstrap` was attempted as `deployer`, which has no passwordless sudo on this droplet                                                                                                              | `SSH_USER=root ./deploy/deploy.sh bootstrap` (one-off, hand-run).                                                                                                   |
+| §3.2: `app: unbound variable`                                      | A `local a="$1" b="$a"` declaration — bash expands all words before the builtin runs, so `$a` is unset and `set -u` aborts                                                                           | One `local` per line (historical fix from 2026-10-07; the helper that hit it no longer exists — `deploy.sh` does not build SPAs any more).                          |
 | `_deploy-sh-env-selection-test.sh` scenario 6 fails intermittently | Pre-existing **flake**: the assertion greps `deploy/log/latest.log` for `APP_ENV=prod` immediately after a run that aborts on the empty `HOST`, so it races the `tee` capture / `latest.log` refresh | Not a regression: `HEAD` shows 28/1 under WSL bash while Git Bash shows 29/0 for the same commit. Make the assertion read the per-run file instead of `latest.log`. |
-| `_deploy-sh-m3-test.sh` always fails (`no infra/.env found`) | Pre-existing **stale** suite: it re-implements the pre-per-env `infra/.env` lookup in a local function instead of calling `deploy.sh`, and this checkout only has `infra/.env.dev` | Rewrite it against the current `COMPOSE_ENV_FILE_LOCAL` chain, or retire it in favour of `_deploy-sh-remote-compose-path-test.sh`. |
+| `_deploy-sh-m3-test.sh` always fails (`no infra/.env found`)       | Pre-existing **stale** suite: it re-implements the pre-per-env `infra/.env` lookup in a local function instead of calling `deploy.sh`, and this checkout only has `infra/.env.dev`                   | Rewrite it against the current `COMPOSE_ENV_FILE_LOCAL` chain, or retire it in favour of `_deploy-sh-remote-compose-path-test.sh`.                                  |
 
 ---
 
@@ -658,13 +658,13 @@ env + secrets), §3 takes ~2 min.
 The verification above is written assuming a "fresh" mental model. For
 a real-world check:
 
-| Scenario | Sections to run |
-|---|---|
-| Pulled latest `main`, never ran anything | §1, §2 |
-| Pulled latest `main`, local stack is up | §1, §2.4, §2.5, §2.6, §2.7 (skip §2.1–§2.3, §2.8) |
-| Dev deploy happened | §1.5, §1.6, §1.7, §3 |
-| Prod deploy happened | §1.5, §1.6, §1.7, §4 |
-| Wrote a code change | §1, §2 (if local), §3 (if prod) — §1.6 (§1.7) is a fast guard against shipping a bash syntax error |
+| Scenario                                 | Sections to run                                                                                    |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Pulled latest `main`, never ran anything | §1, §2                                                                                             |
+| Pulled latest `main`, local stack is up  | §1, §2.4, §2.5, §2.6, §2.7 (skip §2.1–§2.3, §2.8)                                                  |
+| Dev deploy happened                      | §1.5, §1.6, §1.7, §3                                                                               |
+| Prod deploy happened                     | §1.5, §1.6, §1.7, §4                                                                               |
+| Wrote a code change                      | §1, §2 (if local), §3 (if prod) — §1.6 (§1.7) is a fast guard against shipping a bash syntax error |
 
 ---
 

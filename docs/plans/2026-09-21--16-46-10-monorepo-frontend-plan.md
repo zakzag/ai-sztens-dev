@@ -17,15 +17,15 @@ No Next.js is involved.
 
 ## 2. Confirmed Decisions
 
-| Decision | Choice |
-|---|---|
-| Repo layout | pnpm-workspace monorepo: `apps/api`, `apps/web`, `apps/admin`, `packages/shared` |
-| Public site | React + Vite, multi-page routing via `react-router`, NOT a single-page marketing shell |
-| Admin dashboard | React + Vite SPA |
-| SSR framework | None — no Next.js |
-| Shared contract | TypeScript types + Zod schemas in `packages/shared` |
-| Package manager | pnpm (single lockfile at root) |
-| Language | TypeScript, strict mode everywhere |
+| Decision        | Choice                                                                                 |
+| --------------- | -------------------------------------------------------------------------------------- |
+| Repo layout     | pnpm-workspace monorepo: `apps/api`, `apps/web`, `apps/admin`, `packages/shared`       |
+| Public site     | React + Vite, multi-page routing via `react-router`, NOT a single-page marketing shell |
+| Admin dashboard | React + Vite SPA                                                                       |
+| SSR framework   | None — no Next.js                                                                      |
+| Shared contract | TypeScript types + Zod schemas in `packages/shared`                                    |
+| Package manager | pnpm (single lockfile at root)                                                         |
+| Language        | TypeScript, strict mode everywhere                                                     |
 
 ## 3. Frontend Framework Advice
 
@@ -37,19 +37,19 @@ Both frontends use **React + Vite** because:
 
 Routing and rendering model:
 
-- **`apps/web`** is a *real multi-page site*: separate URLs for Home/landing, the call-back form, a thank-you page, and legal pages. Use `react-router` in browser mode so each page has its own URL and can be linked/shared. This is still a client-rendered app (no Next.js), but with genuine page-level routing rather than a single-screen SPA.
+- **`apps/web`** is a _real multi-page site_: separate URLs for Home/landing, the call-back form, a thank-you page, and legal pages. Use `react-router` in browser mode so each page has its own URL and can be linked/shared. This is still a client-rendered app (no Next.js), but with genuine page-level routing rather than a single-screen SPA.
 - **`apps/admin`** is an SPA with `react-router` and a protected route guard: a login page plus nested routes for requests, calls, recordings, and stats.
 
 ### Library choices
 
-| Concern | Public site `apps/web` | Admin `apps/admin` |
-|---|---|---|
-| Routing | `react-router-dom` | `react-router-dom` (+ route guards) |
-| Forms | `react-hook-form` + `zod` + `@hookform/resolvers` | same |
-| Server state | plain `fetch` (single POST) | `@tanstack/react-query` |
-| Styling | Tailwind CSS | Tailwind CSS + shadcn/ui-style primitives |
-| HTTP | `fetch` | `fetch`/`axios` with auth header interceptor |
-| Auth | none (public) | access token from API, stored in memory + refresh |
+| Concern      | Public site `apps/web`                            | Admin `apps/admin`                                |
+| ------------ | ------------------------------------------------- | ------------------------------------------------- |
+| Routing      | `react-router-dom`                                | `react-router-dom` (+ route guards)               |
+| Forms        | `react-hook-form` + `zod` + `@hookform/resolvers` | same                                              |
+| Server state | plain `fetch` (single POST)                       | `@tanstack/react-query`                           |
+| Styling      | Tailwind CSS                                      | Tailwind CSS + shadcn/ui-style primitives         |
+| HTTP         | `fetch`                                           | `fetch`/`axios` with auth header interceptor      |
+| Auth         | none (public)                                     | access token from API, stored in memory + refresh |
 
 ## 4. Repository Structure
 

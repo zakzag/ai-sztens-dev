@@ -8,7 +8,8 @@ import type { TextareaVariants } from './textarea.variants.js';
  * tests and in the DOM — the same contract as {@link Input}.
  */
 export interface TextareaProps
-  extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'id'>,
+  extends
+    Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'id'>,
     TextareaVariants {
   readonly id: string;
   /** Visible, associated `<label>` text — never a placeholder substitute. */

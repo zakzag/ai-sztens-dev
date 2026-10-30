@@ -25,7 +25,8 @@ export const SESSION_EXPIRED_BANNER_TITLE = 'Lejárt a munkamenet.';
 export const SESSION_EXPIRED_BANNER_ACTION_LABEL = 'Bejelentkezés';
 
 /** Banner copy for a `503`. */
-export const SERVICE_UNAVAILABLE_BANNER_TITLE = 'A szolgáltatás átmenetileg nem elérhető.';
+export const SERVICE_UNAVAILABLE_BANNER_TITLE =
+  'A szolgáltatás átmenetileg nem elérhető.';
 
 /** Accessible name of the banner close control. */
 export const BANNER_DISMISS_LABEL = 'Értesítés bezárása';
@@ -51,26 +52,27 @@ export const FIELD_SURFACE_CODES: readonly string[] = Object.freeze([
  * A `401` is `danger` because the session is unusable until the user acts; the
  * other two are `warning` because they resolve without user intervention.
  */
-export const BANNER_COPY: Readonly<Record<BannerCondition, BannerCopy>> = Object.freeze({
-  offline: {
-    variant: 'warning',
-    title: NETWORK_OFFLINE_BANNER_TITLE,
-    message: NETWORK_OFFLINE_BANNER_MESSAGE,
-    actionLabel: null,
-  },
-  'session-expired': {
-    variant: 'danger',
-    title: SESSION_EXPIRED_BANNER_TITLE,
-    message: SESSION_EXPIRED_MESSAGE,
-    actionLabel: SESSION_EXPIRED_BANNER_ACTION_LABEL,
-  },
-  unavailable: {
-    variant: 'warning',
-    title: SERVICE_UNAVAILABLE_BANNER_TITLE,
-    message: SERVICE_UNAVAILABLE_MESSAGE,
-    actionLabel: null,
-  },
-});
+export const BANNER_COPY: Readonly<Record<BannerCondition, BannerCopy>> =
+  Object.freeze({
+    offline: {
+      variant: 'warning',
+      title: NETWORK_OFFLINE_BANNER_TITLE,
+      message: NETWORK_OFFLINE_BANNER_MESSAGE,
+      actionLabel: null,
+    },
+    'session-expired': {
+      variant: 'danger',
+      title: SESSION_EXPIRED_BANNER_TITLE,
+      message: SESSION_EXPIRED_MESSAGE,
+      actionLabel: SESSION_EXPIRED_BANNER_ACTION_LABEL,
+    },
+    unavailable: {
+      variant: 'warning',
+      title: SERVICE_UNAVAILABLE_BANNER_TITLE,
+      message: SERVICE_UNAVAILABLE_MESSAGE,
+      actionLabel: null,
+    },
+  });
 
 /**
  * Conditions in the order they win when several are present at once.
@@ -80,11 +82,8 @@ export const BANNER_COPY: Readonly<Record<BannerCondition, BannerCopy>> = Object
  * transient outage, because it is the one the user can act on. Exactly one
  * condition is rendered, so two sentences can never stack.
  */
-export const BANNER_CONDITION_PRIORITY: readonly BannerCondition[] = Object.freeze([
-  'offline',
-  'session-expired',
-  'unavailable',
-]);
+export const BANNER_CONDITION_PRIORITY: readonly BannerCondition[] =
+  Object.freeze(['offline', 'session-expired', 'unavailable']);
 
 /** Error `name` values that mean “the caller cancelled”. */
 export const ABORT_LIKE_ERROR_NAMES: readonly string[] = Object.freeze([

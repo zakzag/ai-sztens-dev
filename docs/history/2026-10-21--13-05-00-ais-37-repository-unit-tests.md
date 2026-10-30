@@ -7,30 +7,30 @@
 
 ## Starting point (pre-flight)
 
-| Check | Result |
-|---|---|
-| `apps/api/src/db/` | `schema.ts`, `schema.spec.ts`, `database-url.ts` only — no repository, no DI token |
-| Callback storage | in-memory `Map` in [`callback-requests.service.ts`](../../apps/api/src/callback-requests/callback-requests.service.ts:12) |
-| Jest | `ts-jest` ESM preset, `rootDir: src`, `testRegex: .*\.spec\.ts$` |
-| Baseline tests | 10 suites / 93 tests green |
+| Check              | Result                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/db/` | `schema.ts`, `schema.spec.ts`, `database-url.ts` only — no repository, no DI token                                        |
+| Callback storage   | in-memory `Map` in [`callback-requests.service.ts`](../../apps/api/src/callback-requests/callback-requests.service.ts:12) |
+| Jest               | `ts-jest` ESM preset, `rootDir: src`, `testRegex: .*\.spec\.ts$`                                                          |
+| Baseline tests     | 10 suites / 93 tests green                                                                                                |
 
 ## Changes
 
-| File | Change |
-|---|---|
-| [`apps/api/src/db/database.interface.ts`](../../apps/api/src/db/database.interface.ts) | new — `Database = PostgresJsDatabase<typeof schema>` (the abstraction repositories depend on) |
-| [`apps/api/src/db/database.const.ts`](../../apps/api/src/db/database.const.ts) | new — `DATABASE` injection token (string token: the handle is a type alias, not a class) |
-| [`apps/api/src/db/callback-requests.errors.ts`](../../apps/api/src/db/callback-requests.errors.ts) | new — `CallbackRequestNotFoundError`, `InvalidCallbackRequestIdError`, `CallbackRequestNotPersistedError`; framework-agnostic, each carrying the offending value |
-| [`apps/api/src/db/uuid.ts`](../../apps/api/src/db/uuid.ts) | new — pure `isUuid()` guard (canonical dashed RFC 4122 form) |
-| [`apps/api/src/db/callback-requests.repository.interface.ts`](../../apps/api/src/db/callback-requests.repository.interface.ts) | new — `CallbackRequestsRepository` contract with the failure semantics documented |
-| [`apps/api/src/db/callback-requests.repository.ts`](../../apps/api/src/db/callback-requests.repository.ts) | new — `DrizzleCallbackRequestsRepository` (`@Inject(DATABASE)`): `create` → insert + `returning()`, `findAll` → `created_at DESC`, `findOne` → uuid guard + `where … limit 1` |
-| [`apps/api/src/db/callback-requests.repository.spec.ts`](../../apps/api/src/db/callback-requests.repository.spec.ts) | new — 14 tests: happy paths, empty results, invalid uuid (no query issued), not-found, transport and query failures |
-| [`apps/api/src/db/uuid.spec.ts`](../../apps/api/src/db/uuid.spec.ts) | new — 6 accepted + 12 rejected shapes |
-| [`apps/api/src/db/test/mocks/callback-requests.mock.ts`](../../apps/api/src/db/test/mocks/callback-requests.mock.ts) | new — row/insert fixtures, valid and distinct UUID constants |
-| [`apps/api/src/db/test/mocks/database.mock.ts`](../../apps/api/src/db/test/mocks/database.mock.ts) | new — scripted Drizzle handle (`insert/values/returning`, `select/from/where/limit/orderBy`) with `mockCreateResult`, `mockCreateFailure`, `mockInsertFailure`, `mockSelectResult`, `mockSelectFailure` |
-| [`apps/api/package.json`](../../apps/api/package.json) | `@jest/globals` added to devDependencies (the ESM Jest setup has no `jest` global) |
-| [`apps/api/tsconfig.build.json`](../../apps/api/tsconfig.build.json) | `**/test/**` excluded — test mocks must never be compiled into `dist` |
-| [`docs/Specs/Database-Local.md`](../Specs/Database-Local.md) | §9: new "AIS-37 done" table; the "missing" row now says the repository exists but the `AppModule` does not wire it yet; header date bumped |
+| File                                                                                                                           | Change                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/api/src/db/database.interface.ts`](../../apps/api/src/db/database.interface.ts)                                         | new — `Database = PostgresJsDatabase<typeof schema>` (the abstraction repositories depend on)                                                                                                           |
+| [`apps/api/src/db/database.const.ts`](../../apps/api/src/db/database.const.ts)                                                 | new — `DATABASE` injection token (string token: the handle is a type alias, not a class)                                                                                                                |
+| [`apps/api/src/db/callback-requests.errors.ts`](../../apps/api/src/db/callback-requests.errors.ts)                             | new — `CallbackRequestNotFoundError`, `InvalidCallbackRequestIdError`, `CallbackRequestNotPersistedError`; framework-agnostic, each carrying the offending value                                        |
+| [`apps/api/src/db/uuid.ts`](../../apps/api/src/db/uuid.ts)                                                                     | new — pure `isUuid()` guard (canonical dashed RFC 4122 form)                                                                                                                                            |
+| [`apps/api/src/db/callback-requests.repository.interface.ts`](../../apps/api/src/db/callback-requests.repository.interface.ts) | new — `CallbackRequestsRepository` contract with the failure semantics documented                                                                                                                       |
+| [`apps/api/src/db/callback-requests.repository.ts`](../../apps/api/src/db/callback-requests.repository.ts)                     | new — `DrizzleCallbackRequestsRepository` (`@Inject(DATABASE)`): `create` → insert + `returning()`, `findAll` → `created_at DESC`, `findOne` → uuid guard + `where … limit 1`                           |
+| [`apps/api/src/db/callback-requests.repository.spec.ts`](../../apps/api/src/db/callback-requests.repository.spec.ts)           | new — 14 tests: happy paths, empty results, invalid uuid (no query issued), not-found, transport and query failures                                                                                     |
+| [`apps/api/src/db/uuid.spec.ts`](../../apps/api/src/db/uuid.spec.ts)                                                           | new — 6 accepted + 12 rejected shapes                                                                                                                                                                   |
+| [`apps/api/src/db/test/mocks/callback-requests.mock.ts`](../../apps/api/src/db/test/mocks/callback-requests.mock.ts)           | new — row/insert fixtures, valid and distinct UUID constants                                                                                                                                            |
+| [`apps/api/src/db/test/mocks/database.mock.ts`](../../apps/api/src/db/test/mocks/database.mock.ts)                             | new — scripted Drizzle handle (`insert/values/returning`, `select/from/where/limit/orderBy`) with `mockCreateResult`, `mockCreateFailure`, `mockInsertFailure`, `mockSelectResult`, `mockSelectFailure` |
+| [`apps/api/package.json`](../../apps/api/package.json)                                                                         | `@jest/globals` added to devDependencies (the ESM Jest setup has no `jest` global)                                                                                                                      |
+| [`apps/api/tsconfig.build.json`](../../apps/api/tsconfig.build.json)                                                           | `**/test/**` excluded — test mocks must never be compiled into `dist`                                                                                                                                   |
+| [`docs/Specs/Database-Local.md`](../Specs/Database-Local.md)                                                                   | §9: new "AIS-37 done" table; the "missing" row now says the repository exists but the `AppModule` does not wire it yet; header date bumped                                                              |
 
 Not changed: `schema.ts`, `schema.spec.ts`, `callback-requests.service.ts`, `callback-requests.module.ts`, `app.module.ts`, the generated migration. The `Map` → Postgres swap, the `database.module.ts` provider and the e2e tests stay in AIS-38.
 

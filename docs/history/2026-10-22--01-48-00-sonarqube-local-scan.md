@@ -32,22 +32,22 @@ termeltek LCOV-ot. Így a kódminőség, a duplikáció és a lefedettség sehol
 
 ## Menet közben talált buktatók
 
-| Probléma | Megoldás |
-|---|---|
+| Probléma                                                                                                                                  | Megoldás                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | A helyi `pnpm` 9.15.4 és 11 között virtual-store eltérés (`ERR_PNPM_VIRTUAL_STORE_DIR_MAX_LENGTH_DIFF`, majd `ERR_PNPM_UNEXPECTED_STORE`) | A repó `node_modules`-a pnpm 11-gyel készült; a telepítést `npx pnpm@11`-gyel, Node 26-tal kellett futtatni (a default `node` a gépen 20.19.2). |
-| A jest a `coverageDirectory`-t a `rootDir`-hez képest oldja fel, ezért az `apps/api` coverage először `apps/coverage/api`-ba került | `--coverageDirectory=../../../coverage/api`, plusz `coveragePathIgnorePatterns` a `test/` mappákra. |
-| A `node:test` Windows-on a `path.join`-elt abszolút `SF:` útvonalat nem találta | A `SF:` értékeket előbb POSIX-szeparátorra normalizáljuk, csak utána oldjuk fel. |
+| A jest a `coverageDirectory`-t a `rootDir`-hez képest oldja fel, ezért az `apps/api` coverage először `apps/coverage/api`-ba került       | `--coverageDirectory=../../../coverage/api`, plusz `coveragePathIgnorePatterns` a `test/` mappákra.                                             |
+| A `node:test` Windows-on a `path.join`-elt abszolút `SF:` útvonalat nem találta                                                           | A `SF:` értékeket előbb POSIX-szeparátorra normalizáljuk, csak utána oldjuk fel.                                                                |
 
 ## Verifikáció (lefuttatva)
 
-| Parancs | Eredmény |
-|---|---|
-| `pnpm sonar:test` | 43/43 zöld |
-| `pnpm sonar:coverage` | shared 34, api-client 29, ui 55, admin 87, api 194 teszt zöld; `LCOV merge: 5 package, 91 fájl → coverage/lcov.info`; mind a 91 `SF:` útvonal létezik |
-| `node scripts/sonar/scan.mjs` token nélkül | magyar hibaüzenet, exit code 1 |
-| `SONAR_TOKEN=<dummy> node scripts/sonar/scan.mjs` | preflight `UP`, scanner CLI 6.2.1 letöltés, `sonar-project.properties` betöltés, `Load global settings` → a szerver `401 Not authorized` (várt, dummy token) |
-| `pnpm build` | minden package zöld |
-| `pnpm lint` | **elbukik** az `apps/api`-ban két, ehhez a változáshoz nem tartozó spec fájlon (`vapi-signature.guard.spec.ts`, `vapi-webhooks.e2e-spec.ts`: `@typescript-eslint/no-unsafe-*` a `.mockRestore` hívásokon) — pre-existing hiba, külön javítandó |
+| Parancs                                           | Eredmény                                                                                                                                                                                                                                       |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm sonar:test`                                 | 43/43 zöld                                                                                                                                                                                                                                     |
+| `pnpm sonar:coverage`                             | shared 34, api-client 29, ui 55, admin 87, api 194 teszt zöld; `LCOV merge: 5 package, 91 fájl → coverage/lcov.info`; mind a 91 `SF:` útvonal létezik                                                                                          |
+| `node scripts/sonar/scan.mjs` token nélkül        | magyar hibaüzenet, exit code 1                                                                                                                                                                                                                 |
+| `SONAR_TOKEN=<dummy> node scripts/sonar/scan.mjs` | preflight `UP`, scanner CLI 6.2.1 letöltés, `sonar-project.properties` betöltés, `Load global settings` → a szerver `401 Not authorized` (várt, dummy token)                                                                                   |
+| `pnpm build`                                      | minden package zöld                                                                                                                                                                                                                            |
+| `pnpm lint`                                       | **elbukik** az `apps/api`-ban két, ehhez a változáshoz nem tartozó spec fájlon (`vapi-signature.guard.spec.ts`, `vapi-webhooks.e2e-spec.ts`: `@typescript-eslint/no-unsafe-*` a `.mockRestore` hívásokon) — pre-existing hiba, külön javítandó |
 
 ## Nyitva maradt
 

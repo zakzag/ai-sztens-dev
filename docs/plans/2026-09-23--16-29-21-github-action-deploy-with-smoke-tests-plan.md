@@ -9,15 +9,15 @@
 The repo already has everything needed for a reproducible droplet and for
 verifying that the running stack is healthy:
 
-| Existing piece | Where | Used for |
-|---|---|---|
-| One-time droplet bootstrap | [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh) | Docker, users, SSH keys, UFW (optional) |
-| Local-to-droplet deploy helper | [`deploy/deploy.sh`](../../deploy/deploy.sh) | `rsync` the repo, `docker compose up -d --build` |
-| Runtime stack | [`infra/docker-compose.yml`](../../infra/docker-compose.yml) | api, postgres, caddy, monitor |
-| Container-level smoke suite | [`scripts/test/stack-smoke.sh`](../../scripts/test/stack-smoke.sh) | 4 liveness + 6 cross-service checks, exit-coded for CI |
-| Smoke helpers | [`scripts/test/lib/`](../../scripts/test/lib) | shared `dc`, `dc_exec`, `dc_logs`, `assert_*` |
-| Convenience scripts | [`scripts/test/stack-up.sh`](../../scripts/test/stack-up.sh), [`stack-down.sh`](../../scripts/test/stack-down.sh) | `pnpm test:stack:up` / `:down` |
-| CodeQL workflow (template) | [`.github/workflows/codeql.yml`](../../.github/workflows/codeql.yml) | reference only — kept untouched |
+| Existing piece                 | Where                                                                                                             | Used for                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| One-time droplet bootstrap     | [`deploy/bootstrap.sh`](../../deploy/bootstrap.sh)                                                                | Docker, users, SSH keys, UFW (optional)                |
+| Local-to-droplet deploy helper | [`deploy/deploy.sh`](../../deploy/deploy.sh)                                                                      | `rsync` the repo, `docker compose up -d --build`       |
+| Runtime stack                  | [`infra/docker-compose.yml`](../../infra/docker-compose.yml)                                                      | api, postgres, caddy, monitor                          |
+| Container-level smoke suite    | [`scripts/test/stack-smoke.sh`](../../scripts/test/stack-smoke.sh)                                                | 4 liveness + 6 cross-service checks, exit-coded for CI |
+| Smoke helpers                  | [`scripts/test/lib/`](../../scripts/test/lib)                                                                     | shared `dc`, `dc_exec`, `dc_logs`, `assert_*`          |
+| Convenience scripts            | [`scripts/test/stack-up.sh`](../../scripts/test/stack-up.sh), [`stack-down.sh`](../../scripts/test/stack-down.sh) | `pnpm test:stack:up` / `:down`                         |
+| CodeQL workflow (template)     | [`.github/workflows/codeql.yml`](../../.github/workflows/codeql.yml)                                              | reference only — kept untouched                        |
 
 What is missing is the wiring that lets GitHub do the same thing
 automatically, plus the documentation that tells a human how to take a
@@ -142,15 +142,15 @@ the GitHub Action will later replace code into.
 
 Add the following to **Settings → Secrets and variables → Actions**:
 
-| Secret | Value | Purpose |
-|---|---|---|
-| `DROPLET_HOST` | Droplet public IPv4 (e.g. `164.92.248.194`) | SSH target |
-| `DROPLET_SSH_KEY` | Private key corresponding to `deploy/ssh-keys/deployer.pub` | SSH auth |
-| `INFRA_ENV` | Full contents of [`infra/.env`](../../infra/.env) (multi-line) | Written to `/opt/aisztens/infra/.env` on every deploy |
+| Secret            | Value                                                          | Purpose                                               |
+| ----------------- | -------------------------------------------------------------- | ----------------------------------------------------- |
+| `DROPLET_HOST`    | Droplet public IPv4 (e.g. `164.92.248.194`)                    | SSH target                                            |
+| `DROPLET_SSH_KEY` | Private key corresponding to `deploy/ssh-keys/deployer.pub`    | SSH auth                                              |
+| `INFRA_ENV`       | Full contents of [`infra/.env`](../../infra/.env) (multi-line) | Written to `/opt/aisztens/infra/.env` on every deploy |
 
 Notes:
 
-- `DROPLET_SSH_KEY` must be the *deployer* key, not `root`. The bootstrap
+- `DROPLET_SSH_KEY` must be the _deployer_ key, not `root`. The bootstrap
   step in §4 already installed the matching `authorized_keys`.
 - `INFRA_ENV` is the runtime config. It contains DB passwords and the
   VAPI webhook secret; treat it like a production credential.
@@ -168,18 +168,18 @@ name: Deploy to droplet
 on:
   push:
     branches: [dev]
-  workflow_dispatch:        # manual re-run / rollback lever
+  workflow_dispatch: # manual re-run / rollback lever
 
 concurrency:
   group: deploy-droplet
-  cancel-in-progress: false  # never kill an in-flight deploy
+  cancel-in-progress: false # never kill an in-flight deploy
 
 jobs:
   deploy:
     name: Deploy + smoke-test
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: production   # optional: lets you add manual approval later
+    environment: production # optional: lets you add manual approval later
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -197,9 +197,9 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          source: "."
+          source: '.'
           target: /opt/aisztens
-          rm: true               # mirror, like deploy.sh rsync --delete
+          rm: true # mirror, like deploy.sh rsync --delete
           strip_components: 0
           exclude: |
             .git
@@ -214,7 +214,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: deployer
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          source: "infra/.env"
+          source: 'infra/.env'
           target: /opt/aisztens/infra/.env
 
       - name: Build and start the stack
@@ -354,12 +354,12 @@ step that invokes it.
 
 ### 6.3 Failure handling
 
-| Failure | What the workflow does | What the droplet looks like |
-|---|---|---|
-| `docker compose up -d --build` errors | Job fails on the build/start step. Previous stack untouched (compose only replaces the services it recreates). | Old code keeps running. |
+| Failure                                                              | What the workflow does                                                                                                                                                                                        | What the droplet looks like                                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `docker compose up -d --build` errors                                | Job fails on the build/start step. Previous stack untouched (compose only replaces the services it recreates).                                                                                                | Old code keeps running.                                                                        |
 | Stack comes up but healthcheck stays `starting` for 30 × 5 s = 150 s | Health-gate loop exits with a clear log message; the next step (smoke) still runs because `set -euo pipefail` was not used there — but `preflight_stack_up` will then exit with code 2 and fail the workflow. | New code may be partially up; old containers untouched if `--build` did not recreate them yet. |
-| Smoke test reports `1/N checks failed` | Job fails on the smoke step; the failure-logs step uploads the last 500 lines of every container. | Same as above; ops can `ssh deployer@…` and inspect. |
-| SSH key invalid / droplet unreachable | `appleboy/ssh-action` fails immediately. | No change. |
+| Smoke test reports `1/N checks failed`                               | Job fails on the smoke step; the failure-logs step uploads the last 500 lines of every container.                                                                                                             | Same as above; ops can `ssh deployer@…` and inspect.                                           |
+| SSH key invalid / droplet unreachable                                | `appleboy/ssh-action` fails immediately.                                                                                                                                                                      | No change.                                                                                     |
 
 There is **no automatic rollback**. If a bad image reaches the droplet
 and the smoke test catches it, the old container stays in place. If a
@@ -386,13 +386,13 @@ report the failure with full logs.
 
 ## 8. Files to add / change
 
-| File | Change | Why |
-|---|---|---|
-| `.github/workflows/deploy.yml` | **new** | Tasks 2 + 3 |
-| `.github/workflows/ci.yml` | **new** (optional) | PR-time lint + unit tests |
-| `docs/plans/2026-09-23--16-29-21-github-action-deploy-with-smoke-tests-plan.md` | **new** | This file |
-| `deploy/README.md` | edit | Add a "GitHub Actions" subsection pointing at the new workflow and secrets |
-| `deploy/.env` | edit | Switch `SSH_USER` from `root` to `deployer` after the manual bootstrap succeeds |
+| File                                                                            | Change             | Why                                                                             |
+| ------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------- |
+| `.github/workflows/deploy.yml`                                                  | **new**            | Tasks 2 + 3                                                                     |
+| `.github/workflows/ci.yml`                                                      | **new** (optional) | PR-time lint + unit tests                                                       |
+| `docs/plans/2026-09-23--16-29-21-github-action-deploy-with-smoke-tests-plan.md` | **new**            | This file                                                                       |
+| `deploy/README.md`                                                              | edit               | Add a "GitHub Actions" subsection pointing at the new workflow and secrets      |
+| `deploy/.env`                                                                   | edit               | Switch `SSH_USER` from `root` to `deployer` after the manual bootstrap succeeds |
 
 Nothing in `deploy/bootstrap.sh`, `deploy/deploy.sh`,
 `scripts/test/stack-smoke.sh`, `scripts/test/lib/*.sh`, or

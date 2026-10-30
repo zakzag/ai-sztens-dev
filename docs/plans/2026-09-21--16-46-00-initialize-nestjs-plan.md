@@ -24,12 +24,12 @@ any of its functional units yet.
 
 ## 3. Decisions (confirmed with user)
 
-| Decision | Choice |
-|---|---|
+| Decision             | Choice                                           |
+| -------------------- | ------------------------------------------------ |
 | Application location | Repository root (single backend project for now) |
-| Package manager | pnpm |
-| Functionality | None — pure scaffolding |
-| Language | TypeScript, strict mode on |
+| Package manager      | pnpm                                             |
+| Functionality        | None — pure scaffolding                          |
+| Language             | TypeScript, strict mode on                       |
 
 ## 4. Prerequisites
 
@@ -70,6 +70,7 @@ npx --yes @nestjs/cli@11 new nestjs-scaffold --package-manager pnpm --skip-git -
 ```
 
 Flags:
+
 - `--package-manager pnpm` — use pnpm
 - `--skip-git` — do not run `git init` inside the temp folder (the repo is already git)
 - `--skip-install` — defer dependency install until after the merge
@@ -141,18 +142,18 @@ pnpm run start:dev   # dev server boots; GET http://localhost:3000/api returns H
 
 ## 9. Future Module Mapping (reference only, not implemented now)
 
-| `docs/03` functional unit | Planned NestJS module |
-|---|---|
-| F2 Request API + F3 Validation | `CallbackRequestsModule` (controller, DTO, class-validator) |
-| F4 Request Persistence | `RequestStoreModule` (Postgres + ORM) |
-| F5 Work Queue | `QueueModule` (pg-boss) |
-| F6 Call Dispatcher | `CallDispatcherModule` (queue processor) |
-| F7 Call Provider | `CallProviderModule` (port `CallProvider` + VAPI adapter) |
-| F8 Webhook Receiver | `WebhooksModule` |
-| F10/F11 Action Executor + Registry | `ActionsModule` |
-| F12 Notification Sender | `NotificationsModule` |
-| F13 Calendar Scheduler | `CalendarModule` |
-| F15 Logging / Observability | `LoggerModule` (structured logging, correlation ids) |
+| `docs/03` functional unit          | Planned NestJS module                                       |
+| ---------------------------------- | ----------------------------------------------------------- |
+| F2 Request API + F3 Validation     | `CallbackRequestsModule` (controller, DTO, class-validator) |
+| F4 Request Persistence             | `RequestStoreModule` (Postgres + ORM)                       |
+| F5 Work Queue                      | `QueueModule` (pg-boss)                                     |
+| F6 Call Dispatcher                 | `CallDispatcherModule` (queue processor)                    |
+| F7 Call Provider                   | `CallProviderModule` (port `CallProvider` + VAPI adapter)   |
+| F8 Webhook Receiver                | `WebhooksModule`                                            |
+| F10/F11 Action Executor + Registry | `ActionsModule`                                             |
+| F12 Notification Sender            | `NotificationsModule`                                       |
+| F13 Calendar Scheduler             | `CalendarModule`                                            |
+| F15 Logging / Observability        | `LoggerModule` (structured logging, correlation ids)        |
 
 ## 10. Workflow Diagram
 

@@ -22,12 +22,12 @@ package directories instead of the expected ~647.
 
 ## Diagnosis
 
-| Check | Result |
-|---|---|
-| Drive of the workspace | `E:` — NTFS, fixed disk, 765 GB free (symlinks are supported, so not a filesystem limitation) |
-| pnpm / node | pnpm 9.15.4, node v20.19.2 |
+| Check                           | Result                                                                                                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drive of the workspace          | `E:` — NTFS, fixed disk, 765 GB free (symlinks are supported, so not a filesystem limitation)                                                                     |
+| pnpm / node                     | pnpm 9.15.4, node v20.19.2                                                                                                                                        |
 | Processes holding the workspace | `js-language-service.js` (WebStorm TS service, pid 32728) and `typescript/lib/typingsInstaller.js` (pid 23908) — **both executing from `node_modules/.pnpm/...`** |
-| Antivirus / MCP servers | MCP servers run from `E:/projects/AI/2026-08-28-MCPs` and do not touch this `node_modules`; Defender real-time scan is a secondary suspect only |
+| Antivirus / MCP servers         | MCP servers run from `E:/projects/AI/2026-08-28-MCPs` and do not touch this `node_modules`; Defender real-time scan is a secondary suspect only                   |
 
 Root cause: pnpm on Windows materialises `node_modules` as a tree of
 symlinks. While a language service keeps a handle open on a file inside

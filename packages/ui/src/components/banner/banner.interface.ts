@@ -4,7 +4,8 @@ import type { BannerVariants } from './banner.variants.js';
 /**
  * Props shared by every {@link Banner} usage.
  */
-export interface BannerBaseProps extends HTMLAttributes<HTMLDivElement>, BannerVariants {
+export interface BannerBaseProps
+  extends HTMLAttributes<HTMLDivElement>, BannerVariants {
   /** Bold first line; the body stays in `children`. */
   readonly title?: string;
   /** Action slot on the right (e.g. a login CTA button). */
@@ -36,4 +37,5 @@ export interface BannerStaticProps {
  * without an accessible label — the compiler enforces the accessibility rule
  * instead of a comment in the component.
  */
-export type BannerProps = BannerBaseProps & (BannerDismissibleProps | BannerStaticProps);
+export type BannerProps = BannerBaseProps &
+  (BannerDismissibleProps | BannerStaticProps);

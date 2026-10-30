@@ -17,14 +17,14 @@ most likely, validate before touching code, and then ask for explicit confirmati
 
 Six distinct signals in the log:
 
-| # | Severity | Where | Signal |
-|---|---|---|---|
-| S1 | red | smoke | `api: GET /api returns 200 ("Hello World!") (expected substring: Hello World)` — actual body `Hello Beautiful World!` |
-| S2 | red | smoke | `caddy: admin API on :2019/config/ responds` → `Connection refused` |
-| S3 | red | smoke | `caddy->api: caddy can GET http://api:3000/api (expected substring: Hello World)` — actual `Hello Beautiful World!` |
-| S4 | red | smoke | `postgres-roles: roles aisztens, tkovari, krak exist` → `FATAL: role "root" does not exist` |
-| S5 | yellow | caddy log | `acme_client ... challenge failed ... identifier:"aisztens.hu" ... 185.80.48.2: Invalid response from http://aisztens.hu/.well-known/acme-challenge/...: 404`, then the same retry against ZeroSSL |
-| S6 | info | end of log | `Node.js 20 is deprecated ... actions/checkout@v4 ... forced to run on Node.js 24` |
+| #   | Severity | Where      | Signal                                                                                                                                                                                             |
+| --- | -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1  | red      | smoke      | `api: GET /api returns 200 ("Hello World!") (expected substring: Hello World)` — actual body `Hello Beautiful World!`                                                                              |
+| S2  | red      | smoke      | `caddy: admin API on :2019/config/ responds` → `Connection refused`                                                                                                                                |
+| S3  | red      | smoke      | `caddy->api: caddy can GET http://api:3000/api (expected substring: Hello World)` — actual `Hello Beautiful World!`                                                                                |
+| S4  | red      | smoke      | `postgres-roles: roles aisztens, tkovari, krak exist` → `FATAL: role "root" does not exist`                                                                                                        |
+| S5  | yellow   | caddy log  | `acme_client ... challenge failed ... identifier:"aisztens.hu" ... 185.80.48.2: Invalid response from http://aisztens.hu/.well-known/acme-challenge/...: 404`, then the same retry against ZeroSSL |
+| S6  | info     | end of log | `Node.js 20 is deprecated ... actions/checkout@v4 ... forced to run on Node.js 24`                                                                                                                 |
 
 8 of 12 smoke checks passed (preflight, both internal DNS lookups, caddy→postgres TCP,
 both VAPI webhook 405+200 flows, monitor tick, monitor→api), so the stack is functional;
@@ -55,7 +55,7 @@ S6 is a GitHub-Actions deprecation warning, not a deploy failure. No action.
 Five plausible causes, ranked by likelihood:
 
 1. **Spec drift in smoke test** (S1, S3) — `app.service.ts:6` returns `Hello Beautiful
-   World!`, but the test was written against the older `Hello World!`. Textbook test-rot.
+World!`, but the test was written against the older `Hello World!`. Textbook test-rot.
 2. **`admin off` hardening** (S2) — the `:2019` probe was written before Caddy's admin
    API was deliberately disabled in the `dual-stack-port-collision-fix` milestone.
 3. **`docker compose exec` user mismatch on postgres** (S4) — `postgres:16-alpine`
@@ -67,7 +67,7 @@ Five plausible causes, ranked by likelihood:
    [`2026-10-11--19-29-00-apex-wordpress-intentional-clarification`](2026-10-11--19-29-00-apex-wordpress-intentional-clarification.md)
    but the file was never updated.
 5. **Cosmetic** — Node 20 deprecation warning (S6); `tls.cache.maintenance: storage
-   cleaning happened too recently` (also cosmetic).
+cleaning happened too recently` (also cosmetic).
 
 Distilled to the **1–2 that need a code change today**:
 
@@ -124,7 +124,7 @@ block (lines 100–104) with a multi-line comment that:
 - Points at the two existing docs that already record the intent
   (`docs/history/2026-10-11--19-29-00-apex-wordpress-intentional-clarification.md`
   and `docs/Specs/Caddy-Reverse-Proxy.md`).
-- Includes the *commented-out* apex block as a copy-paste target for the day the
+- Includes the _commented-out_ apex block as a copy-paste target for the day the
   apex is ever migrated to this droplet, so a future contributor does not have to
   re-invent it from memory.
 
@@ -137,7 +137,7 @@ The `Render Caddyfile` step in `deploy.yml` and the `render_caddyfile` function 
 [`docs/Specs/Caddy-Reverse-Proxy.md` §A](../../Specs/Caddy-Reverse-Proxy.md) was updated:
 
 - The previous text claimed the block "kikerül a Caddy-ból — sosem fut le". That was
-  a hope, not reality: the block was in `Caddyfile.rendered` and Caddy *did* try to
+  a hope, not reality: the block was in `Caddyfile.rendered` and Caddy _did_ try to
   obtain a cert. The new text states the block has been **removed from the template**
   and explains why, and describes the two-step process (DNS A-record change +
   uncomment the block) that would be needed if the apex is ever migrated.

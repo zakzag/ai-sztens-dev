@@ -6,12 +6,12 @@ Serve three distinct subdomains from the single droplet `164.92.248.194`,
 terminated by Caddy with automatic Let's Encrypt certs. `ssh.aisztens.hu`
 remains a plain SSH endpoint and is **not** routed by Caddy.
 
-| URL | Serves | Backing |
-|---|---|---|
-| `https://api.aisztens.hu/api/*` | NestJS API | `reverse_proxy api:3000` (internal Docker network) |
-| `https://web.aisztens.hu/*` | Visitor call-back form SPA (static) | `root /srv/web` mounted from `apps/web/dist` |
-| `https://admin.aisztens.hu/*` | Admin dashboard SPA (static) | `root /srv/admin` mounted from `apps/admin/dist` |
-| `ssh.aisztens.hu:22` | OpenSSH | OS-level (unchanged) |
+| URL                             | Serves                              | Backing                                            |
+| ------------------------------- | ----------------------------------- | -------------------------------------------------- |
+| `https://api.aisztens.hu/api/*` | NestJS API                          | `reverse_proxy api:3000` (internal Docker network) |
+| `https://web.aisztens.hu/*`     | Visitor call-back form SPA (static) | `root /srv/web` mounted from `apps/web/dist`       |
+| `https://admin.aisztens.hu/*`   | Admin dashboard SPA (static)        | `root /srv/admin` mounted from `apps/admin/dist`   |
+| `ssh.aisztens.hu:22`            | OpenSSH                             | OS-level (unchanged)                               |
 
 DNS A records for all four names already point at `164.92.248.194`
 (confirmed by the user). No DNS work is required.
@@ -98,6 +98,7 @@ admin.{env.DOMAIN} {
 ```
 
 Notes:
+
 - The `handle /api/*` blocks inside each SPA site are optional safety
   nets — the SPAs do not call same-origin `/api/...` in production
   (they call `https://api.aisztens.hu/api/...`). They exist so a
@@ -113,11 +114,11 @@ out at lines 84–85):
 
 ```yaml
 volumes:
-    - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-    - caddy_data:/data
-    - caddy_config:/config
-    - ${WEB_DIST_PATH:-../apps/web/dist}:/srv/web:ro
-    - ${ADMIN_DIST_PATH:-../apps/admin/dist}:/srv/admin:ro
+  - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+  - caddy_data:/data
+  - caddy_config:/config
+  - ${WEB_DIST_PATH:-../apps/web/dist}:/srv/web:ro
+  - ${ADMIN_DIST_PATH:-../apps/admin/dist}:/srv/admin:ro
 ```
 
 `WEB_DIST_PATH` and `ADMIN_DIST_PATH` are already defined (defaulting

@@ -19,14 +19,14 @@ runs could not be trusted.
 
 ## 2. Evidence
 
-| Measurement | Value |
-|---|---|
-| pnpm / node | 9.15.4 / v20.19.2 |
-| Workspace drive | `E:` NTFS, fixed, 765 GB free → symlinks are supported |
-| Install progress at failure | `resolved 141, reused 141, added 134` (out of ~647 packages) |
-| `.pnpm` directories after the failure | **141** (vs. **647** after a successful run) |
-| Locking processes | `js-language-service.js` (WebStorm TS service, pid 32728) and `typescript/lib/typingsInstaller.js` (pid 23908), both running **from inside `node_modules/.pnpm/...`** |
-| Not involved | MCP servers (they live in `E:/projects/AI/2026-08-28-MCPs`), Docker, Postgres |
+| Measurement                           | Value                                                                                                                                                                 |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| pnpm / node                           | 9.15.4 / v20.19.2                                                                                                                                                     |
+| Workspace drive                       | `E:` NTFS, fixed, 765 GB free → symlinks are supported                                                                                                                |
+| Install progress at failure           | `resolved 141, reused 141, added 134` (out of ~647 packages)                                                                                                          |
+| `.pnpm` directories after the failure | **141** (vs. **647** after a successful run)                                                                                                                          |
+| Locking processes                     | `js-language-service.js` (WebStorm TS service, pid 32728) and `typescript/lib/typingsInstaller.js` (pid 23908), both running **from inside `node_modules/.pnpm/...`** |
+| Not involved                          | MCP servers (they live in `E:/projects/AI/2026-08-28-MCPs`), Docker, Postgres                                                                                         |
 
 ## 3. Root cause
 

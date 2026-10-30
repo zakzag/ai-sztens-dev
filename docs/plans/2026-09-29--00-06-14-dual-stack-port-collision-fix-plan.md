@@ -18,19 +18,19 @@
 Parancsok: `top`, `ps`, `docker ps`, `docker stats`, `docker inspect`, `ss -tlnp`,
 `docker logs`, `docker network ls`.
 
-| Mutató                                        | Érték                                                                                  |
-| --------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Uptime                                        | 7 perc (friss boot)                                                                    |
-| Load average                                  | 3.38 / 2.36 / 1.23 (1 vCPU, magas)                                                     |
-| Host CPU                                      | `aisztens-api-1` 87.69%, `aisztens-caddy-1` exit 128                                   |
-| Host memória                                  | 524 MB használt / 961 MB összes (54%)                                                   |
-| `pnpm-native` process a hoston                | **NINCS** – a user által említett néven futó processz nem létezik                      |
-| `aisztens-caddy-1`                            | `Bind for 0.0.0.0:80 failed: port is already allocated`, exit 128, dead                |
-| `callback-assistant-caddy-1`                  | `Restarting`, exit 1                                                                   |
-| `aisztens-api-1`                              | `Restarting (1)`, healthcheck ExitCode 1 minden próbálkozásnál                         |
-| `aisztens-postgres-1`                         | Up, healthy                                                                            |
-| Host 80/443 port                              | **senki nem figyeli** (`ss -tlnp` kimutatta)                                            |
-| Docker network-ök                             | `aisztens_internal` (új) ÉS `callback-assistant_internal` (régi) párhuzamosan élnek    |
+| Mutató                         | Érték                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| Uptime                         | 7 perc (friss boot)                                                                 |
+| Load average                   | 3.38 / 2.36 / 1.23 (1 vCPU, magas)                                                  |
+| Host CPU                       | `aisztens-api-1` 87.69%, `aisztens-caddy-1` exit 128                                |
+| Host memória                   | 524 MB használt / 961 MB összes (54%)                                               |
+| `pnpm-native` process a hoston | **NINCS** – a user által említett néven futó processz nem létezik                   |
+| `aisztens-caddy-1`             | `Bind for 0.0.0.0:80 failed: port is already allocated`, exit 128, dead             |
+| `callback-assistant-caddy-1`   | `Restarting`, exit 1                                                                |
+| `aisztens-api-1`               | `Restarting (1)`, healthcheck ExitCode 1 minden próbálkozásnál                      |
+| `aisztens-postgres-1`          | Up, healthy                                                                         |
+| Host 80/443 port               | **senki nem figyeli** (`ss -tlnp` kimutatta)                                        |
+| Docker network-ök              | `aisztens_internal` (új) ÉS `callback-assistant_internal` (régi) párhuzamosan élnek |
 
 ## 4. Gyökérok
 
@@ -38,9 +38,9 @@ Parancsok: `top`, `ps`, `docker ps`, `docker stats`, `docker inspect`, `ss -tlnp
 80/443 host portokat kér.** A Docker bind-szinten fatal errort ad
 (`port is already allocated`), ezért:
 
-* az új `aisztens-caddy-1` **nem tud elindulni** (exit 128),
-* a régi `callback-assistant-caddy-1` is `restarting` státuszban van (exit 1),
-* így egyik Caddy sem szolgálja ki a subdomaineket → a host 80/443 üres.
+- az új `aisztens-caddy-1` **nem tud elindulni** (exit 128),
+- a régi `callback-assistant-caddy-1` is `restarting` státuszban van (exit 1),
+- így egyik Caddy sem szolgálja ki a subdomaineket → a host 80/443 üres.
 
 **B. Mivel a Caddy nem megy, az API konténer healthcheckje `fetch('http://127.0.0.1:3000/api')`
 ténylegesen a NestJS-t hívná, de a `start_period: 30s` alatt a NestJS nem mindig
@@ -67,17 +67,17 @@ az API konténer restart loopja.
 A `infra/caddy/Caddyfile` (és a belőle renderelt `infra/caddy/Caddyfile.rendered`)
 **már most is pontosan azt csinálja, amit a user kér**:
 
-| Hoszt               | Viselkedés                                                                  |
-| ------------------- | --------------------------------------------------------------------------- |
-| `api.aisztens.hu`   | `reverse_proxy api:3000` (NestJS Fastify)                                    |
-| `web.aisztens.hu`   | SPA statikus szolgáltatás `apps/web/dist`-ből + `/api/*` safety-net          |
-| `admin.aisztens.hu` | SPA statikus szolgáltatás `apps/admin/dist`-ből + `/api/*` safety-net        |
-| `aisztens.hu`       | `307 → https://web.aisztens.hu{uri}` (apex redirect)                         |
+| Hoszt               | Viselkedés                                                            |
+| ------------------- | --------------------------------------------------------------------- |
+| `api.aisztens.hu`   | `reverse_proxy api:3000` (NestJS Fastify)                             |
+| `web.aisztens.hu`   | SPA statikus szolgáltatás `apps/web/dist`-ből + `/api/*` safety-net   |
+| `admin.aisztens.hu` | SPA statikus szolgáltatás `apps/admin/dist`-ből + `/api/*` safety-net |
+| `aisztens.hu`       | `307 → https://web.aisztens.hu{uri}` (apex redirect)                  |
 
-* Kívülről **kizárólag** a443-as HTTPS porton keresztül érhető el,
+- Kívülről **kizárólag** a443-as HTTPS porton keresztül érhető el,
   a belső alkalmazásportok (3000, 5432) rejtve vannak (`expose:` a `ports:`
   helyett, csak a docker belső hálón).
-* A host 80/443-at csak a Caddy konténer publikálja.
+- A host 80/443-at csak a Caddy konténer publikálja.
 
 Tehát **a routing config módosítása nem szükséges** – a baj kizárólag az, hogy
 a Caddy nem tud elindulni a port-ütközés miatt.
@@ -87,31 +87,34 @@ a Caddy nem tud elindulni a port-ütközés miatt.
 ### 6.1 Azonnali szerver-oldali takarítás (SSH-n végrehajtandó)
 
 1. **A régi `callback-assistant` stack leállítása és konténereinek törlése**:
+
    ```bash
    docker compose -p callback-assistant \
      --env-file /opt/aisztens/infra/.env \
      -f /opt/aisztens/infra/docker-compose.yml down --remove-orphans
    ```
+
    (A régi compose projekt ugyanazt a `infra/docker-compose.yml`-t használta,
    csak `-p callback-assistant` néven. Ha a régi compose fájl nem érhető el,
    akkor `docker rm -f callback-assistant-caddy-1 callback-assistant-api-1
-   callback-assistant-postgres-1 callback-assistant-monitor-1` + `docker network
-   rm callback-assistant_internal` a biztos.)
+callback-assistant-postgres-1 callback-assistant-monitor-1` + `docker network
+rm callback-assistant_internal` a biztos.)
 
 2. **Az új `aisztens` stack konténereinek újraindítása**, hogy a Caddy megkapja a
    80/443 host portokat:
+
    ```bash
    cd /opt/aisztens
    docker compose --env-file infra/.env -f infra/docker-compose.yml up -d
    ```
 
 3. **Ellenőrzés**:
-   * `docker ps` – minden konténer `Up`, a Caddynek `0.0.0.0:80->80`,
+   - `docker ps` – minden konténer `Up`, a Caddynek `0.0.0.0:80->80`,
      `0.0.0.0:443->443` PORTS oszloppal kell rendelkeznie.
-   * `curl -fsS https://api.aisztens.hu/api` – 200 + JSON válasz.
-   * `curl -fsS https://web.aisztens.hu` – 200 + HTML (SPA).
-   * `curl -fsS https://admin.aisztens.hu` – 200 + HTML (SPA).
-   * `docker stats --no-stream` – az API CPU-ja < 5%.
+   - `curl -fsS https://api.aisztens.hu/api` – 200 + JSON válasz.
+   - `curl -fsS https://web.aisztens.hu` – 200 + HTML (SPA).
+   - `curl -fsS https://admin.aisztens.hu` – 200 + HTML (SPA).
+   - `docker stats --no-stream` – az API CPU-ja < 5%.
 
 ### 6.2 Visszatérésgátló config-módosítások (lokálban, commitolandó)
 
@@ -127,44 +130,44 @@ A jövőben ne fordulhasson elő, hogy a deploy újraéleszti a régi stacket:
 
 ### 6.3 Specs doksi frissítése
 
-* `docs/Specs/Caddy-Reverse-Proxy.md`: a "Mit szolgál ki" táblázat frissítése az
+- `docs/Specs/Caddy-Reverse-Proxy.md`: a "Mit szolgál ki" táblázat frissítése az
   aktuális hosztokra és egy explicit "single-Caddy" szabály hozzáadása.
-* `docs/Specs/Production-Runbook.md` (ha van ilyen): a runbook-hoz hozzáadni egy
+- `docs/Specs/Production-Runbook.md` (ha van ilyen): a runbook-hoz hozzáadni egy
   "Ha két Caddy konténer jelenik meg" troubleshooting lépést.
 
 ### 6.4 History + milestone
 
-* `docs/plans/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md` (ez a fájl).
-* `docs/milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md` – a
+- `docs/plans/2026-09-29--00-06-14-dual-stack-port-collision-fix-plan.md` (ez a fájl).
+- `docs/milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md` – a
   milestone a döntés szintje: miért fontos, hogy csak egy Caddy legyen a dropleten,
   és hogyan kerüljük el a jövőben.
 
 ## 7. Nem változtatunk
 
-* **A `Caddyfile` tartalma** – már most is helyes routingot csinál.
-* **A `docker-compose.yml` service-portok és hálózat** – csak a Caddy bind-ját
+- **A `Caddyfile` tartalma** – már most is helyes routingot csinál.
+- **A `docker-compose.yml` service-portok és hálózat** – csak a Caddy bind-ját
   kommenteljük, mást nem nyúlunk.
-* **A healthcheck** – a `start_period: 30s` és a `fetch('http://127.0.0.1:3000/api')`
+- **A healthcheck** – a `start_period: 30s` és a `fetch('http://127.0.0.1:3000/api')`
   marad, mert ha a Caddy port-ütközés megszűnik, az API-nak lesz ideje felállni.
 
 ## 8. Siker-kritériumok
 
-| Kritérium                                                          | Hogyan ellenőrizzük                                                  |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| A droplet CPU-terhelése < 10%                                      | `docker stats --no-stream` és `top`                                  |
-| Csak egy Caddy konténer fut a 80/443 host portokon                 | `docker ps` (PORTS oszlop) és `docker network ls`                    |
-| `https://api.aisztens.hu/api` 200-as JSON-t ad                    | `curl -i https://api.aisztens.hu/api` (kívülről)                    |
-| `https://web.aisztens.hu` a SPA-t szolgáltatja                    | `curl -I https://web.aisztens.hu` → 200 + `text/html`                |
-| `https://admin.aisztens.hu` a SPA-t szolgáltatja                   | `curl -I https://admin.aisztens.hu` → 200 + `text/html`              |
-| A belső alkalmazásportok (3000, 5432) kívülről nem érhetők el      | `curl http://aisztens.hu:3000` (kívülről) → connection refused        |
-| A deploy script automatikusan takarítja a régi stacket             | `deploy/deploy.sh up` parancs futtatása után `docker network ls`     |
+| Kritérium                                                     | Hogyan ellenőrizzük                                              |
+| ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| A droplet CPU-terhelése < 10%                                 | `docker stats --no-stream` és `top`                              |
+| Csak egy Caddy konténer fut a 80/443 host portokon            | `docker ps` (PORTS oszlop) és `docker network ls`                |
+| `https://api.aisztens.hu/api` 200-as JSON-t ad                | `curl -i https://api.aisztens.hu/api` (kívülről)                 |
+| `https://web.aisztens.hu` a SPA-t szolgáltatja                | `curl -I https://web.aisztens.hu` → 200 + `text/html`            |
+| `https://admin.aisztens.hu` a SPA-t szolgáltatja              | `curl -I https://admin.aisztens.hu` → 200 + `text/html`          |
+| A belső alkalmazásportok (3000, 5432) kívülről nem érhetők el | `curl http://aisztens.hu:3000` (kívülről) → connection refused   |
+| A deploy script automatikusan takarítja a régi stacket        | `deploy/deploy.sh up` parancs futtatása után `docker network ls` |
 
 ## 9. Kockázatok / visszafordíthatóság
 
-* **Ha bármi elromlik**, a régi Caddy konténerek eltávolítása után már nincs
+- **Ha bármi elromlik**, a régi Caddy konténerek eltávolítása után már nincs
   visszaút – de a régi stack 5 órás, a Caddy amúgy sem fut, és a configok
   verziókezeltek, így a rollbackhez elég `git revert` + redeploy.
-* A `docker compose -p callback-assistant down` parancs **nem veszélyes**:
+- A `docker compose -p callback-assistant down` parancs **nem veszélyes**:
   csak a konténereket és a hálózatot törli, a `pgdata` volume-ot nem (ha külön
   volume volt, megmarad). Ha a régi és új postgres adatbázis más séma alatt fut,
   az adatvesztés kockázata nulla.

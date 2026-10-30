@@ -7,7 +7,8 @@ import type { InputVariants } from './input.variants.js';
  * `id` is required (not generated) so the label association is deterministic in
  * server-side tests and in the DOM.
  */
-export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'id'>, InputVariants {
+export interface InputProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'id'>, InputVariants {
   readonly id: string;
   /** Visible, associated `<label>` text — never a placeholder substitute. */
   readonly label: string;

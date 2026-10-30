@@ -16,25 +16,25 @@ authored (tracked)                     generated (gitignored, except .roomodes)
     └── mode-overrides.json
 ```
 
-| Kind | Files | Tracked | Who writes it |
-| --- | --- | --- | --- |
-| Rules | `.roo/rules/*.md` | yes | humans |
-| Modes | `.roomodes` (repo root) | yes | the Zoo Code UI (or humans) — **never** the generator |
-| Overrides | `scripts/lib/agent-artifacts/mode-overrides.json` | yes | humans |
-| Generator | `scripts/lib/agent-artifacts/*.mjs` | yes | humans |
-| Agent instruction files | `.github/copilot-instructions.md`, `.cursor/rules/project.mdc`, `CLAUDE.md` | **no** (gitignored) | the generator |
-| Agent mode artefacts | `.github/chatmodes/<slug>.chatmode.md`, `.cursor/commands/<slug>.md`, `.cursor/rules/<slug>.mdc`, `.claude/agents/<slug>.md` | **no** (gitignored) | the generator |
+| Kind                    | Files                                                                                                                        | Tracked             | Who writes it                                         |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------- |
+| Rules                   | `.roo/rules/*.md`                                                                                                            | yes                 | humans                                                |
+| Modes                   | `.roomodes` (repo root)                                                                                                      | yes                 | the Zoo Code UI (or humans) — **never** the generator |
+| Overrides               | `scripts/lib/agent-artifacts/mode-overrides.json`                                                                            | yes                 | humans                                                |
+| Generator               | `scripts/lib/agent-artifacts/*.mjs`                                                                                          | yes                 | humans                                                |
+| Agent instruction files | `.github/copilot-instructions.md`, `.cursor/rules/project.mdc`, `CLAUDE.md`                                                  | **no** (gitignored) | the generator                                         |
+| Agent mode artefacts    | `.github/chatmodes/<slug>.chatmode.md`, `.cursor/commands/<slug>.md`, `.cursor/rules/<slug>.mdc`, `.claude/agents/<slug>.md` | **no** (gitignored) | the generator                                         |
 
 ## 2. Entry points
 
-| Entry point | Purpose |
-| --- | --- |
-| `scripts/init.sh` (bash) | interactive wrapper: agent menu → `node generate.mjs --agent <choice>` |
-| `scripts/init.ps1` (Windows PowerShell) | same, byte-for-byte identical output |
-| `node scripts/lib/agent-artifacts/generate.mjs --agent <copilot\|cursor\|claude>` | non-interactive generation |
-| `--check` | no writes; exit `2` when any artefact is stale (CI guard) |
-| `--dry-run` | no writes; prints what would be written |
-| `pnpm test:agents` | `node --test scripts/lib/agent-artifacts/` |
+| Entry point                                                                       | Purpose                                                                |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `scripts/init.sh` (bash)                                                          | interactive wrapper: agent menu → `node generate.mjs --agent <choice>` |
+| `scripts/init.ps1` (Windows PowerShell)                                           | same, byte-for-byte identical output                                   |
+| `node scripts/lib/agent-artifacts/generate.mjs --agent <copilot\|cursor\|claude>` | non-interactive generation                                             |
+| `--check`                                                                         | no writes; exit `2` when any artefact is stale (CI guard)              |
+| `--dry-run`                                                                       | no writes; prints what would be written                                |
+| `pnpm test:agents`                                                                | `node --test scripts/lib/agent-artifacts/`                             |
 
 Requirements: Node.js on `PATH`. The generator has **no third-party dependencies** — the YAML
 subset parser (`yaml-lite.mjs`) covers what a `.roomodes` file contains.
@@ -54,13 +54,13 @@ subset parser (`yaml-lite.mjs`) covers what a `.roomodes` file contains.
 `.roomodes` stays in the Zoo Code schema. The generator reads it and maps each mode to the
 closest native equivalent of that product:
 
-| Agent | Artefact | Frontmatter | Semantics |
-| --- | --- | --- | --- |
-| Zoo Code | `.roomodes` (the source itself) | — | native custom mode |
-| GitHub Copilot | `.github/chatmodes/<slug>.chatmode.md` | `description`, `tools` | selectable chat mode |
-| Cursor | `.cursor/commands/<slug>.md` | — | invocable `/<slug>` command |
-| Cursor | `.cursor/rules/<slug>.mdc` | `description`, `globs:`, `alwaysApply: false` | on-demand rule |
-| Claude Code | `.claude/agents/<slug>.md` | `name`, `description`, `tools` | project subagent |
+| Agent          | Artefact                               | Frontmatter                                   | Semantics                   |
+| -------------- | -------------------------------------- | --------------------------------------------- | --------------------------- |
+| Zoo Code       | `.roomodes` (the source itself)        | —                                             | native custom mode          |
+| GitHub Copilot | `.github/chatmodes/<slug>.chatmode.md` | `description`, `tools`                        | selectable chat mode        |
+| Cursor         | `.cursor/commands/<slug>.md`           | —                                             | invocable `/<slug>` command |
+| Cursor         | `.cursor/rules/<slug>.mdc`             | `description`, `globs:`, `alwaysApply: false` | on-demand rule              |
+| Claude Code    | `.claude/agents/<slug>.md`             | `name`, `description`, `tools`                | project subagent            |
 
 Body (shared by all artefacts): `## Role` (`roleDefinition`), `## When to use` (`whenToUse`),
 `## Workflow` (`customInstructions`, omitted when empty).
@@ -70,13 +70,13 @@ Body (shared by all artefacts): `## Role` (`roleDefinition`), `## When to use` (
 Zoo Code `groups` → agent tool identifiers (`tools.mjs`). Verify against the product docs on every
 agent upgrade.
 
-| Zoo group | Copilot `tools` | Claude `tools` |
-| --- | --- | --- |
-| `read` | `codebase`, `search`, `usages`, `problems` | `Read`, `Grep`, `Glob` |
-| `edit` | `editFiles` | `Edit`, `Write` |
-| `command` | `runCommands`, `runTasks` | `Bash` |
-| `browser` | `fetch` | `WebFetch`, `WebSearch` |
-| `mcp` | `mcpServers` | `mcp__*` (default), explicit list recommended |
+| Zoo group | Copilot `tools`                            | Claude `tools`                                |
+| --------- | ------------------------------------------ | --------------------------------------------- |
+| `read`    | `codebase`, `search`, `usages`, `problems` | `Read`, `Grep`, `Glob`                        |
+| `edit`    | `editFiles`                                | `Edit`, `Write`                               |
+| `command` | `runCommands`, `runTasks`                  | `Bash`                                        |
+| `browser` | `fetch`                                    | `WebFetch`, `WebSearch`                       |
+| `mcp`     | `mcpServers`                               | `mcp__*` (default), explicit list recommended |
 
 ### 4.2 Overrides
 
@@ -85,7 +85,12 @@ agent upgrade.
 ```json
 {
   "jira-ticket-writer": {
-    "emit": ["copilot-chatmode", "claude-agent", "cursor-command", "cursor-rule"],
+    "emit": [
+      "copilot-chatmode",
+      "claude-agent",
+      "cursor-command",
+      "cursor-rule"
+    ],
     "copilotTools": ["codebase", "editFiles", "runCommands", "mcpServers"],
     "claudeTools": ["Read", "Edit", "Bash", "mcp__atlassian"]
   }
@@ -118,12 +123,12 @@ The generator appends **every generated path and its `.bak`** to the section
 
 ## 7. Do / don't
 
-| Do | Don't |
-| --- | --- |
-| Edit `.roo/rules/*.md` and `.roomodes` | Edit `CLAUDE.md`, `project.mdc`, `*.chatmode.md`, `.claude/agents/*`, `.cursor/commands/*` by hand |
-| Re-run `scripts/init.sh` / `scripts/init.ps1` after changing a source | Copy a mode definition into an agent file manually |
-| Put generator-specific settings into `mode-overrides.json` | Add unknown keys to `.roomodes` (the Zoo Code UI may drop them) |
-| Use `--check` in CI to detect stale artefacts | Commit generated artefacts |
+| Do                                                                    | Don't                                                                                              |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Edit `.roo/rules/*.md` and `.roomodes`                                | Edit `CLAUDE.md`, `project.mdc`, `*.chatmode.md`, `.claude/agents/*`, `.cursor/commands/*` by hand |
+| Re-run `scripts/init.sh` / `scripts/init.ps1` after changing a source | Copy a mode definition into an agent file manually                                                 |
+| Put generator-specific settings into `mode-overrides.json`            | Add unknown keys to `.roomodes` (the Zoo Code UI may drop them)                                    |
+| Use `--check` in CI to detect stale artefacts                         | Commit generated artefacts                                                                         |
 
 ## 8. Related documents
 

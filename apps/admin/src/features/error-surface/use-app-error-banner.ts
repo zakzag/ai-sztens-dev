@@ -13,8 +13,14 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import type { AppErrorBannerResult, BannerCondition } from '../../lib/error-surface.interface.js';
-import { toBannerCondition, toBannerModel } from '../../lib/error-surface.logic.js';
+import type {
+  AppErrorBannerResult,
+  BannerCondition,
+} from '../../lib/error-surface.interface.js';
+import {
+  toBannerCondition,
+  toBannerModel,
+} from '../../lib/error-surface.logic.js';
 import { createQueryErrorStore } from './query-error.store.js';
 import { useOnlineStatus } from './use-online-status.js';
 
@@ -36,7 +42,8 @@ export function useAppErrorBanner(): AppErrorBannerResult {
   );
 
   const condition = toBannerCondition(isOnline, errors);
-  const [dismissedCondition, setDismissedCondition] = useState<BannerCondition | null>(null);
+  const [dismissedCondition, setDismissedCondition] =
+    useState<BannerCondition | null>(null);
 
   useEffect(() => () => errorStore.dispose(), [errorStore]);
 
@@ -52,7 +59,9 @@ export function useAppErrorBanner(): AppErrorBannerResult {
   }, [condition]);
 
   const model =
-    condition !== null && condition !== dismissedCondition ? toBannerModel(condition) : null;
+    condition !== null && condition !== dismissedCondition
+      ? toBannerModel(condition)
+      : null;
 
   return { model, dismiss };
 }

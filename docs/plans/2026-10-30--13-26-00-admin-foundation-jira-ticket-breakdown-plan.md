@@ -9,27 +9,27 @@
 
 ## 1. Amit létrehozok
 
-| # | Típus | Cím | Prioritás | Hullám |
-|---|---|---|---|---|
-| **S1** | Story | Admin + API: egységes adatáramlás, validáció, form- és hibakezelés, UI alap | Highest | — |
-| S1-1 | Subtask | shared: közös formátum-sémák és magyar zod üzenetek | Highest | A |
-| S1-2 | Subtask | shared: lista- és paginációs szerződés (`ApiResult`, `listQuerySchema`) | Highest | A |
-| S1-3 | Subtask | api: generikus paginált lista (`meta.pagination`, query pipe, repo count) | Highest | A |
-| S1-4 | Subtask | api: update/delete konvenció (`PATCH`, `DELETE`, stale write, 422 kód) | High | A |
-| S1-5 | Subtask | api-client: teljes transport (PUT/PATCH/DELETE, query builder, `ApiResult`) | Highest | A |
-| S1-6 | Subtask | api-client: operation-lefedettség és új resource sablon | High | A |
-| S1-7 | Subtask | admin: `src/app/` réteg (providers, router, layout, nav, session, error boundary) | Highest | C |
-| S1-8 | Subtask | admin: generikus hook réteg + generikus mezőhiba-leképezés | Highest | B |
-| S1-9 | Subtask | admin: lista UI state URL search params-ban + zustand store factory | High | C |
-| S1-10 | Subtask | ui: form primitívek (FormField, FormActions, Select, Checkbox, DatePicker…) | Highest | B |
-| S1-11 | Subtask | ui: data-display primitívek (DataTable, Pagination, EmptyState, Skeleton…) | Highest | B |
-| S1-12 | Subtask | ui: overlay primitívek (Dialog, Drawer, Tooltip, DropdownMenu) Radix alapon | High | B |
-| S1-13 | Subtask | admin: MSW alapú teszt harness és fixture-ek | High | C |
-| S1-14 | Subtask | quality: réteg- és token-kapu a CI-ben (boundaries, knip, paletta) | High | D |
-| S1-15 | Subtask | docs: UI-Architecture, Admin-Data-Flow, Forms-and-Validation | Medium | D |
-| S1-16 | Subtask | agent: api-keys oldal átállítása az új alapokra (end-to-end bizonyíték) | Highest | C |
-| S1-17 | Subtask | opcionális: Ladle komponens-katalógus a `packages/ui`-ra | Low | D |
-| S1-18 | Subtask | opcionális: frontend hibamonitoring (Sentry/GlitchTip) | Low | D |
+| #      | Típus   | Cím                                                                               | Prioritás | Hullám |
+| ------ | ------- | --------------------------------------------------------------------------------- | --------- | ------ |
+| **S1** | Story   | Admin + API: egységes adatáramlás, validáció, form- és hibakezelés, UI alap       | Highest   | —      |
+| S1-1   | Subtask | shared: közös formátum-sémák és magyar zod üzenetek                               | Highest   | A      |
+| S1-2   | Subtask | shared: lista- és paginációs szerződés (`ApiResult`, `listQuerySchema`)           | Highest   | A      |
+| S1-3   | Subtask | api: generikus paginált lista (`meta.pagination`, query pipe, repo count)         | Highest   | A      |
+| S1-4   | Subtask | api: update/delete konvenció (`PATCH`, `DELETE`, stale write, 422 kód)            | High      | A      |
+| S1-5   | Subtask | api-client: teljes transport (PUT/PATCH/DELETE, query builder, `ApiResult`)       | Highest   | A      |
+| S1-6   | Subtask | api-client: operation-lefedettség és új resource sablon                           | High      | A      |
+| S1-7   | Subtask | admin: `src/app/` réteg (providers, router, layout, nav, session, error boundary) | Highest   | C      |
+| S1-8   | Subtask | admin: generikus hook réteg + generikus mezőhiba-leképezés                        | Highest   | B      |
+| S1-9   | Subtask | admin: lista UI state URL search params-ban + zustand store factory               | High      | C      |
+| S1-10  | Subtask | ui: form primitívek (FormField, FormActions, Select, Checkbox, DatePicker…)       | Highest   | B      |
+| S1-11  | Subtask | ui: data-display primitívek (DataTable, Pagination, EmptyState, Skeleton…)        | Highest   | B      |
+| S1-12  | Subtask | ui: overlay primitívek (Dialog, Drawer, Tooltip, DropdownMenu) Radix alapon       | High      | B      |
+| S1-13  | Subtask | admin: MSW alapú teszt harness és fixture-ek                                      | High      | C      |
+| S1-14  | Subtask | quality: réteg- és token-kapu a CI-ben (boundaries, knip, paletta)                | High      | D      |
+| S1-15  | Subtask | docs: UI-Architecture, Admin-Data-Flow, Forms-and-Validation                      | Medium    | D      |
+| S1-16  | Subtask | agent: api-keys oldal átállítása az új alapokra (end-to-end bizonyíték)           | Highest   | C      |
+| S1-17  | Subtask | opcionális: Ladle komponens-katalógus a `packages/ui`-ra                          | Low       | D      |
+| S1-18  | Subtask | opcionális: frontend hibamonitoring (Sentry/GlitchTip)                            | Low       | D      |
 
 **Hullámok:** A = szerződés + API + transport (párhuzamosítható 3 sávon) · B = admin hook + primitívek · C = app réteg + teszt harness + api-keys átállítás · D = kapuk és dokumentáció.
 
@@ -47,6 +47,7 @@ A fejlesztő csak a domaint írja le; a szerződést, a transportot, a hookot, a
 a form-elemeket, a hibafelületeket és a lista-megjelenítést készen kapja.
 
 Négy kötelező pillér:
+
 1. Közös adatáramlás: ApiResult<T> (data + meta), lista query-szerződés, PATCH/DELETE,
    típusos request-body a shared registryből, paginált szerver-lista, dto -> view model mapper.
 2. Közös hibakezelés: ApiError -> egy döntő toErrorSurface, generikus toFieldErrors(fieldPaths),
@@ -419,31 +420,31 @@ Nem cél: auth implementáció (AIS-71..74), apps/web átállítás, e-mail modu
 
 ## 4. Meglévő ticketek — bemásolható módosítások
 
-| Ticket | Módosítás |
-|---|---|
-| **AIS-19** (cég lista) | Description kiegészítés: „Előfeltétel: S1 (a közös alap) F7 zöld. A lista a `DataTable` + `Pagination` + URL search params mintát követi, `EmptyState`-tel; a query a `listQuerySchema`-t használja.” |
-| **AIS-20** (cég detail) | „Előfeltétel: S1. A megjelenítés `DescriptionList` primitívvel, loading `Skeleton`, hiba `PageErrorState`, 404 külön ág.” |
-| **AIS-21** (cég módosítás) | „Előfeltétel: S1. A mentés `PATCH` + `updatedAt` (stale write → 409), a mezőhibák a `details[].path`-ból, siker/hiba toast.” |
-| **AIS-22** (email feldolgozás gomb) | „Előfeltétel: S1. Megerősítő `ConfirmDialog` + mutation + toast.” |
-| **AIS-16** | „A cég mezőkészlet és formátumok a `packages/shared/contract/company` sémában rögzítendők (S1-1 mintájára), a UI terv ezt használja.” |
-| **AIS-18** | „A DB táblák a shared `company` contractból vezetendők le; a séma a migráció előtt készüljön el.” |
-| **AIS-99** | Prioritás `Highest`, ütemezés S1-2/S1-5 elé — a típusgenerálás alapja. |
-| **AIS-100** | Összevonható S1-15-tel (ugyanaz a doksi-kör), vagy S1-15 után zárandó. |
-| **AIS-79…AIS-85** | Megjegyzés: az `F3` fázis része; a `NotificationHost` az S1-7 layoutjában mountolható. AIS-85 (ApiKeyForm notify) egybeolvad S1-16-tal. |
-| **AIS-71…AIS-74** | Megjegyzés: párhuzamos sáv; az AIS-74 a S1-7 session store-jára épül. |
-| **AIS-101** | Változatlan, bármikor felvehető. |
+| Ticket                              | Módosítás                                                                                                                                                                                             |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AIS-19** (cég lista)              | Description kiegészítés: „Előfeltétel: S1 (a közös alap) F7 zöld. A lista a `DataTable` + `Pagination` + URL search params mintát követi, `EmptyState`-tel; a query a `listQuerySchema`-t használja.” |
+| **AIS-20** (cég detail)             | „Előfeltétel: S1. A megjelenítés `DescriptionList` primitívvel, loading `Skeleton`, hiba `PageErrorState`, 404 külön ág.”                                                                             |
+| **AIS-21** (cég módosítás)          | „Előfeltétel: S1. A mentés `PATCH` + `updatedAt` (stale write → 409), a mezőhibák a `details[].path`-ból, siker/hiba toast.”                                                                          |
+| **AIS-22** (email feldolgozás gomb) | „Előfeltétel: S1. Megerősítő `ConfirmDialog` + mutation + toast.”                                                                                                                                     |
+| **AIS-16**                          | „A cég mezőkészlet és formátumok a `packages/shared/contract/company` sémában rögzítendők (S1-1 mintájára), a UI terv ezt használja.”                                                                 |
+| **AIS-18**                          | „A DB táblák a shared `company` contractból vezetendők le; a séma a migráció előtt készüljön el.”                                                                                                     |
+| **AIS-99**                          | Prioritás `Highest`, ütemezés S1-2/S1-5 elé — a típusgenerálás alapja.                                                                                                                                |
+| **AIS-100**                         | Összevonható S1-15-tel (ugyanaz a doksi-kör), vagy S1-15 után zárandó.                                                                                                                                |
+| **AIS-79…AIS-85**                   | Megjegyzés: az `F3` fázis része; a `NotificationHost` az S1-7 layoutjában mountolható. AIS-85 (ApiKeyForm notify) egybeolvad S1-16-tal.                                                               |
+| **AIS-71…AIS-74**                   | Megjegyzés: párhuzamos sáv; az AIS-74 a S1-7 session store-jára épül.                                                                                                                                 |
+| **AIS-101**                         | Változatlan, bármikor felvehető.                                                                                                                                                                      |
 
 ---
 
 ## 5. Duplikáció-ellenőrzés (amit NEM hozok létre)
 
-| Felmerült | Miért nem új ticket |
-|---|---|
-| Külön „api-client” story | már van: AIS-57 (Done) + AIS-94 (Done); a hiány az S1-5/S1-6 |
-| Külön „hibakezelés frontend” story | AIS-95 + AIS-96 már leszállította a szinteket; a hiány a *generikus* mezőhiba (S1-8) |
-| Külön „toast rendszer” | AIS-79…AIS-85 már felvéve (To Do) |
-| Külön „UI kit bővítés” | AIS-61 (Done) az alap; a hiányzó primitívek S1-10…S1-12 |
-| Külön „company CRUD backend” | AIS-18 (táblák) + AIS-15 alatti impl subtaskok; az S1-3/S1-4 csak a *konvenciót* adja |
+| Felmerült                          | Miért nem új ticket                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------- |
+| Külön „api-client” story           | már van: AIS-57 (Done) + AIS-94 (Done); a hiány az S1-5/S1-6                          |
+| Külön „hibakezelés frontend” story | AIS-95 + AIS-96 már leszállította a szinteket; a hiány a _generikus_ mezőhiba (S1-8)  |
+| Külön „toast rendszer”             | AIS-79…AIS-85 már felvéve (To Do)                                                     |
+| Külön „UI kit bővítés”             | AIS-61 (Done) az alap; a hiányzó primitívek S1-10…S1-12                               |
+| Külön „company CRUD backend”       | AIS-18 (táblák) + AIS-15 alatti impl subtaskok; az S1-3/S1-4 csak a _konvenciót_ adja |
 
 ---
 

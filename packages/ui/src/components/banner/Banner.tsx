@@ -36,7 +36,11 @@ export function Banner({
       <div className="min-w-0">
         {title ? <p className="font-semibold">{title}</p> : null}
         {children ? (
-          <div className={cn('text-text-secondary', title ? 'mt-0.5' : undefined)}>{children}</div>
+          <div
+            className={cn('text-text-secondary', title ? 'mt-0.5' : undefined)}
+          >
+            {children}
+          </div>
         ) : null}
       </div>
 

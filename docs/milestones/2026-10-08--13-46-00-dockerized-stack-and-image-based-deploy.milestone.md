@@ -19,13 +19,13 @@ delivery mechanism did not:
 
 ## 2. Measured data / evidence
 
-| Observation | Source |
-|---|---|
-| `web`/`admin` built outside Docker, `dist/` copied to the host | [`build_spas()`](../../deploy/deploy.sh:541), [`upload_dists()`](../../deploy/deploy.sh:562) |
-| Caddy serves SPAs from host bind mounts `../apps/{web,admin}/dist` | [`infra/docker-compose.yml`](../../infra/docker-compose.yml:139) |
-| Droplet build: `docker compose up -d --build` over SSH | [`infra/docker-compose.yml`](../../infra/docker-compose.yml:19), [`deploy/deploy.sh`](../../deploy/deploy.sh:1074), [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:247) |
-| Whole repo SCP'd to `/opt/aisztens` on every deploy | [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:138) |
-| pnpm-native OOM restart loops traced to running the build/runtime under a 400 MB cap | [`docs/milestones/2026-09-29--00-34-49-api-healthcheck-fail.milestone.md`](2026-09-29--00-34-49-api-healthcheck-fail.milestone.md) |
+| Observation                                                                          | Source                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `web`/`admin` built outside Docker, `dist/` copied to the host                       | [`build_spas()`](../../deploy/deploy.sh:541), [`upload_dists()`](../../deploy/deploy.sh:562)                                                                                                 |
+| Caddy serves SPAs from host bind mounts `../apps/{web,admin}/dist`                   | [`infra/docker-compose.yml`](../../infra/docker-compose.yml:139)                                                                                                                             |
+| Droplet build: `docker compose up -d --build` over SSH                               | [`infra/docker-compose.yml`](../../infra/docker-compose.yml:19), [`deploy/deploy.sh`](../../deploy/deploy.sh:1074), [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:247) |
+| Whole repo SCP'd to `/opt/aisztens` on every deploy                                  | [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:138)                                                                                                                     |
+| pnpm-native OOM restart loops traced to running the build/runtime under a 400 MB cap | [`docs/milestones/2026-09-29--00-34-49-api-healthcheck-fail.milestone.md`](2026-09-29--00-34-49-api-healthcheck-fail.milestone.md)                                                           |
 
 ## 3. Root cause / design rationale
 
@@ -43,21 +43,21 @@ Two options were considered:
 
 ## 4. Planned implementation (file inventory)
 
-| File | Change |
-|---|---|
-| `infra/web/Dockerfile` | New. Multi-stage Node/pnpm build → `nginx:1.27-alpine` runtime for the web SPA |
-| `infra/web/nginx.conf` | New. SPA fallback, gzip, immutable asset caching |
-| `infra/admin/Dockerfile` | New. Same shape for the admin SPA |
-| `infra/admin/nginx.conf` | New. Same as the web config |
-| `.github/workflows/images.yml` | New. Build + push the four images to GHCR (`sha-<sha>` + env tag) |
-| `infra/docker-compose.yml` | `api`/`monitor` become `image:`-only; add `web` and `admin`; drop SPA bind mounts |
-| `infra/docker-compose.local.yml` | Host the `build:` blocks so local dev still builds from source |
-| `infra/caddy/Caddyfile` | `web.<DOMAIN>` / `admin.<DOMAIN>` become `reverse_proxy` |
-| `infra/.env.example` | Add `IMAGE_TAG` + registry docs; remove `WEB_DIST_PATH` / `ADMIN_DIST_PATH` |
-| `.github/workflows/deploy.yml` | Ship 3 files, then `pull` + `up -d` without `--build` |
-| `deploy/deploy.sh` | Simplified to the same ship-3-files + pull + up flow |
-| `scripts/test/stack-smoke.sh` (+ prelude) | `--up` builds through the local override |
-| `deploy/README.md`, `scripts/README.md`, `docs/Specs/*` | Reflect the new flow and the `web`/`admin` containers |
+| File                                                    | Change                                                                            |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `infra/web/Dockerfile`                                  | New. Multi-stage Node/pnpm build → `nginx:1.27-alpine` runtime for the web SPA    |
+| `infra/web/nginx.conf`                                  | New. SPA fallback, gzip, immutable asset caching                                  |
+| `infra/admin/Dockerfile`                                | New. Same shape for the admin SPA                                                 |
+| `infra/admin/nginx.conf`                                | New. Same as the web config                                                       |
+| `.github/workflows/images.yml`                          | New. Build + push the four images to GHCR (`sha-<sha>` + env tag)                 |
+| `infra/docker-compose.yml`                              | `api`/`monitor` become `image:`-only; add `web` and `admin`; drop SPA bind mounts |
+| `infra/docker-compose.local.yml`                        | Host the `build:` blocks so local dev still builds from source                    |
+| `infra/caddy/Caddyfile`                                 | `web.<DOMAIN>` / `admin.<DOMAIN>` become `reverse_proxy`                          |
+| `infra/.env.example`                                    | Add `IMAGE_TAG` + registry docs; remove `WEB_DIST_PATH` / `ADMIN_DIST_PATH`       |
+| `.github/workflows/deploy.yml`                          | Ship 3 files, then `pull` + `up -d` without `--build`                             |
+| `deploy/deploy.sh`                                      | Simplified to the same ship-3-files + pull + up flow                              |
+| `scripts/test/stack-smoke.sh` (+ prelude)               | `--up` builds through the local override                                          |
+| `deploy/README.md`, `scripts/README.md`, `docs/Specs/*` | Reflect the new flow and the `web`/`admin` containers                             |
 
 ## 5. Outcome and how to verify
 

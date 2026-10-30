@@ -24,8 +24,8 @@ Line 76 of the file at the time:
 
 ```yaml
 75 concurrency:
- 76   group: deploy-${{ matrix.app_env }}
- 77   cancel-in-progress: false
+  76   group: deploy-${{ matrix.app_env }}
+  77   cancel-in-progress: false
 ```
 
 GitHub Actions docs ([expressions → contexts allowed for expressions](https://docs.github.com/en/actions/learn-github-actions/expressions#contexts-allowed-for-expressions)) are explicit: the allowed contexts for `concurrency.group` are `github | inputs | vars | needs`. `matrix` is **not** in that list at the workflow level (it **is** allowed at `jobs.<id>.concurrency.group` because that key is evaluated inside the job body). The previous fix had treated the two as identical.
@@ -41,13 +41,13 @@ Two safe fixes were considered:
 
 ## 4. Solution / implementation
 
-| File | Change |
-|---|---|
-| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:1) | Deleted the 6-line workflow-level `concurrency:` block; replaced with a 5-line `# NOTE:` comment; extended the file-header rationale block with a new "Why no workflow-level `concurrency:` block" section that cites the GitHub Actions expression-context restriction and the two replacement mechanisms. No other code change. |
-| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:1) | `Utolsó frissítés` bullet for the workflow-level concurrency removal; §9.1 prose now states the deletion and the replacement mechanisms. |
-| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md:1) | Same header bullet; §7.1 prose updated. |
-| [`scripts/test/_deploy-yml-concurrency-audit.py`](../../scripts/test/_deploy-yml-concurrency-audit.py:1) | New offline test. Six invariants (YAML parses; no workflow-level `concurrency:`; every remaining `matrix.*` lives inside `jobs.deploy.*`; the Three-Env §5.2 INFRA_ENV grep still ≥ 3; `jobs.deploy.environment` still uses `matrix.app_env`; `jobs.deploy.strategy.matrix.app_env` still `[dev, prod]`). |
-| [`docs/history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md`](../history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md:1) | Day-to-day narrative. |
+| File                                                                                                                                                                 | Change                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml:1)                                                                                               | Deleted the 6-line workflow-level `concurrency:` block; replaced with a 5-line `# NOTE:` comment; extended the file-header rationale block with a new "Why no workflow-level `concurrency:` block" section that cites the GitHub Actions expression-context restriction and the two replacement mechanisms. No other code change. |
+| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:1)                                                                                       | `Utolsó frissítés` bullet for the workflow-level concurrency removal; §9.1 prose now states the deletion and the replacement mechanisms.                                                                                                                                                                                          |
+| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md:1)                                                                                     | Same header bullet; §7.1 prose updated.                                                                                                                                                                                                                                                                                           |
+| [`scripts/test/_deploy-yml-concurrency-audit.py`](../../scripts/test/_deploy-yml-concurrency-audit.py:1)                                                             | New offline test. Six invariants (YAML parses; no workflow-level `concurrency:`; every remaining `matrix.*` lives inside `jobs.deploy.*`; the Three-Env §5.2 INFRA_ENV grep still ≥ 3; `jobs.deploy.environment` still uses `matrix.app_env`; `jobs.deploy.strategy.matrix.app_env` still `[dev, prod]`).                         |
+| [`docs/history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md`](../history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md:1) | Day-to-day narrative.                                                                                                                                                                                                                                                                                                             |
 
 ## 5. Outcome and how to verify
 

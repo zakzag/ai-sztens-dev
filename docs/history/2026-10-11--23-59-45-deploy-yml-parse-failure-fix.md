@@ -40,7 +40,7 @@ SHA produced by the parent commit `3a8f5b6 "deply.yml change"`.
 Three surgical edits in `.github/workflows/deploy.yml`:
 
 1. **GHCR login step (lines 219-240)** — removed `if: ${{ secrets.GHCR_PAT
-   != '' }}`; merged the two `env:` blocks into a single one containing
+!= '' }}`; merged the two `env:` blocks into a single one containing
    `REMOTE_DIR`, `GHCR_PAT`, and `GITHUB_ACTOR`; added an internal shell
    guard `if [ -z "${GHCR_PAT:-}" ]` that exits 0 when the secret is empty
    (public-repo case where anonymous `docker pull` is sufficient).

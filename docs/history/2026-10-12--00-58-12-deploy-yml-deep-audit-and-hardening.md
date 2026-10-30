@@ -62,6 +62,7 @@ or a periodic bump PR is responsible for upgrades, and the version
 comment (`# v1.0.3`) preserves the human-readable hint.
 
 SHAs used:
+
 - `appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634` (v0.1.7)
 - `appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262` (v1.0.3)
 

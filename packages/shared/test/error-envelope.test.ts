@@ -46,7 +46,9 @@ describe('API_ERROR_CODE catalogue', () => {
   });
 
   it('has no catalogue entry for a code that is not declared', () => {
-    expect(Object.keys(API_ERROR_CODE_STATUS).sort()).toEqual([...codes].sort());
+    expect(Object.keys(API_ERROR_CODE_STATUS).sort()).toEqual(
+      [...codes].sort(),
+    );
   });
 });
 

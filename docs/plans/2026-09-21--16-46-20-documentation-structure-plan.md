@@ -13,13 +13,13 @@ fill in next and which artifact is the single source of truth for each concern.
 
 ## 2. Decisions
 
-| Decision | Choice                                                                                                                      |
-|---|-----------------------------------------------------------------------------------------------------------------------------|
-| Spelling fixes | Fixed typos and garbled words in [`docs/Specs/01-Brainstorming.md`](../Specs/01-Kickoff-meeting.md)                         |
-| Functional documentation | A dedicated **functional specification** replaces a standalone `02-MVP.md`                                                  |
-| MVP marking | Each function gets a **`MVP?`** column + priority (`P0/P1/P2`); the MVP scope is derived from it, not maintained separately |
-| Documentation order | Business → Functional (WHAT) → Technical (HOW) → Implementation plan                                                        |
-| Plan storage | All plans go to `docs/plans/<YYYY-MM-DD--HH-ii-ss>-<short-description>-plan.md` (moved out of `docs/history/` on 2026-10-19) |
+| Decision                 | Choice                                                                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Spelling fixes           | Fixed typos and garbled words in [`docs/Specs/01-Brainstorming.md`](../Specs/01-Kickoff-meeting.md)                          |
+| Functional documentation | A dedicated **functional specification** replaces a standalone `02-MVP.md`                                                   |
+| MVP marking              | Each function gets a **`MVP?`** column + priority (`P0/P1/P2`); the MVP scope is derived from it, not maintained separately  |
+| Documentation order      | Business → Functional (WHAT) → Technical (HOW) → Implementation plan                                                         |
+| Plan storage             | All plans go to `docs/plans/<YYYY-MM-DD--HH-ii-ss>-<short-description>-plan.md` (moved out of `docs/history/` on 2026-10-19) |
 
 ## 3. Documentation Flow
 

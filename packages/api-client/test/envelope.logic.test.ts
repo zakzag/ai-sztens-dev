@@ -32,7 +32,9 @@ describe('toPayloadRelativePath', () => {
   });
 
   it('joins nested segments with dots', () => {
-    expect(toPayloadRelativePath(['data', 'items', 0, 'id'])).toBe('items.0.id');
+    expect(toPayloadRelativePath(['data', 'items', 0, 'id'])).toBe(
+      'items.0.id',
+    );
   });
 
   it('maps the payload itself to the empty path', () => {
@@ -56,13 +58,16 @@ describe('toIssueDetails', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]?.path).toBe('id');
-    expect((issues[0]?.message.length ?? 0)).toBeGreaterThan(0);
+    expect(issues[0]?.message.length ?? 0).toBeGreaterThan(0);
   });
 });
 
 describe('unwrapEnvelope — success', () => {
   it('returns the payload of a valid envelope', () => {
-    const result = unwrapEnvelope(itemSchema, envelope({ id: '1', name: 'first' }));
+    const result = unwrapEnvelope(
+      itemSchema,
+      envelope({ id: '1', name: 'first' }),
+    );
 
     expect(result).toEqual({ ok: true, data: { id: '1', name: 'first' } });
   });
@@ -152,13 +157,20 @@ describe('unwrapEnvelope — payload drift', () => {
 
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.issues[0]?.path).toBe('name');
-    expect(result.ok === false && result.issues[0]?.message).toContain('string');
+    expect(result.ok === false && result.issues[0]?.message).toContain(
+      'string',
+    );
   });
 
   it('reports the index of a mismatching array element', () => {
     const result = unwrapEnvelope(
       z.object({ items: z.array(itemSchema) }),
-      envelope({ items: [{ id: '1', name: 'ok' }, { id: '2', name: 42 }] }),
+      envelope({
+        items: [
+          { id: '1', name: 'ok' },
+          { id: '2', name: 42 },
+        ],
+      }),
     );
 
     expect(result.ok).toBe(false);

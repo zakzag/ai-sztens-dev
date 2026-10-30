@@ -8,7 +8,13 @@ import { cn } from '../../lib/cn.js';
  *
  * @param props - see {@link AlertProps}.
  */
-export function Alert({ variant, title, className, children, ...rest }: AlertProps) {
+export function Alert({
+  variant,
+  title,
+  className,
+  children,
+  ...rest
+}: AlertProps) {
   return (
     <div
       {...rest}
@@ -16,7 +22,9 @@ export function Alert({ variant, title, className, children, ...rest }: AlertPro
       className={cn(alertVariants({ variant }), className)}
     >
       {title ? <p className="font-semibold">{title}</p> : null}
-      {children ? <div className={title ? 'mt-1' : undefined}>{children}</div> : null}
+      {children ? (
+        <div className={title ? 'mt-1' : undefined}>{children}</div>
+      ) : null}
     </div>
   );
 }

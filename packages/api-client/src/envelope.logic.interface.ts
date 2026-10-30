@@ -28,5 +28,4 @@ export interface EnvelopeUnwrapFailure {
 
 /** Either the payload or the reasons it could not be produced. */
 export type EnvelopeUnwrapResult<T> =
-  | EnvelopeUnwrapSuccess<T>
-  | EnvelopeUnwrapFailure;
+  EnvelopeUnwrapSuccess<T> | EnvelopeUnwrapFailure;

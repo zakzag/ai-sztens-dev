@@ -38,28 +38,41 @@ describe('parseYamlSubset', () => {
 
     assert.equal(mode.slug, 'jira-ticket-writer');
     assert.equal(mode.description, 'Writes Jira tickets');
-    assert.equal(mode.roleDefinition, 'You are an expert task writer.\n\nSecond paragraph with trailing space ');
+    assert.equal(
+      mode.roleDefinition,
+      'You are an expert task writer.\n\nSecond paragraph with trailing space ',
+    );
     assert.deepEqual(mode.groups, ['read', 'edit', 'command', 'mcp']);
     assert.equal(mode.source, 'project');
   });
 
   it('supports flow sequences and quoted scalars', () => {
-    const document = parseYamlSubset("groups: ['read', \"edit\"]\nname: 'Roo''s mode'\n");
+    const document = parseYamlSubset(
+      "groups: ['read', \"edit\"]\nname: 'Roo''s mode'\n",
+    );
     assert.deepEqual(document.groups, ['read', 'edit']);
     assert.equal(document.name, "Roo's mode");
   });
 
   it('ignores comment lines and blank lines between keys', () => {
-    const document = parseYamlSubset('# top comment\nkey: value\n\n# inner\nother: 1\n');
+    const document = parseYamlSubset(
+      '# top comment\nkey: value\n\n# inner\nother: 1\n',
+    );
     assert.deepEqual(document, { key: 'value', other: '1' });
   });
 
   it('throws on unexpected indentation', () => {
-    assert.throws(() => parseYamlSubset('key: value\n   stray: x\n'), /Unexpected indentation/u);
+    assert.throws(
+      () => parseYamlSubset('key: value\n   stray: x\n'),
+      /Unexpected indentation/u,
+    );
   });
 
   it('throws when a line is not a key/value pair', () => {
-    assert.throws(() => parseYamlSubset('just text\n'), /Expected "key: value"/u);
+    assert.throws(
+      () => parseYamlSubset('just text\n'),
+      /Expected "key: value"/u,
+    );
   });
 });
 
@@ -102,12 +115,18 @@ describe('loadRoomodes', () => {
   });
 
   it('rejects a missing required field', async () => {
-    const file = await writeRoomodes('customModes:\n  - slug: a\n    name: A\n');
-    await assert.rejects(() => loadRoomodes(file), /missing required field "description"/u);
+    const file = await writeRoomodes(
+      'customModes:\n  - slug: a\n    name: A\n',
+    );
+    await assert.rejects(
+      () => loadRoomodes(file),
+      /missing required field "description"/u,
+    );
   });
 
   it('rejects a duplicate slug', async () => {
-    const entry = '  - slug: a\n    name: A\n    description: d\n    roleDefinition: r\n    whenToUse: w\n';
+    const entry =
+      '  - slug: a\n    name: A\n    description: d\n    roleDefinition: r\n    whenToUse: w\n';
     const file = await writeRoomodes(`customModes:\n${entry}${entry}`);
     await assert.rejects(() => loadRoomodes(file), /duplicate mode slug "a"/u);
   });
@@ -116,15 +135,24 @@ describe('loadRoomodes', () => {
     const file = await writeRoomodes(
       'customModes:\n  - slug: a\n    name: A\n    description: d\n    roleDefinition: r\n    whenToUse: w\n    groups:\n      - telepathy\n',
     );
-    await assert.rejects(() => loadRoomodes(file), /unknown group "telepathy"/u);
+    await assert.rejects(
+      () => loadRoomodes(file),
+      /unknown group "telepathy"/u,
+    );
   });
 
   it('rejects an empty customModes list', async () => {
     const file = await writeRoomodes('customModes: []\n');
-    await assert.rejects(() => loadRoomodes(file), /no customModes entries found/u);
+    await assert.rejects(
+      () => loadRoomodes(file),
+      /no customModes entries found/u,
+    );
   });
 
   it('reports a missing file', async () => {
-    await assert.rejects(() => loadRoomodes(join(directory, 'nope')), /Cannot read/u);
+    await assert.rejects(
+      () => loadRoomodes(join(directory, 'nope')),
+      /Cannot read/u,
+    );
   });
 });

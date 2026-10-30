@@ -39,7 +39,5 @@ export function TestQueryProvider({
   client,
   children,
 }: TestQueryProviderProps) {
-  return (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
-  );
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }

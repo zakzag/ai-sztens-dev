@@ -35,12 +35,16 @@ services:
       POSTGRES_EFFECTIVE_CACHE_SIZE: 512MB
       POSTGRES_WORK_MEM: 4MB
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - pgdata_local:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-aisztens_db}"]
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-aisztens_db}',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

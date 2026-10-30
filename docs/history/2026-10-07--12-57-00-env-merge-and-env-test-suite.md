@@ -21,11 +21,11 @@ decided individually before implementation.
 
 ### Env files merged
 
-| File | Change |
-|---|---|
-| [`deploy/.env.dev`](../../deploy/.env.dev:1) | `SUDO_USERS` restored to `tkovari,krak,deployer`; the stale "ACTION REQUIRED: set HOST" seed banner replaced with a dev-target header. `SSH_KEY` kept as the repo-local `./deploy/ssh-keys/root.private.key`. |
-| [`infra/.env.dev`](../../infra/.env.dev:1) | Data already correct (including the new 2-origin `CORS_ORIGINS` = web + admin); only the stale "Copy to `infra/.env`" header was rewritten for the per-env layout. |
-| [`apps/*`](../../apps/) | No old-repo data existed (the old admin app was Angular). Left as-is; the placeholder `VAPI_WEBHOOK_SECRET` in `apps/api/.env.dev` stays because the real secret is injected by compose from `infra/.env.dev`. |
+| File                                         | Change                                                                                                                                                                                                         |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`deploy/.env.dev`](../../deploy/.env.dev:1) | `SUDO_USERS` restored to `tkovari,krak,deployer`; the stale "ACTION REQUIRED: set HOST" seed banner replaced with a dev-target header. `SSH_KEY` kept as the repo-local `./deploy/ssh-keys/root.private.key`.  |
+| [`infra/.env.dev`](../../infra/.env.dev:1)   | Data already correct (including the new 2-origin `CORS_ORIGINS` = web + admin); only the stale "Copy to `infra/.env`" header was rewritten for the per-env layout.                                             |
+| [`apps/*`](../../apps/)                      | No old-repo data existed (the old admin app was Angular). Left as-is; the placeholder `VAPI_WEBHOOK_SECRET` in `apps/api/.env.dev` stays because the real secret is injected by compose from `infra/.env.dev`. |
 
 ### Decisions on the discrepancies
 

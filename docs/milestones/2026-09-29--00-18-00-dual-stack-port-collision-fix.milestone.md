@@ -15,16 +15,16 @@ A droplet egyre belassult, friss újraindítás után is 90%-os CPU-terhelést m
 
 A dropleten SSH-n mérve (`top`, `ps`, `docker ps`, `docker stats`, `docker inspect`, `ss -tlnp`, `docker logs`):
 
-| Mutató | Érték |
-|---|---|
-| `top` load average | 3.38 / 2.36 / 1.23 (1 vCPU, magas) |
-| `aisztens-api-1` CPU | 87.69%, státusz: `Restarting (1)` (újraindulási ciklus) |
-| `aisztens-caddy-1` | `Bind for 0.0.0.0:80 failed: port is already allocated`, exit 128 |
-| `callback-assistant-caddy-1` | `Restarting`, exit 1 (régi compose projekt) |
-| `docker network ls` | `aisztens_internal` AND `callback-assistant_internal` párhuzamosan |
-| `pnpm-native` process | **Nem létezik** a hoston – a konténer PID-je a `pnpm` binárissal |
-| `ss -tlnp` 80/443 | Senki nem figyelt (a Cloud Firewall-ig bezárólag) |
-| `docker stats` Caddy ACME log | `lookup ... 127.0.0.53:53: read: connection refused` → a bridge hálóról a systemd-resolved nem elérhető |
+| Mutató                          | Érték                                                                                                     |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `top` load average              | 3.38 / 2.36 / 1.23 (1 vCPU, magas)                                                                        |
+| `aisztens-api-1` CPU            | 87.69%, státusz: `Restarting (1)` (újraindulási ciklus)                                                   |
+| `aisztens-caddy-1`              | `Bind for 0.0.0.0:80 failed: port is already allocated`, exit 128                                         |
+| `callback-assistant-caddy-1`    | `Restarting`, exit 1 (régi compose projekt)                                                               |
+| `docker network ls`             | `aisztens_internal` AND `callback-assistant_internal` párhuzamosan                                        |
+| `pnpm-native` process           | **Nem létezik** a hoston – a konténer PID-je a `pnpm` binárissal                                          |
+| `ss -tlnp` 80/443               | Senki nem figyelt (a Cloud Firewall-ig bezárólag)                                                         |
+| `docker stats` Caddy ACME log   | `lookup ... 127.0.0.53:53: read: connection refused` → a bridge hálóról a systemd-resolved nem elérhető   |
 | Let's Encrypt HTTP-01 challenge | `Timeout during connect (likely firewall problem)` – a Cloud Firewall blokkolja a bejövő 80/443 forgalmat |
 
 ## 3. Root cause / design rationale
@@ -33,10 +33,10 @@ A dropleten SSH-n mérve (`top`, `ps`, `docker ps`, `docker stats`, `docker insp
 
 Két docker-compose projekt élt párhuzamosan ugyanazon a dropleten:
 
-| Régi stack (`callback-assistant-*`) | Új stack (`aisztens-*`) |
-|---|---|
-| Régi Caddy 3 napos | Új Caddy 5 órás, `aisztens-caddy-1` |
-| Saját `callback-assistant_internal` bridge | Saját `aisztens_internal` bridge |
+| Régi stack (`callback-assistant-*`)        | Új stack (`aisztens-*`)             |
+| ------------------------------------------ | ----------------------------------- |
+| Régi Caddy 3 napos                         | Új Caddy 5 órás, `aisztens-caddy-1` |
+| Saját `callback-assistant_internal` bridge | Saját `aisztens_internal` bridge    |
 
 Mindkettő definiálta a `caddy` service-t, mindkettő a host 80/443-as portját kérte → a Docker bind fatal errort ad (`port is already allocated`). Az új `aisztens-caddy-1` **exit 128-cal** meghalt, a régi `callback-assistant-caddy-1` is `restarting` státuszba került.
 
@@ -61,12 +61,12 @@ A Caddy a systemd-resolved `127.0.0.53:53`-as stub-resolverét másolta a konté
 
 ### 4.2 Config módosítások
 
-| Fájl | Módosítás |
-|---|---|
-| [`infra/docker-compose.yml`](../../infra/docker-compose.yml) (caddy service) | Explicit `dns: [1.1.1.1, 8.8.8.8]` direktíva, hogy a konténer a bridge hálóról is elérje a DNS-t (a systemd-resolved 127.0.0.53-as stub-resolvere a bridge hálóról nem route-olható). Részletes komment a "single-Caddy" invariánsról és a DigitalOcean Cloud Firewall kérdésről. |
-| [`deploy/deploy.sh`](../../deploy/deploy.sh) | Új `prune_legacy_stack()` függvény, ami az `up` parancs előtt fut, és `xargs` + `docker rm -f / network rm / volume rm` segítségével eltávolítja a `callback-assistant-*`, `aisztens-legacy-*`, `old-stack-*` névképletű konténereket, hálózatokat és volume-okat. Új `down-all` vészhelyzeti parancs, ami az összes Docker objektumot törli a dropletről. A `case` ág kiegészítve a `Usage:` sorral együtt. |
-| [`infra/caddy/Caddyfile.rendered`](../../infra/caddy/Caddyfile.rendered) (dropleten) | Visszaállítva az eredeti HTTPS konfigra a Cloud Firewall nyitásáig. Korábban kísérleti `auto_https off` módban futott, de a HTTP listener a konténeren belül nem bindelődött, így a routing nem volt tesztelhető. |
-| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md) | Új §8 szekció: "Single-Caddy invariáns és a Cloud Firewall / ACME DNS kérdés". Rögzíti a regression-garanciát, a `down-all` vészhelyzeti parancsot, és a Cloud Firewall / DNS-01 / HTTP-only fallback megoldási lehetőségeket. |
+| Fájl                                                                                 | Módosítás                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`infra/docker-compose.yml`](../../infra/docker-compose.yml) (caddy service)         | Explicit `dns: [1.1.1.1, 8.8.8.8]` direktíva, hogy a konténer a bridge hálóról is elérje a DNS-t (a systemd-resolved 127.0.0.53-as stub-resolvere a bridge hálóról nem route-olható). Részletes komment a "single-Caddy" invariánsról és a DigitalOcean Cloud Firewall kérdésről.                                                                                                                            |
+| [`deploy/deploy.sh`](../../deploy/deploy.sh)                                         | Új `prune_legacy_stack()` függvény, ami az `up` parancs előtt fut, és `xargs` + `docker rm -f / network rm / volume rm` segítségével eltávolítja a `callback-assistant-*`, `aisztens-legacy-*`, `old-stack-*` névképletű konténereket, hálózatokat és volume-okat. Új `down-all` vészhelyzeti parancs, ami az összes Docker objektumot törli a dropletről. A `case` ág kiegészítve a `Usage:` sorral együtt. |
+| [`infra/caddy/Caddyfile.rendered`](../../infra/caddy/Caddyfile.rendered) (dropleten) | Visszaállítva az eredeti HTTPS konfigra a Cloud Firewall nyitásáig. Korábban kísérleti `auto_https off` módban futott, de a HTTP listener a konténeren belül nem bindelődött, így a routing nem volt tesztelhető.                                                                                                                                                                                            |
+| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md)       | Új §8 szekció: "Single-Caddy invariáns és a Cloud Firewall / ACME DNS kérdés". Rögzíti a regression-garanciát, a `down-all` vészhelyzeti parancsot, és a Cloud Firewall / DNS-01 / HTTP-only fallback megoldási lehetőségeket.                                                                                                                                                                               |
 
 ### 4.3 Végrehajtott SSH-n ellenőrzések
 
@@ -86,14 +86,14 @@ A Caddy `0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp` portokon figyel (a docker-pro
 
 ### 5.1 Azonnali eredmények
 
-| Eredmény | Státusz |
-|---|---|
-| CPU-terhelés a dropleten | 0% (minden konténernél) |
-| `aisztens-api-1` restart loop | Megszűnt, `Up` |
-| `aisztens-caddy-1` port bind | Sikeres, 80/443 figyel |
-| `callback-assistant-*` konténerek | Törölve |
-| `callback-assistant_internal` hálózat | Törölve |
-| `docker network ls` | Csak `aisztens_internal` (és a Docker default-ok) |
+| Eredmény                              | Státusz                                           |
+| ------------------------------------- | ------------------------------------------------- |
+| CPU-terhelés a dropleten              | 0% (minden konténernél)                           |
+| `aisztens-api-1` restart loop         | Megszűnt, `Up`                                    |
+| `aisztens-caddy-1` port bind          | Sikeres, 80/443 figyel                            |
+| `callback-assistant-*` konténerek     | Törölve                                           |
+| `callback-assistant_internal` hálózat | Törölve                                           |
+| `docker network ls`                   | Csak `aisztens_internal` (és a Docker default-ok) |
 
 ### 5.2 Verifikációs lépések (jövőbeli operátor számára)
 

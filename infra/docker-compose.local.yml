@@ -32,7 +32,7 @@ services:
     image: aisztens-local/api:latest
     # Expose the API on the host (WSL2 localhost is forwarded to Windows).
     ports:
-      - "3000:3000"
+      - '3000:3000'
 
   web:
     # Build the web SPA image from infra/web/Dockerfile at the repo root.
@@ -62,7 +62,7 @@ services:
   postgres:
     # Optional: allow local psql clients (Windows / WSL) to reach Postgres.
     ports:
-      - "5432:5432"
+      - '5432:5432'
 
   caddy:
     # No public DNS or Let's Encrypt on a local machine — keep Caddy off.

@@ -39,13 +39,8 @@ export { API_KEY_IDENTIFIER_FIELD_MESSAGE as API_KEY_IDENTIFIER_CONFLICT_MESSAGE
  * The order is the visual order of the fields, so a form-level focus can rely
  * on it.
  */
-export const API_KEY_FIELD_PATHS: readonly ApiKeyFormFieldName[] = Object.freeze([
-  'name',
-  'identifier',
-  'description',
-  'apiKey',
-  'expiresAt',
-]);
+export const API_KEY_FIELD_PATHS: readonly ApiKeyFormFieldName[] =
+  Object.freeze(['name', 'identifier', 'description', 'apiKey', 'expiresAt']);
 
 /**
  * The only error codes allowed to produce field errors (plan `D1`).
@@ -67,10 +62,11 @@ export const FIELD_ERROR_CODES: readonly string[] = FIELD_SURFACE_CODES;
  * on that input even against an older server. `VALIDATION_FAILED` has no default:
  * without a path there is nothing to highlight.
  */
-export const DEFAULT_FIELD_PATH_BY_CODE: Readonly<Record<string, ApiKeyFormFieldName>> =
-  Object.freeze({
-    [API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT]: 'identifier',
-  });
+export const DEFAULT_FIELD_PATH_BY_CODE: Readonly<
+  Record<string, ApiKeyFormFieldName>
+> = Object.freeze({
+  [API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT]: 'identifier',
+});
 
 /**
  * Stable “no data” list.

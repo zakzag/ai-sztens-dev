@@ -6,14 +6,14 @@
 
 ## Döntések
 
-| # | Döntés | Miért |
-|---|---|---|
-| D1 | Scanner: `@sonar/scan` (a `sonarqube-scanner` v5 néven futó csomagja), root devDependency | Nincs külön CLI / Java telepítés; Node ESM API, pnpm scriptből hívható |
-| D2 | Egy Sonar projekt (`sonar.projectKey=aisztens`) az egész monorepóra | Egy dashboard, cross-package duplikáció- és függőség-elemzés |
-| D3 | Coverage: minden tesztet futtató package LCOV-ot ad, egy merge script fűzi össze `coverage/lcov.info`-ba, repo-root relatív `SF:` útvonalakkal | A Sonar JS/TS plugin az `SF:` utakat a projekt gyökeréhez képest oldja fel, a per-package LCOV (`SF:src/...`) enélkül nem találna fájlt |
-| D4 | `SONAR_TOKEN` / `SONAR_HOST_URL` env-ből, opcionálisan `sonar.env` fájlból (gitignore-olt) | Token soha nem kerül a repóba, a script viszont kényelmesen futtatható |
-| D5 | Preflight ellenőrzés: `/api/system/status` hívás + token megléte, értelmes hibaüzenettel | Ne a scanner 30 másodperces logjából kelljen kitalálni, hogy nem fut a szerver |
-| D6 | Quality gate wait opcionális (`SONAR_QUALITYGATE_WAIT=true`), alapból kikapcsolva | Lokális futásnál ne álljon le a script a gate miatt |
+| #   | Döntés                                                                                                                                         | Miért                                                                                                                                   |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Scanner: `@sonar/scan` (a `sonarqube-scanner` v5 néven futó csomagja), root devDependency                                                      | Nincs külön CLI / Java telepítés; Node ESM API, pnpm scriptből hívható                                                                  |
+| D2  | Egy Sonar projekt (`sonar.projectKey=aisztens`) az egész monorepóra                                                                            | Egy dashboard, cross-package duplikáció- és függőség-elemzés                                                                            |
+| D3  | Coverage: minden tesztet futtató package LCOV-ot ad, egy merge script fűzi össze `coverage/lcov.info`-ba, repo-root relatív `SF:` útvonalakkal | A Sonar JS/TS plugin az `SF:` utakat a projekt gyökeréhez képest oldja fel, a per-package LCOV (`SF:src/...`) enélkül nem találna fájlt |
+| D4  | `SONAR_TOKEN` / `SONAR_HOST_URL` env-ből, opcionálisan `sonar.env` fájlból (gitignore-olt)                                                     | Token soha nem kerül a repóba, a script viszont kényelmesen futtatható                                                                  |
+| D5  | Preflight ellenőrzés: `/api/system/status` hívás + token megléte, értelmes hibaüzenettel                                                       | Ne a scanner 30 másodperces logjából kelljen kitalálni, hogy nem fut a szerver                                                          |
+| D6  | Quality gate wait opcionális (`SONAR_QUALITYGATE_WAIT=true`), alapból kikapcsolva                                                              | Lokális futásnál ne álljon le a script a gate miatt                                                                                     |
 
 Előfeltétel, amit az implementáló ellenőriz: `node -v` ≥ 22.12 (a `@sonar/scan` v5 igénye). Ha a lokális Node régebbi, akkor `@sonar/scan@^4` + JRE szükséges — ezt a `docs/Specs/SonarQube.md`-ben dokumentálni kell.
 
@@ -39,6 +39,7 @@ sonar.qualitygate.wait=false
 ### 2. `scripts/sonar/scan.mjs`
 
 Felelősségek (külön függvényekben, hogy tesztelhető legyen):
+
 1. `loadEnvFile(repoRoot)` — `sonar.env` beolvasása `KEY=VALUE` sorokból, ne írja felül a valós `process.env`-et.
 2. `resolveConfig(env)` — `{ serverUrl (default http://localhost:9000), token, waitForQualityGate }`; token hiányában magyar nyelvű, cselekvésre mutató hiba.
 3. `checkServerReachable(serverUrl)` — `GET /api/system/status`, nem `UP` → hiba.
@@ -82,13 +83,13 @@ SONAR_QUALITYGATE_WAIT=false
 
 ### 7. Coverage scriptek package-enként
 
-| Package | Változás |
-|---|---|
-| [`packages/shared/package.json`](../packages/shared/package.json:14) | `"test:cov"` hozzáadása: jest `--coverage --coverageReporters=lcov --coverageDirectory=../../coverage/shared` |
-| [`packages/api-client/package.json`](../packages/api-client/package.json:14) | ugyanaz `../../coverage/api-client`-re |
-| [`apps/api/package.json`](../apps/api/package.json:22) | a meglévő `test:cov` átírása: `--coverageReporters=lcov --coverageDirectory=../../coverage/api`; a `jest.coverageDirectory` bejegyzés törlése/felülírása, hogy ne legyen két igazság |
-| [`packages/ui/package.json`](../packages/ui/package.json:10) | `@vitest/coverage-v8@^3.2.4` devDep + `"test:cov": "vitest run --coverage"` |
-| [`apps/admin/package.json`](../apps/admin/package.json:6) | ugyanaz |
+| Package                                                                      | Változás                                                                                                                                                                             |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`packages/shared/package.json`](../packages/shared/package.json:14)         | `"test:cov"` hozzáadása: jest `--coverage --coverageReporters=lcov --coverageDirectory=../../coverage/shared`                                                                        |
+| [`packages/api-client/package.json`](../packages/api-client/package.json:14) | ugyanaz `../../coverage/api-client`-re                                                                                                                                               |
+| [`apps/api/package.json`](../apps/api/package.json:22)                       | a meglévő `test:cov` átírása: `--coverageReporters=lcov --coverageDirectory=../../coverage/api`; a `jest.coverageDirectory` bejegyzés törlése/felülírása, hogy ne legyen két igazság |
+| [`packages/ui/package.json`](../packages/ui/package.json:10)                 | `@vitest/coverage-v8@^3.2.4` devDep + `"test:cov": "vitest run --coverage"`                                                                                                          |
+| [`apps/admin/package.json`](../apps/admin/package.json:6)                    | ugyanaz                                                                                                                                                                              |
 
 ### 8. Vitest configok
 

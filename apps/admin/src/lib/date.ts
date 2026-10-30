@@ -23,7 +23,10 @@ import {
 } from './date.const.js';
 
 /** Stateless formatter, created once instead of per render. */
-const expiryFormatter = new Intl.DateTimeFormat(EXPIRY_LOCALE, EXPIRY_FORMAT_OPTIONS);
+const expiryFormatter = new Intl.DateTimeFormat(
+  EXPIRY_LOCALE,
+  EXPIRY_FORMAT_OPTIONS,
+);
 
 /**
  * Converts a `<input type="date">` value into the ISO instant the API expects.

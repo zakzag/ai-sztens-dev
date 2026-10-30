@@ -31,14 +31,19 @@ describe('Table', () => {
     renderSampleTable();
 
     expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Név' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Név' }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole('row')).toHaveLength(2);
   });
 
   it('scopes header cells to their column by default', () => {
     renderSampleTable();
 
-    expect(screen.getByRole('columnheader', { name: 'Név' })).toHaveAttribute('scope', 'col');
+    expect(screen.getByRole('columnheader', { name: 'Név' })).toHaveAttribute(
+      'scope',
+      'col',
+    );
   });
 
   it('keeps an explicit scope instead of the default', () => {
@@ -52,7 +57,10 @@ describe('Table', () => {
       </Table>,
     );
 
-    expect(screen.getByRole('rowheader', { name: 'Fejléc' })).toHaveAttribute('scope', 'row');
+    expect(screen.getByRole('rowheader', { name: 'Fejléc' })).toHaveAttribute(
+      'scope',
+      'row',
+    );
   });
 
   it('renders the supplied data in the body cells', () => {
@@ -73,7 +81,9 @@ describe('Table', () => {
   it('paints the container outline with the dark hairline token', () => {
     const { container } = renderSampleTable();
 
-    expect(container.firstElementChild?.className).toContain('border-border-hairline');
+    expect(container.firstElementChild?.className).toContain(
+      'border-border-hairline',
+    );
   });
 
   it('merges caller class names on the table element', () => {

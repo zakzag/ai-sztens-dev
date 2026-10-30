@@ -75,13 +75,21 @@ export function unwrapEnvelope<T>(
   const envelope = successEnvelopeSchema(schema).safeParse(body);
 
   if (!envelope.success) {
-    return { ok: false, issues: toIssueDetails(envelope.error), cause: envelope.error };
+    return {
+      ok: false,
+      issues: toIssueDetails(envelope.error),
+      cause: envelope.error,
+    };
   }
 
   const payload = schema.safeParse(envelope.data.data);
 
   if (!payload.success) {
-    return { ok: false, issues: toIssueDetails(payload.error), cause: payload.error };
+    return {
+      ok: false,
+      issues: toIssueDetails(payload.error),
+      cause: payload.error,
+    };
   }
 
   return { ok: true, data: payload.data };

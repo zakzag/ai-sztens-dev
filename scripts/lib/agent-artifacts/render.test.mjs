@@ -34,11 +34,18 @@ describe('tool mapping', () => {
   });
 
   it('maps read+command groups to Claude tool ids', () => {
-    assert.deepEqual(toClaudeTools(['read', 'command']), ['Read', 'Grep', 'Glob', 'Bash']);
+    assert.deepEqual(toClaudeTools(['read', 'command']), [
+      'Read',
+      'Grep',
+      'Glob',
+      'Bash',
+    ]);
   });
 
   it('prefers the explicit override and de-duplicates it', () => {
-    assert.deepEqual(toCopilotTools(['read'], ['editFiles', 'editFiles']), ['editFiles']);
+    assert.deepEqual(toCopilotTools(['read'], ['editFiles', 'editFiles']), [
+      'editFiles',
+    ]);
     assert.deepEqual(toClaudeTools(['read'], ['Bash']), ['Bash']);
   });
 });
@@ -46,10 +53,22 @@ describe('tool mapping', () => {
 describe('renderCopilotChatMode', () => {
   it('renders the chatmode path and frontmatter', () => {
     const artifact = renderCopilotChatMode(MODE);
-    assert.equal(artifact.relativePath, '.github/chatmodes/jira-ticket-writer.chatmode.md');
-    assert.match(artifact.content, /^---\ndescription: Writes Jira tickets\ntools: \['codebase', /u);
-    assert.match(artifact.content, /## Role\n\nYou are an expert task writer\./u);
-    assert.match(artifact.content, /## When to use\n\nUse it when the user asks for a JIRA issue\./u);
+    assert.equal(
+      artifact.relativePath,
+      '.github/chatmodes/jira-ticket-writer.chatmode.md',
+    );
+    assert.match(
+      artifact.content,
+      /^---\ndescription: Writes Jira tickets\ntools: \['codebase', /u,
+    );
+    assert.match(
+      artifact.content,
+      /## Role\n\nYou are an expert task writer\./u,
+    );
+    assert.match(
+      artifact.content,
+      /## When to use\n\nUse it when the user asks for a JIRA issue\./u,
+    );
     assert.match(artifact.content, /## Workflow\n\nRead the docs first\./u);
     assert.ok(artifact.content.endsWith('\n'));
   });
@@ -65,7 +84,10 @@ describe('renderClaudeSubagent', () => {
     const artifact = renderClaudeSubagent(MODE);
     assert.equal(artifact.relativePath, '.claude/agents/jira-ticket-writer.md');
     assert.match(artifact.content, /^---\nname: jira-ticket-writer\n/u);
-    assert.match(artifact.content, /description: Writes Jira tickets\. Use when the user asks for a JIRA issue\./u);
+    assert.match(
+      artifact.content,
+      /description: Writes Jira tickets\. Use when the user asks for a JIRA issue\./u,
+    );
     assert.match(artifact.content, /tools: Read, Grep, Glob, Bash\n/u);
   });
 });
@@ -73,7 +95,10 @@ describe('renderClaudeSubagent', () => {
 describe('renderCursorCommand / renderCursorRule', () => {
   it('renders the command as an invocable prompt', () => {
     const artifact = renderCursorCommand(MODE);
-    assert.equal(artifact.relativePath, '.cursor/commands/jira-ticket-writer.md');
+    assert.equal(
+      artifact.relativePath,
+      '.cursor/commands/jira-ticket-writer.md',
+    );
     assert.match(artifact.content, /Act as the "Jira Ticket Writer" mode/u);
     assert.match(artifact.content, /## Role/u);
   });
@@ -81,6 +106,9 @@ describe('renderCursorCommand / renderCursorRule', () => {
   it('renders the rule as on-demand (alwaysApply false)', () => {
     const artifact = renderCursorRule(MODE);
     assert.equal(artifact.relativePath, '.cursor/rules/jira-ticket-writer.mdc');
-    assert.match(artifact.content, /^---\ndescription: Writes Jira tickets\nglobs:\nalwaysApply: false\n---\n/u);
+    assert.match(
+      artifact.content,
+      /^---\ndescription: Writes Jira tickets\nglobs:\nalwaysApply: false\n---\n/u,
+    );
   });
 });

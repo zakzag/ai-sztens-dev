@@ -1,6 +1,7 @@
 # Milestone: Silence spurious `ERROR [VapiSignatureGuard]` lines from unit and e2e tests
 
 ## 1. Problem
+
 `pnpm test` and `pnpm test:e2e` in `apps/api` both printed
 `[Nest] ERROR [VapiSignatureGuard] …` lines that looked like real
 production failures, even though every test passed:
@@ -27,12 +28,12 @@ cd apps/api && pnpm test:e2e 2>&1 | grep VapiSignatureGuard
 
 Tracing the lines back:
 
-| Log line | Source test |
-|---|---|
-| `rawBody missing` (unit, ×2 from two cases) | `apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts` — `'throws UnauthorizedException when the raw body is missing'` and `'throws UnauthorizedException when the raw body is neither string nor Buffer'` |
-| `VAPI_WEBHOOK_SECRET not configured` (unit, ×2) | same file — `'throws InternalServerErrorException when the secret is not configured (fail closed)'` (runs `makeGuard({})` and `makeGuard({ secret: '' })`) |
-| `rawBody missing` (e2e, ×1) | `apps/api/test/vapi-webhooks.e2e-spec.ts` — `'rejects the request when raw body capture is disabled (regression guard)'` |
-| `VAPI_WEBHOOK_SECRET not configured` (e2e, ×1) | same file — `'fails closed with 500 when no secret is configured'` |
+| Log line                                        | Source test                                                                                                                                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rawBody missing` (unit, ×2 from two cases)     | `apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts` — `'throws UnauthorizedException when the raw body is missing'` and `'throws UnauthorizedException when the raw body is neither string nor Buffer'` |
+| `VAPI_WEBHOOK_SECRET not configured` (unit, ×2) | same file — `'throws InternalServerErrorException when the secret is not configured (fail closed)'` (runs `makeGuard({})` and `makeGuard({ secret: '' })`)                                                    |
+| `rawBody missing` (e2e, ×1)                     | `apps/api/test/vapi-webhooks.e2e-spec.ts` — `'rejects the request when raw body capture is disabled (regression guard)'`                                                                                      |
+| `VAPI_WEBHOOK_SECRET not configured` (e2e, ×1)  | same file — `'fails closed with 500 when no secret is configured'`                                                                                                                                            |
 
 The guard ([`apps/api/src/vapi-webhooks/vapi-signature.guard.ts:88`](../../apps/api/src/vapi-webhooks/vapi-signature.guard.ts:88))
 intentionally calls `this.logger.error(...)` before throwing, which is
@@ -44,8 +45,9 @@ line only appears in the user's snippet because Jest runs specs in
 parallel workers and stderr is interleaved.
 
 ## 3. Root cause
+
 Negative-path tests invoke a guard branch whose log statement is the
-*only* way the production code communicates the rejection. In a test,
+_only_ way the production code communicates the rejection. In a test,
 the thrown exception is the assertion target — the log is pure noise
 that floods CI output and obscures real failures.
 
@@ -60,6 +62,7 @@ Alternatives considered:
    actually call is more precise and easier to reason about.
 
 ## 4. Solution
+
 Files touched:
 
 - [`apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts`](../../apps/api/src/vapi-webhooks/vapi-signature.guard.spec.ts:65)
@@ -96,6 +99,7 @@ more. The remaining `[Nest] LOG [VapiWebhooksService]` lines in the unit
 suite are the legitimate positive-path service info logs.
 
 ## 6. Follow-ups
+
 - If a new failure-path log level is added to the guard (e.g. `debug` or
   `log`), decide whether to add it to the suppression. Current scope is
   `error` and `warn`, matching today's failure-path logs.

@@ -21,7 +21,13 @@ export const REQUIRED_MODE_FIELDS = Object.freeze([
 ]);
 
 /** Tool groups understood by Zoo Code. */
-export const KNOWN_GROUPS = Object.freeze(['read', 'edit', 'browser', 'command', 'mcp']);
+export const KNOWN_GROUPS = Object.freeze([
+  'read',
+  'edit',
+  'browser',
+  'command',
+  'mcp',
+]);
 
 const DEFAULT_GROUPS = Object.freeze(['read']);
 
@@ -63,7 +69,9 @@ export async function loadRoomodes(filePath) {
     throw new Error(`${filePath}: no customModes entries found`);
   }
 
-  const modes = rawModes.map((entry, index) => normalizeMode(entry, index, filePath));
+  const modes = rawModes.map((entry, index) =>
+    normalizeMode(entry, index, filePath),
+  );
   assertUniqueSlugs(modes, filePath);
   return modes;
 }
@@ -93,7 +101,9 @@ function normalizeMode(entry, index, filePath) {
   for (const field of REQUIRED_MODE_FIELDS) {
     const value = entry[field];
     if (typeof value !== 'string' || value.trim() === '') {
-      throw new Error(`${filePath}: customModes[${index}] is missing required field "${field}"`);
+      throw new Error(
+        `${filePath}: customModes[${index}] is missing required field "${field}"`,
+      );
     }
     mode[field] = value;
   }

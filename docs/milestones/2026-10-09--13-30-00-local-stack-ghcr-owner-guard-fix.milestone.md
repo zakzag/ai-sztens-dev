@@ -41,7 +41,7 @@ local override does not pre-set it.
 and `IMAGE_TAG`. The local override (`docker-compose.local.yml`)
 replaces the `image:` directive with a `build:` + `aisztens-local/...`
 reference, but **Docker Compose interpolates the base file's
-`image:` first**, so the `:?` abort fires *before* the override is
+`image:` first**, so the `:?` abort fires _before_ the override is
 consulted. A developer who has never used the droplet and only wants
 the local stack has no GitHub org to set, and the existing comment in
 `infra/.env.example:107` ("local — leave empty; scripts/dev-stack.sh
@@ -55,10 +55,10 @@ The deploy path was already protected by the
 
 ## 4. Solution / implementation
 
-| File | Change |
-|---|---|
+| File                                                         | Change                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`infra/docker-compose.yml`](../../infra/docker-compose.yml) | All four `image:` lines now use `${VAR:-default}` (defaults: `ghcr.io`, `local`, `latest`); a comment above the `api` line documents why the looser form is safe in prod/dev (deploy workflow always sets the values) and necessary for local (the override replaces `image:`). |
-| [`infra/.env.example`](../../infra/.env.example) | The `GHCR_OWNER=` comment block (lines 105–114) now describes the new base-compose default + local-override behaviour accurately, instead of the old incorrect "leave empty" claim. |
+| [`infra/.env.example`](../../infra/.env.example)             | The `GHCR_OWNER=` comment block (lines 105–114) now describes the new base-compose default + local-override behaviour accurately, instead of the old incorrect "leave empty" claim.                                                                                             |
 
 ## 5. Outcome and how to verify
 

@@ -11,6 +11,7 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
     "test": "pnpm --filter @callback/shared test && pnpm --filter @callback/api-client test && pnpm --filter @callback/ui test && pnpm --filter @callback/admin test && pnpm --filter @callback/api test",
     "test:e2e": "pnpm --filter @callback/api test:e2e",
     "test:agents": "node --test scripts/lib/agent-artifacts/",

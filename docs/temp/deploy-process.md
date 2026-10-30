@@ -1,4 +1,4 @@
- # AIsztens — Image-build & Deploy Process (working document)
+# AIsztens — Image-build & Deploy Process (working document)
 
 **Created:** 2026-10-13
 **Status:** TEMPORARY working document (under `docs/temp/`) — used to review the
@@ -63,13 +63,13 @@ deploy can never race (the deploy always waits for the image it will pull).
 
 ### 3.1 `.github/workflows/images.yml` — build & push
 
-| Aspect | Value |
-|---|---|
-| Triggers | `push` to branch `dev` (→ always `app_env=dev`); `workflow_dispatch` with input `app_env` (`dev`\|`prod`) |
-| Run name | `Build and push images (<app_env>)` — the `(dev)`/`(prod)` suffix is later **parsed by `deploy.yml`** |
-| Permissions | `contents: read`, `packages: write` (pushes GHCR with the built-in `GITHUB_TOKEN`, no PAT) |
-| Concurrency | `images-<workflow>-<ref>`, `cancel-in-progress: true` |
-| Job | one job `build-and-push` on `ubuntu-latest`, `timeout-minutes: 20` |
+| Aspect      | Value                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------------------------- |
+| Triggers    | `push` to branch `dev` (→ always `app_env=dev`); `workflow_dispatch` with input `app_env` (`dev`\|`prod`) |
+| Run name    | `Build and push images (<app_env>)` — the `(dev)`/`(prod)` suffix is later **parsed by `deploy.yml`**     |
+| Permissions | `contents: read`, `packages: write` (pushes GHCR with the built-in `GITHUB_TOKEN`, no PAT)                |
+| Concurrency | `images-<workflow>-<ref>`, `cancel-in-progress: true`                                                     |
+| Job         | one job `build-and-push` on `ubuntu-latest`, `timeout-minutes: 20`                                        |
 
 Steps:
 
@@ -86,21 +86,21 @@ Steps:
    - `sha-<short>` — immutable, what the droplet pins (rollback target);
    - `<app_env>` — mutable convenience pointer (`dev` / `prod`).
 
-| Image | Dockerfile | Build context | Build args |
-|---|---|---|---|
-| `aisztens-api` | `infra/app/Dockerfile` | repo root | `APP_ENV`, `COMMIT_HASH`, `DEPLOY_DATE` |
-| `aisztens-web` | `infra/web/Dockerfile` | repo root | `APP_ENV`, `VITE_API_BASE_URL`, `VITE_DEPLOY_DATE`, `VITE_COMMIT_HASH` |
-| `aisztens-admin` | `infra/admin/Dockerfile` | repo root | `APP_ENV`, `VITE_API_BASE_URL`, `VITE_DEPLOY_DATE`, `VITE_COMMIT_HASH` |
-| `aisztens-monitor` | `infra/monitor/Dockerfile` | `./infra/monitor` | *(none)* |
+| Image              | Dockerfile                 | Build context     | Build args                                                             |
+| ------------------ | -------------------------- | ----------------- | ---------------------------------------------------------------------- |
+| `aisztens-api`     | `infra/app/Dockerfile`     | repo root         | `APP_ENV`, `COMMIT_HASH`, `DEPLOY_DATE`                                |
+| `aisztens-web`     | `infra/web/Dockerfile`     | repo root         | `APP_ENV`, `VITE_API_BASE_URL`, `VITE_DEPLOY_DATE`, `VITE_COMMIT_HASH` |
+| `aisztens-admin`   | `infra/admin/Dockerfile`   | repo root         | `APP_ENV`, `VITE_API_BASE_URL`, `VITE_DEPLOY_DATE`, `VITE_COMMIT_HASH` |
+| `aisztens-monitor` | `infra/monitor/Dockerfile` | `./infra/monitor` | _(none)_                                                               |
 
 ### 3.2 `.github/workflows/deploy.yml` — ship & start
 
-| Aspect | Value |
-|---|---|
-| Triggers | `workflow_run` on **Build and push images** `completed`; `workflow_dispatch` with `app_env` + optional `image_tag`. **No `push` trigger.** |
-| Permissions | `contents: read` |
-| Env | `REMOTE_DIR: /opt/aisztens` |
-| Jobs | `plan` (decision) → `deploy` (`needs: plan`, `if: needs.plan.outputs.should_deploy == 'true'`) |
+| Aspect      | Value                                                                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Triggers    | `workflow_run` on **Build and push images** `completed`; `workflow_dispatch` with `app_env` + optional `image_tag`. **No `push` trigger.** |
+| Permissions | `contents: read`                                                                                                                           |
+| Env         | `REMOTE_DIR: /opt/aisztens`                                                                                                                |
+| Jobs        | `plan` (decision) → `deploy` (`needs: plan`, `if: needs.plan.outputs.should_deploy == 'true'`)                                             |
 
 **`plan` job** — runs [`.github/scripts/deploy-plan.sh`](../../.github/scripts/deploy-plan.sh),
 no secrets, no SSH. It writes `should_deploy`, `app_env`, `image_tag`, `ref`
@@ -131,13 +131,13 @@ evaluated **before** the matrix expands, so `matrix.*` is not available there
    rendered `infra/.env` → `infra/caddy/Caddyfile.rendered`, with placeholder and
    `|`-character guards.
 5. **scp** compose + `.env` + `Caddyfile.rendered` + `scripts/test/*` to the droplet.
-5a. **chmod 600** `infra/.env` on the droplet (scp lands it 0644; 600 is the
+   5a. **chmod 600** `infra/.env` on the droplet (scp lands it 0644; 600 is the
    documented posture).
 6. **docker login ghcr.io** — only when the `GHCR_PAT` secret is set (private repo).
 7. **Pull + start** (no `--build`):
    `docker compose --env-file infra/.env -f infra/docker-compose.yml pull`
    then `APP_ENV=<env> docker compose … up -d --remove-orphans --force-recreate`.
-7a. **Verify every service runs `IMAGE_TAG`** — `ps --format '{{.Service}} {{.Image}}'`,
+   7a. **Verify every service runs `IMAGE_TAG`** — `ps --format '{{.Service}} {{.Image}}'`,
    api/web/admin/monitor must contain `:<image_tag>`. Fails the workflow on a
    stale/hand-pinned image.
 8. **Wait for api healthcheck** — up to 150 s (30 × 5 s); warns but does not fail.
@@ -170,63 +170,63 @@ GHCR (produced by `images.yml`). `local` is not a valid target.
 
 ### 4.1 Trigger inputs
 
-| Variable | Workflow | Source | Default | Effect |
-|---|---|---|---|---|
-| `inputs.app_env` | `images.yml`, `deploy.yml` | `workflow_dispatch` choice | `dev` | selects `dev`\|`prod`; picks the `INFRA_ENV_*` secret, the image env tag, the GitHub Environment and the `deploy-<env>` concurrency group |
-| `inputs.image_tag` | `deploy.yml` | `workflow_dispatch` string | `''` | overrides the auto `sha-<short>` (re-deploy an older image); validated as a Docker tag |
-| push to `dev` | `images.yml` | git | — | implicit `app_env=dev` build |
+| Variable           | Workflow                   | Source                     | Default | Effect                                                                                                                                    |
+| ------------------ | -------------------------- | -------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `inputs.app_env`   | `images.yml`, `deploy.yml` | `workflow_dispatch` choice | `dev`   | selects `dev`\|`prod`; picks the `INFRA_ENV_*` secret, the image env tag, the GitHub Environment and the `deploy-<env>` concurrency group |
+| `inputs.image_tag` | `deploy.yml`               | `workflow_dispatch` string | `''`    | overrides the auto `sha-<short>` (re-deploy an older image); validated as a Docker tag                                                    |
+| push to `dev`      | `images.yml`               | git                        | —       | implicit `app_env=dev` build                                                                                                              |
 
 ### 4.2 GitHub built-in contexts
 
-| Value | Used in | Purpose |
-|---|---|---|
-| `github.sha` | images.yml metadata; deploy.yml `HEAD_SHA` | commit being built / dispatched |
-| `github.repository_owner` | `GHCR_OWNER` fallback | image namespace |
-| `github.actor` | GHCR login username | `docker login ghcr.io -u <actor>` |
-| `github.workflow` / `github.ref` | images.yml concurrency group | cancel superseded builds |
-| `github.event_name` | deploy-plan.sh | `workflow_dispatch` vs `workflow_run` |
-| `github.event.workflow_run.conclusion` | deploy-plan.sh | gate: only `success` deploys |
-| `github.event.workflow_run.event` / `head_branch` | deploy-plan.sh | info in the decision reason |
-| `github.event.workflow_run.head_sha` | deploy-plan.sh | the commit `images.yml` built → `ref` + `image_tag` |
-| `github.event.workflow_run.display_title` | deploy-plan.sh | parsed for the `(dev)`/`(prod)` suffix |
+| Value                                             | Used in                                    | Purpose                                             |
+| ------------------------------------------------- | ------------------------------------------ | --------------------------------------------------- |
+| `github.sha`                                      | images.yml metadata; deploy.yml `HEAD_SHA` | commit being built / dispatched                     |
+| `github.repository_owner`                         | `GHCR_OWNER` fallback                      | image namespace                                     |
+| `github.actor`                                    | GHCR login username                        | `docker login ghcr.io -u <actor>`                   |
+| `github.workflow` / `github.ref`                  | images.yml concurrency group               | cancel superseded builds                            |
+| `github.event_name`                               | deploy-plan.sh                             | `workflow_dispatch` vs `workflow_run`               |
+| `github.event.workflow_run.conclusion`            | deploy-plan.sh                             | gate: only `success` deploys                        |
+| `github.event.workflow_run.event` / `head_branch` | deploy-plan.sh                             | info in the decision reason                         |
+| `github.event.workflow_run.head_sha`              | deploy-plan.sh                             | the commit `images.yml` built → `ref` + `image_tag` |
+| `github.event.workflow_run.display_title`         | deploy-plan.sh                             | parsed for the `(dev)`/`(prod)` suffix              |
 
 ### 4.3 Repository variables
 
-| Variable | Source | Default | Effect |
-|---|---|---|---|
+| Variable     | Source                                | Default                   | Effect                                                                        |
+| ------------ | ------------------------------------- | ------------------------- | ----------------------------------------------------------------------------- |
 | `GHCR_OWNER` | repo/org variable (`vars.GHCR_OWNER`) | `github.repository_owner` | owner segment of every image reference; **must** match between build and pull |
 
 ### 4.4 Secrets
 
-| Secret | Required | Purpose |
-|---|---|---|
-| `DROPLET_HOST` | yes (deploy) | droplet IPv4 / hostname for ssh + scp |
-| `DROPLET_SSH_KEY` | yes (deploy) | passphrase-less deploy private key; logs in as `deployer` |
-| `INFRA_ENV_DEV` | yes (dev) | full contents of `infra/.env.dev` — the static runtime config |
-| `INFRA_ENV_PROD` | yes (prod) | full contents of `infra/.env.prod` |
-| `GHCR_PAT` | optional | PAT with `read:packages`; only needed when the repo/package is private (enables `docker login` on the droplet) |
-| `GITHUB_TOKEN` | automatic | GHCR push in `images.yml` (`packages: write`) |
+| Secret            | Required     | Purpose                                                                                                        |
+| ----------------- | ------------ | -------------------------------------------------------------------------------------------------------------- |
+| `DROPLET_HOST`    | yes (deploy) | droplet IPv4 / hostname for ssh + scp                                                                          |
+| `DROPLET_SSH_KEY` | yes (deploy) | passphrase-less deploy private key; logs in as `deployer`                                                      |
+| `INFRA_ENV_DEV`   | yes (dev)    | full contents of `infra/.env.dev` — the static runtime config                                                  |
+| `INFRA_ENV_PROD`  | yes (prod)   | full contents of `infra/.env.prod`                                                                             |
+| `GHCR_PAT`        | optional     | PAT with `read:packages`; only needed when the repo/package is private (enables `docker login` on the droplet) |
+| `GITHUB_TOKEN`    | automatic    | GHCR push in `images.yml` (`packages: write`)                                                                  |
 
 ### 4.5 Values derived inside the workflows
 
-| Value | Formula | Where it goes |
-|---|---|---|
-| `app_env` | input or run-name suffix | env tag, GitHub Environment, `deploy-<env>` group, `APP_ENV` |
-| `domain` | `grep '^DOMAIN='` from the `INFRA_ENV_*` secret | Caddyfile render, `api_base` |
-| `api_base` | `https://api.<domain>/api` | `VITE_API_BASE_URL` build arg |
-| `short_sha` | `${GITHUB_SHA::7}` | image tag `sha-<short>` |
-| `commit_hash` | `${GITHUB_SHA}` | `COMMIT_HASH` / `VITE_COMMIT_HASH` |
-| `deploy_date` | `date -u +%Y-%m-%dT%H:%M:%SZ` | `DEPLOY_DATE` / `VITE_DEPLOY_DATE` |
-| `image_tag` | `sha-<short>` or dispatch override | `IMAGE_TAG` in `infra/.env` → image pin |
-| `ref` | `github.sha` (dispatch) or `workflow_run.head_sha` | checkout ref of the deploy job |
+| Value         | Formula                                            | Where it goes                                                |
+| ------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| `app_env`     | input or run-name suffix                           | env tag, GitHub Environment, `deploy-<env>` group, `APP_ENV` |
+| `domain`      | `grep '^DOMAIN='` from the `INFRA_ENV_*` secret    | Caddyfile render, `api_base`                                 |
+| `api_base`    | `https://api.<domain>/api`                         | `VITE_API_BASE_URL` build arg                                |
+| `short_sha`   | `${GITHUB_SHA::7}`                                 | image tag `sha-<short>`                                      |
+| `commit_hash` | `${GITHUB_SHA}`                                    | `COMMIT_HASH` / `VITE_COMMIT_HASH`                           |
+| `deploy_date` | `date -u +%Y-%m-%dT%H:%M:%SZ`                      | `DEPLOY_DATE` / `VITE_DEPLOY_DATE`                           |
+| `image_tag`   | `sha-<short>` or dispatch override                 | `IMAGE_TAG` in `infra/.env` → image pin                      |
+| `ref`         | `github.sha` (dispatch) or `workflow_run.head_sha` | checkout ref of the deploy job                               |
 
 ### 4.6 Build args baked into the images (immutable at runtime)
 
-| Image | Build arg | Landed as | Visible at |
-|---|---|---|---|
-| api | `APP_ENV`, `COMMIT_HASH`, `DEPLOY_DATE` | `ENV` in the runtime stage | `GET /healthz` → `commitHash`, `deployDate` |
-| web / admin | `APP_ENV`, `VITE_API_BASE_URL`, `VITE_DEPLOY_DATE`, `VITE_COMMIT_HASH` | `ENV` in the build stage (Vite reads `VITE_*`) | SPA bundle (footer build-info line) |
-| monitor | — | — | — |
+| Image       | Build arg                                                              | Landed as                                      | Visible at                                  |
+| ----------- | ---------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------- |
+| api         | `APP_ENV`, `COMMIT_HASH`, `DEPLOY_DATE`                                | `ENV` in the runtime stage                     | `GET /healthz` → `commitHash`, `deployDate` |
+| web / admin | `APP_ENV`, `VITE_API_BASE_URL`, `VITE_DEPLOY_DATE`, `VITE_COMMIT_HASH` | `ENV` in the build stage (Vite reads `VITE_*`) | SPA bundle (footer build-info line)         |
+| monitor     | —                                                                      | —                                              | —                                           |
 
 Local builds pass none of these, so `/healthz` returns `null` and the SPA footer
 shows `—`: graceful degradation, not an error.
@@ -238,12 +238,12 @@ remote `docker compose --env-file infra/.env` command. Two parts:
 
 **A. Workflow-owned keys (always appended last, stripped from the secret if duplicated):**
 
-| Key | Value | Consumed by |
-|---|---|---|
-| `APP_ENV` | `dev`\|`prod` | compose `api.environment.APP_ENV` |
-| `IMAGE_TAG` | `sha-<short>` | every `image:` reference |
-| `GHCR_OWNER` | org/user | image namespace |
-| `REGISTRY` | `ghcr.io` | image namespace |
+| Key          | Value         | Consumed by                       |
+| ------------ | ------------- | --------------------------------- |
+| `APP_ENV`    | `dev`\|`prod` | compose `api.environment.APP_ENV` |
+| `IMAGE_TAG`  | `sha-<short>` | every `image:` reference          |
+| `GHCR_OWNER` | org/user      | image namespace                   |
+| `REGISTRY`   | `ghcr.io`     | image namespace                   |
 
 **B. Static keys from the `INFRA_ENV_*` secret** (schema in [`infra/.env.example`](../../infra/.env.example)):
 
@@ -315,13 +315,13 @@ sequenceDiagram
 The following were true **before 2026-10-08** and must not appear as current in
 the living specs:
 
-| Retired statement | Reality now |
-|---|---|
-| The repo is rsynced to the droplet; `pnpm install` / `pnpm build` run on the host | Only 4 small files are scp'd; the droplet has no source tree and never runs pnpm |
-| `deploy.sh:ensure_spa_env()` seeds `apps/*/.env.dev` on the host before a build | Function removed; the SPA base URL is the `VITE_API_BASE_URL` build arg in `images.yml` |
-| `deploy.sh:prune_legacy_stack()` removes legacy containers before `up` | Function removed; `up -d --remove-orphans` handles orphan removal |
-| Caddy bind-mounts `/srv/web` + `/srv/admin` and serves SPAs with `file_server` | Caddy `reverse_proxy web:80` / `admin:80`; the bundle is baked into the image |
-| `apps/{web,admin}/dist` and `WEB_DIST_PATH`/`ADMIN_DIST_PATH` exist on the host | No host `dist/`; bundles live at `/usr/share/nginx/html` inside the containers |
-| `deploy.yml` uses a 2-entry `matrix` (`dev`,`prod`) with a job-level `if:` | Replaced by a `plan` job (`deploy-plan.sh`) + `needs.plan.outputs.*` |
-| `deploy.yml` has a `push` trigger | Removed; `images.yml` takes the push and `deploy.yml` follows via `workflow_run` |
-| The droplet builds with `docker compose up -d --build` | No `--build`; `pull` + `up -d --force-recreate` |
+| Retired statement                                                                 | Reality now                                                                             |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| The repo is rsynced to the droplet; `pnpm install` / `pnpm build` run on the host | Only 4 small files are scp'd; the droplet has no source tree and never runs pnpm        |
+| `deploy.sh:ensure_spa_env()` seeds `apps/*/.env.dev` on the host before a build   | Function removed; the SPA base URL is the `VITE_API_BASE_URL` build arg in `images.yml` |
+| `deploy.sh:prune_legacy_stack()` removes legacy containers before `up`            | Function removed; `up -d --remove-orphans` handles orphan removal                       |
+| Caddy bind-mounts `/srv/web` + `/srv/admin` and serves SPAs with `file_server`    | Caddy `reverse_proxy web:80` / `admin:80`; the bundle is baked into the image           |
+| `apps/{web,admin}/dist` and `WEB_DIST_PATH`/`ADMIN_DIST_PATH` exist on the host   | No host `dist/`; bundles live at `/usr/share/nginx/html` inside the containers          |
+| `deploy.yml` uses a 2-entry `matrix` (`dev`,`prod`) with a job-level `if:`        | Replaced by a `plan` job (`deploy-plan.sh`) + `needs.plan.outputs.*`                    |
+| `deploy.yml` has a `push` trigger                                                 | Removed; `images.yml` takes the push and `deploy.yml` follows via `workflow_run`        |
+| The droplet builds with `docker compose up -d --build`                            | No `--build`; `pull` + `up -d --force-recreate`                                         |

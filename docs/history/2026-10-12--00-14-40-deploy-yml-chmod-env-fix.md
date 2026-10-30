@@ -16,8 +16,8 @@ exit status 1
 
 Step 3 of `deploy.yml` writes `infra/.env` from the `INFRA_ENV_*` secret
 and then `chmod 600`s it. The next step is `appleboy/scp-action@v0.1.7`,
-which pre-packs the `source:` paths with `tar` *inside a container that
-runs under a different uid than the runner* (the action ships its own
+which pre-packs the `source:` paths with `tar` _inside a container that
+runs under a different uid than the runner_ (the action ships its own
 docker image). The tar process therefore cannot read a `0600` file
 owned by the runner uid, and the whole scp step aborts.
 

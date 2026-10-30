@@ -16,13 +16,18 @@ describe('Button', () => {
   it('forwards an explicit submit type for forms', () => {
     render(<Button type="submit">Küldés</Button>);
 
-    expect(screen.getByRole('button', { name: 'Küldés' })).toHaveAttribute('type', 'submit');
+    expect(screen.getByRole('button', { name: 'Küldés' })).toHaveAttribute(
+      'type',
+      'submit',
+    );
   });
 
   it('applies the primary variant by default', () => {
     render(<Button>Alap</Button>);
 
-    expect(screen.getByRole('button', { name: 'Alap' }).className).toContain('bg-primary');
+    expect(screen.getByRole('button', { name: 'Alap' }).className).toContain(
+      'bg-primary',
+    );
   });
 
   it('paints its outline with the dark hairline token instead of currentColor', () => {
@@ -37,13 +42,17 @@ describe('Button', () => {
   it('applies the danger variant classes', () => {
     render(<Button variant="danger">Törlés</Button>);
 
-    expect(screen.getByRole('button', { name: 'Törlés' }).className).toContain('bg-danger');
+    expect(screen.getByRole('button', { name: 'Törlés' }).className).toContain(
+      'bg-danger',
+    );
   });
 
   it('applies the requested size', () => {
     render(<Button size="lg">Nagy</Button>);
 
-    expect(screen.getByRole('button', { name: 'Nagy' }).className).toContain('h-12');
+    expect(screen.getByRole('button', { name: 'Nagy' }).className).toContain(
+      'h-12',
+    );
   });
 
   it('keeps caller class names alongside the recipe', () => {

@@ -27,7 +27,10 @@ export function createCodedError(init: {
   readonly status: number;
   readonly code: string | null;
   readonly message?: string;
-  readonly issues?: readonly { readonly path: string; readonly message: string }[];
+  readonly issues?: readonly {
+    readonly path: string;
+    readonly message: string;
+  }[];
   readonly details?: readonly string[];
   readonly requestId?: string | null;
 }): ApiError {
@@ -82,7 +85,10 @@ export function createMultiFieldValidationError(): ApiError {
     message: 'The request payload does not match the API contract.',
     issues: [
       { path: 'name', message: 'String must contain at least 1 character(s)' },
-      { path: 'apiKey', message: 'String must contain at least 8 character(s)' },
+      {
+        path: 'apiKey',
+        message: 'String must contain at least 8 character(s)',
+      },
       { path: 'metadata.owner', message: 'Unrecognized key' },
     ],
     details: [
@@ -111,13 +117,13 @@ export function createValidationError(): ApiError {
  * @param withDetails - whether the body carries leftover detail text.
  * @returns the failure of a broken backend.
  */
-export function createServerError(
-  status = 500,
-  withDetails = false,
-): ApiError {
+export function createServerError(status = 500, withDetails = false): ApiError {
   return createCodedError({
     status,
-    code: status === HTTP_STATUS.SERVICE_UNAVAILABLE ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_ERROR',
+    code:
+      status === HTTP_STATUS.SERVICE_UNAVAILABLE
+        ? 'SERVICE_UNAVAILABLE'
+        : 'INTERNAL_ERROR',
     message: 'Internal server error',
     details: withDetails ? ['Database is unavailable'] : [],
   });

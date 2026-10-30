@@ -74,7 +74,9 @@ function toNonEmptyString(value: unknown): string | null {
  * @returns `path: message`, or the bare message for a payload-level issue.
  */
 export function formatIssueLine(detail: ApiErrorDetail): string {
-  return detail.path.length > 0 ? `${detail.path}: ${detail.message}` : detail.message;
+  return detail.path.length > 0
+    ? `${detail.path}: ${detail.message}`
+    : detail.message;
 }
 
 /** @returns one `{ path, message }` entry, or `null` for a malformed detail. */
@@ -149,7 +151,10 @@ function parseLegacyError(body: unknown): ParsedErrorBody | null {
         ? [raw]
         : []
       : Array.isArray(raw)
-        ? raw.filter((item): item is string => typeof item === 'string' && item.length > 0)
+        ? raw.filter(
+            (item): item is string =>
+              typeof item === 'string' && item.length > 0,
+          )
         : [];
 
   if (lines.length === 0) {
@@ -176,7 +181,9 @@ function parseLegacyError(body: unknown): ParsedErrorBody | null {
  * @returns the parsed facts; an empty result when nothing was usable.
  */
 export function parseErrorBody(body: unknown): ParsedErrorBody {
-  return parseEnvelopeError(body) ?? parseLegacyError(body) ?? EMPTY_PARSED_BODY;
+  return (
+    parseEnvelopeError(body) ?? parseLegacyError(body) ?? EMPTY_PARSED_BODY
+  );
 }
 
 /**

@@ -32,13 +32,13 @@ The obvious first attempt — adding a local interface and casting — is
 wrong under `recommendedTypeChecked`:
 
 | Approach                                      | Result                                                 |
-|----------------------------------------------|--------------------------------------------------------|
+| --------------------------------------------- | ------------------------------------------------------ |
 | `const body = response.json();`               | `any` everywhere, all rules fire                       |
 | `as unknown as HealthBody`                    | All `no-unsafe-*` rules still fire (cast ≠ narrowing)  |
 | `expect(isHealthBody(body)).toBe(true)` only  | Fixes the assignment; `body` remains `unknown` after   |
 | `if (!isHealthBody(body)) throw` + assertions | **All rules satisfied** — control-flow narrowing works |
 
-A double-cast (`as unknown as X`) is a *type assertion*, not a
+A double-cast (`as unknown as X`) is a _type assertion_, not a
 narrowing; under `recommendedTypeChecked` the type-checker still
 treats the result as `any`. It also trips `no-unused-vars` on the
 target interface because the cast erases the symbol from the program's

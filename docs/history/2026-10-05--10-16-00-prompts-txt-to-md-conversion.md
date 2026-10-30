@@ -19,13 +19,13 @@ no code fences, unlinked file paths).
 
 ## Formatting applied
 
-| Aspect | Before | After |
-|---|---|---|
-| Title | none | `#` H1 heading per file |
-| Metadata | none | date / type / conversion note block |
-| Structure | flat prose, `-` and `1.` lines | headings, markdown lists, blockquote for the `FONTOS` warning |
-| Commands | indented plain text | fenced ` ```bash ` and ` ```caddyfile ` blocks |
-| File references | bare paths | relative markdown links to the code paths |
+| Aspect          | Before                         | After                                                         |
+| --------------- | ------------------------------ | ------------------------------------------------------------- |
+| Title           | none                           | `#` H1 heading per file                                       |
+| Metadata        | none                           | date / type / conversion note block                           |
+| Structure       | flat prose, `-` and `1.` lines | headings, markdown lists, blockquote for the `FONTOS` warning |
+| Commands        | indented plain text            | fenced ` ```bash ` and ` ```caddyfile ` blocks                |
+| File references | bare paths                     | relative markdown links to the code paths                     |
 
 Wording was preserved verbatim (including the original typos such as
 `módosíytani` and `noejs`); only markdown structure and emphasis were added.

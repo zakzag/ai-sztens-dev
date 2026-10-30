@@ -22,15 +22,15 @@ tervnek a munkapontjai voltak, nem önálló termékértékek.
 A 7 Story-t Jira `Move` (bulk-move) művelettel **Subtaskká** alakítottuk az
 **AIS-86** Story alatt (`AIS` projekt, `Subtask` issue type, `parent = AIS-86`).
 
-| Issue | Előtte | Utána | Hatókör |
-| --- | --- | --- | --- |
-| AIS-79 | Story | Subtask | `packages/notifications` core store |
-| AIS-80 | Story | Subtask | `sessionStorage` perzisztencia |
-| AIS-81 | Story | Subtask | `Toast` + `ToastStack` |
-| AIS-82 | Story | Subtask | `LogDrawer` + `LogEntryRow` |
-| AIS-83 | Story | Subtask | React bindings + `NotificationHost` |
-| AIS-84 | Story | Subtask | Admin globális capture |
-| AIS-85 | Story | Subtask | `ApiKeyForm` + dokumentáció lezárás |
+| Issue  | Előtte | Utána   | Hatókör                             |
+| ------ | ------ | ------- | ----------------------------------- |
+| AIS-79 | Story  | Subtask | `packages/notifications` core store |
+| AIS-80 | Story  | Subtask | `sessionStorage` perzisztencia      |
+| AIS-81 | Story  | Subtask | `Toast` + `ToastStack`              |
+| AIS-82 | Story  | Subtask | `LogDrawer` + `LogEntryRow`         |
+| AIS-83 | Story  | Subtask | React bindings + `NotificationHost` |
+| AIS-84 | Story  | Subtask | Admin globális capture              |
+| AIS-85 | Story  | Subtask | `ApiKeyForm` + dokumentáció lezárás |
 
 ### Mellékhatások
 

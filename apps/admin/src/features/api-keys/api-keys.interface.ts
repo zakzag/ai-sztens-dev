@@ -20,11 +20,7 @@ import type { ErrorSurface } from '../../lib/error-surface.interface.js';
  * import still only flows `pages → features`.
  */
 export type ApiKeyFormFieldName =
-  | 'name'
-  | 'identifier'
-  | 'description'
-  | 'apiKey'
-  | 'expiresAt';
+  'name' | 'identifier' | 'description' | 'apiKey' | 'expiresAt';
 
 /**
  * Result of mapping a failure onto the form.

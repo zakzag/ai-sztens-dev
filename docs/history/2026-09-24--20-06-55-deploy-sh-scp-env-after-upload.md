@@ -1,9 +1,11 @@
 # Fix: deploy.sh `up` fails with `couldn't find env file: /opt/aisztens/infra/.env`
 
 ## Date
+
 2026-09-24
 
 ## Context
+
 After fixing the rsync `-e` host duplication, `./deploy/deploy.sh up` reaches
 the "Building & starting the stack" step but fails immediately:
 
@@ -24,6 +26,7 @@ so docker-compose resolves `infra/.env` relative to the droplet's
 droplet.
 
 ## Root cause
+
 `infra/.env` (and `deploy/.env`) are listed in the repository-level
 [`.gitignore`](.gitignore:40) (`# dotenv environment variable files`) and are
 **never committed**. On top of that the upload step in
@@ -36,8 +39,9 @@ This was masked earlier because the previous error (`bash: line 1: ssh.aisztens.
 command not found`) aborted the upload before any compose call.
 
 ## Fix
+
 [`deploy/deploy.sh`](deploy/deploy.sh:47) — exclude `.env` files from rsync
-explicitly *and* scp the local copies on top of the upload as the last step
+explicitly _and_ scp the local copies on top of the upload as the last step
 inside `upload()`:
 
 ```bash
@@ -75,14 +79,16 @@ Notes:
   only from local `./deploy/deploy.sh up`.
 
 ## Verification
+
 - `bash -n deploy/deploy.sh` reports `syntax OK`.
 - The next `./deploy/deploy.sh up` is expected to:
   1. rsync the repo (minus env files) into `/opt/aisztens`,
   2. scp `deploy/.env` and `infra/.env` on top,
   3. run `docker compose --env-file infra/.env -f infra/docker-compose.yml
-     up -d --build` successfully.
+up -d --build` successfully.
 
 ## Prerequisites (unchanged)
+
 - WSL Debian: `apt-get install -y rsync openssh-client` ([`deploy/deploy.sh`](deploy/deploy.sh:4)).
 - `deploy/.env` must contain `HOST`, `SSH_USER`, and (optionally) `SSH_KEY`.
 - `infra/.env` must be a real copy of [`infra/.env.example`](../infra/.env.example)

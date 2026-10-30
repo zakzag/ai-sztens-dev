@@ -20,18 +20,18 @@ runbook. Emellett két specs **tárgyi pontatlanságot** tartalmazott a DB-ről.
 
 A lokális (fejlesztői gépi) PostgreSQL egyetlen leírása:
 
-| Fejezet | Tartalom |
-|---|---|
-| §1 | A két lokális Postgres (DB-only vs. teljes stack), tényleges Docker volume- és konténernevekkel, plus a **5432 portütközés** |
-| §2–3 | Előfeltétel; a `infra/.env.local` kötelező kulcsai és defaultjai |
-| §4 | Bootstrap: a két init script, grant-mátrix, `DO $$` tilalom, idempotencia |
-| §5 | Indítás/leállítás, `down -v`, init-lefutás ellenőrzése a logból |
-| §6 | Verifikáció: `\dn`, role-ok, USAGE ×9, `CREATE` a `callback`-re — elvárt kimenetekkel |
-| §7 | Kapcsolódás (konténerből, hostról, GUI-ból, API `DATABASE_URL`) |
-| §8 | Meglévő volume esete: re-apply vagy `down -v` |
-| §9 | **Ami még nincs:** `callback_requests`, `__drizzle_migrations`, működő `db:migrate`, tábla-grantok |
-| §10 | Hibadiagnosztika (portütközés, password auth, role hiány, permission denied, „shutting down") |
-| §11 | Karbantartási szabály |
+| Fejezet | Tartalom                                                                                                                     |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| §1      | A két lokális Postgres (DB-only vs. teljes stack), tényleges Docker volume- és konténernevekkel, plus a **5432 portütközés** |
+| §2–3    | Előfeltétel; a `infra/.env.local` kötelező kulcsai és defaultjai                                                             |
+| §4      | Bootstrap: a két init script, grant-mátrix, `DO $$` tilalom, idempotencia                                                    |
+| §5      | Indítás/leállítás, `down -v`, init-lefutás ellenőrzése a logból                                                              |
+| §6      | Verifikáció: `\dn`, role-ok, USAGE ×9, `CREATE` a `callback`-re — elvárt kimenetekkel                                        |
+| §7      | Kapcsolódás (konténerből, hostról, GUI-ból, API `DATABASE_URL`)                                                              |
+| §8      | Meglévő volume esete: re-apply vagy `down -v`                                                                                |
+| §9      | **Ami még nincs:** `callback_requests`, `__drizzle_migrations`, működő `db:migrate`, tábla-grantok                           |
+| §10     | Hibadiagnosztika (portütközés, password auth, role hiány, permission denied, „shutting down")                                |
+| §11     | Karbantartási szabály                                                                                                        |
 
 ### `Local-Development.md` §2b kiegészítése
 
@@ -44,11 +44,11 @@ A lokális (fejlesztői gépi) PostgreSQL egyetlen leírása:
 
 ## Javított ellentmondások (ellenőrizve)
 
-| Hol | Mi volt a hiba | Javítás |
-|---|---|---|
+| Hol                                                                    | Mi volt a hiba                                                                                                                                                                                        | Javítás                                                                                                                                                                     |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`Three-Env-Verification.md`](../Specs/Three-Env-Verification.md) §2.7 | `SELECT count(*) FROM callback_requests` — ilyen tábla **nincs** (a store in-memory `Map`, [`callback-requests.service.ts:12`](../../apps/api/src/callback-requests/callback-requests.service.ts:12)) | A szekció role/séma-bootstrapot ellenőriz (`current_user`, `\dn`, `has_schema_privilege`), és kimondja, hogy a sor-szintű check AIS-38-cal jön; a §7-es hibasorok is átírva |
-| [`Production-Runbook.md`](../Specs/Production-Runbook.md) §7 | azt állította, hogy a smoke suite „valódi `callback_requests` sort hoz létre az adatbázisban” | A suite csak megfigyel (a kódban nincs ilyen POST); a szöveg ezt írja le, plusz a tábla hiányát |
-| [`Infrastructure-Docker.md`](../Specs/Infrastructure-Docker.md) §6.2 | nem hivatkozott a lokális nézetre | Egy bekezdés + link a `Database-Local.md`-ra |
+| [`Production-Runbook.md`](../Specs/Production-Runbook.md) §7           | azt állította, hogy a smoke suite „valódi `callback_requests` sort hoz létre az adatbázisban”                                                                                                         | A suite csak megfigyel (a kódban nincs ilyen POST); a szöveg ezt írja le, plusz a tábla hiányát                                                                             |
+| [`Infrastructure-Docker.md`](../Specs/Infrastructure-Docker.md) §6.2   | nem hivatkozott a lokális nézetre                                                                                                                                                                     | Egy bekezdés + link a `Database-Local.md`-ra                                                                                                                                |
 
 Emellett a `Production-Runbook.md` §4.4 blokk-idézete után **stray code fence**
 maradt (páratlan fence-szám, emiatt a §4.5-től elcsúszott a renderelés) — ezt

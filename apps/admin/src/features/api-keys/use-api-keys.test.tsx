@@ -38,10 +38,7 @@ import {
   API_KEY_IDENTIFIER_CONFLICT_MESSAGE,
 } from './api-keys.const.js';
 import { toFieldErrors } from './api-keys.logic.js';
-import {
-  useApiKeysQuery,
-  useCreateApiKeyMutation,
-} from './use-api-keys.js';
+import { useApiKeysQuery, useCreateApiKeyMutation } from './use-api-keys.js';
 
 /**
  * Replaces the composition root so the hooks talk to the double.
@@ -51,9 +48,8 @@ import {
  * at factory time.
  */
 vi.mock('../../services/api-client.js', async () => {
-  const { API_KEYS_SERVICE_MOCK: serviceMock } = await import(
-    '../../test/mocks/api-keys.mock.js'
-  );
+  const { API_KEYS_SERVICE_MOCK: serviceMock } =
+    await import('../../test/mocks/api-keys.mock.js');
 
   return { apiKeysService: serviceMock.service };
 });
@@ -63,7 +59,11 @@ vi.mock('../../services/api-client.js', async () => {
  * @returns a `renderHook` wrapper that provides the query context.
  */
 function createWrapper(client: QueryClient) {
-  return function Wrapper({ children }: { readonly children: React.ReactNode }) {
+  return function Wrapper({
+    children,
+  }: {
+    readonly children: React.ReactNode;
+  }) {
     return <TestQueryProvider client={client}>{children}</TestQueryProvider>;
   };
 }
@@ -235,7 +235,9 @@ describe('useCreateApiKeyMutation', () => {
   });
 
   it('rejects with the original error and reports a transport failure', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createNetworkError());
+    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
+      createNetworkError(),
+    );
 
     const { result } = renderHook(() => useCreateApiKeyMutation(), {
       wrapper: createWrapper(client),

@@ -46,9 +46,9 @@ once stopped the whole app from booting).
 
 ## Solution
 
-* `apps/api/src/common/http/api-exception.filter.ts` — `Reflector` is now a value
+- `apps/api/src/common/http/api-exception.filter.ts` — `Reflector` is now a value
   import, with a comment stating why it must never become `import type`.
-* `apps/api/src/common/http/http-wiring.metadata.spec.ts` (new) — asserts
+- `apps/api/src/common/http/http-wiring.metadata.spec.ts` (new) — asserts
   `design:paramtypes` of `ApiExceptionFilter` equals `[ApiResponseService, Reflector]`,
   that no wired provider emits an erased placeholder (`Function` / `Object`), and that
   `RequestIdInterceptor` injects nothing. It runs on **every** Node version, so the
@@ -68,9 +68,9 @@ of throwing `UnknownDependenciesException`.
 
 ## Follow-ups
 
-* The same trap can be introduced by any future type-only import of a class used in a
+- The same trap can be introduced by any future type-only import of a class used in a
   decorated constructor. A lint rule (`@typescript-eslint/consistent-type-imports` with a
   decoration-aware exception, or a custom check over `design:paramtypes`) would fail
   earlier, at PR time rather than at boot.
-* `JEST_CAN_REQUIRE_ESM` still hides module-graph failures on Node < 24.9; CI should run
+- `JEST_CAN_REQUIRE_ESM` still hides module-graph failures on Node < 24.9; CI should run
   the suite on a runtime where it is true.

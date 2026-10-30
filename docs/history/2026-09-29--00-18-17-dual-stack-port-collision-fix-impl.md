@@ -57,12 +57,12 @@ bindelése sikeres volt.
 
 ### 4. Lokális módosítások (commitolandó)
 
-| Fájl | Változtatás |
-|---|---|
-| [`infra/docker-compose.yml`](../../infra/docker-compose.yml) | caddy service: explicit `dns:` direktíva (1.1.1.1, 8.8.8.8) + részletes komment a "single-Caddy" invariánsról és a DigitalOcean Cloud Firewall kérdésről |
-| [`deploy/deploy.sh`](../../deploy/deploy.sh) | Új `prune_legacy_stack()` függvény az `up` parancs előtt + `down-all` vészhelyzeti parancs + `Usage:` sor frissítve |
-| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md) | Új §8 szekció a single-Caddy invariánsról és a Cloud Firewall / DNS kérdésről |
-| [`docs/milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md`](../milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md) | Új milestone a döntés szintjén |
+| Fájl                                                                                                                                           | Változtatás                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`infra/docker-compose.yml`](../../infra/docker-compose.yml)                                                                                   | caddy service: explicit `dns:` direktíva (1.1.1.1, 8.8.8.8) + részletes komment a "single-Caddy" invariánsról és a DigitalOcean Cloud Firewall kérdésről |
+| [`deploy/deploy.sh`](../../deploy/deploy.sh)                                                                                                   | Új `prune_legacy_stack()` függvény az `up` parancs előtt + `down-all` vészhelyzeti parancs + `Usage:` sor frissítve                                      |
+| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md)                                                                 | Új §8 szekció a single-Caddy invariánsról és a Cloud Firewall / DNS kérdésről                                                                            |
+| [`docs/milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md`](../milestones/2026-09-28-dual-stack-port-collision-fix.milestone.md) | Új milestone a döntés szintjén                                                                                                                           |
 
 ### 5. Végállapot ellenőrzése (a dropleten)
 

@@ -8,14 +8,14 @@
 
 ## 1. Összegző értékelés
 
-| Szempont | Értékelés |
-|---|---|
-| Témák szerinti felbontás | **jó** — a hat téma valódi, önállóan leszállítható egység |
+| Szempont                     | Értékelés                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Témák szerinti felbontás     | **jó** — a hat téma valódi, önállóan leszállítható egység                                              |
 | Meglévő ticketek felismerése | **részleges** — a notification és auth sorok jól felismertek, de a legfontosabb Story-konfliktusok nem |
-| Parent-story választás | **hibás** — két helyen is konfliktus van a cél-story explicit kizárásával |
-| Sorrend (függőségek) | **jól átgondolt**, de 4 helyen javítandó |
-| Kód-alapú ellenőrzés | **3 valós hiány** fedezhető fel a bontásban, ami korábban kimaradt |
-| Összesítve | **átstrukturálás szükséges**, a téma-szétválasztás megmarad |
+| Parent-story választás       | **hibás** — két helyen is konfliktus van a cél-story explicit kizárásával                              |
+| Sorrend (függőségek)         | **jól átgondolt**, de 4 helyen javítandó                                                               |
+| Kód-alapú ellenőrzés         | **3 valós hiány** fedezhető fel a bontásban, ami korábban kimaradt                                     |
+| Összesítve                   | **átstrukturálás szükséges**, a téma-szétválasztás megmarad                                            |
 
 ---
 
@@ -33,7 +33,7 @@ A bontás a T1-1…T1-5 subtaskokat (lista contract, paginált API, `PATCH`/`DEL
 
 ### B2 — Az AIS-86 szintén zárja ki a form/hook réteget
 
-Az AIS-86 „Nem része" szekciója az `apps/web`-et, a navigációs logot és a swipe-toastot zárja ki — de a magja explicit módon a **notification store** (core + React bindings + UI primitívek + bekötés). A T2-1 (generikus mezőhiba-leképezés) nem notification-elem, hanem **hibamegjelenítési logika**: az AIS-87 D11 döntése szerint a négy szint *együtt* egy konvenció, és a mezőszint a legfontosabb (RHF `setError`).
+Az AIS-86 „Nem része" szekciója az `apps/web`-et, a navigációs logot és a swipe-toastot zárja ki — de a magja explicit módon a **notification store** (core + React bindings + UI primitívek + bekötés). A T2-1 (generikus mezőhiba-leképezés) nem notification-elem, hanem **hibamegjelenítési logika**: az AIS-87 D11 döntése szerint a négy szint _együtt_ egy konvenció, és a mezőszint a legfontosabb (RHF `setError`).
 
 **Javítás:** a T2-1 legyen az **új T3 (Form és validáció) Story** része, ne az AIS-86 alatt. Az AIS-86 marad a notification store story (AIS-79…85), és a DoD-jából kikerül a „form submit pontosan egy toast" állítás — ezt az AIS-85 birtokolja, és az ottani form-minta lesz a referencia.
 
@@ -50,6 +50,7 @@ Három ticket ugyanazt a fájlt módosítja, és az AIS-85 ráadásul a `UI-Arch
 A T4-1 DoD-ja szerint az api-keys lista átállása a „mag end-to-end bizonyítéka". Ez nem igaz: az api-keys lista átállása **nem** bizonyítja a T5-1 `src/app/` réteget, a T3-3 hook réteget vagy a T5-3 MSW harness-t — ezek külön, későbbi fázisok.
 
 **Javítás:** a bizonyíték-szerep legyen a legutolsó fázis terméke. Két lehetőség:
+
 - (a) a T5 Story kap egy záró subtaskot („`api-keys` oldal teljes átállítása az összes alapra"), **vagy**
 - (b) a T6 (cégadatok) első ticketje legyen a bizonyíték — de akkor a cégadatok korábbi szabadul fel.
 
@@ -63,7 +64,7 @@ A T4-1 DoD-ja szerint az api-keys lista átállása a „mag end-to-end bizonyí
 
 Az AIS-84 hatóköre: `apps/admin/src/app/notifications/notification.store.ts` + `notification-events.logic.ts` + `main.tsx` + `App.tsx`. Vagyis az AIS-84 **az `src/app/` réteget maga alapítja meg** (a notification store ott lakik).
 
-A bontás „T5-1 az AIS-84 előfeltétele" megállapítása tehát **hamis**. Valójában: az AIS-84 létrehozza az `app/` réteg **első szeletét** (a notifications store-ot), és a T5-1 ezt *rendezi* — a layout/router/nav/session store-t — utólag.
+A bontás „T5-1 az AIS-84 előfeltétele" megállapítása tehát **hamis**. Valójában: az AIS-84 létrehozza az `app/` réteg **első szeletét** (a notifications store-ot), és a T5-1 ezt _rendezi_ — a layout/router/nav/session store-t — utólag.
 
 **Javítás:** a T5-1 nem előfeltétele, hanem **utólagos tisztázás** az AIS-84 után, vagy — jobb — a T5-1 kerüljön **előre**, és az AIS-84 csak a `notifications/` alkalmazást hozza létre a már létező rétegben. A tisztább út: **T5-1 előbb**, és az AIS-84 módosítása a megadott útvonalra. Ezt a Jira-konvenció (`AIS-84` már le van írva a régi útvonalakkal) nem bontja meg, csak a leírás frissül.
 
@@ -88,11 +89,11 @@ Az AIS-75 a `packages/shared/src/schemas/api-key.schema.ts`-t írja (a jelenlegi
 
 Ez négy ticket ugyanazon a fájl körül. Jelenleg nincs konfliktus, mert az AIS-84 még nincs implementálva — de **egyiket sem szabad elkezdeni anélkül, hogy a másik három hatókör-tisztázása megvan**.
 
-**Javítás:** a T1-4 legyen a **transport tulajdonosa**; az AIS-84/72/76 csak a `HttpClient` *interfész* bővítését kapja meg a T1-4-ben kialakított formában. Rögzítsük ezt a T1-4 leírásában szó szerint.
+**Javítás:** a T1-4 legyen a **transport tulajdonosa**; az AIS-84/72/76 csak a `HttpClient` _interfész_ bővítését kapja meg a T1-4-ben kialakított formában. Rögzítsük ezt a T1-4 leírásában szó szerint.
 
 ### S5 — A T3-3 függősége az AIS-84-re nézve túl szoros
 
-A T3-3 (`meta.successMessage` támogatás a mutation hookban) az AIS-84-re épül, de a hook maga nem igényel semmilyen notification-t — a `meta` egy opcionális mező. A T3-3 **elkészülhet** az AIS-84 előtt; csak a `meta.successMessage` *feldolgozása* kell hozzá.
+A T3-3 (`meta.successMessage` támogatás a mutation hookban) az AIS-84-re épül, de a hook maga nem igényel semmilyen notification-t — a `meta` egy opcionális mező. A T3-3 **elkészülhet** az AIS-84 előtt; csak a `meta.successMessage` _feldolgozása_ kell hozzá.
 
 **Javítás:** a T3-3 függősége legyen AIS-84 csak a `meta.successMessage` részére, a hook magya független.
 
@@ -134,7 +135,7 @@ Ez nem az admin alap témája, de a **cégadatok** (T6, AIS-18) DB-tábláinak m
 
 A `rg "zustand|useSearchParams|createStore"` keresés az `apps/admin/src`-ben **nulla találatot** adott. A `UI-Architecture.md` a Zustandot „planned" sorként kezeli (AIS-57 döntés: „added with the first page that needs UI state").
 
-**Javaslat:** a T5-2 ne a Zustandra épüljön elsődlegesen. A lista UI state (szűrő/sort/page) **URL-ben** él → ehhez a React Router `useSearchParams` kell, nem Zustand. A Zustand csak a *tranziens* UI state-re (nyitott drawer, kijelölt sor) kell, és az opcionális. A ticket legyen: „URL search params (typed) mint elsődleges + Zustand store factory minta opcionális" — így a T5-2 **nem** igényel új dependency-t, csak a page-store factory (S1-9 mintája) készül el, ha kell.
+**Javaslat:** a T5-2 ne a Zustandra épüljön elsődlegesen. A lista UI state (szűrő/sort/page) **URL-ben** él → ehhez a React Router `useSearchParams` kell, nem Zustand. A Zustand csak a _tranziens_ UI state-re (nyitott drawer, kijelölt sor) kell, és az opcionális. A ticket legyen: „URL search params (typed) mint elsődleges + Zustand store factory minta opcionális" — így a T5-2 **nem** igényel új dependency-t, csak a page-store factory (S1-9 mintája) készül el, ha kell.
 
 ### K6 — A `toErrorMessage` és a `toErrorSurface` kód-kulcs táblája kétszer van
 
@@ -152,39 +153,39 @@ A [`ci.yml`](../../.github/workflows/ci.yml:76) csak az api unit teszteket futta
 
 ## 5. A bontás hibái a kód alapján (a ticket-leírások pontosítása)
 
-| Hely | A bontás állítása | A kód valósága | Javítás |
-|---|---|---|---|
-| T1-1 | „`apiKeyListSchema` átállítása `paginatedSchema(apiKeySchema)`-re" | A `successEnvelopeSchema` **már** tartalmazza a `meta.pagination`-t; a `data` tömb marad tömb. Tehát **nincs breaking** a sémán, csak a `meta.pagination` kitöltése kell | A DoD pontosítsa: „a `data` tömb **marad** tömb; a `meta.pagination` a válaszban jelenik meg; a `paginatedSchema` a **kliensoldali** típust adja" |
-| T1-2 | „`ApiResponseService.ok(data, ctx, pagination)`" | A `toSuccessEnvelope` a `meta`-t paraméterként kapja → a service-t nem kell bővíteni, csak a `pagination`-t átadni | A DoD: „a controller a `ctx`-hez pagination-t ad; a `ApiResponseService` változatlan" |
-| T3-1 | „a séma a szerver pipe-ban, a kliens parse-ban és a RHF resolverben ugyanaz az objektum" | A meglévő `createApiKeySchema` a **request** séma; a form a `apiKeyFormSchema`-t használja, ami **külön** példány (`pages/api-keys/api-keys.logic.ts`) | Pontosítás: „a form-séma a shared request-sémából **származik** (`createApiKeySchema.pick/omit/extend`), nem újrafogalmazott másolat" |
-| T3-2 | „a meglévő `Input`/`Textarea` a `FormField`-re épül" | Az `Input`/`Textarea` ma **önálló** komponens label+error props-szal | A ticket legyen: „a `FormField` **visszafelé kompatibilis** wrapper: a régi `Input`/`Textarea` használata működik, de új oldalon a `FormField` kötelező" — így nincs breaking |
-| T4-1 | „`DataTable` a `@tanstack/react-table` fölött" | A csomag nincs telepítve; a meglévő `Table` natív (`TableHead`/`TableRow`) | A ticket döntse el: vagy a meglévő `Table` bővül (`sortable`, `sticky`, `rowActions`), vagy új `@tanstack/react-table`. **Két tábla implementáció nem maradjon** |
-| T5-1 | „session store a meglévő `session-token.ts` fölött" | Az AIS-74 **törli** a `session-token.ts`-t és a teljes `AuthContext`-et | A T5-1 ne építsen session store-t: **az AIS-74 hozza létre**, a T5-1 csak a helyét nevezi meg |
+| Hely | A bontás állítása                                                                        | A kód valósága                                                                                                                                                           | Javítás                                                                                                                                                                       |
+| ---- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1-1 | „`apiKeyListSchema` átállítása `paginatedSchema(apiKeySchema)`-re"                       | A `successEnvelopeSchema` **már** tartalmazza a `meta.pagination`-t; a `data` tömb marad tömb. Tehát **nincs breaking** a sémán, csak a `meta.pagination` kitöltése kell | A DoD pontosítsa: „a `data` tömb **marad** tömb; a `meta.pagination` a válaszban jelenik meg; a `paginatedSchema` a **kliensoldali** típust adja"                             |
+| T1-2 | „`ApiResponseService.ok(data, ctx, pagination)`"                                         | A `toSuccessEnvelope` a `meta`-t paraméterként kapja → a service-t nem kell bővíteni, csak a `pagination`-t átadni                                                       | A DoD: „a controller a `ctx`-hez pagination-t ad; a `ApiResponseService` változatlan"                                                                                         |
+| T3-1 | „a séma a szerver pipe-ban, a kliens parse-ban és a RHF resolverben ugyanaz az objektum" | A meglévő `createApiKeySchema` a **request** séma; a form a `apiKeyFormSchema`-t használja, ami **külön** példány (`pages/api-keys/api-keys.logic.ts`)                   | Pontosítás: „a form-séma a shared request-sémából **származik** (`createApiKeySchema.pick/omit/extend`), nem újrafogalmazott másolat"                                         |
+| T3-2 | „a meglévő `Input`/`Textarea` a `FormField`-re épül"                                     | Az `Input`/`Textarea` ma **önálló** komponens label+error props-szal                                                                                                     | A ticket legyen: „a `FormField` **visszafelé kompatibilis** wrapper: a régi `Input`/`Textarea` használata működik, de új oldalon a `FormField` kötelező" — így nincs breaking |
+| T4-1 | „`DataTable` a `@tanstack/react-table` fölött"                                           | A csomag nincs telepítve; a meglévő `Table` natív (`TableHead`/`TableRow`)                                                                                               | A ticket döntse el: vagy a meglévő `Table` bővül (`sortable`, `sticky`, `rowActions`), vagy új `@tanstack/react-table`. **Két tábla implementáció nem maradjon**              |
+| T5-1 | „session store a meglévő `session-token.ts` fölött"                                      | Az AIS-74 **törli** a `session-token.ts`-t és a teljes `AuthContext`-et                                                                                                  | A T5-1 ne építsen session store-t: **az AIS-74 hozza létre**, a T5-1 csak a helyét nevezi meg                                                                                 |
 
 ---
 
 ## 6. Javított bontás (a review után)
 
-| # | Téma | Story | Új subtask | Változás a review után |
-|---|---|---|---|---|
-| **T1** | Adatáramlás és API szerződés | **új Story** (nem az AIS-87) | 5 | AIS-87-ből kivéve; + K3 repo-breaking, K2 pipe-megjegyzés |
-| **T2** | Form és validáció | **új Story** | 4 + 1 | a T2-1 (mezőhiba) ide kerül az AIS-86-ból; T3/T4 összevonva |
-| **T3** | Megjelenítés (UI kit) | **új Story** | 2 | + a `Table` vs `@tanstack/react-table` döntés |
-| **T4** | Admin alkalmazás-alap és minőségkapu | **új Story** | 5 | + K1 CI-teszt-futtatás, + T5-1 nem épít session store-t |
-| **T5** | Notification és élő log | **AIS-86** (meglévő, változatlan) | 0 (AIS-79…85) | az AIS-85 bővül a `useAppForm` mintával |
-| **T6** | Cégadatok | **AIS-14 / AIS-15** | 0 (8 üres feltöltve) | + K4 migrációs előfeltétel |
-| **T0** | Gyors győzelmek (külön Story vagy a T4 része) | — | 3 | K1 (CI tesztek), K5 (Zustand opcionális), K6 (kód-táblázat egysége) |
+| #      | Téma                                          | Story                             | Új subtask           | Változás a review után                                              |
+| ------ | --------------------------------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------- |
+| **T1** | Adatáramlás és API szerződés                  | **új Story** (nem az AIS-87)      | 5                    | AIS-87-ből kivéve; + K3 repo-breaking, K2 pipe-megjegyzés           |
+| **T2** | Form és validáció                             | **új Story**                      | 4 + 1                | a T2-1 (mezőhiba) ide kerül az AIS-86-ból; T3/T4 összevonva         |
+| **T3** | Megjelenítés (UI kit)                         | **új Story**                      | 2                    | + a `Table` vs `@tanstack/react-table` döntés                       |
+| **T4** | Admin alkalmazás-alap és minőségkapu          | **új Story**                      | 5                    | + K1 CI-teszt-futtatás, + T5-1 nem épít session store-t             |
+| **T5** | Notification és élő log                       | **AIS-86** (meglévő, változatlan) | 0 (AIS-79…85)        | az AIS-85 bővül a `useAppForm` mintával                             |
+| **T6** | Cégadatok                                     | **AIS-14 / AIS-15**               | 0 (8 üres feltöltve) | + K4 migrációs előfeltétel                                          |
+| **T0** | Gyors győzelmek (külön Story vagy a T4 része) | —                                 | 3                    | K1 (CI tesztek), K5 (Zustand opcionális), K6 (kód-táblázat egysége) |
 
 **Összesen: 4 új Story + 16 új subtask**, a korábbi 13 helyett — a különbség a K1 és a Story-újrakalibrálás.
 
 ### Újonnan felvett subtaskok (a review során találtak)
 
-| ID | Tartalom | Miért |
-|---|---|---|
-| **T4-0** | `CI: a teljes teszt-mátrix futtatása (shared, api-client, ui, admin) a PR-on` | K1/K7 — ma ezek a tesztek **nem futnak** CI-ban |
-| **T4-1** | `admin: hibakód-táblázatok egysége (ERROR_CODE_MESSAGE + FIELD_SURFACE_CODES a shared katalógusból, teszt)` | K6 |
-| **T1-2a** | (a T1-2 DoD bővítése) `Az ApiKeysRepository interfész breaking: findAll → findPage` | K3 |
-| **T4-3** | `admin: session store csak az AIS-74-ben` (a T4 leírás pontosítása, nem új ticket) | a bontás 5. sor |
+| ID        | Tartalom                                                                                                    | Miért                                           |
+| --------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| **T4-0**  | `CI: a teljes teszt-mátrix futtatása (shared, api-client, ui, admin) a PR-on`                               | K1/K7 — ma ezek a tesztek **nem futnak** CI-ban |
+| **T4-1**  | `admin: hibakód-táblázatok egysége (ERROR_CODE_MESSAGE + FIELD_SURFACE_CODES a shared katalógusból, teszt)` | K6                                              |
+| **T1-2a** | (a T1-2 DoD bővítése) `Az ApiKeysRepository interfész breaking: findAll → findPage`                         | K3                                              |
+| **T4-3**  | `admin: session store csak az AIS-74-ben` (a T4 leírás pontosítása, nem új ticket)                          | a bontás 5. sor                                 |
 
 ---
 

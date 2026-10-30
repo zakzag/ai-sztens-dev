@@ -13,18 +13,18 @@ live in [`infra/`](../infra) and this directory.
 
 ## Overview
 
-| Step | Where | What |
-|---|---|---|
-| 1. Local prep | your machine | Create `deploy/.env.dev`, copy real SSH keys into `deploy/ssh-keys/`, set `GHCR_OWNER` and (if private) `GHCR_PAT` |
-| 2. Bootstrap | droplet | [`deploy/bootstrap.sh`](bootstrap.sh): Docker + users + SSH keys + UFW |
-| 3. Image registry | GHCR | `.github/workflows/images.yml` builds and pushes the four images; `deploy.yml` pulls them |
-| 4. Start | droplet | `docker compose pull && docker compose up -d` (no `--build`) |
+| Step              | Where        | What                                                                                                               |
+| ----------------- | ------------ | ------------------------------------------------------------------------------------------------------------------ |
+| 1. Local prep     | your machine | Create `deploy/.env.dev`, copy real SSH keys into `deploy/ssh-keys/`, set `GHCR_OWNER` and (if private) `GHCR_PAT` |
+| 2. Bootstrap      | droplet      | [`deploy/bootstrap.sh`](bootstrap.sh): Docker + users + SSH keys + UFW                                             |
+| 3. Image registry | GHCR         | `.github/workflows/images.yml` builds and pushes the four images; `deploy.yml` pulls them                          |
+| 4. Start          | droplet      | `docker compose pull && docker compose up -d` (no `--build`)                                                       |
 
 > ### How to run the deploy script on Windows
 >
 > **Never double-click `deploy/deploy.sh`, and never type `deploy/deploy.sh up` in
 > PowerShell or cmd.** Windows resolves `.sh` through the Git Bash file association
-> (`git-bash.exe --no-cd "%L" %*`), which opens a *new, throwaway* terminal window and
+> (`git-bash.exe --no-cd "%L" %*`), which opens a _new, throwaway_ terminal window and
 > hands bash a backslash Windows path it cannot resolve:
 >
 > ```
@@ -34,13 +34,13 @@ live in [`infra/`](../infra) and this directory.
 > The window closes before the message can be read, so a failed deploy looks like
 > "it did nothing and showed no error". Use one of these instead:
 >
-> | Shell | Command |
-> |---|---|
-> | Git Bash / WSL | `./deploy/deploy.sh up dev` |
-> | PowerShell / cmd | `bash deploy/deploy.sh up dev` |
-> | PowerShell wrapper (**recommended on Windows**) | `.\deploy\deploy.ps1 up dev` |
+> | Shell                                           | Command                        |
+> | ----------------------------------------------- | ------------------------------ |
+> | Git Bash / WSL                                  | `./deploy/deploy.sh up dev`    |
+> | PowerShell / cmd                                | `bash deploy/deploy.sh up dev` |
+> | PowerShell wrapper (**recommended on Windows**) | `.\deploy\deploy.ps1 up dev`   |
 >
-> The wrapper ([`deploy.ps1`](deploy.ps1)) streams output into the *current* console, keeps
+> The wrapper ([`deploy.ps1`](deploy.ps1)) streams output into the _current_ console, keeps
 > the window open on failure, prints the tail of `deploy/log/latest.log`, and forwards
 > `deploy.sh`'s exit code.
 >
@@ -51,11 +51,11 @@ live in [`infra/`](../infra) and this directory.
 > The argument after the command selects which environment file is loaded. Only `dev`
 > and `prod` are accepted — anything else is a usage error (exit code 2):
 >
-> | Command | Env file | `APP_ENV` |
-> |---|---|---|
-> | `./deploy/deploy.sh up` | `deploy/.env.dev` | `dev` (default) |
-> | `./deploy/deploy.sh up dev` | `deploy/.env.dev` | `dev` |
-> | `./deploy/deploy.sh up prod` | `deploy/.env.prod` | `prod` |
+> | Command                      | Env file           | `APP_ENV`       |
+> | ---------------------------- | ------------------ | --------------- |
+> | `./deploy/deploy.sh up`      | `deploy/.env.dev`  | `dev` (default) |
+> | `./deploy/deploy.sh up dev`  | `deploy/.env.dev`  | `dev`           |
+> | `./deploy/deploy.sh up prod` | `deploy/.env.prod` | `prod`          |
 >
 > The same target also selects `infra/.env.<target>`, the SPA build mode and the compose
 > `--env-file`, so a mistyped target cannot mix dev artefacts into a prod deploy.
@@ -86,7 +86,7 @@ empty falls back to the agent + `~/.ssh` defaults.
 The `dev` target pins the passphrase-less deploy key
 [`deploy/ssh-keys/deploy.private.key`](ssh-keys/deploy.private.key)
 (`SSH_KEY=./deploy/ssh-keys/deploy.private.key`, `SSH_USER=deployer`). The GitHub Actions
-workflow uses the **same** key through the `DROPLET_SSH_KEY` secret *and* the same
+workflow uses the **same** key through the `DROPLET_SSH_KEY` secret _and_ the same
 `deployer` account, so the two deploy paths are interchangeable and the key's public half
 must be in `/home/deployer/.ssh/authorized_keys` on the droplet (§8.1).
 
@@ -100,7 +100,7 @@ deploy/ssh-keys/deployer.pub
 ```
 
 Point DNS `A` records for `DOMAIN` (and `api.DOMAIN`) at the droplet's public IPv4
-*before* the first `up`, so Caddy can obtain TLS certificates.
+_before_ the first `up`, so Caddy can obtain TLS certificates.
 
 ## 2. Bootstrap the droplet
 
@@ -229,14 +229,14 @@ runs install + build + lint + unit tests before the merge is allowed in.
 
 Configure under **Settings → Secrets and variables → Actions**:
 
-| Secret / variable | Value | Notes |
-|---|---|---|
-| `DROPLET_HOST` (secret) | Droplet public IPv4 or hostname (the **current** target droplet — currently the dev one) | e.g. `164.92.248.194`. When a second droplet comes online, the workflow's `inputs.app_env` dispatch needs to select the prod host as well as the prod env secret (`DROPLET_HOST` cannot express two; this is a known follow-up when the prod droplet is provisioned). |
-| `DROPLET_SSH_KEY` (secret) | The passphrase-less deploy key — the contents of [`deploy/ssh-keys/deploy.private.key`](ssh-keys/deploy.private.key) (gitignored) | Its **public** half must be in `/home/deployer/.ssh/authorized_keys` on the droplet, because the workflow logs in as `deployer`. The local `deploy.sh` uses the same key **and the same account**. |
-| `INFRA_ENV_DEV` (secret) | Full contents of `infra/.env.dev` (multi-line, verbatim) | Renders `infra/.env` on every deploy. Picked when `app_env=dev`. |
-| `INFRA_ENV_PROD` (secret) | Full contents of `infra/.env.prod` (multi-line, verbatim) | Renders `infra/.env` on every deploy. Picked when `app_env=prod` (i.e. when an operator dispatches the workflow with `app_env=prod` against a future prod droplet). |
-| `GHCR_OWNER` (variable) | GitHub org/user that owns the image packages | Used to construct the full image reference (`ghcr.io/<GHCR_OWNER>/aisztens-api` etc.). Defaults to `${{ github.repository_owner }}` if unset. |
-| `GHCR_PAT` (secret, optional) | PAT with `read:packages` | Only required when the repository is private and the droplet must `docker login ghcr.io` to pull images. |
+| Secret / variable             | Value                                                                                                                             | Notes                                                                                                                                                                                                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DROPLET_HOST` (secret)       | Droplet public IPv4 or hostname (the **current** target droplet — currently the dev one)                                          | e.g. `164.92.248.194`. When a second droplet comes online, the workflow's `inputs.app_env` dispatch needs to select the prod host as well as the prod env secret (`DROPLET_HOST` cannot express two; this is a known follow-up when the prod droplet is provisioned). |
+| `DROPLET_SSH_KEY` (secret)    | The passphrase-less deploy key — the contents of [`deploy/ssh-keys/deploy.private.key`](ssh-keys/deploy.private.key) (gitignored) | Its **public** half must be in `/home/deployer/.ssh/authorized_keys` on the droplet, because the workflow logs in as `deployer`. The local `deploy.sh` uses the same key **and the same account**.                                                                    |
+| `INFRA_ENV_DEV` (secret)      | Full contents of `infra/.env.dev` (multi-line, verbatim)                                                                          | Renders `infra/.env` on every deploy. Picked when `app_env=dev`.                                                                                                                                                                                                      |
+| `INFRA_ENV_PROD` (secret)     | Full contents of `infra/.env.prod` (multi-line, verbatim)                                                                         | Renders `infra/.env` on every deploy. Picked when `app_env=prod` (i.e. when an operator dispatches the workflow with `app_env=prod` against a future prod droplet).                                                                                                   |
+| `GHCR_OWNER` (variable)       | GitHub org/user that owns the image packages                                                                                      | Used to construct the full image reference (`ghcr.io/<GHCR_OWNER>/aisztens-api` etc.). Defaults to `${{ github.repository_owner }}` if unset.                                                                                                                         |
+| `GHCR_PAT` (secret, optional) | PAT with `read:packages`                                                                                                          | Only required when the repository is private and the droplet must `docker login ghcr.io` to pull images.                                                                                                                                                              |
 
 The `APP_ENV` selector (`dev` / `prod`) is set automatically:
 
@@ -374,10 +374,10 @@ Every run of [`deploy/deploy.sh`](deploy.sh:1) leaves a complete log — not jus
 own messages, but the output of every command it runs (`pnpm`, `rsync`, `scp`, `ssh`,
 `docker compose` over ssh) — written by [`deploy/lib/logger.sh`](lib/logger.sh:1):
 
-| Path | What |
-|---|---|
+| Path                                                         | What                                                                 |
+| ------------------------------------------------------------ | -------------------------------------------------------------------- |
 | `deploy/log/deploy-<YYYYmmdd-HHMMSS>-<command>-<target>.log` | one file per run; the newest `DEPLOY_LOG_KEEP` are kept (default 20) |
-| `deploy/log/latest.log` | always the newest run — **read this first after a failure** |
+| `deploy/log/latest.log`                                      | always the newest run — **read this first after a failure**          |
 
 The target is part of the file name, so `ls deploy/log/` distinguishes a dev run from a
 prod run. Each file opens with a header (command, start time, host, `APP_ENV`, `DOMAIN`,
@@ -386,7 +386,7 @@ path. The resolved target and the env file that was loaded are recorded in the `
 line.
 
 The guard for a missing `HOST` is an explicit, logged check rather than the
-`${HOST:?…}` expansion: bash exits on that expansion *before* the `ERR` trap can run, so
+`${HOST:?…}` expansion: bash exits on that expansion _before_ the `ERR` trap can run, so
 nothing would be reported and no log would be written. With the explicit check, even a run
 that aborts during configuration parsing leaves a log behind.
 
@@ -398,12 +398,12 @@ bash deploy/deploy.sh ps prod           # the prod droplet (needs deploy/.env.pr
 
 Optional tuning (environment or `deploy/.env.<target>`):
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `DEPLOY_LOG_LEVEL` | `INFO` | `DEBUG` keeps `log_debug` / `log_cmd` lines |
-| `DEPLOY_LOG_KEEP` | `20` | number of finished runs retained on disk |
+| Variable           | Default | Meaning                                     |
+| ------------------ | ------- | ------------------------------------------- |
+| `DEPLOY_LOG_LEVEL` | `INFO`  | `DEBUG` keeps `log_debug` / `log_cmd` lines |
+| `DEPLOY_LOG_KEEP`  | `20`    | number of finished runs retained on disk    |
 
 The log never contains secrets: the selected env file is sourced with `set -a`, and the logger
 refuses to start when bash xtrace is enabled (`set -x`), so `bash -x deploy.sh` cannot dump
-env values into the file. The logger prints resolved *names* (`APP_ENV`, `DOMAIN`, host)
+env values into the file. The logger prints resolved _names_ (`APP_ENV`, `DOMAIN`, host)
 only.

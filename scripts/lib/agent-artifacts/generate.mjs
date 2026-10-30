@@ -23,12 +23,21 @@ import { DEFAULT_EMIT, loadOverrides } from './overrides.mjs';
 import { renderClaudeSubagent } from './render-claude.mjs';
 import { renderCopilotChatMode } from './render-copilot.mjs';
 import { renderCursorCommand, renderCursorRule } from './render-cursor.mjs';
-import { AGENT_SPECS, discoverRuleSources, renderInstructionFile } from './rules.mjs';
+import {
+  AGENT_SPECS,
+  discoverRuleSources,
+  renderInstructionFile,
+} from './rules.mjs';
 import { loadRoomodes } from './roomodes.mjs';
 import { syncGitignore, writeArtifact } from './writer.mjs';
 
 const ROOMODES_FILE = '.roomodes';
-const OVERRIDES_PATH = join('scripts', 'lib', 'agent-artifacts', 'mode-overrides.json');
+const OVERRIDES_PATH = join(
+  'scripts',
+  'lib',
+  'agent-artifacts',
+  'mode-overrides.json',
+);
 
 /**
  * @typedef {object} Options
@@ -44,7 +53,12 @@ const OVERRIDES_PATH = join('scripts', 'lib', 'agent-artifacts', 'mode-overrides
  */
 export function parseArgs(argv) {
   /** @type {Options} */
-  const options = { agent: '', root: process.cwd(), dryRun: false, check: false };
+  const options = {
+    agent: '',
+    root: process.cwd(),
+    dryRun: false,
+    check: false,
+  };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -70,7 +84,9 @@ export function parseArgs(argv) {
   }
 
   if (!Object.prototype.hasOwnProperty.call(AGENT_SPECS, options.agent)) {
-    throw new Error(`--agent is required and must be one of: ${Object.keys(AGENT_SPECS).join(', ')}`);
+    throw new Error(
+      `--agent is required and must be one of: ${Object.keys(AGENT_SPECS).join(', ')}`,
+    );
   }
   if (options.root === '') {
     throw new Error('--root must not be empty');
@@ -90,11 +106,15 @@ export async function buildArtifacts(options) {
     console.log(`[i] Forrás: ${source}`);
   }
   if (missingPrimary) {
-    console.warn('[!] Hiányzó elsődleges forrás (kihagyva): .roo/rules/instructions.md');
+    console.warn(
+      '[!] Hiányzó elsődleges forrás (kihagyva): .roo/rules/instructions.md',
+    );
   }
 
   /** @type {import('./rules.mjs').Artifact[]} */
-  const artifacts = [await renderInstructionFile(options.agent, options.root, sources)];
+  const artifacts = [
+    await renderInstructionFile(options.agent, options.root, sources),
+  ];
   artifacts.push(...(await buildModeArtifacts(options)));
   return artifacts;
 }
@@ -106,7 +126,9 @@ export async function buildArtifacts(options) {
 async function buildModeArtifacts(options) {
   const roomodesPath = join(options.root, ROOMODES_FILE);
   if (!existsSync(roomodesPath)) {
-    console.warn(`[!] ${ROOMODES_FILE} nem található - mode artefakt kihagyva.`);
+    console.warn(
+      `[!] ${ROOMODES_FILE} nem található - mode artefakt kihagyva.`,
+    );
     return [];
   }
 
@@ -118,7 +140,9 @@ async function buildModeArtifacts(options) {
   for (const mode of modes) {
     const override = overrides[mode.slug] ?? {};
     const emit = override.emit ?? DEFAULT_EMIT;
-    console.log(`[i] Mode: ${mode.slug} (${mode.groups.join(', ')}) -> ${emit.join(', ')}`);
+    console.log(
+      `[i] Mode: ${mode.slug} (${mode.groups.join(', ')}) -> ${emit.join(', ')}`,
+    );
 
     if (options.agent === 'copilot' && emit.includes('copilot-chatmode')) {
       artifacts.push(renderCopilotChatMode(mode, override));
@@ -174,7 +198,9 @@ async function main() {
     console.warn(`[!] ${gitignore.warning}`);
   }
   for (const entry of gitignore.added) {
-    const label = options.dryRun ? '[i] .gitignore bejegyzés hozzáadandó' : '[+] .gitignore frissítve';
+    const label = options.dryRun
+      ? '[i] .gitignore bejegyzés hozzáadandó'
+      : '[+] .gitignore frissítve';
     console.log(`${label}: ${entry}`);
   }
 

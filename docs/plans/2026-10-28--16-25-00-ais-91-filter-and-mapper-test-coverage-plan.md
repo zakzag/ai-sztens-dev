@@ -11,35 +11,35 @@
 AIS-91 is `To Do` in Jira with no comments, but the production code shipped on
 2026-10-27 (see [`docs/history/2026-10-27--17-01-00-unified-api-envelope-ais-87.md`](../history/2026-10-27--17-01-00-unified-api-envelope-ais-87.md)).
 
-| Ticket item | State |
-|---|---|
-| `ApiResponseService.ok(data, ctx, pagination?)` / `.fail(error, ctx)` | done |
-| Global `@Catch()` filter registered as `APP_FILTER` | done (`HttpModule`, imported by `AppModule`) |
-| Any throwable → `{ error: { code, status, message, details, requestId, timestamp, path } }` | done |
-| 5xx sanitising (fixed message, no stack / SQL / constraint in the body) | done |
-| `HttpException` 404/409 → catalogue code instead of 500 | done |
-| `@SkipEnvelope()` hook via `Reflector` | done |
-| Filter + service unit specs | done |
+| Ticket item                                                                                 | State                                        |
+| ------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `ApiResponseService.ok(data, ctx, pagination?)` / `.fail(error, ctx)`                       | done                                         |
+| Global `@Catch()` filter registered as `APP_FILTER`                                         | done (`HttpModule`, imported by `AppModule`) |
+| Any throwable → `{ error: { code, status, message, details, requestId, timestamp, path } }` | done                                         |
+| 5xx sanitising (fixed message, no stack / SQL / constraint in the body)                     | done                                         |
+| `HttpException` 404/409 → catalogue code instead of 500                                     | done                                         |
+| `@SkipEnvelope()` hook via `Reflector`                                                      | done                                         |
+| Filter + service unit specs                                                                 | done                                         |
 
 Scope names drifted from the ticket, without a functional difference:
 
-| Ticket | Implemented |
-|---|---|
-| `exception.logic.ts` | `to-app-error.ts` |
-| `http.const.ts` | `api-messages.const.ts` |
-| `fail(error: AppErrorShape, ctx: ErrorContext)` | `fail(error: AppError, ctx: RequestContext)` |
-| `APP_FILTER` in `AppModule` | `APP_FILTER` in the global `HttpModule`, imported first by `AppModule` |
+| Ticket                                          | Implemented                                                            |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `exception.logic.ts`                            | `to-app-error.ts`                                                      |
+| `http.const.ts`                                 | `api-messages.const.ts`                                                |
+| `fail(error: AppErrorShape, ctx: ErrorContext)` | `fail(error: AppError, ctx: RequestContext)`                           |
+| `APP_FILTER` in `AppModule`                     | `APP_FILTER` in the global `HttpModule`, imported first by `AppModule` |
 
 ## 2. Definition-of-Done gaps
 
-1. No `to-app-error.spec.ts` — the ticket's *"Unit: `exception.logic`"* requirement had no own
+1. No `to-app-error.spec.ts` — the ticket's _"Unit: `exception.logic`"_ requirement had no own
    spec; its assertions only arrived indirectly through the filter.
 2. The 5xx path **services actually use** was unproven: an `AppError` with a 5xx code carrying a
    SQL-ish message and `details`. Only a raw `Error` and a `HttpException(503)` were covered.
 3. Thrown `null` / `undefined` / primitives / plain objects → `INTERNAL_ERROR` were untested,
    although the ticket lists them.
-4. No log assertions, although the DoD requires *4xx → `warn`, 5xx → `error` with stack, detail
-   present in the log while absent from the body*.
+4. No log assertions, although the DoD requires _4xx → `warn`, 5xx → `error` with stack, detail
+   present in the log while absent from the body_.
 5. Discovered while writing the table test: `422` was missing from `STATUS_TO_CODE`, so a Nest
    `UnprocessableEntityException` answered **500**, contradicting
    [`docs/Specs/API-Convention.md`](../Specs/API-Convention.md) and the AIS-87 milestone, which
@@ -73,10 +73,10 @@ pnpm --filter @callback/api build    # green
 
 ## 5. Out of scope
 
-* AIS-96 / AIS-97 / AIS-98 / AIS-99 (admin error surfaces, CI bare-body gate, generated OpenAPI).
-* Refactoring the local log recorder in `db/database-lifecycle.service.spec.ts` onto the new shared
+- AIS-96 / AIS-97 / AIS-98 / AIS-99 (admin error surfaces, CI bare-body gate, generated OpenAPI).
+- Refactoring the local log recorder in `db/database-lifecycle.service.spec.ts` onto the new shared
   one (it is green and unrelated).
-* A dedicated `SEMANTIC_VALIDATION_FAILED` catalogue code — `422` keeps sharing
+- A dedicated `SEMANTIC_VALIDATION_FAILED` catalogue code — `422` keeps sharing
   `VALIDATION_FAILED` for now.
-* Jira statuses of the sibling subtasks AIS-88…AIS-95, which are also still `To Do` although their
+- Jira statuses of the sibling subtasks AIS-88…AIS-95, which are also still `To Do` although their
   code shipped.

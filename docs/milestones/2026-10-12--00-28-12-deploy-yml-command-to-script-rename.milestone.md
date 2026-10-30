@@ -67,7 +67,7 @@ Expected on the next deploy run:
 - The class of bug "action input silently renamed/removed in a minor
   version" is invisible in YAML lint, but a one-line test in the CI
   pipeline (run `actionlint` on the workflow files) would have caught
-  this *and* the earlier parse-error PR. Add actionlint to `ci.yml`.
+  this _and_ the earlier parse-error PR. Add actionlint to `ci.yml`.
 - The `appleboy/scp-action` step (`source:` list) silently also has
   quirks (cf. the earlier `chmod 600` -> `chmod 644` fix); a future
   action version bump should re-check that the source-list is still

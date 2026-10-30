@@ -1,20 +1,20 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-10-28 (AIS-96: `Banner` primitive, error-surface classifier, page/app error tiers)
-**Status:** living document — describes the *current* state of the React side of the monorepo.
+**Utolsó frissítés:** 2026-10-30 (AIS-118: az `src/app/` réteg — route registry, layout, provider-lánc, error boundary)
+**Status:** living document — describes the _current_ state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
 the rule set disagree, the rule set wins and this document is the bug.
 
 ## 1. Where the pieces live
 
-| Package / app | Role | Build |
-|---|---|---|
-| `packages/ui` | Design tokens + presentational primitives. **Source-only** (no `dist`): consumers bundle the `.ts`/`.tsx` sources directly. | `tsc --noEmit` (type check only) |
-| `packages/api-client` | The only place that talks to the backend (typed services + Zod parsing at the boundary). Tested with **jest + ts-jest**. | `tsc` → `dist` |
-| `packages/shared` | Wire schemas, shared pure helpers used by API, web and admin. Tested with jest. | `tsc` → `dist` |
-| `apps/admin` | Admin SPA. Consumes `@callback/ui` primitives and `@callback/api-client` services. Tested with **vitest + Testing Library**. | `tsc --noEmit` + `vite build` |
-| `apps/web` | Public site. Not yet migrated to the token layer — see §2. | `tsc --noEmit` + `vite build` |
+| Package / app         | Role                                                                                                                         | Build                            |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `packages/ui`         | Design tokens + presentational primitives. **Source-only** (no `dist`): consumers bundle the `.ts`/`.tsx` sources directly.  | `tsc --noEmit` (type check only) |
+| `packages/api-client` | The only place that talks to the backend (typed services + Zod parsing at the boundary). Tested with **jest + ts-jest**.     | `tsc` → `dist`                   |
+| `packages/shared`     | Wire schemas, shared pure helpers used by API, web and admin. Tested with jest.                                              | `tsc` → `dist`                   |
+| `apps/admin`          | Admin SPA. Consumes `@callback/ui` primitives and `@callback/api-client` services. Tested with **vitest + Testing Library**. | `tsc --noEmit` + `vite build`    |
+| `apps/web`            | Public site. Not yet migrated to the token layer — see §2.                                                                   | `tsc --noEmit` + `vite build`    |
 
 Why `packages/ui` has no build step (decision **D14** of the AIS-57 plan): its only
 consumer is a Vite bundle, so a `dist` would add a build ordering dependency and
@@ -32,16 +32,16 @@ Imports flow downwards only — no page→page, no feature→feature imports.
 The rule file describes the **target** structure. The table below shows both the target and
 what exists in `apps/admin` today, so nobody mistakes a planned folder for an existing one.
 
-| Layer | Target contents | State in `apps/admin/src` (2026-10-21) |
-|---|---|---|
-| `app` | providers, router, layout shell, session store | **not created**: `App.tsx` (router + `ProtectedLayout`) and `main.tsx` (`QueryClientProvider`) still sit at the `src` root; the session lives in `auth/AuthContext.tsx` + `auth/session-token.ts`, there is no Zustand session store |
-| `pages/<page>` | route composition, optional page store, page-only parts in `ui/` | **exists**: `pages/api-keys/` (`ApiKeysPage.tsx`, `api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `ui/ApiKeysTable.tsx`, `ui/ApiKeyForm.tsx`) — the first page folder; plus the flat `pages/LoginPage.tsx` and `pages/PlaceholderPage.tsx` |
-| `features/<use-case>` | query/mutation hooks, pure `*.logic.ts` | **exists**: `features/api-keys/` (`api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `use-api-keys.ts`) and `features/error-surface/` (`use-online-status.ts`, `use-app-error-banner.ts`, `query-error.store.ts`) |
-| `entities/<entity>` | domain types, pure mappers, display components | **exists**: `entities/api-key/` (`api-key.interface.ts`, `api-key.mapper.ts`, `api-key.const.ts`) — mappers only, no display components yet |
-| `services` | composition root (client instance + token supplier) | **exists**: `services/api-client.ts` + `services/api-client.const.ts` |
-| `lib` | pure helpers and formatters | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts` (+ their `*.const.ts` / `.interface.ts`) |
-| `components` | generic presentational shells (no data access) | **exists**: `components/BuildInfoFooter.tsx`, `components/error/PageErrorState.tsx`, `components/error/AppErrorBanner.tsx` (the latter is a thin container: all decisions live in `features/error-surface` + `lib/error-surface.*`) |
-| `test/mocks` | all fixtures, doubles, wrappers | **exists**: `test/mocks/api-keys.mock.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts` |
+| Layer                 | Target contents                                                  | State in `apps/admin/src` (2026-10-21)                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app`                 | providers, router, layout shell, session store                   | **exists** (AIS-118): `app/router/` (the route registry + `AppRouter` + `ProtectedRoute`), `app/layout/` (`AdminLayout` + `AdminNav`), `app/providers/` (`AppProviders` + `SessionProvider`), `app/session/` (`useRequireSession`), `app/error/` (`AppErrorBoundary`). `App.tsx` is composition only; the session implementation still lives in `auth/AuthContext.tsx` (the cookie session is AIS-74) |
+| `pages/<page>`        | route composition, optional page store, page-only parts in `ui/` | **exists**: `pages/api-keys/` (`ApiKeysPage.tsx`, `api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `ui/ApiKeysTable.tsx`, `ui/ApiKeyForm.tsx`) — the first page folder; plus the flat `pages/LoginPage.tsx` and `pages/PlaceholderPage.tsx`                                                                                                                                                         |
+| `features/<use-case>` | query/mutation hooks, pure `*.logic.ts`                          | **exists**: `features/api-keys/` (`api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `use-api-keys.ts`) and `features/error-surface/` (`use-online-status.ts`, `use-app-error-banner.ts`, `query-error.store.ts`)                                                                                                                                                                                     |
+| `entities/<entity>`   | domain types, pure mappers, display components                   | **exists**: `entities/api-key/` (`api-key.interface.ts`, `api-key.mapper.ts`, `api-key.const.ts`) — mappers only, no display components yet                                                                                                                                                                                                                                                           |
+| `services`            | composition root (client instance + token supplier)              | **exists**: `services/api-client.ts` + `services/api-client.const.ts`                                                                                                                                                                                                                                                                                                                                 |
+| `lib`                 | pure helpers and formatters                                      | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts` (+ their `*.const.ts` / `.interface.ts`)                                                                                                                                                                                                                                                                              |
+| `components`          | generic presentational shells (no data access)                   | **exists**: `components/BuildInfoFooter.tsx`, `components/error/PageErrorState.tsx`, `components/error/AppErrorBanner.tsx` (the latter is a thin container: all decisions live in `features/error-surface` + `lib/error-surface.*`)                                                                                                                                                                   |
+| `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/api-keys.mock.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                                                                                                                                                                               |
 
 `apps/web` is out of scope for this document's layer map: it has no features/entities
 folders yet and is not migrated to `packages/ui` tokens.
@@ -52,8 +52,8 @@ Consumers import the token file right after Tailwind and register the primitive
 sources for class scanning:
 
 ```css
-@import "tailwindcss";
-@import "../../../packages/ui/src/styles/theme.css";
+@import 'tailwindcss';
+@import '../../../packages/ui/src/styles/theme.css';
 @source "../../../packages/ui/src";
 ```
 
@@ -61,24 +61,24 @@ sources for class scanning:
 
 **Theme identity (admin retheme, 2026-10-22):** graphite / ash surfaces (low-chroma
 cool neutrals) with a **teal-cyan accent**. The previous violet palette is gone; token
-*names* are unchanged, so no component had to be touched to pick up the new look.
+_names_ are unchanged, so no component had to be touched to pick up the new look.
 
-| Group | Tokens | Typical utility | Role |
-|---|---|---|---|
-| Brand | `--color-primary`, `--color-primary-hover`, `--color-primary-foreground`, `--color-secondary(-foreground)`, `--color-tertiary`, `--color-quaternary` | `bg-primary`, `text-primary-foreground` | teal accent (`195°`), dark ink on the accent |
-| Surface | `--color-surface-base/-raised/-sunken/-overlay` | `bg-surface-raised` | graphite ladder, base darkest at `L≈0.17` |
-| Border | `--color-border-hairline/-default/-strong/-focus` | `border-border-hairline` | **dark** greys (`L≈0.30 / 0.36 / 0.45`) + teal focus |
-| Text | `--color-text-primary/-secondary/-muted/-inverse` | `text-text-secondary` | light greys for the dark surfaces |
-| State | `--color-success/-warning/-danger/-info` (+ `-foreground`) | `bg-danger text-danger-foreground` | saturated fills with dark or white ink respectively |
+| Group   | Tokens                                                                                                                                               | Typical utility                         | Role                                                 |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------- |
+| Brand   | `--color-primary`, `--color-primary-hover`, `--color-primary-foreground`, `--color-secondary(-foreground)`, `--color-tertiary`, `--color-quaternary` | `bg-primary`, `text-primary-foreground` | teal accent (`195°`), dark ink on the accent         |
+| Surface | `--color-surface-base/-raised/-sunken/-overlay`                                                                                                      | `bg-surface-raised`                     | graphite ladder, base darkest at `L≈0.17`            |
+| Border  | `--color-border-hairline/-default/-strong/-focus`                                                                                                    | `border-border-hairline`                | **dark** greys (`L≈0.30 / 0.36 / 0.45`) + teal focus |
+| Text    | `--color-text-primary/-secondary/-muted/-inverse`                                                                                                    | `text-text-secondary`                   | light greys for the dark surfaces                    |
+| State   | `--color-success/-warning/-danger/-info` (+ `-foreground`)                                                                                           | `bg-danger text-danger-foreground`      | saturated fills with dark or white ink respectively  |
 
 ### 3.2 Depth, shape, motion, thickness
 
-| Group | Tokens | Utility |
-|---|---|---|
-| Depth | `--shadow-neu-raised`, `--shadow-neu-inset`, `--shadow-neu-pressed`, `--shadow-focus-ring` | `shadow-neu-raised` |
-| Shape | `--radius-control`, `--radius-card`, `--radius-pill` | `rounded-card` |
-| Motion | `--ease-neu`, `--duration-fast`, `--duration-base` | `duration-fast` |
-| Thickness | `--border-width-hairline`, `--border-width-default`, `--border-width-strong` | `border-hairline`, `border-strong` |
+| Group     | Tokens                                                                                     | Utility                            |
+| --------- | ------------------------------------------------------------------------------------------ | ---------------------------------- |
+| Depth     | `--shadow-neu-raised`, `--shadow-neu-inset`, `--shadow-neu-pressed`, `--shadow-focus-ring` | `shadow-neu-raised`                |
+| Shape     | `--radius-control`, `--radius-card`, `--radius-pill`                                       | `rounded-card`                     |
+| Motion    | `--ease-neu`, `--duration-fast`, `--duration-base`                                         | `duration-fast`                    |
+| Thickness | `--border-width-hairline`, `--border-width-default`, `--border-width-strong`               | `border-hairline`, `border-strong` |
 
 `border-hairline`, `border-strong`, `duration-fast` and `duration-base` are
 custom `@utility` declarations: Tailwind v4 has no theme namespace for border
@@ -89,7 +89,7 @@ exposed through those utilities (decision **D15**).
 
 Tailwind v4 preflight ships `border-style: solid` with **no border colour**, so
 `border-color` resolves to `currentColor`. Every primitive that set only a
-*width* (`border border-hairline`) therefore painted its outline with the
+_width_ (`border border-hairline`) therefore painted its outline with the
 near-white text token — the "whitish outlines" defect. Two layers of defence:
 
 1. `theme.css` `@layer base` sets `border-color: var(--color-border-hairline)`
@@ -109,7 +109,7 @@ non-default outline, it must name a border/state token.
 1. No colour literal in `apps/*/src` — literals exist **only** in `theme.css`.
 2. No Tailwind palette utility (`bg-slate-800`, `text-indigo-500`, …) and no
    palette opacity modifiers.
-3. No arbitrary colour values (`bg-[#101010]`); arbitrary *layout* values
+3. No arbitrary colour values (`bg-[#101010]`); arbitrary _layout_ values
    (`grid-cols-[2fr_1fr]`) are allowed.
 4. New visual concepts are built once in `packages/ui` as a primitive or a CVA
    variant — never inline in a page.
@@ -130,16 +130,16 @@ Get-ChildItem -Path 'apps/admin/src' -Recurse -File |
 
 ## 4. Primitives (`packages/ui/src/components`)
 
-| Primitive | Variants / props | Notes |
-|---|---|---|
-| `Button` | `variant`: `primary` \| `secondary` \| `ghost` \| `danger`; `size`: `sm` \| `md` \| `lg`; `isLoading` | `type` defaults to `button` (**D17**); submitting requires an explicit `type="submit"`. Loading sets `disabled` + `aria-busy`. |
-| `Input` | `label`, `id`, `error`, `hint`, `invalid` | `id` is required so the label association is deterministic. Error wins over hint; `aria-invalid` + `aria-describedby` are wired. Forwards its ref so react-hook-form can focus the first invalid field. |
-| `Textarea` | same props as `Input` + `rows` (default `4`) | Multi-line twin of `Input` — same sunken recipe, `resize-y`, ref forwarded. Added by AIS-41 so a 2000-character description does not live in a one-line field. |
-| `Card` | `title`, `description` | Raised surface; title renders as an `h2`. |
-| `Table` + `TableHead` / `TableBody` / `TableRow` / `TableHeaderCell` / `TableCell` | native attributes | `Table` owns the scroll container; header cells default to `scope="col"`. |
-| `Badge` | `variant`: `neutral` \| `info` \| `success` \| `warning` \| `danger` | Variant names are the shared vocabulary for domain mappers. |
-| `Alert` | `variant`: `info` \| `success` \| `warning` \| `danger`, `title` | `danger` is announced as `role="alert"`, the others as `role="status"`. |
-| `Banner` | `variant`: `info` \| `warning` \| `danger`, `title`, `action`, `onDismiss` + `dismissLabel` | App-level, full-width strip for a *persistent condition* (offline / expired session / 503). `danger` → `role="alert"`, the others → `role="status"`. The props type makes `dismissLabel` mandatory whenever `onDismiss` is given, so the close control always has an accessible name. No timer: the banner disappears only when the condition ends or the user closes it (AIS-96). |
+| Primitive                                                                          | Variants / props                                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`                                                                           | `variant`: `primary` \| `secondary` \| `ghost` \| `danger`; `size`: `sm` \| `md` \| `lg`; `isLoading` | `type` defaults to `button` (**D17**); submitting requires an explicit `type="submit"`. Loading sets `disabled` + `aria-busy`.                                                                                                                                                                                                                                                     |
+| `Input`                                                                            | `label`, `id`, `error`, `hint`, `invalid`                                                             | `id` is required so the label association is deterministic. Error wins over hint; `aria-invalid` + `aria-describedby` are wired. Forwards its ref so react-hook-form can focus the first invalid field.                                                                                                                                                                            |
+| `Textarea`                                                                         | same props as `Input` + `rows` (default `4`)                                                          | Multi-line twin of `Input` — same sunken recipe, `resize-y`, ref forwarded. Added by AIS-41 so a 2000-character description does not live in a one-line field.                                                                                                                                                                                                                     |
+| `Card`                                                                             | `title`, `description`                                                                                | Raised surface; title renders as an `h2`.                                                                                                                                                                                                                                                                                                                                          |
+| `Table` + `TableHead` / `TableBody` / `TableRow` / `TableHeaderCell` / `TableCell` | native attributes                                                                                     | `Table` owns the scroll container; header cells default to `scope="col"`.                                                                                                                                                                                                                                                                                                          |
+| `Badge`                                                                            | `variant`: `neutral` \| `info` \| `success` \| `warning` \| `danger`                                  | Variant names are the shared vocabulary for domain mappers.                                                                                                                                                                                                                                                                                                                        |
+| `Alert`                                                                            | `variant`: `info` \| `success` \| `warning` \| `danger`, `title`                                      | `danger` is announced as `role="alert"`, the others as `role="status"`.                                                                                                                                                                                                                                                                                                            |
+| `Banner`                                                                           | `variant`: `info` \| `warning` \| `danger`, `title`, `action`, `onDismiss` + `dismissLabel`           | App-level, full-width strip for a _persistent condition_ (offline / expired session / 503). `danger` → `role="alert"`, the others → `role="status"`. The props type makes `dismissLabel` mandatory whenever `onDismiss` is given, so the close control always has an accessible name. No timer: the banner disappears only when the condition ends or the user closes it (AIS-96). |
 
 Exports are explicit from `packages/ui/src/index.ts` (no `export *`). `cn()` is
 exported too so pages can merge caller classes with the recipe classes.
@@ -150,15 +150,15 @@ A failure becomes visible in exactly one of four places. The decision is made by
 `toErrorSurface(error)` in `apps/admin/src/lib/error-surface.logic.ts` — pure, no React,
 no I/O — so no component inspects `status`, `code` or the server `message`.
 
-| First matching condition | Surface | Rendered by |
-|---|---|---|
-| `AbortError` / `CancelledError` | `silent` | nothing |
-| not an `ApiError` | `page` | `PageErrorState` |
-| `status === null` (offline, DNS, CORS) | `banner` | `AppErrorBanner` |
-| `401` | `banner` (login CTA) | `AppErrorBanner` |
-| `503` | `banner` | `AppErrorBanner` |
-| field code with `issues[]` | `field` | RHF `setError` (AIS-95) |
-| everything else (`400`, `403`, `404`, `409`, `5xx`) | `page` | `PageErrorState` |
+| First matching condition                            | Surface              | Rendered by             |
+| --------------------------------------------------- | -------------------- | ----------------------- |
+| `AbortError` / `CancelledError`                     | `silent`             | nothing                 |
+| not an `ApiError`                                   | `page`               | `PageErrorState`        |
+| `status === null` (offline, DNS, CORS)              | `banner`             | `AppErrorBanner`        |
+| `401`                                               | `banner` (login CTA) | `AppErrorBanner`        |
+| `503`                                               | `banner`             | `AppErrorBanner`        |
+| field code with `issues[]`                          | `field`              | RHF `setError` (AIS-95) |
+| everything else (`400`, `403`, `404`, `409`, `5xx`) | `page`               | `PageErrorState`        |
 
 Banner state is derived, never stored: `useOnlineStatus()` mirrors `navigator.onLine`
 (`useSyncExternalStore` over the `online`/`offline` events) and
@@ -167,6 +167,41 @@ Banner state is derived, never stored: `useOnlineStatus()` mirrors `navigator.on
 condition is ever rendered. The only local state is the dismissal flag, reset when the set
 of cached errors changes. Copy: `lib/error-surface.const.ts`; messages: `toErrorMessage`.
 
+### 4.1 The `app/` layer (`apps/admin/src/app/`)
+
+The application shell: providers, routing, layout, session and the error boundary. It is the
+top of the layer map, so it may import `pages/`, but nothing imports it except `App.tsx`.
+
+| Folder           | Contents                                                                      | Rule                                                                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/router/`    | `route-registry.tsx` (the route table), `AppRouter.tsx`, `ProtectedRoute.tsx` | The registry is the **only** place a route exists. The `<Routes>` markup and the navigation are both derived from it — there is no second, hand-written link list                                                |
+| `app/layout/`    | `AdminLayout.tsx` (header + nav + `<main>`), `AdminNav.tsx`                   | The layout owns the frame; it never decides whether the user is logged in — that is `ProtectedRoute`'s job                                                                                                       |
+| `app/providers/` | `AppProviders.tsx` (the provider chain), `SessionProvider.tsx`                | The order is `QueryClientProvider → SessionProvider`. The `QueryClient` is **created in `main.tsx`** and handed in as a prop, because the notification store (AIS-84) binds its cache callbacks to that instance |
+| `app/session/`   | `use-require-session.ts`, `session.interface.ts`                              | The `app/` layer reads the session **only** through this hook, so the cookie session (AIS-74) changes one file instead of the layout, the router and the nav                                                     |
+| `app/error/`     | `AppErrorBoundary.tsx`                                                        | The fourth error tier: a render error must not blank the page — it shows `PageErrorState` instead                                                                                                                |
+
+The components take the route table as a **prop** (`routes`), never by importing it. That is what
+lets a component test mount the shell with a minimal registry instead of the whole application.
+
+### 4.2 Adding a route
+
+One entry in `app/router/route-registry.tsx`:
+
+```tsx
+{
+  path: '/companies',
+  navLabel: 'Cégadatok',
+  element: <CompaniesPage />,
+  protected: true,
+}
+```
+
+- `navLabel: null` → the route exists but is not linked in the navigation.
+- `hidden: true` → the route has a label but stays out of the navigation (the index route).
+- The registry test enforces the invariants: unique paths, a leading slash, and **no path may start
+  with `/api/`** — the Vite dev proxy forwards `^/api/` to the API, so a colliding route would
+  answer with JSON instead of the app shell (see §8.1).
+
 ## 5. State plan per page
 
 Three buckets only: server state → TanStack Query, page UI state → that page's
@@ -174,12 +209,12 @@ Zustand store, form state → react-hook-form. Never mix them. A page appears in
 even when **two of the three buckets are intentionally empty** — "no store" is a decision, not
 an omission (compare **D9**).
 
-| Page | Server state | Page UI state | Form state | Notes |
-|---|---|---|---|---|
-| `pages/api-keys` (AIS-41, `/api-keys` route) | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`). The query hook exposes the raw `error` (keeps `requestId`), `errorMessage` and `errorSurface` | **none** — no Zustand store, no filters/sort/tabs (D9); the only local state is the form's page-level error in `ApiKeyForm`. The app banner keeps only a dismissal flag (`useState`), never server data | react-hook-form + `zodResolver(apiKeyFormSchema)` (`pages/api-keys/api-keys.logic.ts`); `identifier` field carries the 409 via `setError` (D8/D36) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32). Failure routing: `errorSurface === 'page'` → `PageErrorState` + retry; `banner` → only `AppErrorBanner` speaks, the page renders nothing extra (AIS-96) |
-| `pages/LoginPage` (`/login` route) | none | none | `AuthContext` + `auth/session-token.ts` over `sessionStorage`; no RHF yet | The token storage key lives in one module only (D19). API-side auth guard is out of scope |
-| `pages/PlaceholderPage` (`/` route) | none | none | none | Static shell for the authenticated landing route; replaced when a real dashboard lands |
-| `/calls` route (inline in `App.tsx`) | none | none | none | Inline placeholder markup; becomes a page folder when the calls feature starts |
+| Page                                                                 | Server state                                                                                                                                                                                                                                            | Page UI state                                                                                                                                                                                           | Form state                                                                                                                                         | Notes                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pages/api-keys` (AIS-41, `/api-keys` route)                         | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`). The query hook exposes the raw `error` (keeps `requestId`), `errorMessage` and `errorSurface` | **none** — no Zustand store, no filters/sort/tabs (D9); the only local state is the form's page-level error in `ApiKeyForm`. The app banner keeps only a dismissal flag (`useState`), never server data | react-hook-form + `zodResolver(apiKeyFormSchema)` (`pages/api-keys/api-keys.logic.ts`); `identifier` field carries the 409 via `setError` (D8/D36) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32). Failure routing: `errorSurface === 'page'` → `PageErrorState` + retry; `banner` → only `AppErrorBanner` speaks, the page renders nothing extra (AIS-96) |
+| `pages/LoginPage` (`/login` route)                                   | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | `AuthContext` + `auth/session-token.ts` over `sessionStorage`; no RHF yet                                                                          | The token storage key lives in one module only (D19). The `app/` layer reads the session through `useRequireSession()` only, so the cookie session (AIS-74) changes one file. API-side auth guard is out of scope                                                                                                                           |
+| `pages/PlaceholderPage` (`/` route)                                  | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | none                                                                                                                                               | Static shell for the authenticated landing route; replaced when a real dashboard lands                                                                                                                                                                                                                                                      |
+| `/calls` route (a registry entry in `app/router/route-registry.tsx`) | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | none                                                                                                                                               | Placeholder markup carried by the route registry; becomes a page folder when the calls feature starts                                                                                                                                                                                                                                       |
 
 Adding a page means adding a row here in the same change (rule §0.10). If a page needs
 page-wide UI state, it gets a page-local store factory inside its own folder — never a
@@ -201,8 +236,10 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
    `<use-case>.interface.ts`.
 4. Compose the page from `packages/ui` primitives and page-only parts under `pages/<page>/ui/`.
 5. Implement loading / empty / error / success explicitly — a bare `null` is a defect.
-6. Register the route in `App.tsx`'s `ProtectedLayout` (until `src/app/` exists) and add the nav
-   link; keep the markup on token classes.
+6. Register the route in `app/router/route-registry.tsx` — one `RouteEntry` in
+   `PROTECTED_ROUTE_ENTRIES` with a `navLabel` (or `null` for a route that must not be linked) and
+   a `hidden` flag for the index route. The `<Routes>` markup **and** the navigation are both derived
+   from the registry, so there is no second list to update; keep the markup on token classes.
 7. Add tests: `*.logic.ts` (all branches), the store (if any), the hook (success + error +
    loading), and the page parts. Doubles and fixtures go to `src/test/mocks/**`, never inline.
 8. Add the page row to §5 of this document.
@@ -210,25 +247,25 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 
 ## 7. Dependency list (UI side)
 
-| Dependency | Where | Why | State |
-|---|---|---|---|
-| `class-variance-authority` | `packages/ui` | variant recipes | installed |
-| `clsx`, `tailwind-merge` | `packages/ui` | `cn()` class merging | installed |
-| `tailwindcss` + `@tailwindcss/vite` | `apps/admin` | Tailwind v4 pipeline | installed |
-| `@tanstack/react-query` | `apps/admin` | server-state bucket | installed |
-| `react-router-dom` | `apps/admin` | routing | installed |
-| `@callback/shared`, `@callback/ui`, `@callback/api-client` | `apps/admin` | workspace packages | installed |
-| `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` | `packages/ui`, `apps/admin` | component + hook tests | installed |
-| `@vitest/coverage-v8` | `packages/ui`, `apps/admin` | LCOV coverage for the SonarQube report (`test:cov` → `pnpm sonar:coverage`, see [`SonarQube.md`](SonarQube.md)) | installed (`^3.2.4`) |
-| `jest`, `ts-jest`, `@types/jest` | `packages/shared`, `packages/api-client` | framework-free package tests (D13) | installed |
-| `eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`, `@eslint/js` | `apps/admin` | lint harness | installed |
-| `react-hook-form` | `apps/admin` | form-state bucket (`ApiKeyForm`) | installed (`^7.54.2`, resolved 7.90.0) |
-| `zod` (direct dependency) | `apps/admin` | form schema validation | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30) |
-| `@hookform/resolvers` | `apps/admin` | `zodResolver` for react-hook-form | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3 |
-| `zustand` | `apps/admin` | page-local stores, global session store | **planned — added with the first page that needs UI state** (`/api-keys` has none, D9) |
+| Dependency                                                                                              | Where                                    | Why                                                                                                             | State                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `class-variance-authority`                                                                              | `packages/ui`                            | variant recipes                                                                                                 | installed                                                                                                                                  |
+| `clsx`, `tailwind-merge`                                                                                | `packages/ui`                            | `cn()` class merging                                                                                            | installed                                                                                                                                  |
+| `tailwindcss` + `@tailwindcss/vite`                                                                     | `apps/admin`                             | Tailwind v4 pipeline                                                                                            | installed                                                                                                                                  |
+| `@tanstack/react-query`                                                                                 | `apps/admin`                             | server-state bucket                                                                                             | installed                                                                                                                                  |
+| `react-router-dom`                                                                                      | `apps/admin`                             | routing                                                                                                         | installed                                                                                                                                  |
+| `@callback/shared`, `@callback/ui`, `@callback/api-client`                                              | `apps/admin`                             | workspace packages                                                                                              | installed                                                                                                                                  |
+| `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` | `packages/ui`, `apps/admin`              | component + hook tests                                                                                          | installed                                                                                                                                  |
+| `@vitest/coverage-v8`                                                                                   | `packages/ui`, `apps/admin`              | LCOV coverage for the SonarQube report (`test:cov` → `pnpm sonar:coverage`, see [`SonarQube.md`](SonarQube.md)) | installed (`^3.2.4`)                                                                                                                       |
+| `jest`, `ts-jest`, `@types/jest`                                                                        | `packages/shared`, `packages/api-client` | framework-free package tests (D13)                                                                              | installed                                                                                                                                  |
+| `eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`, `@eslint/js`                                | `apps/admin`                             | lint harness                                                                                                    | installed                                                                                                                                  |
+| `react-hook-form`                                                                                       | `apps/admin`                             | form-state bucket (`ApiKeyForm`)                                                                                | installed (`^7.54.2`, resolved 7.90.0)                                                                                                     |
+| `zod` (direct dependency)                                                                               | `apps/admin`                             | form schema validation                                                                                          | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30) |
+| `@hookform/resolvers`                                                                                   | `apps/admin`                             | `zodResolver` for react-hook-form                                                                               | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3                                                                       |
+| `zustand`                                                                                               | `apps/admin`                             | page-local stores, global session store                                                                         | **planned — added with the first page that needs UI state** (`/api-keys` has none, D9)                                                     |
 
 Adding a dependency requires updating this table in the same change. Rows marked
-*planned* must not be read as available.
+_planned_ must not be read as available.
 
 ## 8. Verification commands
 
@@ -260,7 +297,7 @@ token utilities (`shadow-neu-raised`, `bg-primary`, `rounded-control`, …).
 
 Every client-side route must survive a **direct load**, because a user can paste or reload
 `http://localhost:5174/<route>`. The trap is the dev proxy: a plain `'/api'` key in
-`apps/admin/vite.config.ts` is a *prefix* match, so it also captures SPA routes that merely
+`apps/admin/vite.config.ts` is a _prefix_ match, so it also captures SPA routes that merely
 start with `/api` — `/api-keys` was forwarded to the NestJS API, which answered
 `{"message":"Cannot GET /api-keys","statusCode":404}`. The proxy key is therefore the regex
 **`'^/api/'`** (see the comment in the config); the same applies to `apps/web`.

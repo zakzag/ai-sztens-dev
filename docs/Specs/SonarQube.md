@@ -1,7 +1,7 @@
 # SonarQube — lokális kódelemzés
 
-**Utolsó frissítés:** 2026-10-22
-**Kapcsolódó ticket:** AIS-78
+**Utolsó frissítés:** 2026-10-30 (AIS-121: a PR-on futó CI unit-mátrix, és a SonarQube-pipeline kapcsolata)
+**Kapcsolódó ticket:** AIS-78, AIS-121
 **Kapcsolódó terv:** [`docs/plans/2026-10-21--23-55-00-pnpm-sonarqube-scan-plan.md`](../plans/2026-10-21--23-55-00-pnpm-sonarqube-scan-plan.md)
 
 Ez a doksi írja le, hogyan futtatja a repó a SonarQube elemzést egy fejlesztői gépen futó
@@ -104,7 +104,19 @@ közötti duplikáció és a cross-package függőségek is látszanak.
   `Load global settings`); érvényes token nélkül a szerver `401 Not authorized`-ral válaszol, ami
   a várt viselkedés.
 - `apps/web`-nek még nincs unit tesztje, ezért coverage-et sem ad; az elemzésbe viszont bekerül.
-- CI integráció (`.github/workflows/ci.yml` + `SONAR_TOKEN` secret, `sonar.qualitygate.wait=true`)
-  szándékosan külön feladat, ez a doksi a lokális futtatást írja le.
+- **A PR-on futó unit-mátrix és a SonarQube-pipeline különálló.** Az AIS-121 óta a
+  [`ci.yml`](../../.github/workflows/ci.yml:1) `build-test` jobja a root `pnpm test`-et futtatja,
+  vagyis **a teljes unit-mátrix** (shared → api-client → ui → admin → api) fut a PR-on — de
+  **coverage nélkül**: a `sonar:coverage` lépés nem ebbe a jobba kerül, mert 5 külön runner
+  indítását + LCOV merge-et jelentene, ami a PR-gate idejét megkétszerezné anélkül, hogy új jelet
+  adna. A SonarQube scan a külön pipeline (AIS-78) feladata, `SONAR_TOKEN` secrettel és
+  `sonar.qualitygate.wait=true` beállítással.
+  A két pipelines ugyanazt a teszt-mátrixot használja: a `pnpm sonar:coverage` ugyanazokat a
+  package-eket futtatja `test:cov` módban, mint a `pnpm test` sima módban — tehát ami a PR-on
+  piros, az a SonarQube coverage-ben is hiányozni fog.
+- A `build-test` job Node **24**-et futtat (nem 22-t): a CommonJS `@nestjs/config` az ESM-only
+  `@nestjs/common@12`-et `require()`-olja, amit a Jest ESM runner csak Node ≥ 24.9-től tud
+  betölteni — Node 22-n az `api` unit suite egyik DI-regressziós tesztje néma skip maradna
+  (részletek: [`docs/milestones/`](../milestones/2026-10-30--16-35-00-ais-121-ci-full-test-matrix.milestone.md:1)).
 - Quality Gate és minőségi profil testreszabása (küszöbök, PR-dekoráció) nincs beállítva; a
   szerver default "Sonar way" profilját használja.

@@ -19,14 +19,14 @@ Both workflows had already produced fresh `sha-3a8f5b6` images for `api`, `web`,
 
 ## 2. Diagnostic sequence and what was found
 
-| # | Investigation | Finding |
-|---|---|---|
-| 1 | SSH into droplet (ssh.aisztens.hu as `deployer`, deploy key) | `docker ps -a` empty; nothing listening on 80/443/3000. Stack entirely down. |
-| 2 | Read `deploy/log/latest.log` | Last run was **2026-10-10 00:52** by user `tkovari` from host `DESKTOP-5CMS04A` (manual `deploy.sh up dev`). It ran `prune_legacy_stack` (`docker compose down --remove-orphans` killed all six containers), then started rsync upload, and **aborted mid-rsync** — the log ends without a footer. No `up` ever ran. |
-| 3 | `docker images` on the droplet | Only `aisztens/api:latest` and `aisztens/monitor:latest` (local-build leftovers) + `caddy:2-alpine` + `postgres:16-alpine`. **No GHCR images cached.** |
-| 4 | `docker compose config --services` on the droplet | Lists **only `api, caddy, monitor, postgres`** (4 services) — the droplet's `/opt/aisztens/infra/docker-compose.yml` is **the OLD local-source-build compose** (date 2026-10-09, 7521 bytes). The current working-tree compose is 8335 bytes and lists 6 services (`api, caddy, monitor, postgres, web, admin`) with `image: ${REGISTRY...}/${GHCR_OWNER...}/aisztens-*:${IMAGE_TAG}` references. |
-| 5 | DNS for apex vs subdomains | `aisztens.hu` → `185.80.48.2` (different server, WordPress). `api/web/admin.aisztens.hu` → `164.92.248.194` (droplet). **Apex DNS is wrong** — separate issue, documented in [`docs/Specs/Caddy-Reverse-Proxy.md` §A](../../Specs/Caddy-Reverse-Proxy.md). |
-| 6 | `caddy` log tail via SSH | Showed "No such container: caddy" (no containers). |
+| #   | Investigation                                                | Finding                                                                                                                                                                                                                                                                                                                                                                                           |
+| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | SSH into droplet (ssh.aisztens.hu as `deployer`, deploy key) | `docker ps -a` empty; nothing listening on 80/443/3000. Stack entirely down.                                                                                                                                                                                                                                                                                                                      |
+| 2   | Read `deploy/log/latest.log`                                 | Last run was **2026-10-10 00:52** by user `tkovari` from host `DESKTOP-5CMS04A` (manual `deploy.sh up dev`). It ran `prune_legacy_stack` (`docker compose down --remove-orphans` killed all six containers), then started rsync upload, and **aborted mid-rsync** — the log ends without a footer. No `up` ever ran.                                                                              |
+| 3   | `docker images` on the droplet                               | Only `aisztens/api:latest` and `aisztens/monitor:latest` (local-build leftovers) + `caddy:2-alpine` + `postgres:16-alpine`. **No GHCR images cached.**                                                                                                                                                                                                                                            |
+| 4   | `docker compose config --services` on the droplet            | Lists **only `api, caddy, monitor, postgres`** (4 services) — the droplet's `/opt/aisztens/infra/docker-compose.yml` is **the OLD local-source-build compose** (date 2026-10-09, 7521 bytes). The current working-tree compose is 8335 bytes and lists 6 services (`api, caddy, monitor, postgres, web, admin`) with `image: ${REGISTRY...}/${GHCR_OWNER...}/aisztens-*:${IMAGE_TAG}` references. |
+| 5   | DNS for apex vs subdomains                                   | `aisztens.hu` → `185.80.48.2` (different server, WordPress). `api/web/admin.aisztens.hu` → `164.92.248.194` (droplet). **Apex DNS is wrong** — separate issue, documented in [`docs/Specs/Caddy-Reverse-Proxy.md` §A](../../Specs/Caddy-Reverse-Proxy.md).                                                                                                                                        |
+| 6   | `caddy` log tail via SSH                                     | Showed "No such container: caddy" (no containers).                                                                                                                                                                                                                                                                                                                                                |
 
 So the actual chain was: legacy compose on the droplet → operator ran `deploy.sh up` from a local tree that no longer matched the droplet's compose (the local tree had the new image-based compose; the local operator's working copy also lacked the deploy key's expected working state) → `prune_legacy_stack` killed the stack → terminal closed mid-upload → end state: zero containers, no compose aware of the new image-based model, droplet with the OLD compose.
 
@@ -39,14 +39,14 @@ So the actual chain was: legacy compose on the droplet → operator ran `deploy.
 5. `docker compose up -d --force-recreate --remove-orphans` — brought up all 6 containers.
 6. HTTPS probes:
 
-| URL | Result |
-|---|---|
-| `https://api.aisztens.hu/api` | 200 (NestJS routing live) |
-| `https://api.aisztens.hu/healthz` | 200 `{"status":"ok","uptime":40,"timestamp":"2026-10-11T15:48:16.777Z"}` |
-| `https://api.aisztens.hu/api/callback-requests` | 200 `[]` |
-| `https://web.aisztens.hu/` | 200 HTML 419 B |
-| `https://admin.aisztens.hu/` | 200 HTML, `<html lang="hu">` (Hungarian SPA) |
-| `https://aisztens.hu/` | 200 **but WordPress** (apex DNS wrong — separate issue) |
+| URL                                             | Result                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------ |
+| `https://api.aisztens.hu/api`                   | 200 (NestJS routing live)                                                |
+| `https://api.aisztens.hu/healthz`               | 200 `{"status":"ok","uptime":40,"timestamp":"2026-10-11T15:48:16.777Z"}` |
+| `https://api.aisztens.hu/api/callback-requests` | 200 `[]`                                                                 |
+| `https://web.aisztens.hu/`                      | 200 HTML 419 B                                                           |
+| `https://admin.aisztens.hu/`                    | 200 HTML, `<html lang="hu">` (Hungarian SPA)                             |
+| `https://aisztens.hu/`                          | 200 **but WordPress** (apex DNS wrong — separate issue)                  |
 
 ## 4. Why this happened — gap that let a hand-deploy silently pin the host to an old compose
 
@@ -56,11 +56,11 @@ When the hand deploy aborted, the droplet kept the last hand-shipped compose (le
 
 ## 5. Hardening — three changes that prevent this from happening again
 
-| File | Change | Why |
-|---|---|---|
-| `.github/workflows/deploy.yml` | `up -d --remove-orphans` → `up -d --remove-orphans --force-recreate` | Ensures that even if `IMAGE_TAG` happens to coincide with the running container's tag, an updated compose file (e.g. new env var, new volume) is materialised on every push. |
-| `.github/workflows/deploy.yml` | New step `Verify every service is running IMAGE_TAG` (after `Pull and start the stack`) | Fails the workflow red if any of `api, web, admin, monitor` is not running an image at `:sha-<short>`. Catches both the "deploy aborts after shipping files but before pulling" case (workflow fails) and the "operator left a local-override image behind" case. Output lists the bad rows and prints the manual recovery command. |
-| `deploy/deploy.sh` | `up)` runs a local-host guard: refuse if `infra/docker-compose.yml` still has a `build:` block (legacy) and warn if no `${REGISTRY…}` reference is present (image-based). | Stops a fresh operator from deploying the old local-source compose accidentally. |
+| File                           | Change                                                                                                                                                                    | Why                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/deploy.yml` | `up -d --remove-orphans` → `up -d --remove-orphans --force-recreate`                                                                                                      | Ensures that even if `IMAGE_TAG` happens to coincide with the running container's tag, an updated compose file (e.g. new env var, new volume) is materialised on every push.                                                                                                                                                        |
+| `.github/workflows/deploy.yml` | New step `Verify every service is running IMAGE_TAG` (after `Pull and start the stack`)                                                                                   | Fails the workflow red if any of `api, web, admin, monitor` is not running an image at `:sha-<short>`. Catches both the "deploy aborts after shipping files but before pulling" case (workflow fails) and the "operator left a local-override image behind" case. Output lists the bad rows and prints the manual recovery command. |
+| `deploy/deploy.sh`             | `up)` runs a local-host guard: refuse if `infra/docker-compose.yml` still has a `build:` block (legacy) and warn if no `${REGISTRY…}` reference is present (image-based). | Stops a fresh operator from deploying the old local-source compose accidentally.                                                                                                                                                                                                                                                    |
 
 ## 6. Follow-ups (not blocking)
 

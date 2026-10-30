@@ -23,17 +23,17 @@ script's interface (subcommands, flags, layout) inline — so they could drift.
 
 ## Files changed
 
-| File | Change |
-|---|---|
-| [`scripts/README.md`](../../scripts/README.md) | **New.** Index of every script and folder; links the sub-folder READMEs; documents the conventions and the "link don't restate" rule. |
-| [`docs/03-implementation-general.md`](../../docs/03-implementation-general.md) | §9 Testing: the stack-smoke row and the closing paragraph now link to `scripts/README.md`. |
-| [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md) | §2 lost the duplicated subcommand table / pre-flight / compose invocation (now a pointer); the env-override description stays. §6 see-also gained the scripts index. |
-| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md) | The automated-smoke note, the `local`-target note, §7 smoke section and the §9.1 file list now point at `scripts/README.md` instead of `scripts/test/lib/10-services.sh` / `scripts/test/README.md`. |
-| [`docs/Specs/Three-Env-Verification.md`](../../docs/Specs/Three-Env-Verification.md) | §1i and §3.7 reference `scripts/README.md`; §9 see-also lists the scripts index. Operational commands (they are the point of this doc) were kept. |
-| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md) | The three `dev-stack.sh` mentions now point at `scripts/README.md`; the duplicated compose invocation was removed. |
-| [`docs/snapshot-2026-10-01.md`](../../docs/snapshot-2026-10-01.md) | §2.8 bullet, §2.9, §2.11, §2.13 rows and §4 intro replaced the script descriptions with pointers. |
-| [`README.md`](../../README.md) | The "Useful scripts" table gained a single row pointing at `scripts/README.md`; the env-validation line likewise. |
-| [`deploy/README.md`](../../deploy/README.md) | The GitHub-Actions step list and §9 ("Local development in WSL") now point at `scripts/README.md`. |
+| File                                                                                  | Change                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`scripts/README.md`](../../scripts/README.md)                                        | **New.** Index of every script and folder; links the sub-folder READMEs; documents the conventions and the "link don't restate" rule.                                                                |
+| [`docs/03-implementation-general.md`](../Specs/outdated/03-implementation-general.md) | §9 Testing: the stack-smoke row and the closing paragraph now link to `scripts/README.md`.                                                                                                           |
+| [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md)            | §2 lost the duplicated subcommand table / pre-flight / compose invocation (now a pointer); the env-override description stays. §6 see-also gained the scripts index.                                 |
+| [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md)          | The automated-smoke note, the `local`-target note, §7 smoke section and the §9.1 file list now point at `scripts/README.md` instead of `scripts/test/lib/10-services.sh` / `scripts/test/README.md`. |
+| [`docs/Specs/Three-Env-Verification.md`](../../docs/Specs/Three-Env-Verification.md)  | §1i and §3.7 reference `scripts/README.md`; §9 see-also lists the scripts index. Operational commands (they are the point of this doc) were kept.                                                    |
+| [`docs/Specs/Caddy-Reverse-Proxy.md`](../../docs/Specs/Caddy-Reverse-Proxy.md)        | The three `dev-stack.sh` mentions now point at `scripts/README.md`; the duplicated compose invocation was removed.                                                                                   |
+| [`docs/snapshot-2026-10-01.md`](../../docs/snapshot-2026-10-01.md)                    | §2.8 bullet, §2.9, §2.11, §2.13 rows and §4 intro replaced the script descriptions with pointers.                                                                                                    |
+| [`README.md`](../../README.md)                                                        | The "Useful scripts" table gained a single row pointing at `scripts/README.md`; the env-validation line likewise.                                                                                    |
+| [`deploy/README.md`](../../deploy/README.md)                                          | The GitHub-Actions step list and §9 ("Local development in WSL") now point at `scripts/README.md`.                                                                                                   |
 
 ## Style rule applied
 

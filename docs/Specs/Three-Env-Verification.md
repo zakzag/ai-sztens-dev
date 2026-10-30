@@ -1,9 +1,51 @@
 # Three-Environment Verification — AIsztens
 
 **Status:** living spec
-**Last updated:** 2026-10-08 — image-based deploy: droplet pulls pre-built images
+**Database note (2026-10-21, AIS-64):** the call-back feature was removed
+entirely — API module, admin page, public web form, `callback.callback_requests`,
+`callback.call_status` **and** the `callback` Postgres schema. Only the
+`platform` and `email` schemas remain. The smoke endpoint for the curl checks
+below is now `/healthz`; `/api/callback-requests` no longer exists. Details:
+[`Database-Local.md`](Database-Local.md).
+**Deploy-process consistency (2026-10-13):** §4 no longer describes a
+`deploy.yml` `matrix` (it uses the `plan` job now), and §6/§7 no longer
+assume `pnpm install` / `pnpm build` / droplet-side `apps/*/.env.dev` run
+on the host — the application images are baked in CI.
+**Last updated:** 2026-10-19 — three-env leftover defaults cleanup: the
+default for `scripts/test/stack-up.sh`, `scripts/test/stack-down.sh` and
+[`scripts/test/lib/00-prelude.sh`](../../scripts/test/lib/00-prelude.sh:60)
+is now `infra/.env.local` (developer-machine default), and
+[`deploy/deploy.sh:upload()`](../../deploy/deploy.sh:441) hard-rejects
+the legacy bare `infra/.env` with a migration hint instead of
+silently falling back to it. Locked in by the new
+`scripts/test/_stack-env-default-test.sh` regression (18 offline
+assertions); see the §1f3 verification step. History:
+[`docs/history/2026-10-19--22-30-00-three-env-leftover-defaults-impl.md`](../history/2026-10-19--22-30-00-three-env-leftover-defaults-impl.md).
+Previous update: 2026-10-13 — image-based deploy consistency cleanup: §3.1
+local pre-deploy check now sources `infra/.env.dev` (per-env, not legacy
+`infra/.env`); §3.2 expected deploy log switched from
+`Building & starting the stack ... up -d --build` to
+`Pulling and starting the stack ... pull && up -d --remove-orphans`
+(the droplet never builds, the CI workflow `images.yml` pushes the
+GHCR images); §3.6 SPA bundle checks now read from
+`/usr/share/nginx/html/assets/*.js` _inside_ the `web`/`admin`
+containers (the bundles are image-baked; there is no
+`/srv/{web,admin}` host folder any more); §5.5 CI workflow check
+replaced from `grep 'build:${APP_ENV}' .github/workflows/deploy.yml`
+to `grep 'VITE_API_BASE_URL' .github/workflows/images.yml` (the
+SPA `--mode` flag was retired when `deploy.yml` stopped building).
+Previous update: 2026-10-12 — stack smoke test fixes (see §3.7.1): the
+Caddy liveness check now probes `https://api.<DOMAIN>/healthz` instead
+of the disabled `:2019/config/` admin endpoint; the postgres roles
+check now passes `-U` so it authenticates as the POSTGRES_USER instead
+of the image's `root` user; the API greeting substring in the smoke
+assertions is now `Hello Beautiful World` to match
+[`apps/api/src/app.service.ts:6`](../../apps/api/src/app.service.ts) (see
+[`docs/history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md`](../history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md) +
+[`docs/milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md`](../milestones/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.milestone.md)).
+Previous update: 2026-10-08 — image-based deploy: droplet pulls pre-built images
 from GHCR, never builds; `apps/{web,admin}/dist` host bind mounts removed (see
-[`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Previous note (2026-10-07): deploy identity is `deployer` for both paths and a droplet keeps exactly one runtime env file, `infra/.env` (see §1d, §3.2, §3.8, §7).
+[`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Previous note (2026-10-07): deploy identity is `deployer` for both paths and a droplet keeps exactly one runtime env file, `infra/.env` (see §1d, §3.2, §3.8, §7).
 **Audience:** anyone who wants to confirm the three-env separation actually
 works end-to-end. Use this after pulling the latest `main`, after a
 droplet reboot, or after any change to `deploy/`, `.github/workflows/`,
@@ -96,6 +138,13 @@ for t in scripts/test/_deploy-sh-*.sh; do bash "$t" || echo "FAILED: $t"; done
 #   (`_deploy-sh-m3-test.sh` needs the legacy local infra/.env, and
 #    `_deploy-sh-env-selection-test.sh` scenario 6 is flaky).
 
+# 1f3. The three-env leftover-defaults regression (offline; no droplet, no network)
+bash scripts/test/_stack-env-default-test.sh
+# Expect: "Pass: 18   Fail: 0" (12 static greps + 6 sandbox assertions
+# that prove the per-env local default is wired in and the legacy
+# `infra/.env` is hard-rejected in deploy.sh:upload()). See
+# docs/history/2026-10-19--22-30-00-three-env-leftover-defaults-impl.md.
+
 # 1g. The deploy workflow parses as valid YAML
 python -c "import yaml; yaml.safe_load(open('.github/workflows/deploy.yml').read()); print('YAML_OK')"
 # Expect: YAML_OK
@@ -143,7 +192,7 @@ scripts/dev-stack.sh up
 #   [dev-stack] Stack is up. Open one of:
 #     - http://localhost:3000/healthz          (NestJS healthcheck)
 #     - http://localhost:3000/api              (NestJS API root)
-#     - psql -h localhost -U aisztens -d callback  (Postgres on :5432)
+#     - psql -h localhost -U aisztens -d aisztens_db  (Postgres on :5432)
 
 # 2.2.2 Verify the seed was created
 ls -l infra/.env.local
@@ -170,7 +219,11 @@ investigate** — [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) is the on
 ```bash
 # 2.4.1 Healthcheck
 curl -fsS http://localhost:3000/healthz
-# Expect: 200, response body matches what HealthController returns
+# Expect: 200
+#   {"status":"oks","deployDate":null,"commitHash":null,"uptime":N,"timestamp":"..."}
+# A deployDate/commitHash lokálisan mindig null, mert a build metadata csak az
+# image build (`.github/workflows/images.yml`) során kerül a képbe — lásd
+# docs/Specs/Infrastructure-Docker.md §6.1.
 #   (NestJS health.controller.ts; typically returns "OK" or a JSON status).
 
 # 2.4.2 API root
@@ -178,11 +231,11 @@ curl -i http://localhost:3000/api 2>&1 | head -1
 # Expect: HTTP/1.1 404 Not Found   (or a similar non-200 — there is no
 #   root handler; this confirms the global prefix is applied)
 
-# 2.4.3 POST /api/callback-requests (the real public endpoint)
-curl -fsS -X POST -H "Content-Type: application/json" \
-  -d '{"name":"verify","email":"verify@example.com","phone":"+36300000001","reason":"end-to-end verification"}' \
-  http://localhost:3000/api/callback-requests
-# Expect: 201 + {"id":"<some-uuid>"}
+# 2.4.3 There is no public write endpoint any more: AIS-64 removed the
+#   call-back feature (and with it POST /api/callback-requests). The
+#   unprefixed health probe is the stable, dependency-free check.
+curl -fsS http://localhost:3000/healthz
+# Expect: 200 + the build metadata JSON (see health.controller.ts)
 ```
 
 ### 2.5 CORS allows the local SPA origins
@@ -191,15 +244,15 @@ curl -fsS -X POST -H "Content-Type: application/json" \
 # 2.5.1 From the Vite dev origin (5173) — preflight + actual
 curl -i -H "Origin: http://localhost:5173" \
   -H "Access-Control-Request-Method: GET" \
-  -X OPTIONS http://localhost:3000/api/callback-requests | head -20
+  -X OPTIONS http://localhost:3000/healthz | head -20
 # Expect: 204 No Content + access-control-allow-origin: http://localhost:5173
 
 # 2.5.2 From the 127.0.0.1 variant (also listed in apps/api/.env.local)
-curl -i -H "Origin: http://127.0.0.1:5173" http://localhost:3000/api/callback-requests | head -10
+curl -i -H "Origin: http://127.0.0.1:5173" http://localhost:3000/healthz | head -10
 # Expect: 200 + access-control-allow-origin: http://127.0.0.1:5173
 
 # 2.5.3 From a random other origin (should be rejected)
-curl -i -H "Origin: https://evil.example.com" http://localhost:3000/api/callback-requests | head -10
+curl -i -H "Origin: https://evil.example.com" http://localhost:3000/healthz | head -10
 # Expect: 200 + NO access-control-allow-origin header (CORS denied in the browser)
 ```
 
@@ -225,23 +278,43 @@ cat apps/web/.env.dev
 # Expect: VITE_API_BASE_URL=https://api.aisztens.hu/api
 ```
 
-### 2.7 Postgres is reachable
+### 2.7 Postgres is reachable and bootstrapped
+
+> **Updated 2026-10-21 (AIS-64).** The whole call-back feature is gone: its
+> API module, the `callback.callback_requests` table, the `callback.call_status`
+> enum **and** the `callback` Postgres schema were removed. What remains is the
+> role bootstrap plus the `platform` and `email` schemas. Check those two, not
+> the old callback table.
 
 ```bash
-# 2.7.1 Connect with psql (or use docker compose exec if psql not installed)
+# 2.7.1 Connect as the application role — this is the connection the API uses.
 docker compose --env-file infra/.env.local \
   -f infra/docker-compose.yml \
   -f infra/docker-compose.local.yml \
-  exec postgres psql -U aisztens -d callback -c "SELECT count(*) FROM callback_requests;"
-# Expect: a positive integer (the row inserted by §2.4.3). If you see 0,
-#   that is also fine — it means the test row didn't make it in. Either
-#   way, the connection works.
+  exec postgres psql -U aisztens -d aisztens_db -c "SELECT current_user, current_database();"
+# Expect: aisztens | aisztens_db   (proves the role exists and can log in)
 
-# 2.7.2 The callback_requests table actually has the row from §2.4.3
-docker compose ... exec postgres psql -U aisztens -d callback \
-  -c "SELECT email FROM callback_requests ORDER BY created_at DESC LIMIT 1;"
-# Expect: verify@example.com (the email from §2.4.3)
+# 2.7.2 The per-context schemas created by the init scripts exist.
+docker compose --env-file infra/.env.local \
+  -f infra/docker-compose.yml \
+  -f infra/docker-compose.local.yml \
+  exec postgres psql -U postgres -d aisztens_db -c '\dn'
+# Expect: platform, callback, email
+#   (plus public / information_schema / pg_catalog / pg_toast).
+#   If they are missing, the volume was initialized before AIS-35 — see
+#   docs/Specs/Database-Local.md §8 (re-apply 02-schemas.sh or `down -v`).
+
+# 2.7.3 The app role may create objects in `callback` (needed by the Drizzle runner).
+docker compose --env-file infra/.env.local \
+  -f infra/docker-compose.yml \
+  -f infra/docker-compose.local.yml \
+  exec postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT has_schema_privilege('aisztens','callback','CREATE');"
+# Expect: t
 ```
+
+The full local-DB procedure (env keys, grant matrix, reset/wipe) is in
+[`Database-Local.md`](Database-Local.md).
 
 ### 2.8 Stop the stack and clean up
 
@@ -269,23 +342,30 @@ deployment target is the existing `aisztens.hu`.
 ### 3.1 Local pre-deploy checks
 
 ```bash
-# 3.1.1 The deploy.sh has APP_ENV in scope (CI does this via $GITHUB_ENV;
-#        locally you have to set it yourself)
+# 3.1.1 The deploy.sh has APP_ENV in scope (CI does this via $GITHUB_OUTPUT
+#        and the `plan` job; locally you have to set it yourself — the
+#        second positional argument to `deploy.sh up`, or a pre-set
+#        `APP_ENV` env var, or the default `dev`)
 cd deploy/
-. .env          # set HOST etc.
-set -a; . infra/.env.dev 2>/dev/null  # NO-OP if infra/.env.dev does not
-                                     # yet exist locally (legacy path)
+. .env.dev      # the dev target's per-target operator config
+set -a; . ../infra/.env.dev 2>/dev/null  # per-env DOMAIN / ACME_EMAIL
 echo "DOMAIN=$DOMAIN APP_ENV=${APP_ENV:-unset}"
 # Expect: DOMAIN=aisztens.hu APP_ENV=dev
-#   (If APP_ENV is unset and you have not migrated infra/.env → infra/.env.dev
-#    locally, deploy.sh will still pick up infra/.env and set APP_ENV=dev.)
+#   (If APP_ENV is unset, deploy.sh falls back to `dev`.)
+
+# 3.1.2 The deploy target is `dev|prod` only — `local` is a hard error
+#        with exit code 2 (deploy.sh does not deploy to a local droplet;
+#        the local stack is started by scripts/dev-stack.sh).
+./deploy.sh help 2>&1 | head -30
+# Expect: usage text mentioning dev|prod, no mention of `local` as a deploy target.
 ```
 
 ### 3.2 Deploy (or simulate)
 
-Either trigger a real CI deploy (push to `dev`, or
-`Actions → Deploy to droplet → Run workflow` with `app_env=dev`), or
-run `deploy.sh up dev` from your local machine (`dev` is also the default):
+Either trigger a real CI deploy (`workflow_run` from `images.yml` after a
+push to `dev`, or `Actions → Deploy to droplet → Run workflow` with
+`app_env=dev`), or run `deploy.sh up dev` from your local machine (`dev`
+is also the default):
 
 ```bash
 cd deploy/
@@ -294,9 +374,12 @@ deploy.sh up dev
 #   the preflight line
 #     Preflight OK — /opt/aisztens is writable by deployer@<HOST>.
 #   then
-#     [deploy] Building & starting the stack (APP_ENV=dev) ...
-#     [deploy] docker compose ... up -d --build
-#   ... and ultimately the api container becomes healthy.
+#     [deploy] Pulling and starting the stack (APP_ENV=dev) ...
+#     [deploy] docker compose ... pull
+#     [deploy] docker compose ... up -d --remove-orphans
+#   ... and ultimately the api container becomes healthy. The droplet
+#   never builds anything — the images were pushed by images.yml in CI
+#   and are pulled from GHCR (see §3.7.1 for the running revision).
 #
 #   The config line records the identity and both env-file names:
 #     config: DEPLOY_ENV=dev env_file=deploy/.env.dev APP_ENV=dev ... SSH_USER=deployer
@@ -332,36 +415,49 @@ this is the "still works on the legacy droplet" guarantee.
 ```bash
 # 3.5.1 From the web SPA origin (should pass)
 curl -i -H "Origin: https://web.aisztens.hu" \
-  https://api.aisztens.hu/api/callback-requests | head -10
+  https://api.aisztens.hu/healthz | head -10
 # Expect: 200 + access-control-allow-origin: https://web.aisztens.hu
 
 # 3.5.2 From the admin SPA origin (should pass)
 curl -i -H "Origin: https://admin.aisztens.hu" \
-  https://api.aisztens.hu/api/callback-requests | head -10
+  https://api.aisztens.hu/healthz | head -10
 # Expect: 200 + access-control-allow-origin: https://admin.aisztens.hu
 
 # 3.5.3 From the api origin itself (should NOT get CORS headers)
 curl -i -H "Origin: https://api.aisztens.hu" \
-  https://api.aisztens.hu/api/callback-requests | head -10
-# Expect: 200) + NO access-control-allow-origin header (the dev CORS list
+  https://api.aisztens.hu/healthz | head -10
+# Expect: 200 + NO access-control-allow-origin header (the dev CORS list
 #   does not include api.aisztens.hu by design — see VAPI prompt history)
 ```
 
 ### 3.6 The deployed SPAs hit the dev API URL
 
+The SPAs are baked into the `web` / `admin` images, so the assets live
+inside those containers at `/usr/share/nginx/html/assets/`, not on the
+droplet's host filesystem. To verify the URL the UI uses:
+
 ```bash
-# 3.6.1 The web SPA's baked-in URL
-ssh deployer@aisztens.hu "grep -l aisztens.hu /srv/web/assets/*.js 2>&1 | head -1"
+# 3.6.1 The web SPA's baked-in URL (inside the web container)
+ssh deployer@aisztens.hu "cd /opt/aisztens && \
+  docker compose --env-file infra/.env -f infra/docker-compose.yml exec web \
+    grep -l aisztens.hu /usr/share/nginx/html/assets/*.js 2>&1 | head -1"
 # Expect: at least one .js file path
 
-# 3.6.2 The admin SPA's baked-in URL
-ssh deployer@aisztens.hu "grep -l aisztens.hu /srv/admin/assets/*.js 2>&1 | head -1"
+# 3.6.2 The admin SPA's baked-in URL (inside the admin container)
+ssh deployer@aisztens.hu "cd /opt/aisztens && \
+  docker compose --env-file infra/.env -f infra/docker-compose.yml exec admin \
+    grep -l aisztens.hu /usr/share/nginx/html/assets/*.js 2>&1 | head -1"
 # Expect: at least one .js file path
 
-# 3.6.3 Confirm the URL is the dev one (not localhost)
+# 3.6.3 Confirm the URL is the dev one (not localhost), via the live SPA
 curl -fsS https://web.aisztens.hu/ | grep -oE 'aisztens.hu|localhost' | sort -u
 # Expect: only 'aisztens.hu' appears
 ```
+
+The historical `/srv/web` and `/srv/admin` paths are gone — the SPAs
+are baked into the GHCR images. If a deploy ever leaves those host
+folders behind, it is on the pre-image-based revision (see
+[`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)).
 
 ### 3.7 Smoke tests
 
@@ -371,9 +467,15 @@ ssh deployer@aisztens.hu "cd /opt/aisztens && bash scripts/test/stack-smoke.sh"
 # Expect: 6 liveness + 6 cross-service checks all PASS.
 #   The liveness module gained two VAPI webhook checks (5: Caddy 405
 #   pre-filter, 6: NestJS HMAC accept); they need a running `caddy`
-#   container and derive their target/secret from infra/.env. The suite and
-#   its checks are documented in scripts/README.md (see also
-#   docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md).
+#   container and derive their target/secret from infra/.env. The Caddy
+#   liveness check (#3) probes `https://api.<DOMAIN>/healthz` from
+#   inside the caddy container — the admin API on :2019 is intentionally
+#   disabled (`admin off` in infra/caddy/Caddyfile), so the historical
+#   `:2019/config/` probe no longer applies. The check is gracefully
+#   skipped when DOMAIN is missing from infra/.env. The suite and its
+#   checks are documented in scripts/README.md (see also
+#   docs/history/2026-10-06--12-45-00-vapi-webhook-runtime-fix.md and
+#   docs/history/2026-10-12--09-27-00-stack-smoke-test-expectation-fixes.md).
 #   (If stack-smoke.sh is missing on the droplet, deploy.sh did not ship
 #   scripts/test/ — re-run deploy.sh.)
 ```
@@ -404,22 +506,24 @@ ssh deployer@aisztens.hu "head -3 /opt/aisztens/infra/.env"
 
 ## 4. Prod env verification (droplet, ~15 minutes) `[if-prod-exists]`
 
-Skip this entire section until a prod droplet exists. The deploy.yml
-matrix is dormant by design — pushing nothing triggers a prod deploy.
+Skip this entire section until a prod droplet exists. There is no
+`matrix` any more (the `plan` job replaced it) and no `push` trigger, so
+no push can accidentally target prod.
 
 The day the prod droplet is provisioned:
 
-1. Add `DROPLET_HOST_PROD` and `DROPLET_SSH_KEY_PROD` GitHub Secrets
-   (the current single-`DROPLET_HOST` secret is the dev one).
-2. Wire the `deploy.yml` matrix to pick the prod pair when
-   `inputs.app_env == 'prod'`. (One PR; ~15 lines.)
-3. Set `INFRA_ENV_PROD` to a fresh per-env file: `infra/.env.prod`
+1. Provide the prod droplet connection. `deploy.yml` reads the single
+   `DROPLET_HOST` / `DROPLET_SSH_KEY` secret pair, so either point those
+   at the prod droplet for the manual run, or add a prod pair and select
+   it from `needs.plan.outputs.app_env` (one small PR).
+2. Set `INFRA_ENV_PROD` to a fresh per-env file: `infra/.env.prod`
    with `<prod-domain>` replaced by the real apex and all secrets unique
    (NOT a copy of `infra/.env.dev`).
-4. Add a manual-reviewer protection rule on the GitHub `production`
+3. Add a manual-reviewer protection rule on the GitHub `production`
    environment.
-5. Trigger via **Actions → Deploy to droplet → Run workflow →
-   app_env=prod**. The push-to-`dev` path cannot accidentally target prod.
+4. Trigger via **Actions → Deploy to droplet → Run workflow →
+   app_env=prod**. The push-to-`dev` path cannot accidentally target prod
+   (it only feeds `images.yml`, whose run-name suffix is `(dev)`).
 
 ### 4.1 The prod-only fail-closed guard
 
@@ -431,10 +535,16 @@ ssh deployer@<prod-host> "cd /opt/aisztens && \
 
 # 4.1.2 Empty CORS_ORIGINS in prod refuses to start.
 # (You cannot test this on a live prod droplet without breaking it.
-#  Smoke-test on a fresh staging droplet instead.)
+#  Smoke-test on a fresh staging droplet instead. The staging droplet is
+#  image-based too — there is no `--build`; instead rebuild and push the
+#  `aisztens-api` image in CI, then on the droplet `pull api` and
+#  `up -d --force-recreate --no-deps api`.)
 ssh deployer@<staging-host> \
   "cd /opt/aisztens && CORS_ORIGINS= APP_ENV=prod docker compose \
-   --env-file infra/.env.dev -f infra/docker-compose.yml up -d --build api"
+   --env-file infra/.env.prod -f infra/docker-compose.yml \
+   pull api && \
+   docker compose --env-file infra/.env.prod -f infra/docker-compose.yml \
+   up -d --force-recreate --no-deps api"
 # Then tail the api log:
 ssh deployer@<staging-host> "cd /opt/aisztens && \
   docker compose logs api 2>&1 | grep -E 'Bootstrap|Refusing'"
@@ -447,12 +557,12 @@ ssh deployer@<staging-host> "cd /opt/aisztens && \
 ```bash
 # 4.2.1 CORS allows the prod web origin
 curl -i -H "Origin: https://web.<prod-domain>" \
-  https://api.<prod-domain>/api/callback-requests | head -10
+  https://api.<prod-domain>/healthz | head -10
 # Expect: 200 + access-control-allow-origin: https://web.<prod-domain>
 
 # 4.2.2 CORS rejects (or empty) a dev origin — the two CORS lists MUST differ
 curl -i -H "Origin: https://web.aisztens.hu" \
-  https://api.<prod-domain>/api/callback-requests | head -10
+  https://api.<prod-domain>/healthz | head -10
 # Expect: 200 + NO access-control-allow-origin header (dev origin NOT in
 #   prod CORS list; a browser would block the request).
 ```
@@ -492,9 +602,9 @@ git grep -nE 'docker compose .*--env-file "infra/\.env"' \
 git grep -nE 'docker compose .*--env-file "infra/\.env\.' .github/workflows/deploy.yml
 # Expect: empty.
 
-# 5.5 The build step uses --mode
-grep -n 'build:${APP_ENV}' .github/workflows/deploy.yml
-# Expect: at least one line (the web SPA build call).
+# 5.5 The image workflow uses --build-arg for the SPA base URL
+grep -n 'VITE_API_BASE_URL' .github/workflows/images.yml
+# Expect: at least one line (the web + admin SPA image build).
 
 # 5.6 The 'up' SSH call exports APP_ENV
 grep -B 1 -A 4 'docker compose \\$' .github/workflows/deploy.yml
@@ -508,13 +618,13 @@ grep -B 1 -A 4 'docker compose \\$' .github/workflows/deploy.yml
 
 For a fresh repo state on a developer machine with a fast SSD:
 
-| Section | Estimated wall time |
-|---|---|
-| §1 Repo checks | 30 s |
-| §2 Local (full down/up cycle + curl probes) | 5–10 min (dominated by the first `docker compose up -d --build` cold-start) |
-| §3 Dev (deploy + smoke + curl) | 10–15 min (dominated by `pnpm install` + `pnpm build:dev` for web + admin) |
-| §4 Prod | same as §3, only on the prod host |
-| §5 CI | 30 s |
+| Section                                     | Estimated wall time                                                                                                                           |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| §1 Repo checks                              | 30 s                                                                                                                                          |
+| §2 Local (full down/up cycle + curl probes) | 5–10 min (dominated by the first `docker compose up -d --build` cold-start)                                                                   |
+| §3 Dev (deploy + smoke + curl)              | 2–5 min (dominated by the GHCR image pull — the droplet no longer runs `pnpm install` / `pnpm build:dev`; the SPA/API images are built in CI) |
+| §4 Prod                                     | same as §3, only on the prod host                                                                                                             |
+| §5 CI                                       | 30 s                                                                                                                                          |
 
 For an incremental change on the dev droplet (no SPAs rebuilt, just
 env + secrets), §3 takes ~2 min.
@@ -523,22 +633,23 @@ env + secrets), §3 takes ~2 min.
 
 ## 7. Common failure modes
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| §1b: any per-env file is committed | The gitignore patterns are missing | Re-run `git check-ignore -v infra/.env.local` to see which pattern matches; if none, the Step 0 commit was lost — re-apply. |
-| §2.3: banner reports `dev` or unset instead of `local` | `APP_ENV` is leaking from the shell | `unset APP_ENV` then re-run `scripts/dev-stack.sh up`. |
-| §2.5.1: CORS preflight returns 200 instead of 204 | Wrong FastifyAdapter CORS setup | The `main.ts:34` block uses `credentials: true` with an explicit allow-list — should be fine; check `apps/api/.env.local`. |
-| §2.7.2: the inserted row is missing | The Postgres volume was wiped between runs | Re-run §2.4.3 and §2.7.1. |
-| §3.3: banner reports `local` or unset on the dev droplet | deploy.yml didn't pass APP_ENV, or a local shell exported `APP_ENV=local`. Since 2026-10-06 the target comes from the argument (default `dev`) and an invalid `APP_ENV` is rejected with exit 2 | Check the run's `config:` log line (`DEPLOY_ENV=… env_file=… APP_ENV=…`) in `deploy/log/latest.log`, and the `local_infra_env` block. Re-run `deploy.sh up dev`. |
-| §3.5.3: CORS DOES allow `https://api.aisztens.hu` | The CORS list in `infra/.env.dev` was edited incorrectly | Verify with `ssh deployer@aisztens.hu "grep ^CORS_ORIGINS /opt/aisztens/infra/.env"` — must NOT have `api.aisztens.hu`. |
-| §3.6.3: SPA also references `localhost` | An SPA `.env.dev` file got the wrong content | Verify with `ssh deployer@aisztens.hu "cat /opt/aisztens/apps/web/.env.dev"` — must contain `https://api.aisztens.hu/api`. |
-| §4.1.2: the api boot does NOT refuse with empty CORS | `apps/api/src/main.ts:42` isProd check is missing | The Step 2 commit `a054d0e` was lost — re-apply. |
-| §5.4: a remote command names the local per-env file | The per-env name is a LOCAL source name; a droplet has one env file | Use `--env-file infra/.env` remotely, `infra/.env.${APP_ENV}` locally. Guard: `bash scripts/test/_deploy-sh-remote-compose-path-test.sh`. |
-| §3.2: `the remote user cannot write /opt/aisztens` | That directory is not writable by `deployer` (rsync `--delete`, `mkdir`, `scp` all need it) | Run the fix the error prints: `ssh -i <deploy key> root@<HOST> 'mkdir -p /opt/aisztens && chown -R deployer:deployer /opt/aisztens'`. |
-| §3.2: `'bootstrap' must run as root` | `bootstrap` was attempted as `deployer`, which has no passwordless sudo on this droplet | `SSH_USER=root ./deploy/deploy.sh bootstrap` (one-off, hand-run). |
-| §3.2: `app: unbound variable` | A `local a="$1" b="$a"` declaration — bash expands all words before the builtin runs, so `$a` is unset and `set -u` aborts | One `local` per line (fixed in `ensure_spa_env()` on 2026-10-07). |
+| Symptom                                                            | Likely cause                                                                                                                                                                                         | Fix                                                                                                                                                                 |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §1b: any per-env file is committed                                 | The gitignore patterns are missing                                                                                                                                                                   | Re-run `git check-ignore -v infra/.env.local` to see which pattern matches; if none, the Step 0 commit was lost — re-apply.                                         |
+| §2.3: banner reports `dev` or unset instead of `local`             | `APP_ENV` is leaking from the shell                                                                                                                                                                  | `unset APP_ENV` then re-run `scripts/dev-stack.sh up`.                                                                                                              |
+| §2.5.1: CORS preflight returns 200 instead of 204                  | Wrong FastifyAdapter CORS setup                                                                                                                                                                      | The `main.ts:34` block uses `credentials: true` with an explicit allow-list — should be fine; check `apps/api/.env.local`.                                          |
+| §2.7.1: `role "aisztens" does not exist`                           | The init scripts never ran on this volume (it was created before `01-roles.sh` was shipped/fixed)                                                                                                    | Re-apply the init scripts or recreate the volume — [`Database-Local.md`](Database-Local.md) §8.                                                                     |
+| §2.7.2: `platform` / `callback` / `email` missing                  | Same cause as above, specifically the `02-schemas.sh` half (AIS-35)                                                                                                                                  | `exec -T postgres bash /docker-entrypoint-initdb.d/02-schemas.sh` or `down -v` — [`Database-Local.md`](Database-Local.md) §8.                                       |
+| §3.3: banner reports `local` or unset on the dev droplet           | deploy.yml didn't pass APP_ENV, or a local shell exported `APP_ENV=local`. Since 2026-10-06 the target comes from the argument (default `dev`) and an invalid `APP_ENV` is rejected with exit 2      | Check the run's `config:` log line (`DEPLOY_ENV=… env_file=… APP_ENV=…`) in `deploy/log/latest.log`, and the `local_infra_env` block. Re-run `deploy.sh up dev`.    |
+| §3.5.3: CORS DOES allow `https://api.aisztens.hu`                  | The CORS list in `infra/.env.dev` was edited incorrectly                                                                                                                                             | Verify with `ssh deployer@aisztens.hu "grep ^CORS_ORIGINS /opt/aisztens/infra/.env"` — must NOT have `api.aisztens.hu`.                                             |
+| §3.6.3: SPA also references `localhost`                            | The image was built with the wrong `VITE_API_BASE_URL` (the `web`/`admin` bundles are baked at CI build time; there is no droplet-side `apps/*/.env.dev`)                                            | Verify in `images.yml` that `VITE_API_BASE_URL=https://api.<DOMAIN>/api` is passed, then rebuild + push the `web`/`admin` images and re-pull on the droplet.        |
+| §4.1.2: the api boot does NOT refuse with empty CORS               | `apps/api/src/main.ts:42` isProd check is missing                                                                                                                                                    | The Step 2 commit `a054d0e` was lost — re-apply.                                                                                                                    |
+| §5.4: a remote command names the local per-env file                | The per-env name is a LOCAL source name; a droplet has one env file                                                                                                                                  | Use `--env-file infra/.env` remotely, `infra/.env.${APP_ENV}` locally. Guard: `bash scripts/test/_deploy-sh-remote-compose-path-test.sh`.                           |
+| §3.2: `the remote user cannot write /opt/aisztens`                 | That directory is not writable by `deployer` (`scp` and `mkdir` need it; the image-based deploy no longer rsyncs the repo)                                                                           | Run the fix the error prints: `ssh -i <deploy key> root@<HOST> 'mkdir -p /opt/aisztens && chown -R deployer:deployer /opt/aisztens'`.                               |
+| §3.2: `'bootstrap' must run as root`                               | `bootstrap` was attempted as `deployer`, which has no passwordless sudo on this droplet                                                                                                              | `SSH_USER=root ./deploy/deploy.sh bootstrap` (one-off, hand-run).                                                                                                   |
+| §3.2: `app: unbound variable`                                      | A `local a="$1" b="$a"` declaration — bash expands all words before the builtin runs, so `$a` is unset and `set -u` aborts                                                                           | One `local` per line (historical fix from 2026-10-07; the helper that hit it no longer exists — `deploy.sh` does not build SPAs any more).                          |
 | `_deploy-sh-env-selection-test.sh` scenario 6 fails intermittently | Pre-existing **flake**: the assertion greps `deploy/log/latest.log` for `APP_ENV=prod` immediately after a run that aborts on the empty `HOST`, so it races the `tee` capture / `latest.log` refresh | Not a regression: `HEAD` shows 28/1 under WSL bash while Git Bash shows 29/0 for the same commit. Make the assertion read the per-run file instead of `latest.log`. |
-| `_deploy-sh-m3-test.sh` always fails (`no infra/.env found`) | Pre-existing **stale** suite: it re-implements the pre-per-env `infra/.env` lookup in a local function instead of calling `deploy.sh`, and this checkout only has `infra/.env.dev` | Rewrite it against the current `COMPOSE_ENV_FILE_LOCAL` chain, or retire it in favour of `_deploy-sh-remote-compose-path-test.sh`. |
+| `_deploy-sh-m3-test.sh` always fails (`no infra/.env found`)       | Pre-existing **stale** suite: it re-implements the pre-per-env `infra/.env` lookup in a local function instead of calling `deploy.sh`, and this checkout only has `infra/.env.dev`                   | Rewrite it against the current `COMPOSE_ENV_FILE_LOCAL` chain, or retire it in favour of `_deploy-sh-remote-compose-path-test.sh`.                                  |
 
 ---
 
@@ -547,13 +658,13 @@ env + secrets), §3 takes ~2 min.
 The verification above is written assuming a "fresh" mental model. For
 a real-world check:
 
-| Scenario | Sections to run |
-|---|---|
-| Pulled latest `main`, never ran anything | §1, §2 |
-| Pulled latest `main`, local stack is up | §1, §2.4, §2.5, §2.6, §2.7 (skip §2.1–§2.3, §2.8) |
-| Dev deploy happened | §1.5, §1.6, §1.7, §3 |
-| Prod deploy happened | §1.5, §1.6, §1.7, §4 |
-| Wrote a code change | §1, §2 (if local), §3 (if prod) — §1.6 (§1.7) is a fast guard against shipping a bash syntax error |
+| Scenario                                 | Sections to run                                                                                    |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Pulled latest `main`, never ran anything | §1, §2                                                                                             |
+| Pulled latest `main`, local stack is up  | §1, §2.4, §2.5, §2.6, §2.7 (skip §2.1–§2.3, §2.8)                                                  |
+| Dev deploy happened                      | §1.5, §1.6, §1.7, §3                                                                               |
+| Prod deploy happened                     | §1.5, §1.6, §1.7, §4                                                                               |
+| Wrote a code change                      | §1, §2 (if local), §3 (if prod) — §1.6 (§1.7) is a fast guard against shipping a bash syntax error |
 
 ---
 
@@ -563,5 +674,5 @@ a real-world check:
 - [`docs/Specs/Local-Development.md`](Local-Development.md) — the developer-side workflow (per-env files, `APP_ENV` propagation, pitfalls).
 - [`docs/Specs/Production-Runbook.md`](Production-Runbook.md) — what to do once the stack is on the droplet.
 - [`deploy/README.md`](../../deploy/README.md) — the deploy-side runbook (secrets table, workflow steps, `APP_ENV` matrix).
-- [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../history/2026-10-05--10-30-00-three-env-separation-plan.md) — the plan document.
+- [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — the plan document.
 - [`docs/history/2026-10-05--10-30-00-three-env-separation-step{0..5}.md`](../history/) — per-commit history entries.

@@ -1,14 +1,14 @@
 # 2026-10-05 10:30 — Three-env separation · Step 0 (`infra/.env` → `infra/.env.dev`)
 
-**Scope:** Step 0 of [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md).
+**Scope:** Step 0 of [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md).
 No behaviour change on the dev droplet; this only prepares the file layout for the steps that follow.
 
 ## What changed
 
-| # | Action | Result |
-|---|---|---|
-| 1 | Rename `infra/.env` → `infra/.env.dev` in the working copy (content preserved verbatim) | the dev secrets now live under the per-env filename they will keep for the rest of the plan |
-| 2 | Extend [`.gitignore`](../../.gitignore:42) with per-env ignores for the new files and the upcoming ones | `apps/**/.env.local`, `apps/**/.env.dev`, `apps/**/.env.prod`, `infra/.env.local`, `infra/.env.dev`, `infra/.env.prod` are now gitignored, with explicit whitelists for the existing `.env.example` templates so they stay tracked |
+| #   | Action                                                                                                  | Result                                                                                                                                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Rename `infra/.env` → `infra/.env.dev` in the working copy (content preserved verbatim)                 | the dev secrets now live under the per-env filename they will keep for the rest of the plan                                                                                                                                        |
+| 2   | Extend [`.gitignore`](../../.gitignore:42) with per-env ignores for the new files and the upcoming ones | `apps/**/.env.local`, `apps/**/.env.dev`, `apps/**/.env.prod`, `infra/.env.local`, `infra/.env.dev`, `infra/.env.prod` are now gitignored, with explicit whitelists for the existing `.env.example` templates so they stay tracked |
 
 Important nuance: **neither `infra/.env` nor `infra/.env.dev` is tracked by git**. The existing [`.gitignore:43`](../../.gitignore:43) (`.env`) and the new patterns both keep them out of the index. The rename is a **working-directory** operation only — git sees no diff for either file. This is intentional and correct: secret files must never be committed, and the developer copy is not part of the repo's source of truth (the droplet has its own copy, and CI has its own GitHub Secret).
 

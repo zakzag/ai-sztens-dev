@@ -13,14 +13,14 @@ was: what is this file needed for, and what breaks if it is missing?
 
 ## 2. Measured evidence
 
-| # | Check | Result |
-|---|---|---|
-| 1 | `/opt/aisztens/infra/.env` on the droplet | exists — 2721 B, mtime `2026-09-29 16:24`, `755 root:root`, 54 lines, 0 `change-me` values |
-| 2 | `docker compose --env-file <missing> -f infra/docker-compose.yml config --services` | **hard failure**: `couldn't find env file: …`, exit 1 — no silent blank defaults |
-| 3 | `…-ai-sztens-dev-old\infra\.env` | exists, 2721 B, `sha256 03060b66…8be988cd` — **identical to the droplet copy** |
-| 4 | `infra/.env` in the active checkout | existed only as a copy of `infra/.env.example` (48 lines, `change-me-*` placeholders) |
-| 5 | `deploy/.env` in the active checkout | missing → [`deploy.sh:59`](../../deploy/deploy.sh:59) aborts on `HOST="${HOST:?...}"` |
-| 6 | `E:\projects\AI\infra\.env` (parent-dir fallback) | missing |
+| #   | Check                                                                               | Result                                                                                     |
+| --- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1   | `/opt/aisztens/infra/.env` on the droplet                                           | exists — 2721 B, mtime `2026-09-29 16:24`, `755 root:root`, 54 lines, 0 `change-me` values |
+| 2   | `docker compose --env-file <missing> -f infra/docker-compose.yml config --services` | **hard failure**: `couldn't find env file: …`, exit 1 — no silent blank defaults           |
+| 3   | `…-ai-sztens-dev-old\infra\.env`                                                    | exists, 2721 B, `sha256 03060b66…8be988cd` — **identical to the droplet copy**             |
+| 4   | `infra/.env` in the active checkout                                                 | existed only as a copy of `infra/.env.example` (48 lines, `change-me-*` placeholders)      |
+| 5   | `deploy/.env` in the active checkout                                                | missing → [`deploy.sh:59`](../../deploy/deploy.sh:59) aborts on `HOST="${HOST:?...}"`      |
+| 6   | `E:\projects\AI\infra\.env` (parent-dir fallback)                                   | missing                                                                                    |
 
 ## 3. Root cause
 
@@ -48,11 +48,11 @@ yields an empty list, so [`origin: true`](../../apps/api/src/main.ts:28) accepts
 
 ## 4. Solution
 
-| File | Change |
-|---|---|
-| `infra/.env` | Restored locally via `copy /Y` from `…-ai-sztens-dev-old\infra\.env`; verified identical to the droplet copy (`sha256 03060b66…8be988cd`, 54 lines, 0 placeholders). Gitignored, so local-only — nothing was uploaded. |
-| [`docs/history/2026-10-02--20-42-00-infra-env-restore-and-monitor-watchdog.md`](../history/2026-10-02--20-42-00-infra-env-restore-and-monitor-watchdog.md) | Full narrative: monitor watchdog explanation + this diagnosis. |
-| [`docs/milestones/2026-10-02--20-42-00-infra-env-droplet-persistence.milestone.md`](2026-10-02--20-42-00-infra-env-droplet-persistence.milestone.md) | This document. |
+| File                                                                                                                                                       | Change                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `infra/.env`                                                                                                                                               | Restored locally via `copy /Y` from `…-ai-sztens-dev-old\infra\.env`; verified identical to the droplet copy (`sha256 03060b66…8be988cd`, 54 lines, 0 placeholders). Gitignored, so local-only — nothing was uploaded. |
+| [`docs/history/2026-10-02--20-42-00-infra-env-restore-and-monitor-watchdog.md`](../history/2026-10-02--20-42-00-infra-env-restore-and-monitor-watchdog.md) | Full narrative: monitor watchdog explanation + this diagnosis.                                                                                                                                                         |
+| [`docs/milestones/2026-10-02--20-42-00-infra-env-droplet-persistence.milestone.md`](2026-10-02--20-42-00-infra-env-droplet-persistence.milestone.md)       | This document.                                                                                                                                                                                                         |
 
 No application code, compose file or deploy script was modified.
 
@@ -82,5 +82,5 @@ grep -oE '^[A-Z0-9_]+=' /opt/aisztens/infra/.env | tr -d '=' | sort
   uses `wget` although the image ships `curl`; [`infra/.env.example:40`](../../infra/.env.example:40)
   documents the webhook field as `status` while [`watch.sh:29`](../../infra/monitor/watch.sh:29) sends `state`.
 - Secrets still live as plaintext env files; the 3-phase secret-management plan in
-  [`docs/history/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md`](../history/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md)
+  [`docs/plans/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md`](../plans/2026-10-01--10-33-59-env-storage-and-deploy-automation-plan.md)
   is still unimplemented.

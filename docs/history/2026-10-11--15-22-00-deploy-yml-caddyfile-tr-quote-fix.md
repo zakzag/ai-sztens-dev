@@ -18,11 +18,11 @@ When the operator re-ran the build workflow, the same parse error text reappeare
 
 ## 2. Evidence
 
-| Source | Observation |
-|---|---|
-| `git grep -nE "tr -d" .github/workflows/deploy.yml` | Two matches at lines 173 and 174, each `tr -d '"' | tr -d \"'\"` (the unparseable form). |
+| Source                                                       | Observation                                                                                                                                                                                           |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `git grep -nE "tr -d" .github/workflows/deploy.yml`          | Two matches at lines 173 and 174, each `tr -d '"'                                                                                                                                                     | tr -d \"'\"` (the unparseable form). |
 | `bash -n` of an extracted copy of the unpatched `run:` block | `unexpected EOF while looking for matching ')'` exit 2 — same root cause as `images.yml`, different line number reported because the closing `)` of the `$(...)` is the first thing bash runs out of. |
-| `git show HEAD:.github/workflows/images.yml` (control) | Already contains `tr -d $'\"\047'` (Variant D, fixed in 4587e78); confirms `images.yml` is fine and the second log emission was a stale view. |
+| `git show HEAD:.github/workflows/images.yml` (control)       | Already contains `tr -d $'\"\047'` (Variant D, fixed in 4587e78); confirms `images.yml` is fine and the second log emission was a stale view.                                                         |
 
 ## 3. Root cause
 
@@ -55,13 +55,13 @@ Why the `_quote_chars` indirection here (different from `images.yml`, which inli
 
 ## 5. Validation
 
-| Check | Result |
-|---|---|
-| `python -c "yaml.safe_load(open('.github/workflows/deploy.yml'))"` | parses |
-| `bash -n` of the extracted patched `run:` block | exit 0 |
+| Check                                                                   | Result                                                |
+| ----------------------------------------------------------------------- | ----------------------------------------------------- |
+| `python -c "yaml.safe_load(open('.github/workflows/deploy.yml'))"`      | parses                                                |
+| `bash -n` of the extracted patched `run:` block                         | exit 0                                                |
 | End-to-end run against a fixture `infra/.env` + `infra/caddy/Caddyfile` | exits 0, `Caddyfile rendered for DOMAIN=example.com.` |
-| The original two-`tr` line, run in isolation | reproduces `unexpected EOF …` (test is sensitive) |
-| `git grep -nE "tr -d \"\\\\'\"" .github/workflows/` | no remaining matches in either workflow |
+| The original two-`tr` line, run in isolation                            | reproduces `unexpected EOF …` (test is sensitive)     |
+| `git grep -nE "tr -d \"\\\\'\"" .github/workflows/`                     | no remaining matches in either workflow               |
 
 ## 6. Why the bug was not caught in the v2 milestone's "follow-up" list
 

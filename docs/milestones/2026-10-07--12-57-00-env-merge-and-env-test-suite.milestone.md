@@ -1,7 +1,7 @@
 # Milestone — env merge (old clone → current repo) + `.env` test suite
 
 **Date:** 2026-10-07
-**Plan:** [`../history/2026-10-07-env-merge-old-new-and-env-tests-plan.md`](../history/2026-10-07-env-merge-old-new-and-env-tests-plan.md)
+**Plan:** [`../plans/2026-10-07-env-merge-old-new-and-env-tests-plan.md`](../plans/2026-10-07-env-merge-old-new-and-env-tests-plan.md)
 **History:** [`../history/2026-10-07--12-57-00-env-merge-and-env-test-suite.md`](../history/2026-10-07--12-57-00-env-merge-and-env-test-suite.md)
 
 ## 1. Problem / feature
@@ -20,12 +20,12 @@ keeping the new structure as the source of truth, and to add a way to test the
 Inventoried every `.env` file in both clones (gitignored files included, and
 the `.env.example` headers used as the structural reference):
 
-| Location | Old clone | Current clone |
-|---|---|---|
-| `deploy/.env` | `SUDO_USERS=tkovari,krak,deployer`, `SSH_KEY=/home/tkovari/.ssh/kalman-…` | `deploy/.env.dev` had `SUDO_USERS=tkovari,krak` |
-| `infra/.env` | `CORS_ORIGINS` included `https://api.aisztens.hu` | `infra/.env.dev` had web+admin only (new) |
-| `apps/*` | none (old admin was Angular) | per-env files present |
-| `deploy/ssh-keys/` | `tkovari.pub`, `krak.pub`, `aisztens.pub`, `deployer.pub` | none |
+| Location           | Old clone                                                                 | Current clone                                   |
+| ------------------ | ------------------------------------------------------------------------- | ----------------------------------------------- |
+| `deploy/.env`      | `SUDO_USERS=tkovari,krak,deployer`, `SSH_KEY=/home/tkovari/.ssh/kalman-…` | `deploy/.env.dev` had `SUDO_USERS=tkovari,krak` |
+| `infra/.env`       | `CORS_ORIGINS` included `https://api.aisztens.hu`                         | `infra/.env.dev` had web+admin only (new)       |
+| `apps/*`           | none (old admin was Angular)                                              | per-env files present                           |
+| `deploy/ssh-keys/` | `tkovari.pub`, `krak.pub`, `aisztens.pub`, `deployer.pub`                 | none                                            |
 
 Discrepancies confirmed against docs:
 [`Three-Env-Verification.md`](../Specs/Three-Env-Verification.md:298) §3.4–3.5
@@ -47,16 +47,16 @@ individually with the requester.
 
 ## 4. Solution / implementation
 
-| Changed file | Change |
-|---|---|
-| [`deploy/.env.dev`](../../deploy/.env.dev:1) | `SUDO_USERS=tkovari,krak,deployer`; seed banner replaced; `SSH_KEY` kept repo-local |
-| [`infra/.env.dev`](../../infra/.env.dev:1) | stale header rewritten; CORS stays web+admin (2 origins) |
-| [`deploy/ssh-keys/`](../../deploy/ssh-keys/README.md:1) | added `tkovari.pub`, `krak.pub`, `aisztens.pub`, `deployer.pub` |
-| [`scripts/env-test/check-env-syntax.sh`](../../scripts/env-test/check-env-syntax.sh:1) | new offline checker (syntax, duplicates, sourcing, required keys, placeholders, SPA↔infra cross-check) |
-| [`scripts/env-test/check-env-live.sh`](../../scripts/env-test/check-env-live.sh:1) | new live checker (SSH, Postgres, HTTPS, secret/CORS/sudo/pub-key) |
-| [`scripts/env-test/*.ps1`](../../scripts/env-test/check-env-syntax.ps1:1) | Windows wrappers |
-| [`scripts/env-test/README.md`](../../scripts/env-test/README.md:1) | new documentation |
-| [`deploy/README.md`](../../deploy/README.md:1), [`scripts/test/README.md`](../../scripts/test/README.md:1), [`README.md`](../../README.md:36) | per-env naming + link to the new suite |
+| Changed file                                                                                                                                  | Change                                                                                                 |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [`deploy/.env.dev`](../../deploy/.env.dev:1)                                                                                                  | `SUDO_USERS=tkovari,krak,deployer`; seed banner replaced; `SSH_KEY` kept repo-local                    |
+| [`infra/.env.dev`](../../infra/.env.dev:1)                                                                                                    | stale header rewritten; CORS stays web+admin (2 origins)                                               |
+| [`deploy/ssh-keys/`](../../deploy/ssh-keys/README.md:1)                                                                                       | added `tkovari.pub`, `krak.pub`, `aisztens.pub`, `deployer.pub`                                        |
+| [`scripts/env-test/check-env-syntax.sh`](../../scripts/env-test/check-env-syntax.sh:1)                                                        | new offline checker (syntax, duplicates, sourcing, required keys, placeholders, SPA↔infra cross-check) |
+| [`scripts/env-test/check-env-live.sh`](../../scripts/env-test/check-env-live.sh:1)                                                            | new live checker (SSH, Postgres, HTTPS, secret/CORS/sudo/pub-key)                                      |
+| [`scripts/env-test/*.ps1`](../../scripts/env-test/check-env-syntax.ps1:1)                                                                     | Windows wrappers                                                                                       |
+| [`scripts/env-test/README.md`](../../scripts/env-test/README.md:1)                                                                            | new documentation                                                                                      |
+| [`deploy/README.md`](../../deploy/README.md:1), [`scripts/test/README.md`](../../scripts/test/README.md:1), [`README.md`](../../README.md:36) | per-env naming + link to the new suite                                                                 |
 
 Out of scope: prod files stay dormant, `infra/.env.local` stays auto-seeded,
 no credential rotation.

@@ -10,13 +10,13 @@
 
 A single-purpose API watchdog. It serves no traffic, restarts nothing, and exposes no metrics.
 
-| Aspect | Value | Source |
-|---|---|---|
-| Image | `aisztens/monitor:latest` (Alpine 3.20 + curl + bash) | [`infra/monitor/Dockerfile`](../../infra/monitor/Dockerfile:4) |
-| Entrypoint | `/app/watch.sh`, runs as `nobody` | [`infra/monitor/Dockerfile`](../../infra/monitor/Dockerfile:12) |
-| Memory / restart | `mem_limit: 32m`, `restart: unless-stopped` | [`infra/docker-compose.yml`](../../infra/docker-compose.yml:145) |
-| Ports | none — internal bridge network only | [`infra/docker-compose.yml`](../../infra/docker-compose.yml:161) |
-| Own healthcheck | none — `docker compose ps` shows `Up`, never `(healthy)` | [`docs/snapshot-2026-10-01.md`](../snapshot-2026-10-01.md:98) |
+| Aspect           | Value                                                    | Source                                                           |
+| ---------------- | -------------------------------------------------------- | ---------------------------------------------------------------- |
+| Image            | `aisztens/monitor:latest` (Alpine 3.20 + curl + bash)    | [`infra/monitor/Dockerfile`](../../infra/monitor/Dockerfile:4)   |
+| Entrypoint       | `/app/watch.sh`, runs as `nobody`                        | [`infra/monitor/Dockerfile`](../../infra/monitor/Dockerfile:12)  |
+| Memory / restart | `mem_limit: 32m`, `restart: unless-stopped`              | [`infra/docker-compose.yml`](../../infra/docker-compose.yml:145) |
+| Ports            | none — internal bridge network only                      | [`infra/docker-compose.yml`](../../infra/docker-compose.yml:161) |
+| Own healthcheck  | none — `docker compose ps` shows `Up`, never `(healthy)` | [`docs/snapshot-2026-10-01.md`](../snapshot-2026-10-01.md:98)    |
 
 Loop behaviour ([`infra/monitor/watch.sh`](../../infra/monitor/watch.sh:36)):
 
@@ -46,14 +46,14 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml exec monitor \
 
 ### Measured evidence
 
-| # | Check | Result |
-|---|---|---|
-| 1 | `/opt/aisztens/infra/.env` on the droplet | exists — 2721 bytes, `Sep 29 16:24`, `755 root:root`, 54 lines, **0** `change-me` occurrences |
-| 2 | `docker compose --env-file <missing> … config --services` | **hard failure**: `couldn't find env file: …`, exit 1 |
-| 3 | `E:\…\2026-08-31-ai-sztens-dev-old\infra\.env` | exists, 2721 bytes, `sha256 03060b66687c64bb3e40d3f4f78aca0defdc0c97e3b53083a830f3aa8be988cd` — **identical to the droplet copy** |
-| 4 | `infra/.env` in this checkout before the fix | existed but was a raw copy of `infra/.env.example` (48 lines, `change-me-*` placeholders) |
-| 5 | `deploy/.env` in this checkout | **missing** → [`deploy.sh:59`](../../deploy/deploy.sh:59) aborts on `HOST="${HOST:?...}"` |
-| 6 | `E:\projects\AI\infra\.env` (parent-dir fallback of [`deploy.sh:204`](../../deploy/deploy.sh:204)) | missing |
+| #   | Check                                                                                              | Result                                                                                                                            |
+| --- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `/opt/aisztens/infra/.env` on the droplet                                                          | exists — 2721 bytes, `Sep 29 16:24`, `755 root:root`, 54 lines, **0** `change-me` occurrences                                     |
+| 2   | `docker compose --env-file <missing> … config --services`                                          | **hard failure**: `couldn't find env file: …`, exit 1                                                                             |
+| 3   | `E:\…\2026-08-31-ai-sztens-dev-old\infra\.env`                                                     | exists, 2721 bytes, `sha256 03060b66687c64bb3e40d3f4f78aca0defdc0c97e3b53083a830f3aa8be988cd` — **identical to the droplet copy** |
+| 4   | `infra/.env` in this checkout before the fix                                                       | existed but was a raw copy of `infra/.env.example` (48 lines, `change-me-*` placeholders)                                         |
+| 5   | `deploy/.env` in this checkout                                                                     | **missing** → [`deploy.sh:59`](../../deploy/deploy.sh:59) aborts on `HOST="${HOST:?...}"`                                         |
+| 6   | `E:\projects\AI\infra\.env` (parent-dir fallback of [`deploy.sh:204`](../../deploy/deploy.sh:204)) | missing                                                                                                                           |
 
 ### Root cause
 

@@ -1,0 +1,142 @@
+/**
+ * AIsztens design tokens — the single source of every colour, depth, shape and
+ * motion value in the React apps.
+ *
+ * Consumers import this file right after Tailwind and register the primitive
+ * sources for class scanning:
+ *
+ *   @import "tailwindcss";
+ *   @import "../../../packages/ui/src/styles/theme.css";
+ *   @source "../../../packages/ui/src";
+ *
+ * Colour literals are allowed *only* here. Everywhere under `apps/*\/src` the
+ * tokens below are the exclusive source of colour
+ * (see `.roo/rules/react.coding-standards.md` §7).
+ *
+ * Theme identity (2026-10-22, admin retheme): graphite / ash surfaces with a
+ * teal-cyan accent. Every border colour is a *dark* token — the theme never
+ * relies on `currentColor` for borders, so no component can pick up the
+ * near-white text colour as its outline.
+ */
+
+@theme {
+  /* Brand ------------------------------------------------------------- */
+  --color-primary: oklch(0.66 0.14 195);
+  --color-primary-hover: oklch(0.72 0.13 195);
+  --color-primary-foreground: oklch(0.16 0.02 195);
+  --color-secondary: oklch(0.62 0.12 250);
+  --color-secondary-foreground: oklch(0.15 0.015 250);
+  --color-tertiary: oklch(0.7 0.13 320);
+  --color-quaternary: oklch(0.74 0.11 150);
+
+  /* Surfaces ---------------------------------------------------------- */
+  --color-surface-base: oklch(0.17 0.008 250);
+  --color-surface-raised: oklch(0.215 0.009 250);
+  --color-surface-sunken: oklch(0.135 0.008 250);
+  --color-surface-overlay: oklch(0.255 0.01 250);
+
+  /* Borders ----------------------------------------------------------- */
+  --color-border-hairline: oklch(0.3 0.01 250);
+  --color-border-default: oklch(0.36 0.012 250);
+  --color-border-strong: oklch(0.45 0.015 250);
+  --color-border-focus: oklch(0.72 0.14 195);
+
+  /* Text -------------------------------------------------------------- */
+  --color-text-primary: oklch(0.95 0.004 250);
+  --color-text-secondary: oklch(0.8 0.008 250);
+  --color-text-muted: oklch(0.65 0.01 250);
+  --color-text-inverse: oklch(0.17 0.008 250);
+
+  /* State ------------------------------------------------------------- */
+  --color-success: oklch(0.66 0.14 158);
+  --color-success-foreground: oklch(0.15 0.02 158);
+  --color-warning: oklch(0.8 0.14 80);
+  --color-warning-foreground: oklch(0.2 0.03 80);
+  --color-danger: oklch(0.63 0.19 25);
+  --color-danger-foreground: oklch(0.99 0.01 25);
+  --color-info: oklch(0.68 0.11 240);
+  --color-info-foreground: oklch(0.15 0.02 240);
+
+  /* Depth ------------------------------------------------------------- */
+  --shadow-neu-raised: 4px 4px 10px oklch(0.1 0.008 250 / 0.8), -3px -3px 9px oklch(0.45 0.012 250 / 0.22);
+  --shadow-neu-inset: inset 3px 3px 7px oklch(0.1 0.008 250 / 0.85), inset -2px -2px 6px oklch(0.45 0.012 250 / 0.16);
+  --shadow-neu-pressed: inset 2px 2px 5px oklch(0.1 0.008 250 / 0.9), inset -1px -1px 4px oklch(0.45 0.012 250 / 0.12);
+  --shadow-focus-ring: 0 0 0 3px oklch(0.72 0.14 195 / 0.35);
+
+  /* Shape ------------------------------------------------------------- */
+  --radius-control: 0.625rem;
+  --radius-card: 1rem;
+  --radius-pill: 9999px;
+
+  /* Motion ------------------------------------------------------------ */
+  --ease-neu: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/**
+ * Tailwind v4 has no theme namespace for border widths or transition
+ * durations, so these tokens are plain custom properties exposed through the
+ * custom utilities below (`border-hairline`, `border-strong`, `duration-fast`,
+ * `duration-base`).
+ */
+:root {
+  --border-width-hairline: 1px;
+  --border-width-default: 1.5px;
+  --border-width-strong: 2px;
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+}
+
+@utility border-hairline {
+  border-width: var(--border-width-hairline);
+}
+
+@utility border-strong {
+  border-width: var(--border-width-strong);
+}
+
+@utility duration-fast {
+  transition-duration: var(--duration-fast);
+}
+
+@utility duration-base {
+  transition-duration: var(--duration-base);
+}
+
+@layer base {
+  /**
+   * Tailwind v4 preflight leaves `border-color` at `currentColor`, which made
+   * every `border`/`border-b`/`border-t` that only sets a *width* inherit the
+   * near-white text colour (the "whitish outlines" defect). Resetting the
+   * default to the dark hairline token means a border is dark unless a
+   * component explicitly asks for another colour token.
+   *
+   * Declared in the `base` layer on purpose: the `utilities` layer comes after
+   * it, so `border-danger`, `border-info`, `border-border-focus` and friends
+   * still win.
+   */
+  *,
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border-hairline);
+  }
+
+  body {
+    background-color: var(--color-surface-base);
+    color: var(--color-text-primary);
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Native widget accents (caret, selection) follow the brand accent. */
+  ::selection {
+    background-color: oklch(0.66 0.14 195 / 0.35);
+    color: var(--color-text-primary);
+  }
+
+  :focus-visible {
+    outline-color: var(--color-border-focus);
+  }
+}

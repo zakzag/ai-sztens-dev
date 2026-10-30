@@ -27,7 +27,7 @@ remedy for this class of problem on Windows:
 
 > On Windows (Git Bash + drvfs) the file always reports 0777;
 > tighten the ACL instead:
->   icacls deploy\\ssh-keys\\deploy.private.key /inheritance:r /grant:r "$USER:F"
+> icacls deploy\\ssh-keys\\deploy.private.key /inheritance:r /grant:r "$USER:F"
 
 but the helper's heuristic of deriving the bash from the msys2 git
 path is fragile, and the deploy.sh's own `SSH_KEY` value gets

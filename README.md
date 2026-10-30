@@ -4,7 +4,7 @@ Automated call-back system: a website visitor requests a call-back through a for
 backend stores and validates the request, then a call worker initiates an AI-driven phone
 call, processes the results and executes configurable follow-up actions.
 
-> Full architecture, flows and decisions: [`docs/01-aisztens.md`](docs/01-aisztens.md)
+> Full architecture, flows and decisions: [`docs/01-aisztens.md`](docs/Specs/outdated/01-aisztens.md)
 > and the other files under [`docs/`](docs).
 
 ## Monorepo Layout
@@ -38,24 +38,24 @@ developer machine, `.env.dev` for the dev droplet, `.env.prod` for the future
 prod droplet — the bare `.env` names are legacy). Copy the `.env.example`
 templates as needed:
 
-| File | Contents |
-|---|---|
-| `apps/api/.env.local` / `.env.dev` / `.env.prod` | `PORT`, `CORS_ORIGINS` |
-| `apps/web/.env.local` / `.env.dev` / `.env.prod` | `VITE_API_BASE_URL` |
-| `apps/admin/.env.local` / `.env.dev` / `.env.prod` | `VITE_API_BASE_URL` |
+| File                                               | Contents               |
+| -------------------------------------------------- | ---------------------- |
+| `apps/api/.env.local` / `.env.dev` / `.env.prod`   | `PORT`, `CORS_ORIGINS` |
+| `apps/web/.env.local` / `.env.dev` / `.env.prod`   | `VITE_API_BASE_URL`    |
+| `apps/admin/.env.local` / `.env.dev` / `.env.prod` | `VITE_API_BASE_URL`    |
 
 Validate every `.env` file offline, and find the other helper scripts, in
 [`scripts/README.md`](scripts/README.md).
 
 ### Useful scripts
 
-| Command | Effect |
-|---|---|
-| `pnpm dev` | Start all apps with watch mode (NestJS + two Vite dev servers) |
-| `pnpm build` | Build the whole monorepo (topological order) |
-| `pnpm test` | API unit tests |
-| `pnpm test:e2e` | API e2e tests (Fastify) |
-| `pnpm lint` | Lint all packages |
+| Command                                  | Effect                                                                                                                       |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                               | Start all apps with watch mode (NestJS + two Vite dev servers)                                                               |
+| `pnpm build`                             | Build the whole monorepo (topological order)                                                                                 |
+| `pnpm test`                              | API unit tests                                                                                                               |
+| `pnpm test:e2e`                          | API e2e tests (Fastify)                                                                                                      |
+| `pnpm lint`                              | Lint all packages                                                                                                            |
 | [`scripts/README.md`](scripts/README.md) | The script index: local stack helper, `.env` checks, stack smoke tests, SSH tooling, AI-rule sync — and how to run each one. |
 
 Per-package scripts are runnable with `pnpm --filter <pkg> <script>`, e.g.
@@ -72,17 +72,17 @@ Per-package scripts are runnable with `pnpm --filter <pkg> <script>`, e.g.
 
 ## Components
 
-| Component | Responsibility |
-|---|---|
-| Web Frontend (`apps/web`) | Public site: landing page + call-back request form |
-| Admin Dashboard (`apps/admin`) | Owner-facing view of requests/calls (scaffold) |
-| Request API (`apps/api`) | Receive + validate submissions, list/store requests |
-| Call Queue + Action Queue | Two separate queues (call jobs + action jobs) |
-| Call Dispatcher | Consumes call queue, starts calls via the CallProvider |
-| VAPI (Call Provider) | Outbound call + AI conversation; emits webhook events |
-| Webhook Receiver | Receives provider events; updates status; saves call details |
-| Action Executor + Registry | Runs in-call and post-call actions |
-| Notification / Calendar Service | Notify owner/caller, booking proposals |
+| Component                       | Responsibility                                               |
+| ------------------------------- | ------------------------------------------------------------ |
+| Web Frontend (`apps/web`)       | Public site: landing page + call-back request form           |
+| Admin Dashboard (`apps/admin`)  | Owner-facing view of requests/calls (scaffold)               |
+| Request API (`apps/api`)        | Receive + validate submissions, list/store requests          |
+| Call Queue + Action Queue       | Two separate queues (call jobs + action jobs)                |
+| Call Dispatcher                 | Consumes call queue, starts calls via the CallProvider       |
+| VAPI (Call Provider)            | Outbound call + AI conversation; emits webhook events        |
+| Webhook Receiver                | Receives provider events; updates status; saves call details |
+| Action Executor + Registry      | Runs in-call and post-call actions                           |
+| Notification / Calendar Service | Notify owner/caller, booking proposals                       |
 
 ## Current State
 

@@ -2,10 +2,10 @@
 # AIsztens — deploy helper (run from YOUR local machine).
 #
 # Mirrors `.github/workflows/deploy.yml` for operators who do not want to
-# use the GitHub Actions path. Both paths now do the SAME thing: ship
-# three small files (docker-compose.yml, infra/.env, Caddyfile.rendered)
-# to the droplet, then `docker compose pull && up -d`. The droplet never
-# builds anything.
+# use the GitHub Actions path. Both paths now do the SAME thing: ship the
+# small deploy files (docker-compose.yml, infra/.env, Caddyfile.rendered,
+# infra/postgres/init) to the droplet, then `docker compose pull && up -d`.
+# The droplet never builds anything.
 #
 # Requires: ssh, scp (use Git Bash / WSL on Windows).
 #
@@ -41,14 +41,14 @@
 # compose --env-file can never drift from the droplet being targeted.
 #
 # Commands:
-#   up         ship 3 files + `docker compose pull && up -d` (no build)
+#   up         ship the deploy files + `docker compose pull && up -d` (no build)
 #   down       stop the stack
 #   down-all   DESTRUCTIVE: remove every Docker object on the droplet
 #   restart    restart the stack
 #   ps         show container status
 #   logs       tail logs
 #   bootstrap  first-time only: as root, install Docker + users + keys
-#   upload     ship 3 files only (without pulling / restarting)
+#   upload     ship the deploy files only (without pulling / restarting)
 #
 # IDENTITY
 # --------
@@ -177,14 +177,15 @@ Usage:  ./deploy/deploy.sh <command> [dev|prod] [--verbose]      (Git Bash / WSL
         .\deploy\deploy.ps1 <command> [dev|prod] [--verbose]     (Windows wrapper)
 
 Commands:
-  up         ship 3 files (compose + infra/.env + Caddyfile.rendered) +
+  up         ship the deploy files (compose + infra/.env +
+              Caddyfile.rendered + postgres/init) +
               `docker compose pull && up -d` (no build)
   down       stop the stack (volumes are preserved)
   down-all   DESTRUCTIVE: remove every Docker object on the droplet
   restart    restart the stack
   ps         show container status
   logs       tail logs (-f)
-  upload     ship the 3 files only, without pulling or restarting
+  upload     ship the deploy files only, without pulling or restarting
   bootstrap  first-time only: install Docker + users + keys (ROOT login)
 
 Target [dev|prod] selects the environment file AND the APP_ENV used for
@@ -418,10 +419,11 @@ REMOTE_PREFLIGHT
 }
 
 # ---------------------------------------------------------------------------
-# Ship ONLY the three small files the droplet needs:
+# Ship ONLY the small files the droplet needs:
 #   * infra/docker-compose.yml
 #   * infra/.env  (rendered from infra/.env.${APP_ENV} + IMAGE_TAG/GHCR_OWNER)
 #   * infra/caddy/Caddyfile.rendered
+#   * infra/postgres/init/   (the docker-entrypoint-initdb.d bind mount)
 #
 # The droplet no longer receives application source code.
 # ---------------------------------------------------------------------------
@@ -437,10 +439,23 @@ upload() {
   if [ -f "$REPO_DIR/infra/.env.${APP_ENV}" ]; then
     local_infra_env="$REPO_DIR/infra/.env.${APP_ENV}"
   elif [ -f "$REPO_DIR/infra/.env" ]; then
-    log "Note: using legacy infra/.env (no infra/.env.${APP_ENV} found); switch to the per-env name to silence it."
-    local_infra_env="$REPO_DIR/infra/.env"
+    # Legacy reject (2026-10-19): the cutover to per-env files was 2026-10-05,
+    # and `deploy.sh` should never silently deploy from a stale `infra/.env`
+    # — that file belongs to a pre-cutover checkout and may not match the
+    # selected target. The `deploy/.env` reject is at deploy.sh:255-265; this
+    # is its `infra/.env` mirror.
+    log_error "source env file not found: infra/.env.${APP_ENV}"
+    log_error "Found the legacy infra/.env instead — it has been replaced by per-env files."
+    log_error "Migration:"
+    log_error "  mv infra/.env infra/.env.${APP_ENV}"
+    log_error "  # verify with: git check-ignore -v infra/.env.${APP_ENV}"
+    log_error "  # (it must stay gitignored — it contains DB secrets and VAPI_WEBHOOK_SECRET)"
+    log_error "Or, if you really meant to deploy from a different target, pick it with 'deploy.sh up <target>'."
+    log_error "Aborted before any file was shipped to the droplet."
+    return 1
   else
-    log "ERROR: no infra/.env.${APP_ENV} or infra/.env found (APP_ENV=${APP_ENV}). Copy infra/.env.example to infra/.env.${APP_ENV} and fill it in before deploying."
+    log_error "source env file not found: infra/.env.${APP_ENV}"
+    log_error "Fix: cp infra/.env.example infra/.env.${APP_ENV}  then fill in the DB passwords and VAPI_WEBHOOK_SECRET before deploying."
     return 1
   fi
   # Stage the rendered env in a temp DIRECTORY whose only entry is a
@@ -468,17 +483,29 @@ upload() {
   } >> "$rendered_env"
   chmod 600 "$rendered_env"
 
-  log "Shipping 3 files to $SSH_USER@$HOST:$REMOTE_DIR ..."
+  log "Shipping the deploy files to $SSH_USER@$HOST:$REMOTE_DIR ..."
   # Always clean up the temp staging directory, even when the scp / mv
   # chain fails. The trap fires on any exit of the function (return or
   # errexit), so the temp dir cannot leak.
   trap "rm -rf '$rendered_env_dir'" RETURN
-  "${SSH[@]}" "mkdir -p $REMOTE_DIR/infra/caddy"
+  "${SSH[@]}" "mkdir -p $REMOTE_DIR/infra/caddy $REMOTE_DIR/infra/postgres"
   "${SCP[@]}" \
     "$REPO_DIR/infra/docker-compose.yml" \
     "$rendered_env" \
     "$REPO_DIR/infra/caddy/Caddyfile.rendered" \
     "$SSH_USER@$HOST:$REMOTE_DIR/"
+  # The Postgres init scripts are what infra/docker-compose.yml bind-mounts
+  # at `./postgres/init:/docker-entrypoint-initdb.d:ro`. They must be shipped
+  # explicitly (`-r`): the official postgres image runs them ONLY on the
+  # first initialization of an empty `pgdata` volume, and without the
+  # directory present a freshly provisioned droplet would never create the
+  # aisztens / tkovari / krak roles.
+  if [ -d "$REPO_DIR/infra/postgres/init" ]; then
+    "${SCP[@]}" -r "$REPO_DIR/infra/postgres/init" \
+      "$SSH_USER@$HOST:$REMOTE_DIR/infra/postgres/"
+  else
+    log_warn "infra/postgres/init is missing — a fresh droplet would start Postgres without the role bootstrap."
+  fi
   # scp preserves the basename when the destination is a directory; the
   # droplet's compose file expects files in the same relative paths as
   # the repo layout (infra/docker-compose.yml, infra/.env,

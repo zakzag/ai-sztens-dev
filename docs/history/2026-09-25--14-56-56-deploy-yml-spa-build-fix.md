@@ -26,12 +26,12 @@ Added four new steps to
 between the env-file upload (old step 4) and `docker compose up`
 (old step 5):
 
-| # | Step | What it does |
-|---|---|---|
-| 4b | `Setup pnpm` ([`deploy.yml:119-122`](.github/workflows/deploy.yml:119)) | Installs pnpm 10 via corepack, same version as `ci.yml` |
-|   | `Setup Node.js` ([`deploy.yml:124-128`](.github/workflows/deploy.yml:124)) | Node 22 + pnpm-store cache |
-| 4c | `Build web and admin SPAs` ([`deploy.yml:137-150`](.github/workflows/deploy.yml:137)) | `pnpm install --frozen-lockfile`, reads `DOMAIN` from the rendered `infra/.env`, then `VITE_API_BASE_URL=https://api.${domain}/api pnpm --filter @callback/{web,admin} build`. Mirrors `deploy/deploy.sh::build_spas()` |
-| 4d | `Upload SPA dist folders to droplet` ([`deploy.yml:159-169`](.github/workflows/deploy.yml:159)) | `appleboy/scp-action` with `source: "apps/web/dist/,apps/admin/dist/"`, `target: /opt/aisztens/apps`, `rm: true`, `strip_components: 1` so each `dist/*` lands at `/opt/aisztens/apps/{web,admin}/dist/*` on the droplet |
+| #   | Step                                                                                            | What it does                                                                                                                                                                                                             |
+| --- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 4b  | `Setup pnpm` ([`deploy.yml:119-122`](.github/workflows/deploy.yml:119))                         | Installs pnpm 10 via corepack, same version as `ci.yml`                                                                                                                                                                  |
+|     | `Setup Node.js` ([`deploy.yml:124-128`](.github/workflows/deploy.yml:124))                      | Node 22 + pnpm-store cache                                                                                                                                                                                               |
+| 4c  | `Build web and admin SPAs` ([`deploy.yml:137-150`](.github/workflows/deploy.yml:137))           | `pnpm install --frozen-lockfile`, reads `DOMAIN` from the rendered `infra/.env`, then `VITE_API_BASE_URL=https://api.${domain}/api pnpm --filter @callback/{web,admin} build`. Mirrors `deploy/deploy.sh::build_spas()`  |
+| 4d  | `Upload SPA dist folders to droplet` ([`deploy.yml:159-169`](.github/workflows/deploy.yml:159)) | `appleboy/scp-action` with `source: "apps/web/dist/,apps/admin/dist/"`, `target: /opt/aisztens/apps`, `rm: true`, `strip_components: 1` so each `dist/*` lands at `/opt/aisztens/apps/{web,admin}/dist/*` on the droplet |
 
 The header comment at the top of the file was updated to reflect the
 new 8-step flow.

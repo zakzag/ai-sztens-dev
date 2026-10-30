@@ -6,11 +6,11 @@
 
 ## Measured data / evidence
 
-| filter | count | names |
-|---|---|---|
-| `--filter label=com.docker.compose.project=aisztens` | 3 | api, postgres, monitor |
-| `--filter label=com.docker.compose.project=aisztens` AND `--filter label=com.docker.compose.oneoff=False` | 2 | api, postgres |
-| `docker compose ps -a` | 2 | api, postgres |
+| filter                                                                                                    | count | names                  |
+| --------------------------------------------------------------------------------------------------------- | ----- | ---------------------- |
+| `--filter label=com.docker.compose.project=aisztens`                                                      | 3     | api, postgres, monitor |
+| `--filter label=com.docker.compose.project=aisztens` AND `--filter label=com.docker.compose.oneoff=False` | 2     | api, postgres          |
+| `docker compose ps -a`                                                                                    | 2     | api, postgres          |
 
 Labels of the blocker `63062cd97afc`:
 
@@ -33,17 +33,17 @@ Design choice: do not use a YAML parser. The compose file is ours and the format
 
 ## Solution / implementation
 
-| File | Change |
-|---|---|
-| [`deploy/deploy.sh:805`](../../deploy/deploy.sh:805) | `_resolve_compose_project_name()` — reads `infra/docker-compose.yml`'s `name:` field, falls back to directory name. |
-| [`deploy/deploy.sh:825`](../../deploy/deploy.sh:825) | `prune_legacy_stack()` rewritten: log the `down` invocation and exit code; after the existing legacy-prefix `docker rm -f` block, scan `docker ps -a` for `<project>-<service>-<index>` containers that lack `com.docker.compose.oneoff=False` and `docker rm -f` them with a log_warn. Heredoc args shipped via env vars (`REMOTE_PRUNE_*`) because SSH argv splits on space. |
-| [`deploy/deploy.sh:905`](../../deploy/deploy.sh:905) | New `verify_up_result()`: parses expected services locally from `infra/docker-compose.yml`, fetches running services from the droplet, collapses newlines (`bash case`'s `*` does not cross `\n`), and aborts with `Not running after up: <missing>` + two diagnose commands if any expected service is not in the running list. |
-| [`deploy/deploy.sh:1029`](../../deploy/deploy.sh:1029) | `up` branch calls `verify_up_result` after `up -d --build`. |
-| [`infra/monitor/Dockerfile:8`](../../infra/monitor/Dockerfile:8) | Strips CRs from `watch.sh` in the COPY step. The source file's CRLF (Windows checkout) was reintroduced on every rebuild; the tr-strip in the Dockerfile makes the image immune. |
-| [`infra/monitor/watch.sh`](../../infra/monitor/watch.sh) | CRLF stripped (`sed -i 's/\r$//'`). |
-| [`scripts/test/_deploy-sh-remote-compose-path-test.sh`](../../scripts/test/_deploy-sh-remote-compose-path-test.sh:1) | Sandbox now copies `infra/docker-compose.yml` (was missing). |
-| [`scripts/test/_deploy-sh-remote-compose-path-test.sh:303`](../../scripts/test/_deploy-sh-remote-compose-path-test.sh:303) | `test8.runs-bootstrap-remotely` switched from `assert_out` to `assert_log` (ssh stub writes argv to its log file; stdout check could never pass). |
-| [`scripts/test/_deploy-sh-remote-compose-path-test.sh:313`](../../scripts/test/_deploy-sh-remote-compose-path-test.sh:313) | New Scenario 10 (6 assertions) — prune stage captured, project name read from compose.yml, all 4 expected services enumerated, missing-services failure path. |
+| File                                                                                                                       | Change                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`deploy/deploy.sh:805`](../../deploy/deploy.sh:805)                                                                       | `_resolve_compose_project_name()` — reads `infra/docker-compose.yml`'s `name:` field, falls back to directory name.                                                                                                                                                                                                                                                            |
+| [`deploy/deploy.sh:825`](../../deploy/deploy.sh:825)                                                                       | `prune_legacy_stack()` rewritten: log the `down` invocation and exit code; after the existing legacy-prefix `docker rm -f` block, scan `docker ps -a` for `<project>-<service>-<index>` containers that lack `com.docker.compose.oneoff=False` and `docker rm -f` them with a log_warn. Heredoc args shipped via env vars (`REMOTE_PRUNE_*`) because SSH argv splits on space. |
+| [`deploy/deploy.sh:905`](../../deploy/deploy.sh:905)                                                                       | New `verify_up_result()`: parses expected services locally from `infra/docker-compose.yml`, fetches running services from the droplet, collapses newlines (`bash case`'s `*` does not cross `\n`), and aborts with `Not running after up: <missing>` + two diagnose commands if any expected service is not in the running list.                                               |
+| [`deploy/deploy.sh:1029`](../../deploy/deploy.sh:1029)                                                                     | `up` branch calls `verify_up_result` after `up -d --build`.                                                                                                                                                                                                                                                                                                                    |
+| [`infra/monitor/Dockerfile:8`](../../infra/monitor/Dockerfile:8)                                                           | Strips CRs from `watch.sh` in the COPY step. The source file's CRLF (Windows checkout) was reintroduced on every rebuild; the tr-strip in the Dockerfile makes the image immune.                                                                                                                                                                                               |
+| [`infra/monitor/watch.sh`](../../infra/monitor/watch.sh)                                                                   | CRLF stripped (`sed -i 's/\r$//'`).                                                                                                                                                                                                                                                                                                                                            |
+| [`scripts/test/_deploy-sh-remote-compose-path-test.sh`](../../scripts/test/_deploy-sh-remote-compose-path-test.sh:1)       | Sandbox now copies `infra/docker-compose.yml` (was missing).                                                                                                                                                                                                                                                                                                                   |
+| [`scripts/test/_deploy-sh-remote-compose-path-test.sh:303`](../../scripts/test/_deploy-sh-remote-compose-path-test.sh:303) | `test8.runs-bootstrap-remotely` switched from `assert_out` to `assert_log` (ssh stub writes argv to its log file; stdout check could never pass).                                                                                                                                                                                                                              |
+| [`scripts/test/_deploy-sh-remote-compose-path-test.sh:313`](../../scripts/test/_deploy-sh-remote-compose-path-test.sh:313) | New Scenario 10 (6 assertions) — prune stage captured, project name read from compose.yml, all 4 expected services enumerated, missing-services failure path.                                                                                                                                                                                                                  |
 
 ## Outcome and how to verify
 

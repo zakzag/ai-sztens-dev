@@ -1,8 +1,14 @@
 # Infrastructure — Docker containers on the droplet
 
 **Státusz:** Élő
-**Utolsó frissítés:** 2026-10-09 (image-based deploy: minden alkalmazás-komponens saját konténerben fut — `api`, `web`, `admin`, `postgres`, `caddy`, `monitor` — a droplet csak `docker compose pull && up -d`-t futtat; a forráskód és a pnpm workspace nem kerül a dropletre)
-**Kapcsolódik:** [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
+
+**Utolsó frissítés:** 2026-10-19 (AIS-35: per-kontext Postgres sémák — `platform`, `callback`, `email` — és a hozzájuk tartozó grantok, új `02-schemas.sh` init script; lásd §6.2)
+
+**Korábbi frissítés:** 2026-10-12 (deploy metadata: az `images.yml` három új build-argot ad át — `COMMIT_HASH` / `DEPLOY_DATE` az api képnek, `VITE_COMMIT_HASH` / `VITE_DEPLOY_DATE` a `web`/`admin` képnek —, így a futó image egy konkrét revízióhoz köthető; lásd §6.1)
+
+**Korábbi frissítés:** 2026-10-09 (image-based deploy: minden alkalmazás-komponens saját konténerben fut — `api`, `web`, `admin`, `postgres`, `caddy`, `monitor` — a droplet csak `docker compose pull && up -d`-t futtat; a forráskód és a pnpm workspace nem kerül a dropletre)
+
+**Kapcsolódik:** [`infra/docker-compose.yml`](../../infra/docker-compose.yml), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`docs/Specs/Caddy-Reverse-Proxy.md`](Caddy-Reverse-Proxy.md), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)
 
 ---
 
@@ -52,30 +58,30 @@ flowchart LR
 
 ## 2. Jelmagyarázat / Legend
 
-| Jel | Jelentés |
-|---|---|
-| Folyamatos nyíl | Runtime forgalom (HTTP/HTTPS kérés vagy adatbázis-kapcsolat) |
-| Szaggatott vonal | Mount / kötet-csatolás a named volume-hoz |
-| `depends_on` | Compose indítási sorrend (nem adatforgalom) — lásd a táblázatot lent |
+| Jel              | Jelentés                                                             |
+| ---------------- | -------------------------------------------------------------------- |
+| Folyamatos nyíl  | Runtime forgalom (HTTP/HTTPS kérés vagy adatbázis-kapcsolat)         |
+| Szaggatott vonal | Mount / kötet-csatolás a named volume-hoz                            |
+| `depends_on`     | Compose indítási sorrend (nem adatforgalom) — lásd a táblázatot lent |
 
 ## 3. Mi van az egyes konténerekben?
 
-| Service | Image | Tartalma / mit futtat | Belső port | mem_limit | depends_on |
-|---|---|---|---|---|---|
-| `caddy` | `caddy:2-alpine` | Renderelt `Caddyfile.rendered`; TLS termináció + reverse proxy + ACME | 80, 443 (host-publikált) | 64m | `api`, `web`, `admin` started |
-| `api` | `ghcr.io/…/aisztens-api` | NestJS + Fastify alkalmazás; `node apps/api/dist/main.js`; `NODE_OPTIONS=--max-old-space-size=384` | 3000 | 400m | `postgres` healthy |
-| `web` | `ghcr.io/…/aisztens-web` | nginx:1.27-alpine a `@callback/web` Vite build-jét szolgálja ki | 80 | 32m | — |
-| `admin` | `ghcr.io/…/aisztens-admin` | nginx:1.27-alpine a `@callback/admin` Vite build-jét szolgálja ki | 80 | 32m | — |
-| `postgres` | `postgres:16-alpine` | PostgreSQL; idempotens role/db init a `./postgres/init`-ből; `shared_buffers=128MB` | 5432 | 400m | — |
-| `monitor` | `ghcr.io/…/aisztens-monitor` | alpine:3.20 + curl + `watch.sh` polling loop | — | 32m | `api` started |
+| Service    | Image                        | Tartalma / mit futtat                                                                                                                                                                                         | Belső port               | mem_limit | depends_on                    |
+| ---------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------- | ----------------------------- |
+| `caddy`    | `caddy:2-alpine`             | Renderelt `Caddyfile.rendered`; TLS termináció + reverse proxy + ACME                                                                                                                                         | 80, 443 (host-publikált) | 64m       | `api`, `web`, `admin` started |
+| `api`      | `ghcr.io/…/aisztens-api`     | NestJS + Fastify alkalmazás; `node apps/api/dist/main.js`; `NODE_OPTIONS=--max-old-space-size=384`                                                                                                            | 3000                     | 400m      | `postgres` healthy            |
+| `web`      | `ghcr.io/…/aisztens-web`     | nginx:1.27-alpine a `@callback/web` Vite build-jét szolgálja ki                                                                                                                                               | 80                       | 32m       | —                             |
+| `admin`    | `ghcr.io/…/aisztens-admin`   | nginx:1.27-alpine a `@callback/admin` Vite build-jét szolgálja ki                                                                                                                                             | 80                       | 32m       | —                             |
+| `postgres` | `postgres:16-alpine`         | PostgreSQL; idempotens role/db/séma init a `./postgres/init`-ből ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh), [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh)); `shared_buffers=128MB` | 5432                     | 400m      | —                             |
+| `monitor`  | `ghcr.io/…/aisztens-monitor` | alpine:3.20 + curl + `watch.sh` polling loop                                                                                                                                                                  | —                        | 32m       | `api` started                 |
 
 ## 4. Named volume-ok
 
-| Volume | Mount-pont | Cél |
-|---|---|---|
-| `pgdata` | postgres `/var/lib/postgresql/data` | Adatbázis-adatok perzisztenciája |
-| `caddy_data` | caddy `/data` | Let's Encrypt tanúsítványok + ACME állapot |
-| `caddy_config` | caddy `/config` | Caddy futásidejű konfiguráció |
+| Volume         | Mount-pont                          | Cél                                        |
+| -------------- | ----------------------------------- | ------------------------------------------ |
+| `pgdata`       | postgres `/var/lib/postgresql/data` | Adatbázis-adatok perzisztenciája           |
+| `caddy_data`   | caddy `/data`                       | Let's Encrypt tanúsítványok + ACME állapot |
+| `caddy_config` | caddy `/config`                     | Caddy futásidejű konfiguráció              |
 
 ## 5. Kommunikáció összefoglaló
 
@@ -94,11 +100,11 @@ flowchart LR
 
 A `api`, `web` és `admin` ugyanabból a monorepóból, ugyanabban a CI jobban épül, de **három külön Dockerfile** van, és mindegyik más package-et választ ki a `pnpm --filter` segítségével:
 
-| App | Dockerfile | Mit buildel / mi kerül a képbe | Runtime a képben |
-|---|---|---|---|
-| `api` | [`infra/app/Dockerfile`](../../infra/app/Dockerfile) | `@callback/shared` + `@callback/api` → `apps/api/dist` | Node 22, `node apps/api/dist/main.js` |
-| `web` | [`infra/web/Dockerfile`](../../infra/web/Dockerfile) | `@callback/shared` + `@callback/web` → `apps/web/dist` | nginx:1.27-alpine |
-| `admin` | [`infra/admin/Dockerfile`](../../infra/admin/Dockerfile) | `@callback/shared` + `@callback/admin` → `apps/admin/dist` | nginx:1.27-alpine |
+| App     | Dockerfile                                               | Mit buildel / mi kerül a képbe                             | Runtime a képben                      |
+| ------- | -------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------- |
+| `api`   | [`infra/app/Dockerfile`](../../infra/app/Dockerfile)     | `@callback/shared` + `@callback/api` → `apps/api/dist`     | Node 22, `node apps/api/dist/main.js` |
+| `web`   | [`infra/web/Dockerfile`](../../infra/web/Dockerfile)     | `@callback/shared` + `@callback/web` → `apps/web/dist`     | nginx:1.27-alpine                     |
+| `admin` | [`infra/admin/Dockerfile`](../../infra/admin/Dockerfile) | `@callback/shared` + `@callback/admin` → `apps/admin/dist` | nginx:1.27-alpine                     |
 
 A szétválasztás két ponton történik:
 
@@ -106,3 +112,102 @@ A szétválasztás két ponton történik:
 2. **Runtime-ban** — az [`infra/docker-compose.yml`](../../infra/docker-compose.yml) három külön service-t definiál, mindegyik a saját képére mutat. A Docker minden service-ből külön konténert indít, saját fájlrendszer-, processz- és hálózati névtérrel. A konténerek nem osztoznak fájlokon; csak az `internal` hálózaton, DNS-neveken keresztül beszélnek egymással, és a Caddy route-ol köztük.
 
 Így a „közös build hely" csak a közös forráskód (monorepo + `packages/shared`); az elkészült artifact-ok külön image-ekbe és külön konténerekbe kerülnek.
+
+> **Image-based deploy (2026-10-08 óta):** a fenti táblázat mind a hat konténert lefedi (`api`, `web`, `admin`, `postgres`, `caddy`, `monitor`), és az alkalmazás-image-ek (`api`, `web`, `admin`, `monitor`) **nem** a hoston futó build-ből, hanem a CI által GHCR-re push-olt artifact-okból származnak (lásd [`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md)). Az SPA bundle-ök az image-be vannak égetve (`/usr/share/nginx/html` a `web`/`admin` konténerben), és nincs hostoldali bind mount. A lokális fejlesztéshez az `infra/docker-compose.local.yml` override visszahozza a `build:` blokkokat.
+
+### 6.1 Beégetett build metadata (deploy dátum + commit hash)
+
+Az [`.github/workflows/images.yml`](../../.github/workflows/images.yml) `Compute image metadata` lépése **egyetlen forrásból** számolja a metadata-t, így a három kép ugyanazt az értéket kapja egy adott revízióhoz:
+
+| Output        | Érték                             | Felhasználás                                  |
+| ------------- | --------------------------------- | --------------------------------------------- |
+| `short_sha`   | `github.sha` első 7 karaktere     | Image tag (`sha-<7>`) — változatlan           |
+| `commit_hash` | teljes `github.sha` (40 karakter) | api: `COMMIT_HASH`, SPA-k: `VITE_COMMIT_HASH` |
+| `deploy_date` | `date -u +%Y-%m-%dT%H:%M:%SZ`     | api: `DEPLOY_DATE`, SPA-k: `VITE_DEPLOY_DATE` |
+
+A build-argok célja Dockerfile-onként:
+
+| Dockerfile                                               | Build-arg                              | Hogyan kerül a képbe                                                                                            | Hol jelenik meg                             |
+| -------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| [`infra/app/Dockerfile`](../../infra/app/Dockerfile)     | `COMMIT_HASH`, `DEPLOY_DATE`           | `ARG` + `ENV` a **runtime** stage-ben (egy intermediate stage ENV-je nem öröklődik át egy későbbi `FROM`-ba)    | `GET /healthz` → `commitHash`, `deployDate` |
+| [`infra/web/Dockerfile`](../../infra/web/Dockerfile)     | `VITE_COMMIT_HASH`, `VITE_DEPLOY_DATE` | `ARG` + `ENV` a **build** stage-ben, hogy a Vite lássa (csak `VITE_*` prefixű változó kerül a kliens bundle-be) | `web` kezdőlap jobb alsó build-info sora    |
+| [`infra/admin/Dockerfile`](../../infra/admin/Dockerfile) | `VITE_COMMIT_HASH`, `VITE_DEPLOY_DATE` | ugyanaz, mint a `web`-nél                                                                                       | `admin` dashboard build-info sora           |
+
+A `monitor` kép szándékosan nem kapja meg ezeket (nincs rájuk szüksége).
+
+Lokális buildnél (`scripts/dev-stack.sh up`, `pnpm --filter … dev`) a build-argok hiányoznak, ezért a Dockerfile-ok üres default-ot használnak: a `/healthz` `null`-t ad vissza, a SPA footer pedig `—` placeholdert renderel — egyik sem hiba, csak a graceful degradáció.
+
+### 6.2 A Postgres NEM saját image — hivatalos image + egyszeri init
+
+A `postgres` az egyetlen alkalmazás-szolgáltatás, amit **nem** az
+[`.github/workflows/images.yml`](../../.github/workflows/images.yml) állít elő.
+A compose a hivatalos `postgres:16-alpine` image-re hivatkozik, ezért:
+
+- a `docker compose pull` a **Docker Hubról** húzza (nem a GHCR-ről), így egy
+  elrontott `GHCR_OWNER` a Postgres-t nem érinti;
+- **mentes az `IMAGE_TAG` pinning alól** — a [`deploy.yml`](../../.github/workflows/deploy.yml)
+  „Verify every service is running IMAGE_TAG" lépése csak az `api`, `web`,
+  `admin` és `monitor` service-eket ellenőrzi;
+- az `up -d --remove-orphans --force-recreate` minden deploy-nál újra
+  létrehozza a konténert, de az adat a `pgdata` named volume-ban marad, tehát
+  túléli az újralétrehozást.
+
+Az `infra/postgres/init/` könyvtár a `/docker-entrypoint-initdb.d` könyvtárba van
+bind-mountolva (`./postgres/init:/docker-entrypoint-initdb.d:ro`), és a hivatalos
+entrypoint **kizárólag az üres `pgdata` volume első inicializálásakor** futtatja a
+benne lévő scripteket, lexikografikus sorrendben; a későbbi indítások `Skipping
+initialization`-t logolnak, és nem futtatják újra. Mindkét script idempotens, ezért
+kézzel bármikor újrafuttatható:
+
+```bash
+docker compose --env-file infra/.env -f infra/docker-compose.yml \
+  exec -T postgres bash /docker-entrypoint-initdb.d/01-roles.sh
+docker compose --env-file infra/.env -f infra/docker-compose.yml \
+  exec -T postgres bash /docker-entrypoint-initdb.d/02-schemas.sh
+```
+
+| Script                                                     | Felelősség                                                                                                                                                                                           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`01-roles.sh`](../../infra/postgres/init/01-roles.sh)     | `aisztens` (app), `tkovari` (owner) és `krak` (operátor) role; a database tulajdonosa az `aisztens`; séma-szintű grantok `\gexec`-guarddal — friss initen no-op, mert a sémák ekkor még nem léteznek |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform` és `email` sémákra, majd a grant-mátrix                                                                                                                   |
+
+Séma ↔ bounded context: `platform` (üzemeltetési adatok + az alkalmazás táblái,
+pl. `platform.api_keys`), `email` (email engine). A sémahatár egyben modulhatár,
+ezért a grantok is ezt követik:
+
+| Séma       | `aisztens` (app)   | `tkovari` (owner) | `krak` (operátor) |
+| ---------- | ------------------ | ----------------- | ----------------- |
+| `platform` | USAGE + **CREATE** | USAGE             | USAGE             |
+| `email`    | USAGE              | USAGE             | USAGE             |
+
+> **AIS-64 (2026-10-21):** a `callback` séma megszűnt (a teljes visszahívás-funkció
+> törlése). A korábbi mátrixban szereplő `callback | USAGE + CREATE` sor eltűnt;
+> a smoke-checkek várt értékei ennek megfelelően 2 séma / 6 USAGE / 1 CREATE.
+
+A `CREATE` jog kizárólag az app role-é, és kizárólag a `platform` sémában: a Drizzle
+migrációs runner ott tartja a könyvelő tábláját (`platform.__drizzle_migrations`)
+és ott hozza létre az alkalmazás tábláit. Enélkül a `db:migrate` `permission denied
+for schema platform` hibával állna meg. A sémák tulajdonosa a bootstrap superuser
+(`POSTGRES_USER`) marad — nincs ownership-átírás.
+
+A grant-mátrixot a [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh)
+(eldobható `postgres:16-alpine` konténer: friss init + kétszeri újrafuttatás) és a
+[`scripts/test/lib/20-cross-service.sh`](../../scripts/test/lib/20-cross-service.sh)
+smoke-checkei (`postgres-schemas`, `postgres-schema-usage`, `postgres-schema-create`)
+őrzik.
+
+A **lokális** (fejlesztői gépi) Postgres bootstrapje, a verifikációs query-k, a
+reset/wipe lépések és a jelenlegi korlátok külön specben vannak:
+[`Database-Local.md`](Database-Local.md). Ez a szekció a droplet-oldali
+üzemeltetésre koncentrál.
+
+A `infra/postgres/init` könyvtárat minden deploy elküldi a dropletre — a
+`.github/workflows/deploy.yml` `scp` forráslistája és a `deploy/deploy.sh`
+`upload()` függvénye is tartalmazza. Enélkül egy friss droplet **role-ok
+nélkül** inicializálná a Postgrest (a bind mount forrása üres lenne), és az API
+az első DB-hívásnál `role "aisztens" does not exist` hibát kapna.
+
+> A scriptben **tilos** `DO $$ … $$` blokkba tenni a psql-változókat: a psql a
+> `:'var'` / `:"var"` helyettesítést lexikailag végzi, és dollar-quote-olt
+> stringen belül **nem** interpolál, így a szerver `syntax error at or near ":"`-t
+> dob. A feltételes DDL ezért `\gexec`-et használ.

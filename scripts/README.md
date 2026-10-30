@@ -12,11 +12,13 @@ scripts/
 ├── README.md            # this file — the script index (source of truth)
 ├── dev-stack.sh         # local Docker stack            (bash)
 ├── dev-stack.ps1        # Windows entry point for dev-stack.sh
-├── init.sh              # AI-agent instruction sync     (bash)
-├── init.ps1             # AI-agent instruction sync     (Windows PowerShell)
+├── init.sh              # AI-agent artefact sync       (bash wrapper)
+├── init.ps1             # AI-agent artefact sync       (Windows PowerShell wrapper)
 ├── test-syntax.ps1      # PowerShell syntax guard for init.ps1
+├── lib/agent-artifacts/ # shared Node generator behind init.sh / init.ps1
 ├── env-test/            # .env validation suite        → env-test/README.md
 ├── ssh/                 # local SSH key tooling        → ssh/README.md
+├── sonar/               # local SonarQube analysis     → sonar/README.md
 └── test/                # container stack smoke suite  → test/README.md
 ```
 
@@ -28,6 +30,13 @@ restores `build:` blocks for `api`/`web`/`admin`/`monitor` so
 `scripts/dev-stack.sh up --build` still works from source. The smoke
 suite's `dc` helper auto-merges the local override when present; the
 droplet-side CI call uses just the base compose file.
+
+The `up -d --build` invocations below (the `pnpm test:stack:up` script,
+the smoke `--up` flag, and the per-stack snippet in §"Limitations") are
+all **local**: they only run when the developer machine has the
+`infra/docker-compose.local.yml` override in scope. The droplet never
+runs `docker compose up -d --build` — there is no source tree to build
+from, and the images come from GHCR (`ghcr.io/<owner>/aisztens-{api,web,admin,monitor}:sha-<short>`). On the droplet the equivalent is `docker compose --env-file infra/.env -f infra/docker-compose.yml pull && up -d --remove-orphans --force-recreate`.
 
 ## Root scripts
 
@@ -46,15 +55,46 @@ scripts/dev-stack.sh up          # bash (Linux / WSL / Git Bash / macOS)
 pwsh scripts/dev-stack.ps1 up    # Windows wrapper (delegates to bash via WSL)
 ```
 
-### `init.sh` / `init.ps1` — AI-agent instruction sync
+### `init.sh` / `init.ps1` — AI-agent artefact sync
 
-Interactive, idempotent generator: concatenates the `.roo/rules/*.md` sources into the chosen
-agent's instruction file — Copilot → `.github/copilot-instructions.md`, Cursor →
-`.cursor/rules/project.mdc`, Claude Code → `CLAUDE.md` — keeps a single `.bak` when the content
-changes, and appends the generated path to `.gitignore`.
+Interactive, idempotent generator: `init.sh` and `init.ps1` are **thin wrappers** (agent menu +
+`node` pre-flight) around one shared implementation, `scripts/lib/agent-artifacts/generate.mjs`.
+Both produce exactly the same bytes; requires Node.js on `PATH`.
 
-The source of truth is `.roo/rules/`; never edit a generated file by hand. Exit codes: `0`
-success or user quit, `1` fatal error.
+**Inputs (never written by the scripts):**
+
+| Source                                            | Meaning                                                                                                                                                                      |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.roo/rules/*.md`                                 | concatenated into the agent instruction file — every `*.md` directly under `.roo/rules/`, `instructions.md` first, the rest in byte order; zero-byte and `~$*` files skipped |
+| `.roomodes` (repo root)                           | project-level Zoo Code custom modes, authored in the Zoo Code UI                                                                                                             |
+| `scripts/lib/agent-artifacts/mode-overrides.json` | optional per-mode `emit` / tool-list overrides (the `.roomodes` file must stay valid Zoo Code schema)                                                                        |
+
+**Outputs per agent:**
+
+| Agent          | Instruction file                  | Mode artefacts                                           |
+| -------------- | --------------------------------- | -------------------------------------------------------- |
+| GitHub Copilot | `.github/copilot-instructions.md` | `.github/chatmodes/<slug>.chatmode.md`                   |
+| Cursor         | `.cursor/rules/project.mdc`       | `.cursor/commands/<slug>.md`, `.cursor/rules/<slug>.mdc` |
+| Claude Code    | `CLAUDE.md`                       | `.claude/agents/<slug>.md`                               |
+
+Every output is written as UTF-8 **without BOM** with LF endings and a single trailing newline,
+is left untouched when unchanged, and gets a `.bak` when it changes. **Each generated file and
+its `.bak` are appended automatically to the `.gitignore` section**
+`# --- AI agent instruction files (autogenerated by scripts/init.*) ---` — idempotently and
+CRLF-tolerantly. `.roomodes` is _never_ added (it is the source and stays tracked).
+
+CLI (used by both wrappers, also handy for CI):
+
+```bash
+node scripts/lib/agent-artifacts/generate.mjs --agent copilot        # write
+node scripts/lib/agent-artifacts/generate.mjs --agent cursor --check # exit 2 when stale
+node scripts/lib/agent-artifacts/generate.mjs --agent claude --dry-run
+```
+
+Exit codes: `0` success (or user quit), `1` fatal error, `2` stale artefacts in `--check` mode.
+Tests: `pnpm test:agents` (`node --test scripts/lib/agent-artifacts/`).
+
+The source of truth is `.roo/rules/` and `.roomodes`; never edit a generated file by hand.
 
 ```bash
 scripts/init.sh                  # bash
@@ -70,13 +110,36 @@ error. A cheap pre-flight check after editing the init scripts.
 powershell -File scripts/test-syntax.ps1
 ```
 
+### `sonar/` — local SonarQube analysis
+
+Runs a SonarQube analysis of the whole monorepo against an already running server, using the
+`@sonar/scan` dev dependency (no separate scanner CLI install). Driven by the root scripts
+`pnpm sonar`, `pnpm sonar:coverage`, `pnpm sonar:scan` and `pnpm sonar:test`; configuration
+lives in [`sonar-project.properties`](../sonar-project.properties) and the credentials in
+`SONAR_TOKEN` / `SONAR_HOST_URL` (or the git-ignored `sonar.env`).
+
+```bash
+cp sonar.env.example sonar.env   # then fill in SONAR_TOKEN
+pnpm sonar
+```
+
+- **Pre-flight:** `/api/system/status` must answer `UP`, otherwise the script stops before
+  downloading anything.
+- **Exit codes:** `0` success, `1` missing token / unreachable server / scanner failure.
+- **Coverage:** `lcov-merge.mjs` rewrites the per-package LCOV paths to repo-root relative and
+  writes `coverage/lcov.info` (consumed via `sonar.javascript.lcov.reportPaths`).
+
+See [`sonar/README.md`](sonar/README.md) for the file-level breakdown and
+[`docs/Specs/SonarQube.md`](../docs/Specs/SonarQube.md) for prerequisites and troubleshooting.
+
 ## Folders
 
-| Folder | What it is | Documentation |
-|---|---|---|
-| [`test/`](test/README.md) | Container-level smoke suite for the `infra/docker-compose.yml` stack (api / postgres / caddy / monitor), wired to `pnpm test:stack`, **plus** the offline `_deploy-sh-*.sh` suites that exercise `deploy/deploy.sh` without a droplet (argument/target handling, the logger, the env-file paths, the remote identity). | [`test/README.md`](test/README.md) |
-| [`env-test/`](env-test/README.md) | `.env` validation: an offline syntax/consistency checker plus an explicit live-access checker. | [`env-test/README.md`](env-test/README.md) |
-| [`ssh/`](ssh/README.md) | Local SSH key tooling (PPK → OpenSSH conversion, key inspection, passphrase removal). | [`ssh/README.md`](ssh/README.md) |
+| Folder                            | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Documentation                              |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| [`test/`](test/README.md)         | Container-level smoke suite for the `infra/docker-compose.yml` stack (api / postgres / caddy / monitor), wired to `pnpm test:stack`, **plus** the offline `_deploy-sh-*.sh` suites that exercise `deploy/deploy.sh` without a droplet (argument/target handling, the logger, the env-file paths, the remote identity), `_postgres-init-schemas-test.sh` (throwaway Postgres with the real init scripts mounted), and `_stack-env-default-test.sh` (three-env leftover defaults + the legacy `infra/.env` deploy.sh hard-reject). | [`test/README.md`](test/README.md)         |
+| [`env-test/`](env-test/README.md) | `.env` validation: an offline syntax/consistency checker plus an explicit live-access checker.                                                                                                                                                                                                                                                                                                                                                                                                                                   | [`env-test/README.md`](env-test/README.md) |
+| [`ssh/`](ssh/README.md)           | Local SSH key tooling (PPK → OpenSSH conversion, key inspection, passphrase removal).                                                                                                                                                                                                                                                                                                                                                                                                                                            | [`ssh/README.md`](ssh/README.md)           |
+| [`sonar/`](sonar/README.md)       | Local SonarQube analysis: config validation + server pre-flight, then `@sonar/scan`; plus the LCOV merge that makes monorepo coverage readable by SonarQube.                                                                                                                                                                                                                                                                                                                                                                     | [`sonar/README.md`](sonar/README.md)       |
 
 ## Conventions
 

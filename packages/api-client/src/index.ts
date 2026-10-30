@@ -1,0 +1,63 @@
+export {
+  API_ERROR_CODE,
+  API_ERROR_NAME,
+  HTTP_STATUS,
+  NETWORK_ERROR_MESSAGE,
+  UNEXPECTED_PAYLOAD_CODE,
+  UNEXPECTED_PAYLOAD_MESSAGE,
+  UNPARSEABLE_ERROR_MESSAGE,
+} from './api-error.const.js';
+
+export type { ApiErrorCode } from './api-error.const.js';
+
+export {
+  ApiError,
+  extractErrorDetails,
+  formatIssueLine,
+  isConflict,
+  isNetworkError,
+  isNotFoundError,
+  isValidationError,
+  parseErrorBody,
+  toFailureMessage,
+} from './api-error.js';
+
+export {
+  toIssueDetails,
+  toPayloadRelativePath,
+  unwrapEnvelope,
+} from './envelope.logic.js';
+
+export type {
+  EnvelopeUnwrapFailure,
+  EnvelopeUnwrapResult,
+  EnvelopeUnwrapSuccess,
+} from './envelope.logic.interface.js';
+
+export type {
+  ApiErrorBody,
+  ApiErrorEnvelopeBody,
+  ApiErrorInit,
+  ParsedErrorBody,
+} from './api-error.interface.js';
+
+export { createHttpClient, joinUrl } from './http-client.js';
+
+export {
+  InvalidEndpointPathError,
+  UnknownEndpointError,
+  clientPathOf,
+  toClientPath,
+} from './endpoint-path.js';
+
+export type {
+  HttpClient,
+  HttpClientConfig,
+  RequestOptions,
+} from './http-client.interface.js';
+
+export { API_KEYS_PATH } from './api-keys/api-keys.const.js';
+
+export { createApiKeysService } from './api-keys/api-keys.service.js';
+
+export type { ApiKeysService } from './api-keys/api-keys.interface.js';

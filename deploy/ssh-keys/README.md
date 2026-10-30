@@ -2,12 +2,12 @@
 
 Place one public key per user before running [`deploy/bootstrap.sh`](../bootstrap.sh):
 
-| File | Purpose |
-|---|---|
-| `tkovari.pub` | Owner (sudo) |
-| `krak.pub` | Colleague (sudo) |
+| File           | Purpose                                        |
+| -------------- | ---------------------------------------------- |
+| `tkovari.pub`  | Owner (sudo)                                   |
+| `krak.pub`     | Colleague (sudo)                               |
 | `aisztens.pub` | App runtime user (no sudo, can operate Docker) |
-| `deployer.pub` | Deploy user (sudo) |
+| `deployer.pub` | Deploy user (sudo)                             |
 
 The private keys are the ones that "already exist" per the droplet plan; only the
 **public** halves belong here. Real `*.pub` files are gitignored — commit only the

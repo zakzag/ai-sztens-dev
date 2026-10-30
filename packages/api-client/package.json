@@ -1,0 +1,63 @@
+{
+  "name": "@callback/api-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --coverageReporters=lcov --coverageDirectory=../../coverage/api-client"
+  },
+  "dependencies": {
+    "@callback/shared": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.0",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.3"
+  },
+  "jest": {
+    "preset": "ts-jest/presets/default-esm",
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "moduleNameMapper": {
+      "^@callback/shared$": "<rootDir>/../shared/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "rootDir": ".",
+    "testMatch": [
+      "<rootDir>/test/**/*.test.ts"
+    ],
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
+    "transform": {
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
+    },
+    "collectCoverageFrom": [
+      "src/**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}

@@ -1,0 +1,22 @@
+# Files that are generated or machine-maintained and must not be reformatted.
+#
+# Prettier output on a generated file is noise: the next `drizzle-kit generate`
+# rewrites it in drizzle's own format, so the diff is a formatting fight that
+# never ends. The repo has no `format:check` gate yet (the git-hooks quality
+# gate plan covers that), so this list is what keeps `pnpm format` honest.
+
+# Drizzle migration snapshots and the migration journal — written by
+# `drizzle-kit generate`, read by `drizzle-kit check` and `drizzle-kit migrate`.
+apps/api/drizzle/meta/
+
+# Build output and caches.
+dist/
+coverage/
+node_modules/
+
+# Lockfiles are generated and must stay byte-identical.
+pnpm-lock.yaml
+
+# Local environment files — never commit, never format.
+.env
+.env.*

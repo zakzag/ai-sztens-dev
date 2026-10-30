@@ -30,9 +30,11 @@ Two interacting facts made this fail:
 
 1. The test script in [`apps/api/package.json:17`](apps/api/package.json:17) is a **fixed
    invocation** with no arg forwarding:
+
    ```json
    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
    ```
+
    Any arg appended by the runner becomes a positional arg of `node`, which
    `jest` then interprets as a **test file pattern** (not a CLI flag).
 

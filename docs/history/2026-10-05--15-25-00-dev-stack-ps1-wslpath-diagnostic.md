@@ -2,7 +2,7 @@
 
 **Status:** improved error reporting
 **Area:** [`scripts/dev-stack.ps1`](../../scripts/dev-stack.ps1:111) (Step 3 commit `8dd9f8f`)
-**Symptom:** `pwsh scripts/dev-stack.ps1 up` reports `Could not translate repo path to WSL: E:\projects\AI\2026-08-31-ai-sztens-dev` and exits, with no further information about *why* `wslpath` failed.
+**Symptom:** `pwsh scripts/dev-stack.ps1 up` reports `Could not translate repo path to WSL: E:\projects\AI\2026-08-31-ai-sztens-dev` and exits, with no further information about _why_ `wslpath` failed.
 
 ## Context
 
@@ -41,9 +41,9 @@ In [`scripts/dev-stack.ps1:111`](../../scripts/dev-stack.ps1:111), two
 changes:
 
 1. **Replace `& wsl.exe wslpath -u $RepoDir 2>$null` with `Start-Process`
-   + `-ArgumentList`** + `RedirectStandardOutput` / `RedirectStandardError`
-   to separate temp files. The script reads the stderr file on non-zero
-   exit and prints it after the high-level "Could not translate" message.
+   - `-ArgumentList`** + `RedirectStandardOutput` / `RedirectStandardError`
+     to separate temp files. The script reads the stderr file on non-zero
+     exit and prints it after the high-level "Could not translate" message.
 2. **Switch the bash invocation to `Start-Process` + `-ArgumentList`**
    for the same reason — `wsl.exe --cd $wslPath bash 'scripts/dev-stack.sh' …`
    has the same argument-mangling risk if the `wsl.exe` wrapper ever
@@ -112,3 +112,4 @@ the path before forwarding to wslpath; Start-Process with
 -ArgumentList exhibits the same behaviour. The path forward
 (non-wsl.exe-mediated wslpath) is documented as a future
 improvement.
+```

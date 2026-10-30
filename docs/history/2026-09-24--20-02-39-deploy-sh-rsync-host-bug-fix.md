@@ -1,9 +1,11 @@
 # Fix: rsync `-e` re-uses `user@host`, leading to `bash: line 1: <host>: command not found`
 
 ## Date
+
 2026-09-24
 
 ## Context
+
 Running `./deploy/deploy.sh bootstrap` from WSL (Debian) against the production
 droplet (`ssh.aisztens.hu`) failed while uploading the repository:
 
@@ -16,6 +18,7 @@ rsync error: error in rsync protocol data stream (code 12) at io.c(232) [sender=
 ```
 
 ## Root cause
+
 [`deploy/deploy.sh`](deploy/deploy.sh:32) originally built a single `SSH` array
 that contained both the ssh command/options **and** the `user@host` pair:
 
@@ -39,6 +42,7 @@ manifested as `bash: line 1: ssh.aisztens.hu: command not found`. The
 authentication prompt appeared twice because rsync makes two attempts.
 
 ## Fix
+
 Split the array: one for the ssh command (no host), one for the full
 `user@host`. Use the command-only array in rsync's `-e`.
 [`deploy/deploy.sh`](deploy/deploy.sh:37):
@@ -60,11 +64,13 @@ rest of the script (`bootstrap`, `up`, `down`, `restart`, `ps`, `logs`) was not
 touched.
 
 ## Verification
+
 - `bash -n deploy/deploy.sh` reports `syntax OK`.
 - The next `./deploy/deploy.sh bootstrap` run is expected to upload the repo
   cleanly and then invoke `deploy/bootstrap.sh` as root on the droplet.
 
 ## Side notes / prerequisites
+
 - WSL still needs `rsync` installed locally (the prerequisite is declared in
   [`deploy/deploy.sh`](deploy/deploy.sh:4) but is not always preinstalled):
   `apt-get install -y rsync openssh-client`.

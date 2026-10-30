@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Button, Card, Input } from '@callback/ui';
 import { useAuth } from '../auth/AuthContext.js';
 
 /**
@@ -19,28 +20,20 @@ export function LoginPage() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-xl bg-slate-900 p-8 shadow-sm ring-1 ring-slate-800">
-      <h1 className="text-xl font-bold text-white">Bejelentkezés</h1>
+    <Card className="w-full max-w-sm">
+      <h1 className="text-xl font-bold text-text-primary">Bejelentkezés</h1>
       <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-slate-300">
-            Jelszó (bármilyen nem üres érték)
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
-        </div>
-        <button
-          type="submit"
-          className="w-full rounded-md bg-indigo-600 px-4 py-2.5 font-medium text-white hover:bg-indigo-500"
-        >
+        <Input
+          id="password"
+          type="password"
+          label="Jelszó (bármilyen nem üres érték)"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <Button type="submit" size="lg" className="w-full">
           Login (Belépés)
-        </button>
+        </Button>
       </form>
-    </div>
+    </Card>
   );
 }

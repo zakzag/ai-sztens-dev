@@ -47,7 +47,9 @@ run_cross_service_checks() {
   # Hits the Fastify listener directly (not through the public reverse-proxy
   # site block, which would require a valid Host header). The default root
   # controller in apps/api/src/app.controller.ts returns the literal string
-  # "Hello World!" — matching that is a strong proof of end-to-end reach.
+  # "Hello World!" — matching the unique substring is a strong
+  # proof of end-to-end reach. The substring must be kept in sync with
+  # [apps/api/src/app.service.ts:6] if the greeting ever changes.
   assert_service_out "caddy->api" \
     "caddy can GET http://api:3000/api" \
     "Hello World" \
@@ -72,11 +74,74 @@ run_cross_service_checks() {
   # startup. We expect exactly three rows: aisztens (app role), tkovari and
   # krak (operator roles). The query is wrapped in a single line so psql -tAc
   # returns one row per role.
+  #
+  # We pass -U because `docker compose exec` defaults to the image's
+  # primary user (root for postgres:16-alpine), and psql authenticates
+  # over the unix socket as that OS user. The `root` role does not exist
+  # in postgres, so the call would return `FATAL: role "root" does not
+  # exist`. Forcing -U to POSTGRES_USER (which the postgres image
+  # initializes as a superuser) avoids that trap. This mirrors the
+  # postgres healthcheck in [infra/docker-compose.yml:127].
+  #
+  # FLAG ORDER MATTERS. `-c` consumes the NEXT argv as its argument, so the
+  # historical form `psql -tAc -U user "SQL"` made `-c` swallow `-U` and the
+  # SQL text was sent as the username:
+  #   FATAL: role "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tko" does not exist
+  # Keep `-U`/`-d` BEFORE the `-At -c` pair.
+  #
+  # The user/database names come from $ENV_FILE (infra/.env) via
+  # resolve_env_value, so this check cannot drift from the compose config
+  # (the old hard-coded `callback` did not exist on the droplet, whose
+  # POSTGRES_DB is `aisztens_db`).
   assert_service_out "postgres-roles" \
     "roles aisztens, tkovari, krak exist" \
     "3" \
-    dc_exec postgres psql -tAc \
-      "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak')"
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak')"
+
+  # -----------------------------------------------------------------------
+  # 5b. postgres — per-context schemas exist (AIS-35).
+  # -----------------------------------------------------------------------
+  # Proves that infra/postgres/init/02-schemas.sh ran on first startup. It
+  # cannot distinguish "ran now" from "ran when the volume was created", so
+  # the idempotent re-run path is covered by
+  # scripts/test/_postgres-init-schemas-test.sh instead. Same -U/-d ordering
+  # rule as the role check above.
+  # AIS-64 removed the `callback` context, so two schemas remain.
+  assert_service_out "postgres-schemas" \
+    "schemas platform and email exist" \
+    "2" \
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','email')"
+
+  # -----------------------------------------------------------------------
+  # 5c. postgres — schema privileges (AIS-35).
+  # -----------------------------------------------------------------------
+  # Expected matrix (AIS-64: `callback` removed): USAGE on both remaining
+  # schemas for aisztens, tkovari and krak (2 schemas × 3 roles = 6 rows), and
+  # CREATE for the app role only, in `platform` (the Drizzle bookkeeping table
+  # platform.__drizzle_migrations plus the migration-created tables such as
+  # platform.api_keys). Losing that grant breaks `db:migrate`, not just the
+  # smoke suite.
+  assert_service_out "postgres-schema-usage" \
+    "USAGE on both schemas for aisztens, tkovari and krak" \
+    "6" \
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM (VALUES ('platform'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
+
+  assert_service_out "postgres-schema-create" \
+    "only aisztens may create objects, in platform" \
+    "1" \
+    dc_exec postgres psql \
+      -U "$(resolve_env_value POSTGRES_USER postgres)" \
+      -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
+      -At -c "SELECT count(*) FROM (VALUES ('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
 
   # -----------------------------------------------------------------------
   # 6. monitor -> api — restated for symmetry with the per-service check.

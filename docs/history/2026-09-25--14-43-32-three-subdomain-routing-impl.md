@@ -1,20 +1,21 @@
 # 2026-09-25 — Three-subdomain routing implementation
 
 Implements the plan in
-[`docs/history/2026-09-25-three-subdomain-routing-plan.md`](docs/history/2026-09-25-three-subdomain-routing-plan.md:1).
+[`docs/plans/2026-09-25--14-22-49-three-subdomain-routing-plan.md`](../plans/2026-09-25--14-22-49-three-subdomain-routing-plan.md:1).
 After this change + `./deploy/deploy.sh up`, the three subdomains serve
 distinct apps over HTTPS from the same droplet:
 
-| URL | Serves | Backing |
-|---|---|---|
-| `https://api.aisztens.hu/api/*` | NestJS API | Caddy `reverse_proxy` to `api:3000` |
-| `https://web.aisztens.hu/*` | Visitor call-back form SPA | Caddy `root /srv/web` (mounted from `apps/web/dist`) |
-| `https://admin.aisztens.hu/*` | Admin dashboard SPA | Caddy `root /srv/admin` (mounted from `apps/admin/dist`) |
-| `ssh.aisztens.hu:22` | OpenSSH | unchanged |
+| URL                             | Serves                     | Backing                                                  |
+| ------------------------------- | -------------------------- | -------------------------------------------------------- |
+| `https://api.aisztens.hu/api/*` | NestJS API                 | Caddy `reverse_proxy` to `api:3000`                      |
+| `https://web.aisztens.hu/*`     | Visitor call-back form SPA | Caddy `root /srv/web` (mounted from `apps/web/dist`)     |
+| `https://admin.aisztens.hu/*`   | Admin dashboard SPA        | Caddy `root /srv/admin` (mounted from `apps/admin/dist`) |
+| `ssh.aisztens.hu:22`            | OpenSSH                    | unchanged                                                |
 
 ## Files changed
 
 ### 1. [`infra/.env`](infra/.env:1)
+
 - `DOMAIN=ssh.aisztens.hu` → `DOMAIN=aisztens.hu` (Caddy now requests LE
   certs for the real apex).
 - `CORS_ORIGINS=...` trimmed to the three SPA origins that actually call
@@ -22,6 +23,7 @@ distinct apps over HTTPS from the same droplet:
 - Apex and `ssh.aisztens.hu` removed (no SPA, no HTTPS).
 
 ### 2. [`infra/caddy/Caddyfile`](infra/caddy/Caddyfile:1)
+
 - The previously commented-out `admin.{env.DOMAIN}` block is now active.
 - New `web.{env.DOMAIN}` block added with the same SPA shape
   (`root`, `try_files {path} /index.html`, `handle /api/*` safety net).
@@ -32,12 +34,14 @@ distinct apps over HTTPS from the same droplet:
   ([`docs/history/2026-09-25-caddyfile-env-substitution-fix.md`](docs/history/2026-09-25-caddyfile-env-substitution-fix.md:1)).
 
 ### 3. [`infra/docker-compose.yml`](infra/docker-compose.yml:1)
+
 - Uncommented the two static-frontend volume mounts on the `caddy`
   service:
   - `${WEB_DIST_PATH:-../apps/web/dist}:/srv/web:ro`
   - `${ADMIN_DIST_PATH:-../apps/admin/dist}:/srv/admin:ro`
 
 ### 4. [`deploy/deploy.sh`](deploy/deploy.sh:1)
+
 - New `DOMAIN` variable read either from `deploy/.env` (if defined) or
   parsed from the local `infra/.env`. Falls back to `localhost`.
 - New `build_spas()` function:

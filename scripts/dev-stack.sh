@@ -106,7 +106,7 @@ dc_up() {
   ok "Stack is up. Open one of:"
   echo "  - http://localhost:3000/healthz          (NestJS healthcheck)"
   echo "  - http://localhost:3000/api              (NestJS API root)"
-  echo "  - psql -h localhost -U aisztens -d callback  (Postgres on :5432)"
+  echo "  - psql -h localhost -U aisztens -d aisztens_db  (Postgres on :5432)"
   echo
   echo "Tear it down with: $0 down"
 }

@@ -1,16 +1,16 @@
 # 2026-10-05 10:55 — Three-env separation · verification spec (post-Step 5)
 
-**Plan:** [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md).
+**Plan:** [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md).
 **Scope:** documentation only — no runtime change. Closes a gap flagged in
 the plan's "open questions" list (operator-facing verification recipe).
 
 ## What changed
 
-| # | File | Change |
-|---|---|---|
-| 1 | [`docs/Specs/Three-Env-Verification.md`](../../docs/Specs/Three-Env-Verification.md:1) | New spec. **Single source of truth for "did the three-env separation actually work?"** Five sections: §1 repo-level checks (run anywhere), §2 local env (no droplet, ~10 min), §3 dev env (droplet, ~15 min), §4 prod env (dormant until prod droplet exists, `[if-prod-exists]` tagged), §6 timing, §7 common failure modes, §8 which sections to run for which scenario, §9 see also. |
-| 2 | [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md:175) | §6 "See also" now lists the verification spec first. |
-| 3 | [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:373) | §9.1 now lists the verification spec between the Local-Development spec and the plan doc. The Hungarian-language one-liner explicitly says: run §1 + your env's section on every deploy / fresh pull. |
+| #   | File                                                                                   | Change                                                                                                                                                                                                                                                                                                                                                                                  |
+| --- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | [`docs/Specs/Three-Env-Verification.md`](../../docs/Specs/Three-Env-Verification.md:1) | New spec. **Single source of truth for "did the three-env separation actually work?"** Five sections: §1 repo-level checks (run anywhere), §2 local env (no droplet, ~10 min), §3 dev env (droplet, ~15 min), §4 prod env (dormant until prod droplet exists, `[if-prod-exists]` tagged), §6 timing, §7 common failure modes, §8 which sections to run for which scenario, §9 see also. |
+| 2   | [`docs/Specs/Local-Development.md`](../../docs/Specs/Local-Development.md:175)         | §6 "See also" now lists the verification spec first.                                                                                                                                                                                                                                                                                                                                    |
+| 3   | [`docs/Specs/Production-Runbook.md`](../../docs/Specs/Production-Runbook.md:373)       | §9.1 now lists the verification spec between the Local-Development spec and the plan doc. The Hungarian-language one-liner explicitly says: run §1 + your env's section on every deploy / fresh pull.                                                                                                                                                                                   |
 
 ## What it covers (the important commands)
 
@@ -43,11 +43,11 @@ Deploy and verify the existing dev droplet (`aisztens.hu`):
 
 1. Local pre-deploy: source `deploy/.env`, source `infra/.env.dev` (or the legacy `infra/.env`), confirm `APP_ENV=dev`.
 2. Deploy via either `deploy.sh up` or `Actions → Deploy to droplet → Run workflow` (push trigger).
-4. On the droplet, the api boot banner must read `APP_ENV=dev (raw=dev), …` — **not** local.
-5. CORS: `curl -H "Origin: https://web.aisztens.hu"` (pass), `…/admin.aisztens.hu` (pass), `…/api.aisztens.hu` (no `allow-origin`).
-6. SPA bundles on the droplet (`/srv/web/assets/*.js`, `/srv/admin/assets/*.js`) contain the dev URL — not `localhost`.
-7. Full smoke: `ssh … bash scripts/test/stack-smoke.sh` → all 4 liveness + 6 cross-service checks PASS.
-8. Legacy fallback: `cat /opt/aisztens/infra/.env` still has the dev values (Step 4 ships the new `infra/.env.dev` file to the unchanged `infra/.env` destination).
+3. On the droplet, the api boot banner must read `APP_ENV=dev (raw=dev), …` — **not** local.
+4. CORS: `curl -H "Origin: https://web.aisztens.hu"` (pass), `…/admin.aisztens.hu` (pass), `…/api.aisztens.hu` (no `allow-origin`).
+5. SPA bundles on the droplet (`/srv/web/assets/*.js`, `/srv/admin/assets/*.js`) contain the dev URL — not `localhost`.
+6. Full smoke: `ssh … bash scripts/test/stack-smoke.sh` → all 4 liveness + 6 cross-service checks PASS.
+7. Legacy fallback: `cat /opt/aisztens/infra/.env` still has the dev values (Step 4 ships the new `infra/.env.dev` file to the unchanged `infra/.env` destination).
 
 ### §4 Prod env (dormant, `[if-prod-exists]`)
 
@@ -150,3 +150,4 @@ docs(spec): add Three-Env-Verification.md + pointer cross-references
 
 Closes the operator-facing verification gap flagged in the three-env
 separation plan's open questions.
+```

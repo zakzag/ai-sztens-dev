@@ -1,62 +1,35 @@
-import { Link, Route, Routes } from 'react-router-dom';
-import { AuthProvider, useAuth } from './auth/AuthContext.js';
-import { DashboardPage } from './pages/DashboardPage.js';
-import { LoginPage } from './pages/LoginPage.js';
+import type { AppProps } from './app/app.interface.js';
+import { AppErrorBoundary } from './app/error/AppErrorBoundary.js';
+import { AppProviders } from './app/providers/app-providers.js';
+import { AppRouter } from './app/router/AppRouter.js';
+import {
+  NOT_FOUND_ROUTE_ENTRY,
+  PROTECTED_ROUTE_ENTRIES,
+  PUBLIC_ROUTE_ENTRIES,
+} from './app/router/route-registry.js';
 
-function ProtectedLayout() {
-  const { isAuthenticated } = useAuth();
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <LoginPage />
-      </div>
-    );
-  }
-
+/**
+ * The root of the admin application.
+ *
+ * It is composition only: the providers, the router and the error boundary
+ * live in the `app/` layer, and this file wires them together. There is no
+ * route markup and no navigation list here — both are derived from the route
+ * registry (`app/router/route-registry.tsx`), so a new page is a single
+ * registry entry (AIS-118, `D1`).
+ *
+ * @param props - see {@link AppProps}.
+ * @returns the application tree.
+ */
+export function App({ queryClient }: AppProps) {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-800 bg-slate-900">
-        <nav className="flex items-center justify-between px-6 py-3">
-          <Link to="/" className="text-lg font-semibold text-white">
-            AIsztens — Admin
-          </Link>
-          <Routes>
-            <Route
-              path="*"
-              element={
-                <span className="text-sm text-slate-400">
-                  <Link className="mr-4 hover:text-white" to="/">
-                    Kérések
-                  </Link>
-                  <Link className="mr-4 hover:text-white" to="/calls">
-                    Hívások
-                  </Link>
-                </span>
-              }
-            />
-          </Routes>
-        </nav>
-      </header>
-
-      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/calls" element={<div className="text-slate-400">Hívások — hamarosan</div>} />
-          <Route path="*" element={<div className="text-slate-400">Nem található</div>} />
-        </Routes>
-      </main>
-    </div>
-  );
-}
-
-export function App() {
-  return (
-    <AuthProvider>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/*" element={<ProtectedLayout />} />
-      </Routes>
-    </AuthProvider>
+    <AppProviders queryClient={queryClient}>
+      <AppErrorBoundary>
+        <AppRouter
+          publicRoutes={PUBLIC_ROUTE_ENTRIES}
+          protectedRoutes={PROTECTED_ROUTE_ENTRIES}
+          notFoundRoute={NOT_FOUND_ROUTE_ENTRY}
+        />
+      </AppErrorBoundary>
+    </AppProviders>
   );
 }

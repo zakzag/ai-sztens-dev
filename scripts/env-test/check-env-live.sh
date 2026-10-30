@@ -117,7 +117,7 @@ SUDO_USERS="${SUDO_USERS:-}"
 CORS_ORIGINS="${CORS_ORIGINS:-}"
 VAPI_WEBHOOK_SECRET="${VAPI_WEBHOOK_SECRET:-}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
-POSTGRES_DB="${POSTGRES_DB:-callback}"
+POSTGRES_DB="${POSTGRES_DB:-aisztens_db}"
 
 printf '%s[env-live]%s repo root: %s\n' "$C_BLUE" "$C_RESET" "$REPO_ROOT"
 

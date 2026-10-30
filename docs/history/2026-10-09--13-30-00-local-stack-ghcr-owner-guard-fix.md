@@ -13,7 +13,7 @@ locally-built one (`build:` + `aisztens-local/...`), so on paper the local
 path should never need `GHCR_OWNER`. In practice, **Docker Compose
 interpolates the base file's `image:` first** (with the `:?` abort form),
 and the local override's `image:` substitution only happens after that
-succeeds. The `:?` therefore fires *before* the override is consulted, and
+succeeds. The `:?` therefore fires _before_ the override is consulted, and
 `scripts/dev-stack.sh up` cannot get off the ground on a fresh checkout.
 
 ## Root cause
@@ -29,7 +29,7 @@ GitHub org, and should not need one.
 The misleading `docker compose v2 required` message from the very first
 attempt is unrelated: the script's [`require_docker()`](../../scripts/dev-stack.sh:62)
 check passed (compose v5.5.1 is present in WSL), and a re-run of the same
-command reproduced the *real* `GHCR_OWNER` error. The first message was
+command reproduced the _real_ `GHCR_OWNER` error. The first message was
 likely a transient WSL↔Docker bridge hiccup on a cold Docker Desktop
 start; the user's `pwsh dev-stack.ps1 up` was actually the second symptom
 of the same chain of events (buildkit wedge, not a missing plugin).
@@ -80,7 +80,7 @@ of the same chain of events (buildkit wedge, not a missing plugin).
 
 - If the local stack still hangs at base-image extract after a Docker
   Desktop restart, run `docker buildx prune -af` and `docker builder
-  prune -af` to clear any stale buildkit cache.
+prune -af` to clear any stale buildkit cache.
 - The deploy-time safety net (`deploy.sh` writes `GHCR_OWNER` and
   `IMAGE_TAG` to `infra/.env` before every `up`) should be exercised by
   the next `deploy up dev` to confirm the new `${VAR:-default}` form

@@ -14,11 +14,11 @@ The earlier session at [2026-10-11--15-50-00](2026-10-11--15-50-00-image-based-d
 
 So §A was rewritten to make this explicit:
 
-| Host | Who serves it |
-|---|---|
-| `api.aisztens.hu`, `web.aisztens.hu`, `admin.aisztens.hu` | Caddy on the droplet (`164.92.248.194`) |
-| `aisztens.hu` | Separate WordPress server (`185.80.48.2`) — intentional, not a bug |
-| `ssh.aisztens.hu` | OpenSSH on the droplet |
+| Host                                                      | Who serves it                                                      |
+| --------------------------------------------------------- | ------------------------------------------------------------------ |
+| `api.aisztens.hu`, `web.aisztens.hu`, `admin.aisztens.hu` | Caddy on the droplet (`164.92.248.194`)                            |
+| `aisztens.hu`                                             | Separate WordPress server (`185.80.48.2`) — intentional, not a bug |
+| `ssh.aisztens.hu`                                         | OpenSSH on the droplet                                             |
 
 ## Verified still-live (~3 hours after bring-up)
 

@@ -26,20 +26,20 @@ hibaüzenetet okoz a `compose pull` lépésben.
 A [`deploy/.env.example`](../../deploy/.env.example) `REMOTE_DIR` blokkja
 után új szekció került:
 
-* `IMAGE_TAG=latest` és `REGISTRY=ghcr.io` defaultok (a
+- `IMAGE_TAG=latest` és `REGISTRY=ghcr.io` defaultok (a
   [`deploy/deploy.sh:299`](../../deploy/deploy.sh:299) és
   [`deploy/deploy.sh:301`](../../deploy/deploy.sh:301) sorokkal azonos
   értékek, hogy a base compose interpolációja ne térjen el a script
   defaultjától).
-* `GHCR_OWNER=` üresen hagyva, de a komment egyértelműsíti:
-    * a [`images.yml`](../../.github/workflows/images.yml) workflow
-      `${{ github.repository_owner }}` értékével kell egyeznie,
-    * üresen hagyva a deploy script a `local` defaultra esik, ami nem
-      valódi GHCR tulajdonos, és a pull `error from registry: denied`
-      hibával szakad meg,
-    * a `postgres:16-alpine` és `caddy:2-alpine` (Docker Hub) ettől
-      függetlenül elérhetők, de a teljes `pull` lánc leáll, ezért az
-      ő üzeneteik is „Interrupted" státusszal jelennek meg.
+- `GHCR_OWNER=` üresen hagyva, de a komment egyértelműsíti:
+  - a [`images.yml`](../../.github/workflows/images.yml) workflow
+    `${{ github.repository_owner }}` értékével kell egyeznie,
+  - üresen hagyva a deploy script a `local` defaultra esik, ami nem
+    valódi GHCR tulajdonos, és a pull `error from registry: denied`
+    hibával szakad meg,
+  - a `postgres:16-alpine` és `caddy:2-alpine` (Docker Hub) ettől
+    függetlenül elérhetők, de a teljes `pull` lánc leáll, ezért az
+    ő üzeneteik is „Interrupted" státusszal jelennek meg.
 
 A meglévő stílust követi (fejléc, leíró komment, default érték, példa).
 
@@ -48,14 +48,14 @@ A meglévő stílust követi (fejléc, leíró komment, default érték, példa)
 1. `cp deploy/.env.example deploy/.env.dev` → a másolat most már
    tartalmazza az új szekciót `GHCR_OWNER=` üres sorral, így az
    operátor azonnal látja, hova kell beírni a GitHub org/user nevet.
-3. `./deploy/deploy.sh up dev` a `GHCR_OWNER` kitöltése nélkül
+2. `./deploy/deploy.sh up dev` a `GHCR_OWNER` kitöltése nélkül
    ugyanúgy `denied` hibát ad, de a hibaüzenet mostantól
    összeköthető a `.env.example` kommentjével — a hiba reprodukálható
    és a javítás egyértelmű.
 
 ## Következő lépések
 
-* A [`deploy/.env.dev`](../../deploy/.env.dev) és
+- A [`deploy/.env.dev`](../../deploy/.env.dev) és
   [`deploy/.env.prod`](../../deploy/.env.prod) fájlokba be kell írni
   a tényleges `GHCR_OWNER` értéket (külön feladat, nem része ennek a
   commitnak — a felhasználó kérésére kizárólag a dokumentáció frissült).

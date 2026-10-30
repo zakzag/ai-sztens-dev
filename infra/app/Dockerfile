@@ -4,6 +4,11 @@
 # Build context MUST be the repository root:
 #   docker build -f infra/app/Dockerfile .
 #
+# Optional build args (supplied by `.github/workflows/images.yml`, left empty
+# for local builds so `/healthz` degrades to `null` values):
+#   COMMIT_HASH — full 40-char git SHA of the deployed revision.
+#   DEPLOY_DATE — UTC build timestamp of the image, ISO 8601.
+#
 # The image runs the package's own `start:prod` script so the entry point never
 # drifts from what `apps/api/package.json` defines.
 # ---------------------------------------------------------------------------
@@ -55,6 +60,18 @@ ENV NODE_ENV=production
 # Leave ~16 MB headroom under the 400 MB container limit for the libuv
 # thread-pool, native buffers and V8 overhead.
 ENV NODE_OPTIONS=--max-old-space-size=384
+
+# Build metadata baked in by `.github/workflows/images.yml` so a running
+# container can be traced back to an exact revision:
+#   COMMIT_HASH — full 40-char git SHA (empty default for local builds).
+#   DEPLOY_DATE — UTC build timestamp, ISO 8601 (empty default for local builds).
+# The ARGs must be re-declared in this (runtime) stage: a build ARG/ENV set in
+# an intermediate stage does not carry over to a later FROM.
+# Both are exported as ENV so `HealthController` can read them at call time.
+ARG COMMIT_HASH
+ARG DEPLOY_DATE
+ENV COMMIT_HASH=${COMMIT_HASH} \
+    DEPLOY_DATE=${DEPLOY_DATE}
 WORKDIR /workspace
 
 # Copy the built workspace: node_modules (with workspace symlinks resolved),

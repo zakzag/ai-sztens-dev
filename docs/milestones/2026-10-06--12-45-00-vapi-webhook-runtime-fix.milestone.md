@@ -9,20 +9,20 @@
 
 The VAPI inbound-webhook slice (guard, controller, Caddy pre-filter, tests, specs) existed only in
 the working tree and had **never been executed end-to-end**. Three independent defects each made
-the feature unusable, and two artefacts actively hid them: every test injected a synthetic *string*
+the feature unusable, and two artefacts actively hid them: every test injected a synthetic _string_
 body, and the smoke checks were dead code.
 
 ## 2. Measured data / evidence
 
-| Check | Result before | Result after |
-|---|---|---|
-| `NestFactory.create(AppModule, …)` | `UnknownDependenciesException: Nest can't resolve dependencies of the VapiSignatureGuard (?)` — the API could not boot | boots |
-| `tsc --noEmit` | 2 × `TS2353 'rawBody' does not exist in type …FastifyAdapterBaseOptions` (`main.ts`, e2e spec) | clean |
-| Adapter contract | `parseAs: 'buffer'` ⇒ `request.rawBody` is a **Buffer**, guard required `string` ⇒ every webhook 401 | guard accepts Buffer and string |
-| `pnpm --filter @callback/api test` | 9 failed / 20 passed (`app-env.spec.ts`: `jest is not defined`) | **56 passed / 56** |
-| `pnpm test:e2e` | 3 suites failed to load | 4 suites load; 11 VAPI cases + boot test pass |
-| Smoke suite | `log: command not found` → exit 127, suite aborted after check 4 (verified on the droplet) | checks 1–6 execute, function returns |
-| Live droplet `POST /api/vapi/webhooks/end-of-call-report` | 404 from NestJS (Caddy forwards verbatim; api uptime ≈ 6.8 d) | unchanged — never deployed |
+| Check                                                     | Result before                                                                                                          | Result after                                  |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `NestFactory.create(AppModule, …)`                        | `UnknownDependenciesException: Nest can't resolve dependencies of the VapiSignatureGuard (?)` — the API could not boot | boots                                         |
+| `tsc --noEmit`                                            | 2 × `TS2353 'rawBody' does not exist in type …FastifyAdapterBaseOptions` (`main.ts`, e2e spec)                         | clean                                         |
+| Adapter contract                                          | `parseAs: 'buffer'` ⇒ `request.rawBody` is a **Buffer**, guard required `string` ⇒ every webhook 401                   | guard accepts Buffer and string               |
+| `pnpm --filter @callback/api test`                        | 9 failed / 20 passed (`app-env.spec.ts`: `jest is not defined`)                                                        | **56 passed / 56**                            |
+| `pnpm test:e2e`                                           | 3 suites failed to load                                                                                                | 4 suites load; 11 VAPI cases + boot test pass |
+| Smoke suite                                               | `log: command not found` → exit 127, suite aborted after check 4 (verified on the droplet)                             | checks 1–6 execute, function returns          |
+| Live droplet `POST /api/vapi/webhooks/end-of-call-report` | 404 from NestJS (Caddy forwards verbatim; api uptime ≈ 6.8 d)                                                          | unchanged — never deployed                    |
 
 `caddy adapt` (caddy:2-alpine) confirmed the Caddyfile is correct: `@vapi_match` → `/api/vapi/*` 405
 → `/healthz` → `/api/*`, all in one mutually-exclusive `handle` group.
@@ -51,16 +51,16 @@ body, and the smoke checks were dead code.
 
 ## 4. Solution / implementation
 
-| File | Change |
-|---|---|
-| `apps/api/src/vapi-webhooks/vapi-webhook-config.ts` | **New** token + interface + pure env reader + `FactoryProvider` |
-| `apps/api/src/vapi-webhooks/vapi-signature.guard.ts` | `@Inject(VAPI_WEBHOOK_CONFIG)`; accepts Buffer **and** string raw bodies |
-| `apps/api/src/vapi-webhooks/vapi-webhooks.module.ts` | registers the config provider |
-| `apps/api/src/main.ts` | `{ rawBody: true }` as the application option |
-| `apps/api/src/config/app-env.ts` + spec | exports pure `normaliseAppEnv()` (trim + lower-case); ESM-safe spec |
-| 4 × new/rewritten unit specs, `test/vapi-webhooks.e2e-spec.ts`, `test/app-boot.e2e-spec.ts`, `test/lib/app-module-gate.ts` | coverage for guard (17 cases), service, controller, module wiring, config reader, HTTP pipeline, full boot |
-| `scripts/test/lib/10-services.sh` | `log_info` instead of the non-existent `log`; `resolve_webhook_check_env()` fills `WEBHOOK_TARGET`/`VAPI_WEBHOOK_SECRET` from `$ENV_FILE` only when Caddy runs |
-| `.gitattributes` | `*.sh text eol=lf` — CRLF silently kills bash scripts (`$'\r'` syntax error) |
+| File                                                                                                                       | Change                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/vapi-webhooks/vapi-webhook-config.ts`                                                                        | **New** token + interface + pure env reader + `FactoryProvider`                                                                                                |
+| `apps/api/src/vapi-webhooks/vapi-signature.guard.ts`                                                                       | `@Inject(VAPI_WEBHOOK_CONFIG)`; accepts Buffer **and** string raw bodies                                                                                       |
+| `apps/api/src/vapi-webhooks/vapi-webhooks.module.ts`                                                                       | registers the config provider                                                                                                                                  |
+| `apps/api/src/main.ts`                                                                                                     | `{ rawBody: true }` as the application option                                                                                                                  |
+| `apps/api/src/config/app-env.ts` + spec                                                                                    | exports pure `normaliseAppEnv()` (trim + lower-case); ESM-safe spec                                                                                            |
+| 4 × new/rewritten unit specs, `test/vapi-webhooks.e2e-spec.ts`, `test/app-boot.e2e-spec.ts`, `test/lib/app-module-gate.ts` | coverage for guard (17 cases), service, controller, module wiring, config reader, HTTP pipeline, full boot                                                     |
+| `scripts/test/lib/10-services.sh`                                                                                          | `log_info` instead of the non-existent `log`; `resolve_webhook_check_env()` fills `WEBHOOK_TARGET`/`VAPI_WEBHOOK_SECRET` from `$ENV_FILE` only when Caddy runs |
+| `.gitattributes`                                                                                                           | `*.sh text eol=lf` — CRLF silently kills bash scripts (`$'\r'` syntax error)                                                                                   |
 
 ## 5. Outcome and how to verify
 

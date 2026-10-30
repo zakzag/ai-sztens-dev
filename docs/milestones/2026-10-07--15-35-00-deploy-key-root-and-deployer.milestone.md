@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-07
 **History:** [`../history/2026-10-07--15-35-00-deploy-key-root-and-deployer.md`](../history/2026-10-07--15-35-00-deploy-key-root-and-deployer.md)
-**Plan:** [`../history/2026-10-07-deploy-root-ssh-key-plan.md`](../history/2026-10-07-deploy-root-ssh-key-plan.md)
+**Plan:** [`../plans/2026-10-07-deploy-root-ssh-key-plan.md`](../plans/2026-10-07-deploy-root-ssh-key-plan.md)
 
 ## 1. Problem / feature
 
@@ -14,16 +14,16 @@ it to `root`, and authorise the new key for `deployer` instead.
 
 ## 2. Measured data / evidence
 
-| Observation | Result |
-|---|---|
-| `deploy/.env.dev` | already `SSH_USER=root` + `SSH_KEY=./deploy/ssh-keys/root.private.key` — local path already wired |
-| `deploy.yml` | `username: deployer` + `key: secrets.DROPLET_SSH_KEY` in **7** steps; unchanged by the decision |
-| `ssh-keygen -y -f deploy/ssh-keys/root.private.key` (Windows OpenSSH) | `invalid format` |
-| `C:\Progs\Git\usr\bin\ssh-keygen.exe -y -f …` | `error in libcrypto` |
-| base64 payload decoded | `openssh-key-v1`, 274 bytes, all field lengths consistent |
-| after trimming trailing whitespace per armour line | parses; prints `ssh-ed25519 AAAA…GGf3 aisztens.hu-root-no-passphrase` |
-| Windows OpenSSH before the ACL fix | `UNPROTECTED PRIVATE KEY FILE` / `bad permissions` |
-| `/home/deployer/.ssh/authorized_keys` | already contained the key's public half (`grep -c` = 1) |
+| Observation                                                           | Result                                                                                            |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `deploy/.env.dev`                                                     | already `SSH_USER=root` + `SSH_KEY=./deploy/ssh-keys/root.private.key` — local path already wired |
+| `deploy.yml`                                                          | `username: deployer` + `key: secrets.DROPLET_SSH_KEY` in **7** steps; unchanged by the decision   |
+| `ssh-keygen -y -f deploy/ssh-keys/root.private.key` (Windows OpenSSH) | `invalid format`                                                                                  |
+| `C:\Progs\Git\usr\bin\ssh-keygen.exe -y -f …`                         | `error in libcrypto`                                                                              |
+| base64 payload decoded                                                | `openssh-key-v1`, 274 bytes, all field lengths consistent                                         |
+| after trimming trailing whitespace per armour line                    | parses; prints `ssh-ed25519 AAAA…GGf3 aisztens.hu-root-no-passphrase`                             |
+| Windows OpenSSH before the ACL fix                                    | `UNPROTECTED PRIVATE KEY FILE` / `bad permissions`                                                |
+| `/home/deployer/.ssh/authorized_keys`                                 | already contained the key's public half (`grep -c` = 1)                                           |
 
 ## 3. Root cause / design rationale
 
@@ -39,13 +39,13 @@ Least privilege was chosen over convenience for CI: the workflow keeps the `depl
 
 ## 4. Solution / implementation
 
-| Changed file | Change |
-|---|---|
-| `.github/workflows/deploy.yml` | comments only: `DROPLET_SSH_KEY` = the passphrase-less deploy key, public half in `/home/deployer/.ssh/authorized_keys`; `username: deployer` unchanged |
-| `deploy/README.md` | §1/§2/§8/§8.1/§8.4 updated for the new key, the local `root` login, and the root-key trade-off |
-| `deploy/ssh-keys/README.md` | new "The deploy key" section (both login paths + the public half) |
-| `deploy/.env.example`, `deploy/.env.dev` | `HOST`/`SSH_USER`/`SSH_KEY` comments rewritten (no more "switch to deployer") |
-| `deploy/ssh-keys/root.private.key` (gitignored) | rewritten cleanly (LF, trailing whitespace stripped) + ACL restricted to the session user |
+| Changed file                                    | Change                                                                                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/deploy.yml`                  | comments only: `DROPLET_SSH_KEY` = the passphrase-less deploy key, public half in `/home/deployer/.ssh/authorized_keys`; `username: deployer` unchanged |
+| `deploy/README.md`                              | §1/§2/§8/§8.1/§8.4 updated for the new key, the local `root` login, and the root-key trade-off                                                          |
+| `deploy/ssh-keys/README.md`                     | new "The deploy key" section (both login paths + the public half)                                                                                       |
+| `deploy/.env.example`, `deploy/.env.dev`        | `HOST`/`SSH_USER`/`SSH_KEY` comments rewritten (no more "switch to deployer")                                                                           |
+| `deploy/ssh-keys/root.private.key` (gitignored) | rewritten cleanly (LF, trailing whitespace stripped) + ACL restricted to the session user                                                               |
 
 Droplet: the key was already authorised for `deployer`; ownership/mode re-asserted (0600,
 `deployer:deployer`).

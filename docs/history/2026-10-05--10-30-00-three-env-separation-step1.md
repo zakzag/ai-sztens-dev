@@ -1,18 +1,18 @@
 # 2026-10-05 10:30 — Three-env separation · Step 1 (Vite modes)
 
-**Plan:** [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](2026-10-05--10-30-00-three-env-separation-plan.md) — Step 1 of 5.
+**Plan:** [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — Step 1 of 5.
 **Scope:** SPAs (`apps/web`, `apps/admin`) and [`deploy/deploy.sh:build_spas()`](../../deploy/deploy.sh:99). The NestJS API is **not** touched in this step (that lands in Step 2).
 
 ## What changed
 
-| # | File | Change |
-|---|---|---|
-| 1 | [`apps/web/package.json`](../../apps/web/package.json:6), [`apps/admin/package.json`](../../apps/admin/package.json:6) | Added `dev:dev`, `dev:prod`, `build:dev`, `build:prod` scripts that wrap `vite` / `vite build` with `--mode dev` / `--mode prod`. The existing `dev` and `build` scripts are kept untouched as the **local** entry points (they load `.env.local` with no `--mode`). |
-| 2 | [`apps/web/.env.example`](../../apps/web/.env.example), [`apps/admin/.env.example`](../../apps/admin/.env.example) | Rewrote to document all three envs (local / dev / prod) in one committed template. Real per-env files live on developer machines / the droplet / CI and are gitignored. |
-| 3 | `apps/web/.env`, `apps/admin/.env` → `apps/web/.env.local`, `apps/admin/.env.local` | Renamed on disk; content (`VITE_API_BASE_URL=/api`) preserved verbatim. Vite natively prefers `.env.local` over `.env`, so the rename is semantically a no-op for `pnpm dev`. |
-| 4 | `apps/web/.env.dev`, `apps/admin/.env.dev` | Created locally with `VITE_API_BASE_URL=https://api.aisztens.hu/api`. Used by `pnpm build:dev` and by `deploy.sh build_spas` (after this commit). Gitignored. |
-| 5 | `apps/web/.env.prod`, `apps/admin/.env.prod` | Created locally with `VITE_API_BASE_URL=https://api.<prod-domain>/api` (placeholder, dormant). Used by future `pnpm build:prod`. Gitignored. |
-| 6 | [`deploy/deploy.sh:99`](../../deploy/deploy.sh:99) | `build_spas()` no longer injects `VITE_API_BASE_URL=` inline. It now picks the per-mode file via `pnpm ... build:dev`, defaulting to `SPA_BUILD_MODE=dev`. A new `ensure_spa_env()` helper seeds the per-env file from `DOMAIN` the first time, so a fresh droplet (which has only `.env.example` rsynced) still gets the right URL without manual seeding. |
+| #   | File                                                                                                                   | Change                                                                                                                                                                                                                                                                                                                                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | [`apps/web/package.json`](../../apps/web/package.json:6), [`apps/admin/package.json`](../../apps/admin/package.json:6) | Added `dev:dev`, `dev:prod`, `build:dev`, `build:prod` scripts that wrap `vite` / `vite build` with `--mode dev` / `--mode prod`. The existing `dev` and `build` scripts are kept untouched as the **local** entry points (they load `.env.local` with no `--mode`).                                                                                        |
+| 2   | [`apps/web/.env.example`](../../apps/web/.env.example), [`apps/admin/.env.example`](../../apps/admin/.env.example)     | Rewrote to document all three envs (local / dev / prod) in one committed template. Real per-env files live on developer machines / the droplet / CI and are gitignored.                                                                                                                                                                                     |
+| 3   | `apps/web/.env`, `apps/admin/.env` → `apps/web/.env.local`, `apps/admin/.env.local`                                    | Renamed on disk; content (`VITE_API_BASE_URL=/api`) preserved verbatim. Vite natively prefers `.env.local` over `.env`, so the rename is semantically a no-op for `pnpm dev`.                                                                                                                                                                               |
+| 4   | `apps/web/.env.dev`, `apps/admin/.env.dev`                                                                             | Created locally with `VITE_API_BASE_URL=https://api.aisztens.hu/api`. Used by `pnpm build:dev` and by `deploy.sh build_spas` (after this commit). Gitignored.                                                                                                                                                                                               |
+| 5   | `apps/web/.env.prod`, `apps/admin/.env.prod`                                                                           | Created locally with `VITE_API_BASE_URL=https://api.<prod-domain>/api` (placeholder, dormant). Used by future `pnpm build:prod`. Gitignored.                                                                                                                                                                                                                |
+| 6   | [`deploy/deploy.sh:99`](../../deploy/deploy.sh:99)                                                                     | `build_spas()` no longer injects `VITE_API_BASE_URL=` inline. It now picks the per-mode file via `pnpm ... build:dev`, defaulting to `SPA_BUILD_MODE=dev`. A new `ensure_spa_env()` helper seeds the per-env file from `DOMAIN` the first time, so a fresh droplet (which has only `.env.example` rsynced) still gets the right URL without manual seeding. |
 
 ## Why the deploy script needed an `ensure_spa_env` helper
 
@@ -26,6 +26,7 @@ local api_base="https://api.${DOMAIN}/api"
 The new flow reads the URL from `apps/<app>/.env.dev` (gitignored, never rsynced from this repo to the droplet). On a **new** droplet the file does not exist, and `pnpm build:dev` would fail or silently fall back to `.env.example` — which contains all three envs concatenated and is the documentation template, not a runtime config.
 
 The helper solves this with **one-shot seeding**:
+
 - If `apps/<app>/.env.<mode>` exists, do nothing (the operator already curated it).
 - If it does not exist, write `VITE_API_BASE_URL=https://api.${DOMAIN}/api` into it and continue.
 
@@ -35,18 +36,18 @@ Subsequent deploys do **not** overwrite — so any hand-edited value (e.g. an op
 
 Vite loads `.env` files in this priority (highest wins):
 
-1. `.env.[mode].local`  ← only loaded when --mode is set
-2. `.env.[mode]`        ← loaded only when --mode is set
-3. `.env.local`         ← always loaded (but gitignored)
-4. `.env`               ← always loaded
+1. `.env.[mode].local` ← only loaded when --mode is set
+2. `.env.[mode]` ← loaded only when --mode is set
+3. `.env.local` ← always loaded (but gitignored)
+4. `.env` ← always loaded
 
 Implications for this project:
 
-| Command | Files consulted | Result |
-|---|---|---|
-| `pnpm dev` (no flag) | `.env.local` only | `VITE_API_BASE_URL=/api` (Vite dev proxy, no CORS) |
-| `pnpm --filter ... build:dev` | `.env.dev` (overrides `.env.local`) | `VITE_API_BASE_URL=https://api.aisztens.hu/api` |
-| `pnpm --filter ... build:prod` | `.env.prod` (overrides `.env.local`) | `VITE_API_BASE_URL=https://api.<prod-domain>/api` |
+| Command                        | Files consulted                      | Result                                             |
+| ------------------------------ | ------------------------------------ | -------------------------------------------------- |
+| `pnpm dev` (no flag)           | `.env.local` only                    | `VITE_API_BASE_URL=/api` (Vite dev proxy, no CORS) |
+| `pnpm --filter ... build:dev`  | `.env.dev` (overrides `.env.local`)  | `VITE_API_BASE_URL=https://api.aisztens.hu/api`    |
+| `pnpm --filter ... build:prod` | `.env.prod` (overrides `.env.local`) | `VITE_API_BASE_URL=https://api.<prod-domain>/api`  |
 
 A developer who wants a **local-only override** of a dev build can drop a `apps/web/.env.dev.local` file (gitignored) and Vite will pick it up. The committed defaults remain untouched.
 
@@ -122,4 +123,5 @@ Adds --mode dev / --mode prod Vite scripts and per-env files
 (apps/{web,admin}/.env.local|.env.dev|.env.prod). The deploy script
 seeds .env.dev from DOMAIN on the first build so a fresh droplet
 just works. See
-docs/history/2026-10-05--10-30-00-three-env-separation-plan.md
+docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md
+```

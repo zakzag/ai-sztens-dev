@@ -6,7 +6,7 @@
 - `docs/prompts/2026-10-02-vapi-webhook-security.txt` → [`docs/prompts/2026-10-02-vapi-webhook-security.md`](../prompts/2026-10-02-vapi-webhook-security.md)
 - Both `.txt` originals were deleted, so the archive folder now contains
   markdown files only.
-- Stale reference fixed: [`docs/history/2026-09-21--16-46-30-droplet-deploy-infra-plan.md`](2026-09-21--16-46-30-droplet-deploy-infra-plan.md:6)
+- Stale reference fixed: [`docs/plans/2026-09-21--16-46-30-droplet-deploy-infra-plan.md`](../plans/2026-09-21--16-46-30-droplet-deploy-infra-plan.md:6)
   pointed at the removed `.txt` path of the droplet-setup prompt.
 
 ## Why
@@ -19,13 +19,13 @@ no code fences, unlinked file paths).
 
 ## Formatting applied
 
-| Aspect | Before | After |
-|---|---|---|
-| Title | none | `#` H1 heading per file |
-| Metadata | none | date / type / conversion note block |
-| Structure | flat prose, `-` and `1.` lines | headings, markdown lists, blockquote for the `FONTOS` warning |
-| Commands | indented plain text | fenced ` ```bash ` and ` ```caddyfile ` blocks |
-| File references | bare paths | relative markdown links to the code paths |
+| Aspect          | Before                         | After                                                         |
+| --------------- | ------------------------------ | ------------------------------------------------------------- |
+| Title           | none                           | `#` H1 heading per file                                       |
+| Metadata        | none                           | date / type / conversion note block                           |
+| Structure       | flat prose, `-` and `1.` lines | headings, markdown lists, blockquote for the `FONTOS` warning |
+| Commands        | indented plain text            | fenced ` ```bash ` and ` ```caddyfile ` blocks                |
+| File references | bare paths                     | relative markdown links to the code paths                     |
 
 Wording was preserved verbatim (including the original typos such as
 `módosíytani` and `noejs`); only markdown structure and emphasis were added.

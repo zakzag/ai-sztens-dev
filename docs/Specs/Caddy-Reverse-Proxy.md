@@ -1,8 +1,10 @@
 # Caddy — Reverse Proxy és TLS termináció
 
 **Státusz:** Élő (a `docs/Specs/outdated/`-ba kerül, ha a relevanciája megszűnik)
-**Utolsó frissítés:** 2026-10-11 (apex WordPress-szándék explicit rögzítése §A-ban; hardening: `deploy.yml` `Verify every service is running IMAGE_TAG` lépés + `compose up -d --force-recreate`; `deploy.sh up` compose-védelem — lásd [`docs/history/2026-10-11--15-50-00-image-based-deploy-host-up-and-hardening.md`](../history/2026-10-11--15-50-00-image-based-deploy-host-up-and-hardening.md)) (image-based deploy: a `web` és `admin` site-ok `reverse_proxy`‑ra váltottak, a Caddy a `web:80` és `admin:80` konténereket proxy‑zza — lásd [`docs/history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../history/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md). A dropleten a runtime env fájl mindig `infra/.env`: egy droplet egy környezet, a per-env név csak lokális forrás — a §4.4 rotációs példa már `deployer`-ként lép be, ahogy a `deploy.sh` és a CI is. **háromkörnyezetes szétválasztás:** a Caddy a `dev`/`prod` dropleteken fut, `local`-ban a [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override `profiles: [never]`-re teszi, így a fejlesztői stackben nincs Caddy — a Caddy csak a nyilvános TLS terminációért felelős; a per-env renderelést és a `APP_ENV`-alapú compose szekciót lásd lentebb a §3.3 / §4.2 szakaszokban. **§4.4 frissítve:** a VAPI guard konfigurációja `VAPI_WEBHOOK_CONFIG` tokennel érkezik, a `rawBody` pedig Nest *alkalmazás* opció — lásd [`docs/milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md`](../milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md)).
-**Kapcsolódik:** [`docs/01-callback-assistant.md`](../01-callback-assistant.md), [`docs/02-flowchart.md`](../02-flowchart.md), [`docs/03-implementation-general.md`](../03-implementation-general.md), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md)
+**Utolsó frissítés:** 2026-10-13 (image-based deploy konzisztencia takarítás: a §2 „A Caddy szerepe" szakasz a stack 6 konténerét sorolja fel (`api`, `web`, `admin`, `postgres`, `caddy`, `monitor`); a §2.1 3-as és 4-es alpontok a `web` / `admin` SPA-kat `reverse_proxy web:80` és `reverse_proxy admin:80` formában írják le (a SPA bundle a konténer `/usr/share/nginx/html` útvonalán van, a Caddy nem `file_server`); a §3.1 mermaid diagram a `web`/`admin` subgraphját image-konténer node-okra cserélte; a §3.2 magyarázó lista törölte a „SPA bundle-öket bind mount-on keresztül kapja meg" mondatot; a §4.1 direktíva-táblázat 4. és 5. sora `reverse_proxy web:80` / `reverse_proxy admin:80`).
+
+2026-10-12 (deploy.yml: a `matrix` kivezetve, egy dedikált `plan` job dönti el a döntést `.github/scripts/deploy-plan.sh` segítségével; a mátrix azért szűnt meg, mert a `jobs.<id>.if` a mátrix-expandálás ELŐTT fut le, és a `matrix` context ott nem érhető el — a `matrix.app_env == (inputs.app_env || …)` kifejezés `Unrecognized named-value: 'matrix'` parse hibát dobott. A `plan` job `should_deploy | app_env | image_tag | ref` kimeneteket ír a `GITHUB_OUTPUT`-ba, és a `deploy` job `needs: plan` + `if: needs.plan.outputs.should_deploy == 'true'` formában fut. A workflow-szintű `push` trigger **törölve** volt: push-ra `images.yml` indul, és a `workflow_run` hívja meg a deploy-t — így nincs versenyhelyzet a build és a deploy között, és az `IMAGE_TAG` mindig a ténylegesen megépített commit SHA-ból jön (`github.event.workflow_run.head_sha`, nem `github.sha`). Lásd [`docs/plans/2026-10-12--15-09-00-deploy-yml-plan-job.md`](../plans/2026-10-12--15-09-00-deploy-yml-plan-job.md) + [`docs/milestones/2026-10-12--15-09-00-deploy-yml-plan-job.milestone.md`](../milestones/2026-10-12--15-09-00-deploy-yml-plan-job.milestone.md)). 2026-10-12 (image-based deploy: a workflow-szintű `concurrency:` blokk **törölve**, mert a `concurrency.group` expression evaluator csak a `github | inputs | vars | needs` context-eket engedi — a `matrix` context **nem** érhető el workflow-szinten, így a korábbi `concurrency.group = deploy-${{ matrix.app_env }}` szintén `Unrecognized named-value: 'matrix'` hibát dobott; a per-env szeparáció most kizárólag a job-szintű `if:` filteren és a `jobs.deploy.environment` GitHub-Environment bindingon múlik. Lásd [`docs/history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md`](../history/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.md) + [`docs/milestones/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.milestone.md`](../milestones/2026-10-12--14-50-00-deploy-yml-workflow-concurrency-matrix-fix.milestone.md)). 2026-10-12 (image-based deploy: a korábbi workflow-szintű `env.APP_ENV` helper kiváltva egy 2-elemű `matrix.app_env`-re (`dev|prod`), mert a `env.*` context **nem** érhető el `jobs.<id>.name` / `jobs.<id>.environment` helyeken — a GitHub Actions expression parser `Unrecognized named-value: 'env'` hibát dobott. Lásd [`docs/history/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md`](../history/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.md) + [`docs/milestones/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.milestone.md`](../milestones/2026-10-12--14-15-00-deploy-yml-env-context-matrix-fix.milestone.md). 2026-10-12 (apex `<DOMAIN> { redir ... }` blokk **törölve** a [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile) template-ből, mert a `dig +short aisztens.hu A` → `185.80.48.2` (WordPress-szerver, nem a droplet), így a Let's Encrypt `http-01` challenge a WordPress szerverhez futott be és 404-et kapott → Caddy `could not get certificate from issuer` végtelen ciklus minden konténerinduláskor. A template utolsó sora most egy kéthasábos komment, ami elmagyarázza, miért nincs ott, és mintaként megadja, hogyan kell visszaállítani, ha az apexet a dropletre migrálnánk — lásd [`docs/history/2026-10-12--10-52-00-caddyfile-apex-block-removed.md`](../history/2026-10-12--10-52-00-caddyfile-apex-block-removed.md). §A frissítve, hogy az új valóságot tükrözze.). 2026-10-12 (image-based deploy: deploy.yml workflow-szintű APP_ENV helper hozzáadva; `Render Caddyfile` lépés most fail-fast, ha a DOMAIN vagy ACME_EMAIL '|' karaktert tartalmaz — a sed `|` delimiter miatt; lásd [`docs/history/2026-10-12--00-50-00-deploy-yml-deep-audit-and-hardening.md`](../history/2026-10-12--00-50-00-deploy-yml-deep-audit-and-hardening.md)) (apex WordPress-szándék explicit rögzítése §A-ban; hardening: `deploy.yml` `Verify every service is running IMAGE_TAG` lépés + `compose up -d --force-recreate`; `deploy.sh up` compose-védelem — lásd [`docs/history/2026-10-11--15-50-00-image-based-deploy-host-up-and-hardening.md`](../history/2026-10-11--15-50-00-image-based-deploy-host-up-and-hardening.md)) (image-based deploy: a `web` és `admin` site-ok `reverse_proxy`‑ra váltottak, a Caddy a `web:80` és `admin:80` konténereket proxy‑zza — lásd [`docs/plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md`](../plans/2026-10-08-dockerized-stack-and-image-based-deploy-plan.md). A dropleten a runtime env fájl mindig `infra/.env`: egy droplet egy környezet, a per-env név csak lokális forrás — a §4.4 rotációs példa már `deployer`-ként lép be, ahogy a `deploy.sh` és a CI is. **háromkörnyezetes szétválasztás:** a Caddy a `dev`/`prod` dropleteken fut, `local`-ban a [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override `profiles: [never]`-re teszi, így a fejlesztői stackben nincs Caddy — a Caddy csak a nyilvános TLS terminációért felelős; a per-env renderelést és a `APP_ENV`-alapú compose szekciót lásd lentebb a §3.3 / §4.2 szakaszokban. **§4.4 frissítve:** a VAPI guard konfigurációja `VAPI_WEBHOOK_CONFIG` tokennel érkezik, a `rawBody` pedig Nest _alkalmazás_ opció — lásd [`docs/milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md`](../milestones/2026-10-06--12-45-00-vapi-webhook-runtime-fix.milestone.md)).
+**Kapcsolódik:** [`docs/01-callback-assistant.md`](../01-callback-assistant.md), [`docs/02-flowchart.md`](outdated/02-flowchart.md), [`docs/03-implementation-general.md`](outdated/03-implementation-general.md), [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile), [`deploy/deploy.sh`](../../deploy/deploy.sh), [`docs/Specs/Production-Runbook.md`](Production-Runbook.md), [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Three-Env-Verification.md`](Three-Env-Verification.md)
 
 ---
 
@@ -10,11 +12,11 @@
 
 A **Caddy** egy nyílt forráskódú, Go-ban írt webkiszolgáló és reverse proxy. Három dolgot tud alapvetően, és mindhármat használjuk:
 
-| Funkció | Mit jelent | Hogyan oldja meg a Caddy |
-|---|---|---|
-| **Reverse proxy** | A bejövő HTTP/HTTPS kéréseket a belső hálózaton lévő alkalmazáskonténerek felé továbbítja | A `reverse_proxy` direktíva a cél hoszt:portra irányítja a kérést, és a választ visszaküldi a kliensnek |
-| **Automatikus TLS** | A HTTPS-tanúsítványokat (Let's Encrypt) a Caddy saját maga kéri le és újítja meg, konfiguráció nélkül | A `email` direktíva és az ACME-kliens integráció révén; induláskor `http-01` vagy `tls-alpn-01` challenge-eken keresztül szerzi be a tanúsítványokat |
-| **Statikus fájl-kiszolgálás** | A beépített `file_server` a lemezről olvas és kiszolgál (itt a SPA bundle-öket) | A `root * /srv/web` direktíva mondja meg, honnan olvassa a fájlokat; a `try_files` a mély-linkek SPA fallback-jét kezeli |
+| Funkció                       | Mit jelent                                                                                                                                                                                                 | Hogyan oldja meg a Caddy                                                                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Reverse proxy**             | A bejövő HTTP/HTTPS kéréseket a belső hálózaton lévő alkalmazáskonténerek felé továbbítja                                                                                                                  | A `reverse_proxy` direktíva a cél hoszt:portra irányítja a kérést, és a választ visszaküldi a kliensnek                                              |
+| **Automatikus TLS**           | A HTTPS-tanúsítványokat (Let's Encrypt) a Caddy saját maga kéri le és újítja meg, konfiguráció nélkül                                                                                                      | A `email` direktíva és az ACME-kliens integráció révén; induláskor `http-01` vagy `tls-alpn-01` challenge-eken keresztül szerzi be a tanúsítványokat |
+| **Statikus fájl-kiszolgálás** | A beépített `file_server` a lemezről olvas és kiszolgál (nem használjuk, de a Caddy erre is képes — a korábbi implementáció ezt használta a SPA-kiszolgálásra, lásd a `docs/Specs/outdated/` előzményeket) | A `root * /srv/web` direktíva mondaná meg, honnan olvassa a fájlokat; a `try_files` a mély-linkek SPA fallback-jét kezelné                           |
 
 A Caddy két további tulajdonsága, ami miatt a projektben **őt választottuk** az nginx / Traefik / HAProxy helyett:
 
@@ -25,26 +27,26 @@ A Caddy két további tulajdonsága, ami miatt a projektben **őt választottuk*
 
 ## 2. A Caddy szerepe ebben a projektben — miért van rá szükség?
 
-A projekt runtime stackje ([`infra/docker-compose.yml`](../../infra/docker-compose.yml)) négy konténerből áll: `api` (NestJS), `postgres`, `caddy`, `monitor`. Ezek közül csak a Caddy kap publikus hálózati hozzáférést (80-as és 443-as port a hoston), a többi a belső `internal` bridge networkön kommunikál.
+A projekt runtime stackje ([`infra/docker-compose.yml`](../../infra/docker-compose.yml)) hat konténerből áll: `api` (NestJS), `web` (nginx), `admin` (nginx), `postgres`, `caddy`, `monitor`. Ezek közül csak a Caddy kap publikus hálózati hozzáférést (80-as és 443-as port a hoston), a többi a belső `internal` bridge networkön kommunikál. Az image-based deploy (2026-10-08) óta a `web` és `admin` SPA-k a saját nginx-konténerükben futnak (a bundle az image-be van építve a `/usr/share/nginx/html` útvonalon) — a Caddy `reverse_proxy`-val éri el őket, nem `file_server`-rel és nem bind-mounttal.
 
 ### 2.1 A Caddy konkrét feladatai a projektben
 
 1. **TLS termináció a nyilvános végpontokon** — a Let's Encrypt tanúsítványokat a Caddy kezeli a `web.aisztens.hu`, `api.aisztens.hu`, `admin.aisztens.hu` és `aisztens.hu` hosztnevekre. **A VAPI webhook callback-ek csak HTTPS-en működnek**, a callback URL-t a VAPI konzolban HTTPS-ként kell megadni.
 2. **Reverse proxy az API-hoz** — a `https://api.aisztens.hu/api/*` hívásokat a Caddy a belső `api:3000` konténerhez továbbítja. A böngésző CORS preflight-ok és a VAPI bejövő webhookok ugyanazt a végpontot használják.
-3. **A web SPA kiszolgálása** — a `https://web.aisztens.hu/*` a Vite-tel buildelt React SPA statikus fájljait (`/srv/web`, mountolva az `apps/web/dist`-ből) szolgálja ki. A `try_files {path} /index.html` biztosítja, hogy a React Router deep-linkjei (`/legal`, `/thank-you`) működjenek.
-4. **Az admin SPA kiszolgálása** — ugyanaz, mint a web, de `/srv/admin` mount-ponttal és `apps/admin/dist` forrással.
+3. **A web SPA kiszolgálása** — a `https://web.aisztens.hu/*` a `ghcr.io/<owner>/aisztens-web` image-ből futó nginx konténer felé proxy-zik (`reverse_proxy web:80`). Az SPA bundle-t az [`images.yml`](../../.github/workflows/images.yml) buildeli a Vite-tel, és a konténer `/usr/share/nginx/html` mappájába égeti. A Caddy nem szolgál ki statikus fájlokat — a `file_server` az nginx konténerben fut, és a `try_files {path} /index.html` biztosítja, hogy a React Router deep-linkjei (`/legal`, `/thank-you`) működjenek.
+4. **Az admin SPA kiszolgálása** — ugyanaz, mint a web, de a `ghcr.io/<owner>/aisztens-admin` image-ből, ugyanazzal az nginx-default konfigurációval. A Caddy `reverse_proxy admin:80`-lal éri el.
 5. **Apex domain átirányítása** — a `https://aisztens.hu/*` HTTP 307-tel átirányít a `https://web.aisztens.hu/*`-ra (amíg nincs külön landing page).
 6. **Védelmi vonal** — bár a konténer `mem_limit: 64m`-rel fut (lásd [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md)), a Caddy az egyetlen konténer, ami az internet felé „lát", így a DoS-támadások és a TLS-terminálás CPU-terhelése itt csapódik le.
 
 ### 2.2 Miért NEM az nginx / Traefik?
 
-| Szempont | Caddy | nginx | Traefik |
-|---|---|---|---|
-| Automatikus Let's Encrypt | **Beépített, ACME DNS-01 / http-01 / tls-alpn-01** | Külön certbot + cron | Beépített, de bonyolultabb config |
-| Konfiguráció formátum | Caddyfile (olvasható, kevés boilerplate) | nginx.conf (sok boilerplate, zárójelezés) | TOML/YAML (router-middlewire elv, meredek tanulási görbe) |
-| Memóriahasználat | ~30 MB alapterület, 64 MB konténer-limit bőven elég | Hasonló | ~40 MB, sok dynamic config feature |
-| HTTP/3 támogatás | Alapértelmezetten bekapcsolva | Külön kapcsoló | Külön kapcsoló |
-| Elsődleges felhasználási eset | Egyszerű reverse proxy + TLS | Általános webkiszolgáló | Dinamikus service discovery (Docker / Kubernetes) |
+| Szempont                      | Caddy                                               | nginx                                     | Traefik                                                   |
+| ----------------------------- | --------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------- |
+| Automatikus Let's Encrypt     | **Beépített, ACME DNS-01 / http-01 / tls-alpn-01**  | Külön certbot + cron                      | Beépített, de bonyolultabb config                         |
+| Konfiguráció formátum         | Caddyfile (olvasható, kevés boilerplate)            | nginx.conf (sok boilerplate, zárójelezés) | TOML/YAML (router-middlewire elv, meredek tanulási görbe) |
+| Memóriahasználat              | ~30 MB alapterület, 64 MB konténer-limit bőven elég | Hasonló                                   | ~40 MB, sok dynamic config feature                        |
+| HTTP/3 támogatás              | Alapértelmezetten bekapcsolva                       | Külön kapcsoló                            | Külön kapcsoló                                            |
+| Elsődleges felhasználási eset | Egyszerű reverse proxy + TLS                        | Általános webkiszolgáló                   | Dinamikus service discovery (Docker / Kubernetes)         |
 
 A projekt statikus: egy droplet, négy konténer, ritkán változó hosztnévlista. A Traefik dynamic service discovery képessége kihasználatlan lenne. Az nginx konfigurációs overhead-je és a certbot külön üzemeltetése felesleges komplexitás. A Caddy a legkisebb cognitive load mellett adja az összes szükséges funkciót.
 
@@ -66,9 +68,9 @@ flowchart LR
             CF["Caddyfile.rendered<br/>TLS termináció + reverse proxy"]
         end
 
-        subgraph SPA["SPA statikus fájlok (volume mount)"]
-            Web["/srv/web ← apps/web/dist"]
-            Admin["/srv/admin ← apps/admin/dist"]
+        subgraph SPA["SPA konténerek (image-based)"]
+            Web["web konténer (nginx)<br/>image: aisztens-web:&lt;sha&gt;<br/>SPA bundle baked into /usr/share/nginx/html"]
+            Admin["admin konténer (nginx)<br/>image: aisztens-admin:&lt;sha&gt;<br/>SPA bundle baked into /usr/share/nginx/html"]
         end
 
         subgraph Backend["Belső Docker network: internal"]
@@ -86,8 +88,8 @@ flowchart LR
     VAPI -- "HTTPS 443<br/>POST /api/vapi/webhook" --> CF
 
     CF -- "reverse_proxy api:3000" --> API
-    CF -- "root * /srv/web<br/>+ try_files" --> Web
-    CF -- "root * /srv/admin<br/>+ try_files" --> Admin
+    CF -- "reverse_proxy web:80" --> Web
+    CF -- "reverse_proxy admin:80" --> Admin
     CF -. "ACME / Let's Encrypt<br/>obtain + renew" .-> Vol
 
     API -- "DATABASE_URL" --> DB
@@ -97,8 +99,8 @@ flowchart LR
 ### 3.2 Mit jelent ez a Caddy szempontjából?
 
 - A Caddy az **egyetlen konténer, ami port-forward-ol** a hostra (80-as és 443-as port). Minden más kizárólag a belső `internal` bridge networkön kommunikál.
-- A Caddy a `docker-compose.yml` `internal` network tagján látja az `api` konténert `api:3000` néven — ez a DNS-feloldás a Docker beépített service discovery-ján keresztül működik.
-- A Caddy a SPA bundle-öket bind mount-on keresztül kapja meg (`./apps/web/dist:/srv/web:ro` a compose fájlban). A deploy során az `apps/web/dist` mappa tartalma rsync-vel kerül fel a dropletre.
+- A Caddy a `docker-compose.yml` `internal` bridge network tagján a teljes stack-et látja (`api`, `web`, `admin`, `postgres`, `caddy`, `monitor`), de a reverse proxy csak az `api`, `web` és `admin` konténereket címzi: `api:3000` (NestJS), `web:80` (public SPA), `admin:80` (admin SPA). A service-nevek a Docker beépített DNS service discovery-jén keresztül oldódnak fel.
+- A SPA bundle-ök az image-alapú deploy (2026-10-08) óta **nincsenek a hoston**: az `images.yml` buildeli a `web` és `admin` image-eket a Vite-tel, és az SPA bundle a `/usr/share/nginx/html` útvonalon van beégetve a konténer fájlrendszerébe. A Caddy kizárólag reverse-proxyzik ezekbe a konténerekbe — nincs bind mount, nincs hoston lévő `dist/` mappa, nincs `pnpm build` lépés a deploy során.
 - A Let's Encrypt tanúsítványok a `caddy_data` és `caddy_config` named volume-okban tárolódnak, így a konténer újraindítása után is megmaradnak.
 
 ---
@@ -114,23 +116,23 @@ A renderelés a [`deploy/deploy.sh:render_caddyfile()`](../../deploy/deploy.sh)-
 
 ### 4.1 A Caddyfile direktívái és hatásaik
 
-| Sorszám | Direktíva | Mit csinál | Hatás a projektben |
-|---|---|---|---|
-| 1 | `email <ACME_EMAIL>` | A Let's Encrypt felé a kapcsolattartó email cím | A LE tanúsítvány lejáratáról szóló értesítések ide érkeznek; az ACME regisztrációhoz kell |
-| 2 | `admin off` | Letiltja a Caddy admin API-t (REST endpoint a konténeren belül) | Biztonsági keményítés: a Caddy nem futtat belső HTTP admin felületet |
-| 3 | `api.<DOMAIN> { encode zstd gzip, handle @vapi_match { reverse_proxy api:3000 }, handle /api/vapi/* { respond 405 }, handle /api/* { reverse_proxy api:3000 }, handle /healthz { reverse_proxy api:3000 } }` | A `api.aisztens.hu` hosztnevet a NestJS API-hoz proxy-zza, zstd + gzip tömörítéssel. A `@vapi_match` named matcher (`path /api/vapi/*` + `header X-Vapi-Signature *` + `method POST`) az első védelmi vonal: csak a VAPI webhookok továbbítódnak, minden más `/api/vapi/*` kérés 405-öt kap anélkül, hogy elérné a NestJS-t. | A böngésző CORS preflight-ok és a VAPI bejövő webhookok ezen a végponton érkeznek; a `/api/vapi/*` pre-filter csak a header+method alakú egyezést nézi, a HMAC ellenőrzést a [`VapiSignatureGuard`](../../apps/api/src/vapi-webhooks/vapi-signature.guard.ts:35) végzi |
-| 4 | `web.<DOMAIN> { root * /srv/web, try_files {path} /index.html, file_server, handle /api/* }` | A SPA statikus fájljait szolgálja ki `/srv/web` mount-ból; a nem létező útvonalakat `/index.html`-re redirecteli (SPA fallback); a `/api/*` útvonalakat átproxy-zza az API-hoz | A React Router deep-linkjei (`/legal`, `/thank-you`) működnek böngésző-frissítéskor; ugyanarról az eredetről (same-origin) is elérhető az API. **`file_server` kötelező**: amint bármely `handle` blokk megjelenik a site-on belül, a Caddy kiveszi az implicit `file_server`-t; nélküle a `try_files` csak URI-t ír át, nem szolgál ki fájlt, és a böngésző üres 200-as választ kap (`content-length: 0`). |
-| 5 | `admin.<DOMAIN> { root * /srv/admin, file_server, ... }` | Ugyanaz, mint a `web`, de `/srv/admin` mount-ból, az admin SPA-t szolgálja ki | Az admin dashboard a `https://admin.aisztens.hu/`-n érhető el |
-| 6 | `<DOMAIN> { redir https://web.<DOMAIN>{uri} 307 }` | Az apex domain (`aisztens.hu/*`) összes kérését 307-es átirányítással a `web.aisztens.hu/*`-ra küldi | Amíg nincs külön landing page, a felhasználó azonnal a web app-ba jut |
+| Sorszám | Direktíva                                                                                                                                                                                                    | Mit csinál                                                                                                                                                                                                                                                                                                                   | Hatás a projektben                                                                                                                                                                                                                                                     |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1       | `email <ACME_EMAIL>`                                                                                                                                                                                         | A Let's Encrypt felé a kapcsolattartó email cím                                                                                                                                                                                                                                                                              | A LE tanúsítvány lejáratáról szóló értesítések ide érkeznek; az ACME regisztrációhoz kell                                                                                                                                                                              |
+| 2       | `admin off`                                                                                                                                                                                                  | Letiltja a Caddy admin API-t (REST endpoint a konténeren belül)                                                                                                                                                                                                                                                              | Biztonsági keményítés: a Caddy nem futtat belső HTTP admin felületet                                                                                                                                                                                                   |
+| 3       | `api.<DOMAIN> { encode zstd gzip, handle @vapi_match { reverse_proxy api:3000 }, handle /api/vapi/* { respond 405 }, handle /api/* { reverse_proxy api:3000 }, handle /healthz { reverse_proxy api:3000 } }` | A `api.aisztens.hu` hosztnevet a NestJS API-hoz proxy-zza, zstd + gzip tömörítéssel. A `@vapi_match` named matcher (`path /api/vapi/*` + `header X-Vapi-Signature *` + `method POST`) az első védelmi vonal: csak a VAPI webhookok továbbítódnak, minden más `/api/vapi/*` kérés 405-öt kap anélkül, hogy elérné a NestJS-t. | A böngésző CORS preflight-ok és a VAPI bejövő webhookok ezen a végponton érkeznek; a `/api/vapi/*` pre-filter csak a header+method alakú egyezést nézi, a HMAC ellenőrzést a [`VapiSignatureGuard`](../../apps/api/src/vapi-webhooks/vapi-signature.guard.ts:35) végzi |
+| 4       | `web.<DOMAIN> { reverse_proxy web:80 }`                                                                                                                                                                      | A `ghcr.io/<owner>/aisztens-web` image-ből futó nginx konténer felé proxy-zik. A konténer belsejében az nginx `root /usr/share/nginx/html` + `try_files $uri /index.html` + `file_server` látja el a React SPA fallback-et.                                                                                                  | A Caddy oldaláról ez egy egyszerű reverse proxy; a SPA fallback és a statikus fájl-kiszolgálás a `web` konténerben van.                                                                                                                                                |
+| 5       | `admin.<DOMAIN> { reverse_proxy admin:80 }`                                                                                                                                                                  | Ugyanaz, mint a `web`, de a `ghcr.io/<owner>/aisztens-admin` image nginx konténere felé                                                                                                                                                                                                                                      | Az admin dashboard a `https://admin.aisztens.hu/`-n érhető el                                                                                                                                                                                                          |
+| 6       | `<DOMAIN> { redir https://web.<DOMAIN>{uri} 307 }`                                                                                                                                                           | Az apex domain (`aisztens.hu/*`) összes kérését 307-es átirányítással a `web.aisztens.hu/*`-ra küldi                                                                                                                                                                                                                         | Amíg nincs külön landing page, a felhasználó azonnal a web app-ba jut                                                                                                                                                                                                  |
 
 ### 4.2 A template-render mechanizmus
 
 ```mermaid
 flowchart LR
-    A["infra/caddy/Caddyfile<br/>(template, <DOMAIN> token)"] -- "rsync" --> B["/opt/aisztens/infra/caddy/Caddyfile<br/>(dropleten)"]
-    B -- "sed s/<DOMAIN>/$DOMAIN/g" --> C["/opt/aisztens/infra/caddy/Caddyfile.rendered<br/>(renderelt)"]
-    C -- "docker compose volume mount" --> D["caddy konténer /etc/caddy/Caddyfile"]
-    E["deploy.sh:render_caddyfile()<br/>(DOMAIN + ACME_EMAIL kiolvasása<br/>+ sed + sanity check + SCP)"] -.-> C
+    A["infra/caddy/Caddyfile<br/>(template, <DOMAIN> token)"] -- "sed s/<DOMAIN>/$DOMAIN/g<br/>(CI runner vagy lokális gép)" --> C["infra/caddy/Caddyfile.rendered<br/>(renderelt, gitignored)"]
+    C -- "scp (deploy.yml / deploy.sh)" --> C2["/opt/aisztens/infra/caddy/Caddyfile.rendered<br/>(dropleten)"]
+    C2 -- "docker compose volume mount" --> D["caddy konténer /etc/caddy/Caddyfile"]
+    E["deploy.sh:render_caddyfile() VAGY<br/>deploy.yml 'Render Caddyfile' step<br/>(DOMAIN + ACME_EMAIL kiolvasása<br/>+ sed + sanity check)"] -.-> C
 ```
 
 A renderelés lépései ([`deploy/deploy.sh`](../../deploy/deploy.sh) `render_caddyfile()` függvény):
@@ -179,7 +181,7 @@ Egy `GET /api/vapi/webhooks/tool-calls` (vagy `POST` `X-Vapi-Signature` header n
 **A második vonal (NestJS, HMAC):** az `apps/api/src/vapi-webhooks/vapi-signature.guard.ts` újraszámolja a HMAC-SHA256-ot a `${X-Vapi-Timestamp}.${rawBody}` payload felett a `VAPI_WEBHOOK_SECRET` kulccsal, és `crypto.timingSafeEqual`-lel hasonlítja a `X-Vapi-Signature` headerhez.
 
 A `rawBody`-t a **Nest alkalmazás** `{ rawBody: true }` opciója szolgáltatja a
-`main.ts`-ben (`NestFactory.create(AppModule, new FastifyAdapter(), { rawBody: true })`) — *nem* a
+`main.ts`-ben (`NestFactory.create(AppModule, new FastifyAdapter(), { rawBody: true })`) — _nem_ a
 `FastifyAdapter` konstruktorának opciója, ott a kulcs nem is létezik, és a `request.rawBody`
 kitöltetlen maradna. A Nest ezt az opciót adja tovább az adapter
 `registerParserMiddleware()` metódusának (`@nestjs/core/nest-application.js`). A JSON parser
@@ -225,13 +227,13 @@ A korábbi próbálkozás a Caddy beépített placeholder-szintaxisával (`{$DOM
 
 ### 4.5 Per-env renderelés és a `local` override
 
-A háromkörnyezetes szétválasztás ([`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../history/2026-10-05--10-30-00-three-env-separation-plan.md)) óta a renderelés és a DOMAIN érték is per-env:
+A háromkörnyezetes szétválasztás ([`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md)) óta a renderelés és a DOMAIN érték is per-env:
 
-| Env | `DOMAIN` forrása | `infra/.env.${APP_ENV}` | Caddy a stackben? |
-|---|---|---|---|
-| **local** (fejlesztői gép) | — (nincs Caddy) | `infra/.env.local` (a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) seedeli az `infra/.env.example`-ből — lásd [`scripts/README.md`](../../scripts/README.md)) | **Nem.** Az [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override a Caddy service-t `profiles: [never]`-re teszi, így `docker compose --profile never up` nem indítja. A fejlesztő a `http://localhost:3000/api`-n éri el a NestJS-t közvetlenül, nincs publikus DNS, nincs Let's Encrypt. |
-| **dev** droplet (`aisztens.hu`) | `infra/.env.dev` `DOMAIN=aisztens.hu` | `infra/.env.dev` (a [`deploy/deploy.sh:render_caddyfile()`](../../deploy/deploy.sh) rendereli, a CI a [`INFRA_ENV_DEV`](../../.github/workflows/deploy.yml:111) secretből seedeli) | Igen — a [`Caddyfile.rendered`](../../infra/caddy/Caddyfile.rendered) a `web.aisztens.hu`, `api.aisztens.hu`, `admin.aisztens.hu`, `aisztens.hu` hosztnevekre szól. |
-| **prod** droplet (jövő) | `infra/.env.prod` `DOMAIN=<prod-domain>` | `infra/.env.prod` (a CI a [`INFRA_ENV_PROD`](../../.github/workflows/deploy.yml:120) secretből seedeli, csak `workflow_dispatch` `app_env=prod` indítja; a GitHub `production` environment protection rule adja a manuális review-t) | Igen, a domotic-IP-n kiadott Let's Encrypt tanúsítványokkal. |
+| Env                             | `DOMAIN` forrása                         | `infra/.env.${APP_ENV}`                                                                                                                                                                                                              | Caddy a stackben?                                                                                                                                                                                                                                                                                                      |
+| ------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **local** (fejlesztői gép)      | — (nincs Caddy)                          | `infra/.env.local` (a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) seedeli az `infra/.env.example`-ből — lásd [`scripts/README.md`](../../scripts/README.md))                                                                | **Nem.** Az [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) override a Caddy service-t `profiles: [never]`-re teszi, így `docker compose --profile never up` nem indítja. A fejlesztő a `http://localhost:3000/api`-n éri el a NestJS-t közvetlenül, nincs publikus DNS, nincs Let's Encrypt. |
+| **dev** droplet (`aisztens.hu`) | `infra/.env.dev` `DOMAIN=aisztens.hu`    | `infra/.env.dev` (a [`deploy/deploy.sh:render_caddyfile()`](../../deploy/deploy.sh) rendereli, a CI a [`INFRA_ENV_DEV`](../../.github/workflows/deploy.yml:111) secretből seedeli)                                                   | Igen — a [`Caddyfile.rendered`](../../infra/caddy/Caddyfile.rendered) a `web.aisztens.hu`, `api.aisztens.hu`, `admin.aisztens.hu`, `aisztens.hu` hosztnevekre szól.                                                                                                                                                    |
+| **prod** droplet (jövő)         | `infra/.env.prod` `DOMAIN=<prod-domain>` | `infra/.env.prod` (a CI a [`INFRA_ENV_PROD`](../../.github/workflows/deploy.yml:120) secretből seedeli, csak `workflow_dispatch` `app_env=prod` indítja; a GitHub `production` environment protection rule adja a manuális review-t) | Igen, a domotic-IP-n kiadott Let's Encrypt tanúsítványokkal.                                                                                                                                                                                                                                                           |
 
 A `DOMAIN` értéke az [`infra/.env.${APP_ENV}`](../../infra/.env.example) `DOMAIN=` sorából jön; a [`deploy/deploy.sh`](../../deploy/deploy.sh) `render_caddyfile()` függvénye `sed`-del cseréli ki a `<DOMAIN>` és `<ACME_EMAIL>` tokeneket a template-ben, és a sanity check (`grep` a maradék tokenekre) megakadályozza, hogy a renderelés érvénytelen Caddyfile-lal fusson.
 
@@ -296,7 +298,7 @@ A Caddy-specifikus doksi mellett érdemes lenne a következő diagramokat is lé
 ### 6.1 Azonnal hasznos lenne
 
 1. **TLS kézfogás folyamata** — sequence diagram, ami a Caddy ACME challenge-eit, a Let's Encrypt-tel való kommunikációt, és a tanúsítvány megújítási ciklust mutatja. Időzítés: amint a Cloud Firewall / DNS A rekordok véglegesek.
-2. **Deploy pipeline** — sequence diagram a `git push` → GitHub Actions → `deploy/deploy.sh up` → `docker compose up` → Caddy reload láncról. A renderelési fázis kiemelve. Időzítés: a [`docs/history/2026-09-23-github-action-deploy-with-smoke-tests-impl.md`](../history/2026-09-23-github-action-deploy-with-smoke-tests-impl.md) alapján egyszerű.
+2. **Deploy pipeline** — sequence diagram a `git push` → [`.github/workflows/images.yml`](../../.github/workflows/images.yml) (build + GHCR push) → [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) `plan` job → `deploy` job (`scp` + `docker compose pull && up -d`) → Caddy reload láncról. A renderelési fázis (`infra/.env` + `Caddyfile.rendered`) kiemelve. A `deploy/deploy.sh` ugyanezt a folyamatot futtatja kézzel, GHCR-ből pullolva.
 3. **Memória-eloszlás diagram** — horizontal stacked bar, ami a 961 MB-os droplet memóriáját szeletekre bontja (host ~150 MB, dockerd ~190 MB, do-agent ~600 MB, konténerek: api 400 MB, postgres 400 MB, caddy 64 MB, monitor 32 MB), és az upgrade-elt 2 GB-os verziót is mutatja. Időzítés: a [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md) memória-kontó táblázata alapján.
 4. **Webhook flow** — sequence diagram, ami a VAPI → Caddy → api konténer → postgres útvonalat mutatja egy bejövő `tool-calls` vagy `end-of-call-report` webhook feldolgozásakor. Időzítés: amint a VAPI integráció élesben fut.
 
@@ -304,7 +306,7 @@ A Caddy-specifikus doksi mellett érdemes lenne a következő diagramokat is lé
 
 5. **Hálózati topológia** — részletes diagram a DO Cloud Firewall szabályairól (80/TCP, 443/TCP nyitva; 22/TCP csak a `ssh.aisztens.hu`-n), a droplet hálózati interfészéről, és a belső Docker bridge networkről.
 6. **Hibakezelési mátrix** — melyik komponens milyen hibát kezel, és hogyan propagálódik a hiba a stacken felfelé (pl. Caddy restart → ACME challenge fail → deploy sikertelen).
-7. **Backup / restore folyamat** — a `pgdata` volume, a `caddy_data` (tanúsítvány cache), és az `apps/{web,admin}/dist` könyvtárak mentési stratégiája. Jelenleg ez **nincs implementálva** — fontos lenne a P1 fázisban.
+7. **Backup / restore folyamat** — a `pgdata` volume és a `caddy_data` (tanúsítvány cache) mentési stratégiája. (Az SPA bundle-ök az image-ekbe vannak égetve, ezért nincs hostoldali `apps/{web,admin}/dist` könyvtár, amit menteni kellene.) Jelenleg ez **nincs implementálva** — fontos lenne a P1 fázisban.
 8. **Verzió-frissítési stratégia** — hogyan frissül a Caddy image (caddy:2-alpine), az API Node verzió (22-bookworm-slim), és a postgres (16-alpine) a projekten belül, milyen rollback lehetőségek vannak.
 
 ---
@@ -318,18 +320,18 @@ A Caddy-specifikus doksi mellett érdemes lenne a következő diagramokat is lé
 - [`infra/docker-compose.yml`](../../infra/docker-compose.yml) — a Caddy konténer definíciója (mem_limit, volume mount, network, `APP_ENV` propagáció az api service-en keresztül)
 - [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml) — a `local` env override (`profiles: [never]` a Caddy-n, host port publikálás az api/postgres-nek); a [`scripts/dev-stack.sh`](../../scripts/dev-stack.sh) ezt merge-öli (lásd [`scripts/README.md`](../../scripts/README.md))
 - [`deploy/deploy.sh`](../../deploy/deploy.sh) — a `render_caddyfile()` függvény + `APP_ENV` szelektor
-- [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) — a CI deploy; az `INFRA_ENV_DEV` / `INFRA_ENV_PROD` secretből renderel (`${{ secrets[format('INFRA_ENV_{0}', upper(inputs.app_env || 'dev'))] }}`)
+- [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) — a CI deploy; az `INFRA_ENV_DEV` / `INFRA_ENV_PROD` secretből rendereli az `infra/.env`-et és a `Caddyfile.rendered`-et (a Caddyfile renderelés a `Render Caddyfile` step-ben, ugyanazzal a `sed` logikával, mint a [`deploy.sh:render_caddyfile()`](../../deploy/deploy.sh)). A `dev`/`prod` kiválasztást a **`plan` job** végzi ([`.github/scripts/deploy-plan.sh`](../../.github/scripts/deploy-plan.sh)), amely `should_deploy | app_env | image_tag | ref` kimeneteket ír a `GITHUB_OUTPUT`-ba; a `deploy` job `needs: plan` + `if: needs.plan.outputs.should_deploy == 'true'` formában fut, és a GitHub Environment kötést a `needs.plan.outputs.app_env`-ből oldja fel (`${{ needs.plan.outputs.app_env == 'prod' && 'production' || 'dev' }}`). Trigger: `workflow_run` (az `images.yml` sikeres futása után) vagy `workflow_dispatch` — **nincs `push` trigger és nincs `matrix`** (a `jobs.<id>.if` a mátrix-expandálás előtt fut, ezért a `matrix` context ott nem elérhető; a `plan` job váltja ki). Lásd [`docs/plans/2026-10-12--15-09-00-deploy-yml-plan-job.md`](../plans/2026-10-12--15-09-00-deploy-yml-plan-job.md))
 - [`infra/.env.example`](../../infra/.env.example) — a `DOMAIN` és `ACME_EMAIL` per-env sablonja
 - [`infra/.env.dev`](../../infra/.env.example) — a dev droplet DOMAIN-je (commitolva nincs, a CI secretből jön)
 - [`infra/.env.prod`](../../infra/.env.example) — a prod droplet DOMAIN-je (jövőbeli; a CI secretből jön)
 - [`docs/milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md`](../milestones/2026-09-28-caddy-restart-loop-and-mem-limits.milestone.md) — a korábbi Caddy restart-loop bug és a mem_limit-ek milestone-ja
-- [`docs/history/2026-10-05--10-30-00-three-env-separation-plan.md`](../history/2026-10-05--10-30-00-three-env-separation-plan.md) — a háromkörnyezetes szétválasztás terve, amely a `local`-ban a Caddy kikapcsolását és a per-env renderelést bevezette
+- [`docs/plans/2026-10-05--10-30-00-three-env-separation-plan.md`](../plans/2026-10-05--10-30-00-three-env-separation-plan.md) — a háromkörnyezetes szétválasztás terve, amely a `local`-ban a Caddy kikapcsolását és a per-env renderelést bevezette
 
 ### 7.2 Projekt-szintű dokumentumok
 
 - [`docs/01-callback-assistant.md`](../01-callback-assistant.md) — a projekt magas szintű leírása
-- [`docs/02-flowchart.md`](../02-flowchart.md) — az üzleti folyamat folyamatábrája
-- [`docs/03-implementation-general.md`](../03-implementation-general.md) — a keretrendszer-független implementációs specifikáció
+- [`docs/02-flowchart.md`](outdated/02-flowchart.md) — az üzleti folyamat folyamatábrája
+- [`docs/03-implementation-general.md`](outdated/03-implementation-general.md) — a keretrendszer-független implementációs specifikáció
 - [`docs/Specs/Kick-off-Meeting.md`](Kick-off-Meeting.md) — az üzleti és MVP scope meghatározása
 - [`docs/Specs/Functional-Specification.md`](Functional-Specification.md) — a funkcionális specifikáció
 
@@ -352,7 +354,7 @@ Bind for 0.0.0.0:80 failed: port is already allocated
 A garanciát két dolog adja:
 
 1. **`infra/docker-compose.yml` caddy service** — explicit `dns:` direktíva (`1.1.1.1`, `8.8.8.8`) és részletes komment arról, hogy ez az egyetlen Caddy a hoston, és hogy a systemd-resolved `127.0.0.53`-as stub-resolvere a bridge hálóról nem elérhető.
-2. **`deploy/deploy.sh:prune_legacy_stack()`** — minden `up` parancs előtt fut, és `xargs` + `docker rm -f` + `docker network rm` + `docker volume rm` segítségével eltávolítja a `callback-assistant-*`, `aisztens-legacy-*` és `old-stack-*` névképletű konténereket, hálózatokat és volume-okat. Ez egy "brute force" cleanup, ami minden korábbi compose projekt maradványát felszámolja.
+2. **`docker compose up -d --remove-orphans`** — a deploy mindkét útvonala (a [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) `Pull and start the stack` stepje és a `deploy/deploy.sh up` `compose_pull_up` stage-e) ezzel indítja a stacket, ami a korábbi compose projektekből visszamaradt, azonos nevű konténereket automatikusan eltávolítja. (A korábbi `deploy.sh:prune_legacy_stack()` "brute force" cleanup-függvény az image-based deploy bevezetésével kivezetésre került.)
 
 Ezen felül vészhelyzetre bevezettük a `down-all` parancsot:
 
@@ -399,16 +401,21 @@ A Caddy config és a konténer hálózat **100%-ban működik**, de a Let's Encr
 
 A Caddy a dropleten **kizárólag a subdomaint szolgálja ki**: `api.aisztens.hu`, `web.aisztens.hu`, `admin.aisztens.hu`. Az apex `aisztens.hu` egy **másik, különálló szerveren** fut (WordPress), nem a mi Caddy-nkön. Ez nem bug, hanem szándékos felállás:
 
-| Host | Ki szolgálja ki | DNS (NAT64 nézet) |
-|---|---|---|
-| `api.aisztens.hu`   | Caddy → `api:3000`   | `64:ff9b::a45c:f8c2` (= `164.92.248.194`, a droplet) |
-| `web.aisztens.hu`   | Caddy → `web:80`     | `64:ff9b::a45c:f8c2` (= `164.92.248.194`, a droplet) |
-| `admin.aisztens.hu` | Caddy → `admin:80`   | `64:ff9b::a45c:f8c2` (= `164.92.248.194`, a droplet) |
-| `aisztens.hu`       | WordPress (másik szerver) | `64:ff9b::b950:3002` (= `185.80.48.2`) |
+| Host                | Ki szolgálja ki           | DNS (NAT64 nézet)                                    |
+| ------------------- | ------------------------- | ---------------------------------------------------- |
+| `api.aisztens.hu`   | Caddy → `api:3000`        | `64:ff9b::a45c:f8c2` (= `164.92.248.194`, a droplet) |
+| `web.aisztens.hu`   | Caddy → `web:80`          | `64:ff9b::a45c:f8c2` (= `164.92.248.194`, a droplet) |
+| `admin.aisztens.hu` | Caddy → `admin:80`        | `64:ff9b::a45c:f8c2` (= `164.92.248.194`, a droplet) |
+| `aisztens.hu`       | WordPress (másik szerver) | `64:ff9b::b950:3002` (= `185.80.48.2`)               |
 
-A `Caddyfile.rendered`-ben lévő `aisztens.hu { redir https://web.aisztens.hu{uri} 307 }` blokk **kikerül a Caddy-ból** — sosem fut le, mert a `aisztens.hu` host soha nem jut el a dropletig. Ezt a `ssh.aisztens.hu` kivételével minden A rekordra igaz: a Caddy csak azt a három subdomainet szolgálja ki, amelyet a DNS a droplet IP-jére mutat.
+A `Caddyfile.rendered`-ben lévő `aisztens.hu { redir https://web.aisztens.hu{uri} 307 }` blokk **ki van véve a template-ből** ([`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile) utolsó blokkjaként ma is ott van egy kéthasábos komment, ami elmagyarázza, miért, és mintaként megadja, hogyan kell visszatenni, ha egyszer az apexet a dropletre migrálnánk). Korábban a blokk bent volt, és Caddy minden induláskor megpróbált ACME tanúsítványt szerezni `aisztens.hu`-ra — ez percenként kudarccal járt (Let's Encrypt `185.80.48.2: Invalid response ... 404`), és elárasztotta a `docker compose logs caddy` kimenetét `could not get certificate from issuer` / `ZeroSSL` váltakozó hibaüzenetekkel. A template-ből való kivétel óta Caddy csak a három subdomainre (`api.`, `web.`, `admin.`) kér tanúsítványt, és a `docker compose logs caddy` ACME-hibái eltűntek.
 
-Ha a jövőben az apexet is a dropletre akarjuk átvinni, a regisztrátornál kell az `aisztens.hu` A rekordot `164.92.248.194`-re frissíteni, **de erre jelenleg nincs terv** — az apex WordPress marad a helyén.
+Ha a jövőben az apexet is a dropletre akarjuk átvinni, két dolgot kell egyszerre megtenni:
+
+1. A regisztrátornál az `aisztens.hu` A rekordot `164.92.248.194`-re frissíteni.
+2. A template-ben a kommentelt apex blokkot visszaállítani (a kommentben szerepel a kód), és a `deploy.yml` / `deploy.sh` legközelebbi futásakor a `sed` kicseréli a `<DOMAIN>` tokent.
+
+**Erre jelenleg nincs terv** — az apex WordPress marad a helyén.
 
 ---
 

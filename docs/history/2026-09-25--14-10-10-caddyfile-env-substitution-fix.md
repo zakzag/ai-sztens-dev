@@ -2,8 +2,8 @@
 
 > **⚠ SUPERSEDED 2026-09-28.** The conclusion below — that Caddy supports
 > `{env.VAR}` in site addresses — is **wrong**. Caddy only resolves
-> `{env.VAR}` inside certain *module directives* (e.g. `root`, `header`,
-> `rewrite`); in *site addresses* (the line right after the global options
+> `{env.VAR}` inside certain _module directives_ (e.g. `root`, `header`,
+> `rewrite`); in _site addresses_ (the line right after the global options
 > block) it is treated as a literal string. The single-subdomain config
 > worked by accident because the broken hostname `api.{env.DOMAIN}` happens
 > to be rejected by ACME in a way that did not crash Caddy outright; when
@@ -12,7 +12,7 @@
 > the resulting `admin.{env.DOMAIN}` host name started causing the Caddy
 > container to crash-loop with
 > `Error: adapting config using caddyfile: subject does not qualify for
-> certificate: 'admin.{env.DOMAIN}'`, manifesting as high `kswapd0` CPU and
+certificate: 'admin.{env.DOMAIN}'`, manifesting as high `kswapd0` CPU and
 > unresponsive droplet.
 >
 > The correct fix is the template-render approach in
@@ -69,11 +69,11 @@ looked like a connection timeout because no HTTP response ever came back.
 `infra/caddy/Caddyfile` was rewritten to use Caddy’s native env-var
 placeholders:
 
-| Before (broken) | After (fixed) |
-|---|---|
-| `email {$ACME_EMAIL}` | `email {env.ACME_EMAIL}` |
-| `api.{$DOMAIN} { … }` | `api.{env.DOMAIN} { … }` |
-| `{$DOMAIN} { … }` | `{env.DOMAIN} { … }` |
+| Before (broken)                   | After (fixed)                        |
+| --------------------------------- | ------------------------------------ |
+| `email {$ACME_EMAIL}`             | `email {env.ACME_EMAIL}`             |
+| `api.{$DOMAIN} { … }`             | `api.{env.DOMAIN} { … }`             |
+| `{$DOMAIN} { … }`                 | `{env.DOMAIN} { … }`                 |
 | `redir https://api.{$DOMAIN} 307` | `redir https://api.{env.DOMAIN} 307` |
 
 The values are still supplied by `infra/docker-compose.yml` (`environment:

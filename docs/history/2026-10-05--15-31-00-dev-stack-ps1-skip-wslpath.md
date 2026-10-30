@@ -21,12 +21,12 @@ strips backslashes from any argument that looks like a Windows path,
 producing `E:projectsAI...` regardless of how the PowerShell side
 quotes or escapes the value. So:
 
-| Caller form | What `wsl.exe` forwards to `wslpath` |
-|---|---|
-| `& wsl.exe wslpath -u $RepoDir` | `E:projectsAI...` |
-| `& wsl.exe wslpath -u "$RepoDir"` | `E:projectsAI...` |
-| `& wsl.exe --% wslpath -u $RepoDir` | `E:projectsAI...` |
-| `Start-Process wsl.exe -ArgumentList @('wslpath','-u',$RepoDir)` | `E:projectsAI...` |
+| Caller form                                                      | What `wsl.exe` forwards to `wslpath` |
+| ---------------------------------------------------------------- | ------------------------------------ |
+| `& wsl.exe wslpath -u $RepoDir`                                  | `E:projectsAI...`                    |
+| `& wsl.exe wslpath -u "$RepoDir"`                                | `E:projectsAI...`                    |
+| `& wsl.exe --% wslpath -u $RepoDir`                              | `E:projectsAI...`                    |
+| `Start-Process wsl.exe -ArgumentList @('wslpath','-u',$RepoDir)` | `E:projectsAI...`                    |
 
 So no PowerShell-side arg-passing technique helps. The conversion has
 to happen **before** `wsl.exe` is involved.
@@ -95,7 +95,7 @@ $wslPath = "/mnt/$drive$tail"                               # '/mnt/e/projects/A
 
 This commit builds on `02ba18a` (which kept the wslpath call but
 captured its stderr for diagnostics). The diagnostic is still useful
-when the *path conversion* fails for other reasons (e.g. a future
+when the _path conversion_ fails for other reasons (e.g. a future
 change adds UNC support and then needs the error message), but the
 common case is now handled in-process and never reaches wslpath.
 
@@ -112,3 +112,4 @@ the same E:projectsAI... mangling). Convert the path in PowerShell
 before invoking wsl.exe so the wrapper has no backslashes to strip.
 The conversion is the same logic wslpath -u uses for the standard
 /mnt/<drive>/... auto-mount layout.
+```

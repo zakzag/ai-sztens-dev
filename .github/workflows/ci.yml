@@ -9,7 +9,10 @@
 #   * pnpm install (frozen lockfile) succeeds against the repo lockfile
 #   * `pnpm -r build` succeeds — exercises shared, api, web, admin builds
 #   * `pnpm -r lint` succeeds (api enforces ESLint, root runs prettier)
-#   * `pnpm --filter @callback/api test` succeeds (Jest unit tests)
+#   * `pnpm test` succeeds — the full unit matrix (shared, api-client, ui,
+#     admin, api). The root script is the canonical list; the CI does not
+#     spell out per-package commands, so a new package is picked up here
+#     automatically instead of drifting in two places (AIS-121).
 
 name: CI
 
@@ -33,7 +36,10 @@ jobs:
   build-test:
     name: Install, build, lint, unit test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The full unit matrix adds ~1 minute of test time over the single API
+    # suite this job used to run; 20 minutes leaves headroom for a cold
+    # install plus the vite builds without ever hitting the timeout.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -46,10 +52,19 @@ jobs:
         with:
           version: 10
 
+      # Node 24, not 22: the API unit suite contains a test that compiles the
+      # real `ApiKeysModule` (a DI-graph regression guard — a bad provider token
+      # means the API does not boot at all). That test is gated on
+      # `JEST_CAN_REQUIRE_ESM` (apps/api/test/lib/app-module-gate.ts), which
+      # needs Node >= 24.9: the CommonJS-only `@nestjs/config` internally
+      # `require()`s the ESM-only `@nestjs/common@12`, and Jest's ESM runner can
+      # only do that from 24.9 on. On Node 22 the test self-skips with a loud
+      # warning and the job stays green — i.e. it would be dead code in CI
+      # exactly like the suites this job used to skip (AIS-121).
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
@@ -66,12 +81,89 @@ jobs:
       - name: Lint
         run: pnpm -r lint
 
-      # Run jest unit tests. The script in apps/api/package.json is a fixed
-      # `node ... jest.js` invocation with no arg forwarding, so passing flags
-      # through pnpm (`-- --foo`) is unsafe: pnpm v10 forwards them literally
-      # to jest, where positional args are treated as test file patterns
-      # (result: "No tests found"). Locally `npm test` strips the `--`, which
-      # is why this never surfaced there. Colors are off by default in CI
-      # because stdout is not a TTY, so no extra flag is needed.
-      - name: Unit tests (api)
-        run: pnpm --filter @callback/api test
+      # Run the full unit matrix. `pnpm test` at the repo root is the canonical
+      # entry point (see package.json): it chains shared -> api-client -> ui ->
+      # admin -> api, so the CI never has to repeat the package list.
+      #
+      # The chain is `&&`-sequential, so the first failing suite stops it and
+      # the job goes red at that point; the failing suite's own output (jest /
+      # vitest) names the broken test file. That is what makes the negative
+      # proof in the AIS-121 DoD meaningful: a deliberately broken admin test
+      # turns this step red, and reverting it turns the step green again.
+      #
+      # Note on flags: the jest scripts (apps/api, packages/shared,
+      # packages/api-client) are fixed `node ... jest.js` invocations with no
+      # arg forwarding, so passing flags through pnpm (`-- --foo`) is unsafe:
+      # pnpm v10 forwards them literally to jest, where positional args are
+      # treated as test file patterns (result: "No tests found"). The root
+      # script passes no flags, so this is not an issue here. Colors are off by
+      # default in CI because stdout is not a TTY, so no extra flag is needed.
+      - name: Unit tests (full matrix)
+        run: pnpm test
+
+  # The envelope and OpenAPI contract gates live in the e2e suite (AIS-97).
+  # Separate job, and not only for speed:
+  #
+  #   * the DB-backed branches need a reachable Postgres (migrations create the
+  #     `platform` / `email` schemas themselves, so a plain service is enough);
+  #   * nearly every `AppModule` suite self-skips below Node 24.9, because Jest's
+  #     ESM runner cannot `require()` the CommonJS `@nestjs/config` there
+  #     (see apps/api/test/lib/app-module-gate.ts). Running the gate on Node 22
+  #     would be green without executing anything — the exact failure mode this
+  #     job exists to prevent.
+  api-e2e:
+    name: API e2e (envelope + OpenAPI gates, Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aisztens
+          POSTGRES_PASSWORD: aisztens
+          POSTGRES_DB: aisztens_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aisztens -d aisztens_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      APP_ENV: dev
+      DATABASE_URL: postgres://aisztens:aisztens@localhost:5432/aisztens_db
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm --filter @callback/shared build
+
+      - name: Build api
+        run: pnpm --filter @callback/api build
+
+      - name: Apply database migrations
+        run: pnpm --filter @callback/api db:migrate
+
+      # Fails on: a route that answers with the envelope without a registry
+      # entry, an exemption that does not exist, an untracked raw route, a 500
+      # whose body leaks, or a mapper that drifts from the shared schema.
+      - name: E2E tests (envelope, OpenAPI, contract gate)
+        run: pnpm --filter @callback/api test:e2e

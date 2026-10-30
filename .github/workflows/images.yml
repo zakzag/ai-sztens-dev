@@ -31,6 +31,17 @@
 #     or for a future rollback that just needs to re-publish an old commit);
 #   * splitting keeps `deploy.yml` focused on droplet delivery.
 
+# The run-name embeds the env chosen for the build, e.g.
+#   "Build and push images (dev)"
+#   "Build and push images (prod)"
+# The deploy workflow reads `github.event.workflow_run.display_title`
+# and parses the env out of the trailing `(dev|prod)`, so a manual
+# `workflow_dispatch` with `app_env=prod` (which has no payload in the
+# `workflow_run` event) still carries the env into the deploy step.
+# On a `push` trigger, `inputs.app_env` is empty and the title defaults
+# to `Build and push images (dev)`; that is also the env auto-deployed.
+run-name: "Build and push images (${{ inputs.app_env || 'dev' }})"
+
 name: Build and push images
 
 on:
@@ -148,8 +159,19 @@ jobs:
         id: meta
         run: |
           set -euo pipefail
+          # short_sha  — immutable image tag suffix (sha-<7 chars>).
+          # commit_hash — full 40-char SHA, baked into the images and shown in
+          #               the SPAs / `/healthz` so a running container can be
+          #               traced back to an exact revision.
+          # deploy_date — immutable UTC build time, same source of truth for
+          #               api, web and admin so all three report identical
+          #               metadata for a given revision.
           short_sha="${GITHUB_SHA::7}"
+          commit_hash="$GITHUB_SHA"
+          deploy_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
+          echo "commit_hash=$commit_hash" >> "$GITHUB_OUTPUT"
+          echo "deploy_date=$deploy_date" >> "$GITHUB_OUTPUT"
 
       # Build + push api (NestJS).
       - name: Build and push api
@@ -164,6 +186,8 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/aisztens-api:${{ steps.resolve.outputs.app_env }}
           build-args: |
             APP_ENV=${{ steps.resolve.outputs.app_env }}
+            COMMIT_HASH=${{ steps.meta.outputs.commit_hash }}
+            DEPLOY_DATE=${{ steps.meta.outputs.deploy_date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -181,6 +205,8 @@ jobs:
           build-args: |
             APP_ENV=${{ steps.resolve.outputs.app_env }}
             VITE_API_BASE_URL=${{ steps.resolve.outputs.api_base }}
+            VITE_DEPLOY_DATE=${{ steps.meta.outputs.deploy_date }}
+            VITE_COMMIT_HASH=${{ steps.meta.outputs.commit_hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -198,6 +224,8 @@ jobs:
           build-args: |
             APP_ENV=${{ steps.resolve.outputs.app_env }}
             VITE_API_BASE_URL=${{ steps.resolve.outputs.api_base }}
+            VITE_DEPLOY_DATE=${{ steps.meta.outputs.deploy_date }}
+            VITE_COMMIT_HASH=${{ steps.meta.outputs.commit_hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

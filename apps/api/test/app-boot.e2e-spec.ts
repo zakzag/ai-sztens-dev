@@ -1,8 +1,6 @@
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
+import { createFastifyAdapter } from '../src/common/http/create-fastify-adapter.js';
 import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
 
 /**
@@ -34,7 +32,7 @@ describe('AppModule bootstrap (e2e)', () => {
 
     const app: NestFastifyApplication =
       moduleRef.createNestApplication<NestFastifyApplication>(
-        new FastifyAdapter(),
+        createFastifyAdapter(),
         { rawBody: true },
       );
     app.setGlobalPrefix('api', { exclude: ['healthz'] });

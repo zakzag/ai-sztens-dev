@@ -19,10 +19,10 @@ droplet deploy that depends on those images could not proceed.
 
 ## 2. Evidence
 
-| Source | Observation |
-|---|---|
-| Workflow run log | `Run set -euo pipefail` followed by `unexpected EOF …` on line 7 of the runner's temp script, exit 2. |
-| Local repro | Copying the same `run:` block to a `.sh` file and running under `bash 5.2.37` reproduced the same error text and exit code. |
+| Source             | Observation                                                                                                                                                                                              |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workflow run log   | `Run set -euo pipefail` followed by `unexpected EOF …` on line 7 of the runner's temp script, exit 2.                                                                                                    |
+| Local repro        | Copying the same `run:` block to a `.sh` file and running under `bash 5.2.37` reproduced the same error text and exit code.                                                                              |
 | Tokenisation trace | Inside `$(...)` the token `tr -d \"'\"` produces `\"` (literal `"`) then `'` (opens a SQ) then `\"` (literal, inside the SQ) — the SQ is never closed, so the closing `)` of `$(...)` is also swallowed. |
 
 ## 3. Root cause
@@ -50,11 +50,11 @@ comment; nothing else in the workflow is touched.
 
 ## 5. Verification
 
-| Check | Result |
-|---|---|
-| `python -c "yaml.safe_load(open('images.yml'))"` | parses cleanly |
-| 8-case bash unit test of the fixed line (unquoted, dq-wrapped, sq-in-value, dq-in-value, both-quotes, with-noise, no-domain, trailing-eq) | 8/8 PASS |
-| Original buggy line, run in isolation | reproduces `unexpected EOF …` (proves the test is sensitive to the bug) |
+| Check                                                                                                                                     | Result                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `python -c "yaml.safe_load(open('images.yml'))"`                                                                                          | parses cleanly                                                          |
+| 8-case bash unit test of the fixed line (unquoted, dq-wrapped, sq-in-value, dq-in-value, both-quotes, with-noise, no-domain, trailing-eq) | 8/8 PASS                                                                |
+| Original buggy line, run in isolation                                                                                                     | reproduces `unexpected EOF …` (proves the test is sensitive to the bug) |
 
 The fix is local to the working copy. To activate it: `git add
 .github/workflows/images.yml docs/history/2026-10-11--14-39-17-images-yml-tr-quote-fix.md

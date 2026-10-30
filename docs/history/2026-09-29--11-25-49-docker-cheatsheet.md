@@ -2,10 +2,10 @@
 
 ## What changed
 
-- Initial draft: [`docs/docker-cheatsheet.md`](../docker-cheatsheet.md)
+- Initial draft: [`docs/docker-cheatsheet.md`](../Specs/Docker-Cheatsheet.md)
   — created 2026-09-29 11:25 as a generic Docker debugging reference.
 - 2026-09-29 13:09: deleted `docs/docker-cheatsheet.md` and replaced with
-  [`docs/docker-debug-playbook.md`](../docker-debug-playbook.md). The new
+  [`docs/docker-debug-playbook.md`](../Specs/Docker-Debug-Playbook.md). The new
   file is a **scenario-driven playbook** grounded in the actual incidents
   in `docs/history/2026-09-23 … 2026-09-29`, instead of a generic
   cheatsheet.

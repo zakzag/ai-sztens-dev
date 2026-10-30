@@ -6,16 +6,25 @@
   "scripts": {
     "predev": "pnpm --filter @callback/shared build",
     "dev": "concurrently -k -n shared,api,web,admin -c yellow,blue,green,magenta \"pnpm --filter @callback/shared dev\" \"pnpm --filter @callback/api start:dev\" \"pnpm --filter @callback/web dev\" \"pnpm --filter @callback/admin dev\"",
+    "db:up": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml up -d",
+    "db:down": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml down",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
-    "test": "pnpm --filter @callback/api test",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
+    "test": "pnpm --filter @callback/shared test && pnpm --filter @callback/api-client test && pnpm --filter @callback/ui test && pnpm --filter @callback/admin test && pnpm --filter @callback/api test",
     "test:e2e": "pnpm --filter @callback/api test:e2e",
+    "test:agents": "node --test scripts/lib/agent-artifacts/",
     "test:stack": "bash scripts/test/stack-smoke.sh",
     "test:stack:up": "bash scripts/test/stack-up.sh",
-    "test:stack:down": "bash scripts/test/stack-down.sh"
+    "test:stack:down": "bash scripts/test/stack-down.sh",
+    "sonar": "pnpm sonar:coverage && pnpm sonar:scan",
+    "sonar:scan": "node scripts/sonar/scan.mjs",
+    "sonar:coverage": "pnpm --filter @callback/shared test:cov && pnpm --filter @callback/api-client test:cov && pnpm --filter @callback/ui test:cov && pnpm --filter @callback/admin test:cov && pnpm --filter @callback/api test:cov && node scripts/sonar/lcov-merge.mjs",
+    "sonar:test": "node --test scripts/sonar/lcov-merge.test.mjs scripts/sonar/scan-config.test.mjs scripts/sonar/scan.test.mjs"
   },
   "devDependencies": {
+    "@sonar/scan": "^4.4.0",
     "concurrently": "^9.2.4",
     "prettier": "^3.9.9"
   }

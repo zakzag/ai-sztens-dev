@@ -1,0 +1,53 @@
+# AIsztens — local-only helper: run JUST the Postgres service.
+#
+# The API is normally developed with `pnpm --filter @callback/api start:dev`
+# running directly on the host (not in a container). This file starts only
+# Postgres so the host-run API has a database to talk to on localhost:5432.
+# It is intentionally independent from `infra/docker-compose.yml`, so it does
+# NOT pull/build the api/web/admin images and does NOT need Caddy.
+#
+# It uses its own named volume (`pgdata_local`) so it does not share data
+# with the full local stack started by `scripts/dev-stack.sh`.
+#
+# Usage (repo root):
+#   cp infra/.env.example infra/.env.local   # first time only, then edit passwords
+#   pnpm db:up                              # starts Postgres on localhost:5432
+#   pnpm db:down                            # stops it
+#
+# The API connects via DATABASE_URL (see apps/api/.env.example, local block):
+#   postgres://<AISZTENS_DB_USER>:<AISZTENS_DB_PASSWORD>@localhost:5432/<POSTGRES_DB>
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Cap Postgres the same way the full stack does (infra/docker-compose.yml).
+    mem_limit: 400m
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aisztens_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TKOVARI_DB_PASSWORD: ${TKOVARI_DB_PASSWORD}
+      KRAK_DB_PASSWORD: ${KRAK_DB_PASSWORD}
+      AISZTENS_DB_USER: ${AISZTENS_DB_USER:-aisztens}
+      AISZTENS_DB_PASSWORD: ${AISZTENS_DB_PASSWORD}
+      POSTGRES_SHARED_BUFFERS: 128MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 512MB
+      POSTGRES_WORK_MEM: 4MB
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata_local:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-aisztens_db}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata_local:

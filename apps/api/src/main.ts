@@ -1,10 +1,9 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { Logger } from '@nestjs/common';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { API_GLOBAL_PREFIX } from '@callback/shared';
 import { AppModule } from './app.module.js';
+import { createFastifyAdapter } from './common/http/create-fastify-adapter.js';
 import { APP_ENV, APP_ENV_RAW, isProd } from './config/app-env.js';
 
 async function bootstrap() {
@@ -24,18 +23,21 @@ async function bootstrap() {
   // `new FastifyAdapter({ rawBody: true })` compiles to nothing but a
   // TypeScript error (the option does not exist there) and silently leaves
   // `request.rawBody` undefined — every webhook would then fail with 401.
+  // The adapter factory (not `new FastifyAdapter()`) owns request-id
+  // generation: `genReqId` returns a random UUID, so `meta.requestId` is unique
+  // across restarts and replicas. Every e2e suite builds the same adapter.
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    createFastifyAdapter(),
     { rawBody: true },
   );
 
-  // All HTTP endpoints live under /api (e.g. POST /api/callback-requests).
+  // All HTTP endpoints live under /api (e.g. GET /api/api-keys).
   // `healthz` is excluded so the Docker healthcheck and the monitor watchdog
   // can hit a stable, unprefixed path that never drifts with the business
   // routing. Keep this list in sync with the controllers that must stay
   // outside the prefix (currently only HealthController).
-  app.setGlobalPrefix('api', { exclude: ['healthz'] });
+  app.setGlobalPrefix(API_GLOBAL_PREFIX, { exclude: ['healthz'] });
 
   // CORS is driven by @fastify/cors (ships with @nestjs/platform-fastify).
   // The allow-list comes from the per-env file picked at boot by
@@ -58,13 +60,12 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  // Deliberately **no** global `ValidationPipe`: request validation is done by
+  // `ZodBodyPipe` / `ZodQueryPipe` with the schema from `@callback/shared`
+  // (AIS-90, AIS-93). A global class-validator pipe would be a second, silent
+  // description of the same payloads — and `class-validator` /
+  // `class-transformer` are no longer dependencies. An unvalidated route is a
+  // contract bug, not something a catch-all pipe should paper over.
 
   // Bind explicitly to 0.0.0.0 so the Fastify listener is reachable from
   // OTHER containers (e.g. the Caddy reverse proxy on the `internal`

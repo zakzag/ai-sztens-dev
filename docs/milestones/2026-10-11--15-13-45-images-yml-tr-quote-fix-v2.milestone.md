@@ -14,12 +14,12 @@ The image-build workflow [`.github/workflows/images.yml`](../../.github/workflow
 
 ## 2. Evidence
 
-| Source | Observation |
-|---|---|
-| GH Actions log | `/home/runner/work/_temp/<uuid>.sh: line 7: unexpected EOF while looking for matching ''`, exit 2. |
-| Local repro | `bash -n` of the exact `domain=…` line from the runner produced the same error text and exit code. |
-| Tokenisation | Inside `$(…)`, `tr -d \"'\"` parses as `\"` (literal `"`), `'` (opens SQ), `\"` (literal, inside SQ) — the SQ is never closed, so the closing `)` of `$(…)` is swallowed, so bash hits EOF. |
-| Second bug | The on-disk `run:` block tested `[ -z "$domain" ]` but no longer assigned `$domain`. Without bug #1 masking it, bug #2 would have made the step fail at the guard with "DOMAIN is not set in INFRA_ENV_${app_env^^}." on every run. |
+| Source         | Observation                                                                                                                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GH Actions log | `/home/runner/work/_temp/<uuid>.sh: line 7: unexpected EOF while looking for matching ''`, exit 2.                                                                                                                                  |
+| Local repro    | `bash -n` of the exact `domain=…` line from the runner produced the same error text and exit code.                                                                                                                                  |
+| Tokenisation   | Inside `$(…)`, `tr -d \"'\"` parses as `\"` (literal `"`), `'` (opens SQ), `\"` (literal, inside SQ) — the SQ is never closed, so the closing `)` of `$(…)` is swallowed, so bash hits EOF.                                         |
+| Second bug     | The on-disk `run:` block tested `[ -z "$domain" ]` but no longer assigned `$domain`. Without bug #1 masking it, bug #2 would have made the step fail at the guard with "DOMAIN is not set in INFRA_ENV_${app_env^^}." on every run. |
 
 ## 3. Solution
 
@@ -33,24 +33,24 @@ domain="$(printf '%s\n' "$INFRA_ENV" | grep -E '^DOMAIN=' | head -n1 | cut -d= -
 
 ## 4. Why Variant D over Variant A
 
-| Criterion | Variant A (`_quote_chars="\"'"`) | Variant D (`$'\"\047'`) — chosen |
-|---|---|---|
-| Effective code lines | 2 | 1 |
-| New shell variable | yes | no |
-| Diff in YAML | wider | narrower |
-| Robustness to "simplify this" review | fragile (extra var invites inlining) | opaque `\047` octal survives casual review |
-| Behavioural correctness | 8/8 cases pass | 8/8 cases pass |
-| Footgun if mis-edited | regresses to original parse error | regresses to a *different* parse error, less likely to be misread as "fine" |
+| Criterion                            | Variant A (`_quote_chars="\"'"`)     | Variant D (`$'\"\047'`) — chosen                                            |
+| ------------------------------------ | ------------------------------------ | --------------------------------------------------------------------------- |
+| Effective code lines                 | 2                                    | 1                                                                           |
+| New shell variable                   | yes                                  | no                                                                          |
+| Diff in YAML                         | wider                                | narrower                                                                    |
+| Robustness to "simplify this" review | fragile (extra var invites inlining) | opaque `\047` octal survives casual review                                  |
+| Behavioural correctness              | 8/8 cases pass                       | 8/8 cases pass                                                              |
+| Footgun if mis-edited                | regresses to original parse error    | regresses to a _different_ parse error, less likely to be misread as "fine" |
 
 ## 5. Verification
 
-| Check | Result |
-|---|---|
-| `python -c "yaml.safe_load(open('.github/workflows/images.yml'))"` | parses |
-| `bash -n` of the extracted `run:` block | no error |
-| 8-case bash unit test (unquoted, dq-wrapped, sq-in-value, dq-in-value, both-quotes, with-noise, no-domain, trailing-eq) | 8/8 PASS |
-| Original buggy `tr -d \"'\"` line, run in isolation | reproduces `unexpected EOF …` (test is sensitive) |
-| Guard `if [ -z "$domain" ]` actually fires on the no-domain case | exits 1 with the expected error |
+| Check                                                                                                                   | Result                                            |
+| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `python -c "yaml.safe_load(open('.github/workflows/images.yml'))"`                                                      | parses                                            |
+| `bash -n` of the extracted `run:` block                                                                                 | no error                                          |
+| 8-case bash unit test (unquoted, dq-wrapped, sq-in-value, dq-in-value, both-quotes, with-noise, no-domain, trailing-eq) | 8/8 PASS                                          |
+| Original buggy `tr -d \"'\"` line, run in isolation                                                                     | reproduces `unexpected EOF …` (test is sensitive) |
+| Guard `if [ -z "$domain" ]` actually fires on the no-domain case                                                        | exits 1 with the expected error                   |
 
 ## 6. Outcome
 

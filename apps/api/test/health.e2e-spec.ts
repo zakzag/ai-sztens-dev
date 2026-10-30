@@ -1,8 +1,6 @@
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
+import { createFastifyAdapter } from '../src/common/http/create-fastify-adapter.js';
 import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
 
 /**
@@ -34,8 +32,19 @@ import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
  */
 interface HealthBody {
   status: 'ok';
+  deployDate: string | null;
+  commitHash: string | null;
   uptime: number;
   timestamp: string;
+}
+
+/**
+ * Build metadata is baked into the image at CI build time, so under a bare
+ * Jest run (no build args) both fields must be present and `null`. The guard
+ * accepts `string | null` so a CI-run image with real values also passes.
+ */
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
 }
 
 function isHealthBody(value: unknown): value is HealthBody {
@@ -43,6 +52,8 @@ function isHealthBody(value: unknown): value is HealthBody {
   const v = value as Record<string, unknown>;
   return (
     v['status'] === 'oks' &&
+    isNullableString(v['deployDate']) &&
+    isNullableString(v['commitHash']) &&
     typeof v['uptime'] === 'number' &&
     typeof v['timestamp'] === 'string'
   );
@@ -61,7 +72,7 @@ async function bootApp(): Promise<NestFastifyApplication | null> {
   }).compile();
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(
-    new FastifyAdapter(),
+    createFastifyAdapter(),
   );
   // Same prefix config as production (see src/main.ts).
   app.setGlobalPrefix('api', { exclude: ['healthz'] });
@@ -80,6 +91,11 @@ describe('HealthController (e2e)', () => {
       });
 
       expect(response.statusCode).toBe(200);
+      // Exempt route: the body carries no envelope, but the correlation header
+      // must still be there so a healthcheck failure is traceable (AIS-92).
+      expect(response.headers['x-request-id']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
       const body: unknown = response.json();
       // Type-guard narrows `unknown` -> `HealthBody`; `expect()` would not.
       if (!isHealthBody(body)) throw new Error('health body shape mismatch');
@@ -88,6 +104,10 @@ describe('HealthController (e2e)', () => {
       expect(body.uptime).toBeGreaterThanOrEqual(0);
       expect(typeof body.timestamp).toBe('string');
       expect(Number.isNaN(Date.parse(body.timestamp))).toBe(false);
+      // Build metadata is always present in the payload; it is `null` when the
+      // image was built without the CI build args (i.e. every Jest run).
+      expect(body.deployDate).toBeNull();
+      expect(body.commitHash).toBeNull();
     } finally {
       await app.close();
     }

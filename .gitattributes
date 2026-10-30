@@ -18,6 +18,15 @@
 #
 # PowerShell scripts keep CRLF (the native Windows convention; PS 5.1 reads
 # both, but CRLF is what every Windows editor expects).
+#
+# Everything else is LF, not just the shell scripts. The second half of the
+# reason is prettier: `pnpm format:check` compares the working tree byte for
+# byte, so a file that arrives with CRLF (a Windows checkout, or a `git revert`
+# that restores the CRLF working copy) fails the check even though its content
+# is formatted correctly. A CRLF-only diff is noise, and noise in a gate is how
+# gates get disabled.
+
+* text=auto eol=lf
 
 *.sh        text eol=lf
 *.bash      text eol=lf
@@ -25,3 +34,11 @@
 *.ps1       text eol=crlf
 *.psm1      text eol=crlf
 *.psd1      text eol=crlf
+
+# Binary assets are never line-ending converted.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary

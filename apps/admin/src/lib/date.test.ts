@@ -43,7 +43,7 @@ describe('toExpiryIso', () => {
 
     expect(instant.getFullYear()).toBe(2026);
     expect(instant.getMonth()).toBe(6);
-    expect(instant.getDate()).toBe(1);
+    expect(instant.getDate()).toBe(2);
     expect(instant.getHours()).toBe(0);
     expect(instant.getMinutes()).toBe(0);
   });

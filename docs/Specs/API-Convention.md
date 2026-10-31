@@ -1,7 +1,7 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-10-29
-**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98
+**Utolsó frissítés:** 2026-10-30
+**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
 ---
@@ -112,6 +112,50 @@ One `ApiEndpointContract` per operation, typed so a missing or misspelled field 
 | Success with nothing to return | `"data": null`, 200        | `204`                          |
 | Duplicate                      | `409` + `code: *_CONFLICT` | silent overwrite               |
 | Validation                     | `400` + `details[]`        | one concatenated string        |
+
+---
+
+## 4.1 List query (the shared paging contract)
+
+Every paginated list endpoint takes the **same** query shape, validated by the same schema on the
+server (`ZodQueryPipe`) and built by the same helper on the client.
+
+| Field   | Type            | Default           | Range / rule                                                                           |
+| ------- | --------------- | ----------------- | -------------------------------------------------------------------------------------- |
+| `page`  | number          | `1`               | integer, ≥ 1. Coerced from the query string.                                           |
+| `limit` | number          | `20`              | integer, 1…100. Coerced from the query string.                                         |
+| `sort`  | string          | resource-specific | **enum over the resource's allow-list** — an unknown column is a `400`, never a `500`. |
+| `order` | `asc` \| `desc` | `desc`            | enum.                                                                                  |
+| `q`     | string          | absent            | free-text search, trimmed, max 200 chars. An empty term means **no filter**.           |
+
+**The schema lives in `@callback/shared`** (`listQuerySchema`, plus `createListQuerySchema(sortBy)`
+for the resource-specific `sort` allow-list), so the browser and the server cannot enforce two
+different sets of numbers.
+
+```ts
+// server: the same schema validates the query string
+@Get()
+async list(
+  @Query(new ZodQueryPipe(listQuerySchema)) query: ListQuery,
+  @ReqCtx() ctx: RequestContext,
+): Promise<ApiEnvelope<readonly ApiKey[]>> {
+  // ...
+}
+
+// client: the same shape, with the defaults left out of the URL
+const params = toListQueryParams(query); // → '?page=3&limit=50' — never '?page=1'
+```
+
+**The response.** The wire format does **not** change: `data` stays an array and `meta.pagination`
+carries the paging block (see §2). What the client gets is a **type**: `ApiResult<TRows>` pairs
+the rows with a **mandatory** `meta.pagination`, so `total` and `totalPages` are reachable without
+digging through the envelope and without a type assertion. A paginated response **without**
+`meta.pagination` is a contract violation — the parse fails rather than silently treating it as a
+single page.
+
+**No server-side paging yet.** `findAll` is deliberately unpaginated (the tables hold provider
+credentials, a handful of rows); the paginated endpoint is a separate change that turns
+`findAll` into `findPage`.
 
 ---
 

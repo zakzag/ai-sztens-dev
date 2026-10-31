@@ -3,7 +3,8 @@
 **Dátum:** 2026-10-30 17:25 (Europe/Budapest)
 **Ticket:** AIS-106 (subtask az AIS-102 alatt: „Adatáramlás: lista/pagináció konvenció, PATCH/DELETE végpontok és teljes kliens-transport")
 **Téma:** a lista-lekérdezésnek legyen egy közös, validált alakja, és a kliens kapjon róla **típust**, hogy a `meta.pagination` elérhető legyen.
-**Státusz:** tervezve
+**Státusz:** implementálva (2026-10-30)
+**Implementáció:** [`docs/history/2026-10-30--17-50-00-ais-106-list-query-contract.md`](../history/2026-10-30--17-50-00-ais-106-list-query-contract.md:1) · **Milestone:** [`docs/milestones/2026-10-30--17-50-00-ais-106-list-query-contract.milestone.md`](../milestones/2026-10-30--17-50-00-ais-106-list-query-contract.milestone.md:1)
 
 ---
 
@@ -107,6 +108,34 @@ jelen marad** `undefined` értékkel (`Object.keys()` → `['q']`). Tehát a `to
 **nem** csak a `default` értékeket hagyja ki, hanem az **`undefined` értékű mezőket is** — különben
 a `?q=undefined` kerülne a URL-be. Ez a helper feladata, nem a sémaé.
 
+### 1.7 Az implementáció során mért zod-generikus akadály (a terv javítva)
+
+A terv eredeti `paginatedSchema` vázlata `successEnvelopeSchema(itemSchema.array())`-t használt, és a
+`ApiResult<TItem>` interfészt `data: TItem[]`-ként. Ez **nem fordult le**:
+
+```text
+src/contract/paginated.schema.ts(35,7): error TS2322:
+  Type 'TItem[]' is not assignable to type 'TItem[][]'.
+```
+
+**A gyökérok:** a `successEnvelopeSchema` a payload sémát `.nullable()`-lal wrapped (a `data`
+`null` lehet, ha nincs mit visszaadni). A zod `ZodNullable<ZodType<T>>` **egy extra array
+dimenzióval** bővíti az elemet-típust, ha a `T` egy általános `ZodType` — vagyis a `body.data`
+`TItem[][]` lesz `TItem[]` helyett. Ez **a `tsc` fogta meg**, nem a teszt (a tesztek futnak, mert
+zod runtime-on nem típusoz).
+
+**A megoldás (a repó mintájára):** a `paginatedSchema` **nem** a `successEnvelopeSchema`-ra
+épül, hanem **a `responseMetaSchema`-ra** — ugyanazt a `meta`-t validálja, de a payload-ot
+saját `z.object`-tel kezeli. Így:
+
+- a `data` típusa pontos (`TRows`, nem `TRows[]`),
+- a `meta` **ugyanaz** a sémából jön (nincs duplikáció),
+- a `pagination` kötelezőségét egy explicit transform őrzi.
+
+**A tanulság:** a `successEnvelopeSchema` nullable payloadja **és** a `paginatedSchema` nem
+tűnik össze: az elsőnek a `data: T | null` alakja kell (a `POST`/`DELETE` miatt), a másodiknak
+`data: T[]` (a lista soha nem `null`). A kettő **szándékosan** különbözik.
+
 ---
 
 ## 2. Döntések
@@ -204,14 +233,23 @@ parse-ol, és amit a `useApiList` (AIS-114) fogyaszt.
 **A `meta` típusa `ResponseMeta & { pagination }`** — így a `requestId`/`timestamp` is megmarad,
 és nincs külön `ApiResultMeta` típus.
 
-### D8 — A `contract/index.ts` exportok frissülnek, a `src/index.ts`-en **nem** kell új blokk
+### D8 — Mindkét export-index frissül: a `contract/index.ts` **és** a `src/index.ts`
 
-**Döntés:** az új exportok a `contract/index.ts`-be kerülnek (a `contract/` a szerződés otthona),
-és a `src/index.ts` a `contract/index.js`-t re-exportálja — így **egy** helyen kell frissíteni.
+**Döntés:** az új exportok **mindkét** indexbe kerülnek — a `contract/index.ts`-be (a szerződés
+otthona) és a `src/index.ts`-be (a csomag publikus API-ja).
 
-**Indoklás:** a [`src/index.ts`](../../packages/shared/src/index.ts) jelenleg a `contract/index.js`
-elemeket exportálja újra. A Duplikáció elkerüléséért az új elemek **csak** a `contract/index.ts`-be
-kerülnek.
+**Indoklás (a terv eredeti feltevése hibás volt):** a terv azt feltételezte, hogy a
+[`src/index.ts`](../../packages/shared/src/index.ts) a `contract/index.js`-t re-exportálja — és így
+**egy** helyen kell frissíteni. **Nem így van:** a két index **duplikálja** egymás exportjait
+(fegyverrel ugyanaz a lista, kétszer). Ez a repo meglévő mintája, és a `packages/api-client` és az
+`apps/api` is a **root** indexen keresztül importál (`@callback/shared`).
+
+A duplikáció megszüntetése (`export * from './contract/index.js'`) **nem** opció: a fájl docblockja
+kifejezetten tiltja a `export *`-ot, hogy a csomag felszíne **grippelhető** maradjon, és egy
+átnevezés ne bontsa ki csendben.
+
+**Következmény:** egy új exportet **két** helyen kell felvenni. Ez a duplikáció a repo
+dokumentált mintája, nem újonnan bevezetett technikai adósság.
 
 ### D9 — A `sort` a queryben **mindig** jelen van a defaulttal
 
@@ -377,48 +415,49 @@ létezik), az `api-keys.schema.ts` (a D1 miatt, és az AIS-75 konfliktus elkerü
 
 ## 5. A végrehajtás lépései
 
-### Fázis 0 — A típusok és a séma (tiszta, tesztelhető)
+### Fázis 0 — A típusok és a séma (tiszta, tesztelhető) ✅ ELKÉSZÜLT
 
-- [ ] **0.1** `list-query.schema.ts` — a konstansok, a mező-sémák, a statikus `listQuerySchema`, a `createListQuerySchema` factory.
-- [ ] **0.2** `list-query.helper.ts` — a `ListQuery` interfész, a `mergeListQuery`, a `toListQueryParams`.
-- [ ] **0.3** `api-result.interface.ts` — az `ApiResult<T>`.
-- [ ] **0.4** `paginated.schema.ts` — a `paginatedSchema` factory.
+- [x] **0.1** `list-query.schema.ts` — a konstansok, a mező-sémák, a statikus `listQuerySchema`, a `createListQuerySchema` factory.
+- [x] **0.2** `list-query.helper.ts` — a `ListQuery` interfész, a `mergeListQuery`, a `toListQueryParams`.
+- [x] **0.3** `api-result.interface.ts` — az `ApiResult<TRows>`.
+- [x] **0.4** `paginated.schema.ts` — a `paginatedSchema` factory.
 
-### Fázis 1 — A tesztek
+### Fázis 1 — A tesztek ✅ ELKÉSZÜLT
 
-- [ ] **1.1** `list-query.test.ts` — a defaultok, a coercion, a határértékek, az `order`, a `q`.
-- [ ] **1.2** `list-query-factory.test.ts` — az allow-list és a default `sort`.
-- [ ] **1.3** `list-query-helper.test.ts` — a `mergeListQuery` és a `toListQueryParams`.
-- [ ] **1.4** `paginated.test.ts` — az üres lista átmegy, a hiányzó `pagination` elhasal.
+- [x] **1.1** `list-query.test.ts` — a defaultok, a coercion, a határértékek, az `order`, a `q`.
+- [x] **1.2** `list-query-factory.test.ts` — az allow-list és a default `sort`.
+- [x] **1.3** `list-query-helper.test.ts` — a `mergeListQuery` és a `toListQueryParams`.
+- [x] **1.4** `paginated.test.ts` — az üres lista átmegy, a hiányzó `pagination` elhasal.
 
-### Fázis 2 — Az exportok és a dokumentáció
+### Fázis 2 — Az exportok és a dokumentáció ✅ ELKÉSZÜLT
 
-- [ ] **2.1** `contract/index.ts` — az új exportok.
-- [ ] **2.2** `docs/Specs/API-Convention.md` — a lista query-szerződés szakasza + a fejléc dátuma.
-- [ ] **2.3** `docs/history/<dátum>-ais-106-list-query-contract.md` — a kivonulás.
-- [ ] **2.4** `docs/milestones/<dátum>-ais-106-list-query-contract.milestone.md` — a döntés-szintű összegzés.
+- [x] **2.1** `contract/index.ts` **és** `src/index.ts` — az új exportok (lásd D8: a két index duplikál).
+- [x] **2.2** `docs/Specs/API-Convention.md` — az új §4.1 (a lista query-szerződés) + a fejléc dátuma.
+- [x] **2.3** `docs/history/2026-10-30--17-50-00-ais-106-list-query-contract.md` — a kivonulás.
+- [x] **2.4** `docs/milestones/2026-10-30--17-50-00-ais-106-list-query-contract.milestone.md` — a döntés-szintű összegzés.
 
-### Fázis 3 — Az ellenőrzés
+### Fázis 3 — Az ellenőrzés ✅ ELKÉSZÜLT
 
-- [ ] **3.1** `pnpm --filter @callback/shared test` zöld.
-- [ ] **3.2** `pnpm --filter @callback/shared build` zöld (a `tsc` a generikus típusokat is ellenőrzi).
-- [ ] **3.3** `pnpm -r build` zöld — **a `packages/api-client` és az `apps/api` sem broke**.
-- [ ] **3.4** `pnpm test` — a teljes mátrix zöld.
-- [ ] **3.5** `pnpm format:check` tiszta.
+- [x] **3.1** `pnpm --filter @callback/shared test` zöld — **9 fájl / 146 teszt**.
+- [x] **3.2** `pnpm --filter @callback/shared build` zöld (a `tsc` a generikus típusokat is ellenőrzi — és meg is fogta a `TItem[][]` hibát).
+- [x] **3.3** `pnpm -r build` zöld — **a `packages/api-client` és az `apps/api` sem broke**.
+- [x] **3.4** `pnpm test` — a teljes mátrix zöld.
+- [x] **3.5** `pnpm format:check` tiszta.
 
 ---
 
 ## 6. A DoD ellenőrzési listája
 
-| DoD pont                                                                                                        | Hol bizonyul                                                                                                                                                                          | Státusz             |
-| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| `listQuerySchema` unit teszt: defaultok, határértékek (`limit: 0`, `limit: 101`), érvénytelen `order`, üres `q` | `list-query.test.ts`                                                                                                                                                                  | ⬜ Fázis 1.1        |
-| `paginatedSchema` unit teszt: `data: []` + `total: 0` átmegy; hiányzó `meta.pagination` elhasal                 | `paginated.test.ts`                                                                                                                                                                   | ⬜ Fázis 1.4        |
-| A `meta.pagination` típusa elérhető a kliensoldalon **típusassert nélkül**                                      | Az `ApiResult<T>` interfész a `contract/index.ts`-en keresztül exportálva — a `paginatedSchema` `z.ZodType<ApiResult<TItem>>`-ot ad vissza, vagyis a típus **inferálható** parse után | ⬜ Fázis 0.3 + 0.4  |
-| `pnpm --filter @callback/shared test` zöld; a `contract/index.ts` exportok frissültek                           | Fázis 3.1 + 2.1                                                                                                                                                                       | ⬜ Fázis 2.1 + 3.1  |
-| _(kiegészítő)_ A `sort` allow-list miatt egy ismeretlen oszlopnév **400**, nem 500                              | `list-query-factory.test.ts`                                                                                                                                                          | ⬜ Fázis 1.2        |
-| _(kiegészítő)_ Nincs breaking a response sémán                                                                  | Az `envelope.schema.ts` **változatlan**                                                                                                                                               | ✅ a döntés alapján |
-| _(kiegészítő)_ Nincs új npm dependency                                                                          | A `packages/shared/package.json` változatlan                                                                                                                                          | ✅                  |
+| DoD pont                                                                                                        | Hol bizonyul                                                                                                                                           | Státusz             |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| `listQuerySchema` unit teszt: defaultok, határértékek (`limit: 0`, `limit: 101`), érvénytelen `order`, üres `q` | `list-query.test.ts` (15 teszt)                                                                                                                        | ✅ Fázis 1.1        |
+| `paginatedSchema` unit teszt: `data: []` + `total: 0` átmegy; hiányzó `meta.pagination` elhasal                 | `paginated.test.ts` (8 teszt)                                                                                                                          | ✅ Fázis 1.4        |
+| A `meta.pagination` típusa elérhető a kliensoldalon **típusassert nélkül**                                      | Az `ApiResult<TRows>` interfész exportálva — a `paginatedSchema` `z.ZodType<ApiResult<TRows>>`-ot ad vissza, vagyis a típus **inferálható** parse után | ✅ Fázis 0.3 + 0.4  |
+| `pnpm --filter @callback/shared test` zöld; a `contract/index.ts` exportok frissültek                           | 9 fájl / 146 teszt zöld; a `contract/index.ts` **és** a `src/index.ts` exportjai frissültek (D8)                                                       | ✅ Fázis 2.1 + 3.1  |
+| _(kiegészítő)_ A `sort` allow-list miatt egy ismeretlen oszlopnév **400**, nem 500                              | `list-query-factory.test.ts` (6 teszt) — az enum hibaüzenete felsorolja a megengedett oszlopokat                                                       | ✅ Fázis 1.2        |
+| _(kiegészítő)_ Nincs breaking a response sémán                                                                  | Az `envelope.schema.ts` **változatlan**                                                                                                                | ✅ a döntés alapján |
+| _(kiegészítő)_ Nincs új npm dependency                                                                          | A `packages/shared/package.json` változatlan                                                                                                           | ✅                  |
+| _(kiegészítő)_ A `pnpm -r build` sem broke (a `packages/api-client` és az `apps/api` sem)                       | `pnpm -r build` zöld                                                                                                                                   | ✅ Fázis 3.3        |
 
 ---
 

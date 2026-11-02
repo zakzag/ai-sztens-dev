@@ -1,32 +1,33 @@
+import { Card } from '@callback/ui';
 import { BuildInfoFooter } from '../components/BuildInfoFooter.js';
+
+/** The three value propositions under the hero panel. */
+const VALUE_POINTS: ReadonlyArray<readonly [string, string]> = [
+  ['Gyors', 'Átlagosan perceken belül visszahívjuk.'],
+  ['Személyes', 'Szakértő kollégánk beszél Önnel telefonon.'],
+  ['Ingyenes', 'A visszahívás Önnek semmibe nem kerül.'],
+];
 
 export function HomePage() {
   return (
     <section className="space-y-6">
-      <div className="rounded-xl bg-slate-900 p-8 shadow-sm ring-1 ring-slate-800">
-        <h1 className="text-3xl font-bold text-white">
+      <Card className="p-8">
+        <h1 className="text-3xl font-bold text-text-primary">
           Nem értünk el? Hívjuk mi vissza Önt! Még ma!
         </h1>
-        <p className="mt-3 text-slate-400">
+        <p className="mt-3 text-text-secondary">
           Adja meg elérhetőségeit, és szakértő kollégánk a lehető leghamarabb
           visszahívja. Az ügyintézés telefonon történik, így nem kell várakoznia
           a vonalban.
         </p>
-      </div>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          ['Gyors', 'Átlagosan perceken belül visszahívjuk.'],
-          ['Személyes', 'Szakértő kollégánk beszél Önnel telefonon.'],
-          ['Ingyenes', 'A visszahívás Önnek semmibe nem kerül.'],
-        ].map(([title, text]) => (
-          <div
-            key={title}
-            className="rounded-xl bg-slate-900 p-6 shadow-sm ring-1 ring-slate-800"
-          >
-            <h2 className="font-semibold text-white">{title}</h2>
-            <p className="mt-2 text-sm text-slate-400">{text}</p>
-          </div>
+        {VALUE_POINTS.map(([title, text]) => (
+          <Card key={title}>
+            <h2 className="font-semibold text-text-primary">{title}</h2>
+            <p className="mt-2 text-sm text-text-secondary">{text}</p>
+          </Card>
         ))}
       </div>
 

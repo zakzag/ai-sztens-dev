@@ -1,6 +1,16 @@
+/**
+ * Public site stylesheet entry.
+ *
+ * `tailwindcss` first, then the shared design tokens from `@callback/ui`, then
+ * the `@source` registration so Tailwind also scans the primitive sources that
+ * live outside this app (they are bundled from TypeScript, not from `dist`).
+ *
+ * The base `body` surface (`--color-surface-base`, `--color-text-primary`,
+ * `color-scheme: dark`, font smoothing) comes from the token file's `@layer
+ * base` — this file must not contain colour literals or palette utilities
+ * (enforced by `pnpm quality:tokens`).
+ */
 @import "tailwindcss";
+@import "../../../packages/ui/src/styles/theme.css";
 
-body {
-  @apply bg-slate-950 text-slate-100 antialiased;
-  color-scheme: dark;
-}
+@source "../../../packages/ui/src";

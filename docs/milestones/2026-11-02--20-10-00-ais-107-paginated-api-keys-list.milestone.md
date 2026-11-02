@@ -76,8 +76,9 @@ Manual check: open `/api/docs` (dev only) — `GET /api/api-keys` now lists `pag
 
 ## 6. Follow-ups
 
-- **The AppModule e2e suites cannot run on Node 20.19.2** (Jest ESM + CommonJS `@nestjs/config`
-  gate): the new e2e scenarios must be executed on a Node ≥ 24.9 runner before closing the ticket.
+- ~~The AppModule e2e suites cannot run on Node 20.19.2~~ — **resolved**: the repo now pins
+  Node ≥ 24.9 (`engines` + `.node-version` 24.22.2) and the full e2e run executed
+  (11 suites / 51 tests, nothing skipped) against the local Postgres.
 - `packages/api-client` `list()` still sends no query and drops `meta` (AIS-109), so the admin list
   shows page 1 of 20 (AIS-114 owns the pager).
 - `%` and `_` in `?q=` behave as SQL wildcards (documented, not escaped).

@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "description": "AIsztens monorepo: NestJS+Fastify API, React public site, React admin SPA",
+  "engines": {
+    "node": ">=24.9.0"
+  },
   "scripts": {
     "predev": "pnpm --filter @callback/shared build",
     "quality:layers": "depcruise apps/admin/src --config .dependency-cruiser.cjs --output-type err",

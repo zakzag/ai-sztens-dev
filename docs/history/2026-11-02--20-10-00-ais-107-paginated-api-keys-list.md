@@ -64,14 +64,33 @@ The `Database` mock gained `offset()`, a scripted `count(*)` (`countWhere`) and 
 chain nodes: an eagerly created rejected promise that a test chains over is an unhandled rejection
 and kills the Jest worker, which is a 30-minute debug for a one-line fix.
 
-## Not verified here (environment limitation)
+## e2e — executed, not skipped
 
-`apps/api` e2e suites that boot `AppModule` **self-skip** on this machine: Jest's ESM runner needs
-Node ≥ 24.9 to `require()` the CommonJS-only `@nestjs/config`, and the local runtime is 20.19.2
-(`[app-module-gate] skipped…`). The new `api-keys.e2e-spec.ts` scenarios (12 seeded rows, page-2
-slice with `meta.pagination`, empty result → `200`/`total: 0`, `limit=101` → `400` on `limit`,
-unknown `sort` → `400`) are written but ran as “skipped”. They must be executed on a Node ≥ 24.9
-runner before the ticket is closed.
+The first run of this suite self-skipped: Jest's ESM runner needs Node ≥ 24.9 to `require()` the
+CommonJS-only `@nestjs/config`, and the shell was on 20.19.2 (`[app-module-gate] skipped…`). After
+switching the repo to Node 24 (see below) **all 13 `api-keys` e2e tests executed against the real
+`AppModule` and the local Postgres** — including the five new scenarios:
+
+```
+√ GET /api/api-keys lists the created keys inside `data` with `meta.pagination`
+√ GET /api/api-keys serves page 2 of a filtered, name-ascending list
+√ GET /api/api-keys answers an empty result with 200, `data: []` and `total: 0`
+√ GET /api/api-keys rejects limit=101 with 400 + a `limit` detail
+√ GET /api/api-keys rejects an unknown sort column with 400 + a `sort` detail
+```
+
+The full e2e run: **11 suites / 51 tests passed, nothing skipped**.
+
+## Node baseline raised to 24
+
+- [`package.json`](../../package.json:6) — `"engines": { "node": ">=24.9.0" }`.
+- [`.node-version`](../../.node-version:1) — `24.22.2`, the version `fnm` switches to.
+- [`docs/Specs/Local-Development.md`](../Specs/Local-Development.md:40) — new §2.1 documenting why
+  the gate matters (an older runtime makes the `AppModule` suites pass **without asserting**).
+
+Docker Desktop was not running, so the DB step is worth recording: `docker info` failed with
+`npipe:////./pipe/dockerDesktopLinuxEngine`, then `pnpm db:up` reported
+`Container infra-postgres-1 Running` once the engine was up.
 
 ## Out of scope (deliberately)
 

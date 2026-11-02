@@ -1,6 +1,6 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-11-02 (AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; előtte AIS-118: az `src/app/` réteg — route registry, layout, provider-lánc, error boundary)
+**Utolsó frissítés:** 2026-11-02 (AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; `apps/web` átállt a tokenekre; előtte AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **Status:** living document — describes the _current_ state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -14,7 +14,7 @@ the rule set disagree, the rule set wins and this document is the bug.
 | `packages/api-client` | The only place that talks to the backend (typed services + Zod parsing at the boundary). Tested with **jest + ts-jest**.     | `tsc` → `dist`                   |
 | `packages/shared`     | Wire schemas, shared pure helpers used by API, web and admin. Tested with jest.                                              | `tsc` → `dist`                   |
 | `apps/admin`          | Admin SPA. Consumes `@callback/ui` primitives and `@callback/api-client` services. Tested with **vitest + Testing Library**. | `tsc --noEmit` + `vite build`    |
-| `apps/web`            | Public site. Not yet migrated to the token layer — see §2.                                                                   | `tsc --noEmit` + `vite build`    |
+| `apps/web`            | Public site. Consumes `@callback/ui` (`Card` + tokens) since AIS-122; still a flat `App.tsx` + `pages/*`, no layer folders.  | `tsc --noEmit` + `vite build`    |
 
 Why `packages/ui` has no build step (decision **D14** of the AIS-57 plan): its only
 consumer is a Vite bundle, so a `dist` would add a build ordering dependency and
@@ -43,8 +43,9 @@ what exists in `apps/admin` today, so nobody mistakes a planned folder for an ex
 | `components`          | generic presentational shells (no data access)                   | **exists**: `components/BuildInfoFooter.tsx`, `components/error/PageErrorState.tsx`, `components/error/AppErrorBanner.tsx` (the latter is a thin container: all decisions live in `features/error-surface` + `lib/error-surface.*`)                                                                                                                                                                   |
 | `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/handlers/` (MSW network doubles: `api-keys.handlers.ts`, `generic.handlers.ts`, `handler-envelope.ts`), `server.ts`, `render-with-providers.tsx`, `request-recorder.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                              |
 
-`apps/web` is out of scope for this document's layer map: it has no features/entities
-folders yet and is not migrated to `packages/ui` tokens.
+`apps/web` is out of scope for this document's **layer map**: it has no features/entities
+folders yet, so `pnpm quality:layers` cruises `apps/admin/src` only. The site *is* on
+`packages/ui` tokens and primitives since AIS-122, and `pnpm quality:tokens` covers it.
 
 ## 3. Design tokens (`packages/ui/src/styles/theme.css`)
 
@@ -114,19 +115,15 @@ non-default outline, it must name a border/state token.
 4. New visual concepts are built once in `packages/ui` as a primitive or a CVA
    variant — never inline in a page.
 
-Definition-of-done check, bash / ripgrep (run from the repo root, must print nothing):
+Definition-of-done check — the gate that enforces §3.3 (it also scans
+`packages/ui/src`, which the old `rg` one-liner did not):
 
 ```bash
-rg "#[0-9a-fA-F]{3,8}|(bg|text|border|ring|from|to|via)-(slate|gray|zinc|neutral|stone|indigo|red|amber|green|emerald|blue)-[0-9]{2,3}" apps/admin/src apps/web/src
+pnpm quality:tokens   # must print "OK quality:tokens (palette): 0 violations"
 ```
 
-The same check without ripgrep, on Windows:
-
-```powershell
-Get-ChildItem -Path 'apps/admin/src' -Recurse -File |
-  Where-Object { $_.Extension -in '.ts','.tsx','.css' } |
-  Select-String -Pattern '#[0-9a-fA-F]{3,8}|(bg|text|border|ring|from|to|via)-(slate|gray|zinc|neutral|stone|indigo|red|amber|green|emerald|blue)-[0-9]{2,3}'
-```
+The gate is dependency-free (no `rg` needed on Windows) and implements exactly the
+three rules above; see §9 for its negative fixture and its exemption list.
 
 ## 4. Primitives (`packages/ui/src/components`)
 
@@ -272,6 +269,8 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 | `zod` (direct dependency)                                                                               | `apps/admin`                             | form schema validation                                                                                          | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30) |
 | `@hookform/resolvers`                                                                                   | `apps/admin`                             | `zodResolver` for react-hook-form                                                                               | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3                                                                       |
 | `zustand`                                                                                               | `apps/admin`                             | page-local stores, global session store                                                                         | **planned — added with the first page that needs UI state** (`/api-keys` has none, D9)                                                     |
+| `dependency-cruiser`                                                                                    | repo root                                | layer gate: `app → pages → features → entities → services → lib` (§9.1)                                         | installed (`^16`) — dev-only, never shipped                                                                                                |
+| `knip`                                                                                                  | repo root                                | dead-code gate: unused files / exports / dependencies (§9.2)                                                    | installed (`^5`) — dev-only, `apps/api` deliberately out of scope (D8)                                                                     |
 
 Adding a dependency requires updating this table in the same change. Rows marked
 _planned_ must not be read as available.
@@ -325,3 +324,92 @@ Invariant: **no SPA route may collide with the API base path prefix.** Productio
 construction (Caddy `handle /api/*`, nginx `try_files … /index.html`), only the Vite dev server
 needs the regex.
 The palette check in §3.3 is part of the definition of done as well.
+
+## 9. CI quality gates (AIS-122)
+
+The rules in `.roo/rules/react.coding-standards.md` are **machine-enforced**. Four static gates
+run in the `quality-gates` CI job (`.github/workflows/ci.yml`), one step per gate, so the red step
+names the failing rule. Locally the same four are one command:
+
+```bash
+pnpm quality          # layers → dead code → tokens → field errors
+pnpm test:quality     # the gates' own tests (negative + positive fixtures)
+```
+
+Nothing here builds or runs tests: every gate is a static file walk plus one
+`dependency-cruiser` run, which is why the whole job reports in about a minute.
+
+| Command                   | Enforces                                                                   | Scope                                                   |
+| ------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `pnpm quality:layers`     | `app → pages → features → entities → services → lib`; no page→page, no feature→feature, no cycles | `apps/admin/src` (the only app with layers)              |
+| `pnpm quality:dead-code`  | no unused file, export, exported type or dependency                        | `apps/{admin,web}` + `packages/{ui,api-client,shared}`   |
+| `pnpm quality:tokens`     | no colour literal, no Tailwind palette utility, no arbitrary colour value   | `apps/*/src` **and** `packages/ui/src`                  |
+| `pnpm quality:field-errors` | no `error.status ===` / `error.code ===` / `instanceof ApiError` outside a pure decision function | `apps/*/src`                          |
+
+### 9.1 Layer gate (`dependency-cruiser`)
+
+The rules live in **one module**, `.dependency-cruiser.rules.cjs`, imported by two configs so
+"the gate" and "the proof of the gate" cannot drift:
+
+| Config                           | Target                                    |
+| -------------------------------- | ----------------------------------------- |
+| `.dependency-cruiser.cjs`        | `apps/admin/src` (the real tree)          |
+| `.dependency-cruiser.fixtures.cjs` | `scripts/quality/fixtures/layers/{negative,positive}` |
+
+Element patterns are written **location-agnostically** (`(?:^|/)src/pages/([^/]+)/`), which is
+what lets one rules module match both the real tree and a fixture tree.
+
+Documented grandfathers — visible in the module with a one-line reason each:
+
+| Edge                              | Why                                                                  | Removed by |
+| --------------------------------- | -------------------------------------------------------------------- | ---------- |
+| `components → features/error-surface` | `AppErrorBanner` is a deliberate thin container (AIS-96)         | AIS-96 follow-up |
+| `auth` as its own element         | three files import it legitimately; it ranks with `services`          | AIS-74 (`auth/` → `app/session`) |
+
+The repo imports its own modules with **explicit `.js` specifiers**; `dependency-cruiser` resolves
+them to `.ts`/`.tsx` natively through `enhancedResolveOptions.extensions`. Two options are absent
+on purpose: `extensionAlias` (not in its config schema — it rejects the whole config) and
+`tsConfig` (neither `apps/admin/tsconfig.json` nor its base declares `paths`/`baseUrl`, and an
+`extends`-ing config is resolved from the cwd, which produced `TS5083`/`TS18003`).
+
+### 9.2 Dead-code gate (`knip`)
+
+`knip.json` configures five workspaces and one **exclusion**:
+
+| Entry                          | Reason                                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `ignoreWorkspaces: ["apps/api"]` | Nest DI resolves providers at runtime and `apps/api/drizzle/**` is generated — triaging those false positives is its own ticket. A gate that cries wolf gets switched off. |
+| `entry: scripts/lib/agent-artifacts/generate.mjs` | The CLI is invoked from `scripts/init.sh` / `init.ps1`, which `knip` cannot see. |
+| `ignoreDependencies: ["tailwindcss"]` | Used only from CSS (`@import "tailwindcss"`), never imported from TypeScript.          |
+| `ignoreExportsUsedInFile: true` | Mock helpers and constants are exported for readability but used in their own file; a real orphan is still reported as an unused **file**. |
+
+Triage happened in the same change: the orphan barrel `packages/shared/src/contract/index.ts` was
+deleted (it duplicated `packages/shared/src/index.ts`), and the `DEFAULT_EMIT` duplicate alias in
+`scripts/lib/agent-artifacts/overrides.mjs` was replaced by `EMITTABLE` at its single call site.
+
+### 9.3 Token gate and field-error gate
+
+Both are dependency-free Node ESM scripts in `scripts/quality/`, sharing a posix-path walker
+(`walk-sources.mjs`) and one reporter (`report.mjs`, printing `file:line: [rule] snippet`).
+
+- **Token gate**: three rules — colour literal (`#…`, `rgb(`, `hsl(`, `oklch(`, …), Tailwind
+  palette utility (incl. `text-white` / `bg-black` and `/50` modifiers), arbitrary colour value.
+  The **only** exemption is `packages/ui/src/styles/theme.css` from the literal rule (it *is* the
+  palette); a palette utility inside that file still fails.
+- **Field-error gate**: the allowlist *is* the rule — `apps/*/src/lib/error-surface.logic.ts`,
+  `apps/*/src/lib/error-message.ts` and `apps/*/src/**/*.logic.ts`. Test code
+  (`*.test.ts(x)`, `apps/*/src/test/**`) is out of scope, and exclusion wins over the allowlist.
+
+### 9.4 The proof (negative fixtures)
+
+Every gate is proven to **fire**, not just to be green — a gate that cannot fail is not a gate:
+
+| Gate         | Negative fixture                                                                | Positive fixture                          |
+| ------------ | ------------------------------------------------------------------------------- | ----------------------------------------- |
+| Layers       | `fixtures/layers/negative` → exit ≠ 0 and names `no-page-to-page`, `no-feature-to-feature`, `no-lib-to-higher-layer` | `fixtures/layers/positive` → exit 0 (`no-page-to-foreign-feature` proves a page may import its *own* feature) |
+| Dead code    | (no fixture: `knip` is a tool, the gate is its exit code)                        | —                                         |
+| Tokens       | `fixtures/palette/negative` (a `bg-slate-800` + `text-white/80` + `bg-[#101010]` component, a `#101010`/`rgb(…)` stylesheet) | `fixtures/palette/positive` (token classes, `grid-cols-[2fr_1fr]`, `#main`) |
+| Field errors | `fixtures/field-errors/negative` (a component and a hook branching on `status` / `code` / `instanceof ApiError`) | `fixtures/field-errors/positive` (the allowlisted decision file, a clean component, a `*.test.tsx` asserting on error shape) |
+
+`pnpm test:quality` runs both directions plus unit tests for the walker, the reporter and each rule
+(`*.test.mjs` next to the code, `node --test`).

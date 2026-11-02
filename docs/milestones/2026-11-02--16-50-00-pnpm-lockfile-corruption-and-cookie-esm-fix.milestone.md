@@ -46,7 +46,7 @@ chosen because it stays inside `fastify@5.12.7`'s declared `light-my-request:
 
 | File | Change |
 | --- | --- |
-| [`package.json`](../../package.json) | Added `pnpm.overrides.light-my-request = "6.6.0"`. |
+| [`package.json`](../../package.json) | Added `pnpm.overrides.light-my-request = "6.6.0"`. **Update (AIS-122, 2026-11-02 19:05):** the same override now lives in [`pnpm-workspace.yaml`](../../pnpm-workspace.yaml:14), because pnpm ≥11 no longer reads the `pnpm` field of `package.json`. |
 | [`pnpm-lock.yaml`](../../pnpm-lock.yaml) | Deleted the corrupt file and regenerated a valid single-document lockfile via `pnpm install`. |
 
 Resulting graph: `light-my-request@6.6.0` → `cookie@1.1.1` (CommonJS); no `cookie@2.0.1`.

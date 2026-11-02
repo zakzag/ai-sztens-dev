@@ -84,6 +84,8 @@ export type { ListQueryDefaults } from './contract/list-query.helper.js';
 
 export { paginatedSchema } from './contract/paginated.schema.js';
 
+export { noPayloadSchema } from './contract/no-payload.schema.js';
+
 export type { ApiResult } from './contract/api-result.interface.js';
 
 export {
@@ -144,6 +146,7 @@ export {
   VALID_API_KEY,
   VALID_API_KEY_LIST,
   VALID_API_KEY_PAIR,
+  VALID_UPDATE_API_KEY_REQUEST,
 } from './contract/api-keys/api-keys.fixture.js';
 
 export {
@@ -154,7 +157,13 @@ export {
   createApiKeySchema,
 } from './contract/api-keys/api-keys.schema.js';
 
+export {
+  API_KEY_UPDATE_FORBIDDEN_FIELDS,
+  updateApiKeySchema,
+} from './contract/api-keys/api-keys.update.js';
+
 export type {
   ApiKey,
   CreateApiKeyInput,
+  UpdateApiKeyInput,
 } from './contract/api-keys/api-keys.interface.js';

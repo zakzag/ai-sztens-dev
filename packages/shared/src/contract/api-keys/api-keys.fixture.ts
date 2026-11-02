@@ -11,7 +11,7 @@
  * compile error appears here instead of in the generated spec.
  */
 
-import type { ApiKey } from './api-keys.interface.js';
+import type { ApiKey, UpdateApiKeyInput } from './api-keys.interface.js';
 
 /** A realistic single key; every `api-keys` response schema accepts it. */
 export const VALID_API_KEY: ApiKey = {
@@ -60,3 +60,17 @@ export const VALID_API_KEY_PAIR: readonly ApiKey[] = [
   FILLED_API_KEY,
   SECOND_API_KEY,
 ];
+
+/**
+ * A valid `PATCH /api/api-keys/:identifier` body (AIS-108).
+ *
+ * `updatedAt` repeats {@link VALID_API_KEY}'s version on purpose: the sample
+ * body is what a client sends *after* reading that row, and the two values
+ * belonging together is the whole point of the concurrency token. The payload
+ * only carries what changes, so `identifier` and `apiKey` are absent.
+ */
+export const VALID_UPDATE_API_KEY_REQUEST: UpdateApiKeyInput = {
+  name: 'Vapi production',
+  description: null,
+  updatedAt: VALID_API_KEY.updatedAt,
+};

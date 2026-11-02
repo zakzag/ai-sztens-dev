@@ -30,9 +30,11 @@ import {
   apiKeyListSchema,
   apiKeySchema,
   createApiKeySchema,
+  noPayloadSchema,
   paginationMetaSchema,
   responseMetaSchema,
   resolveApiErrorStatus,
+  updateApiKeySchema,
 } from '@callback/shared';
 import type { ApiEndpointContract, ApiErrorCode } from '@callback/shared';
 import { UnregisteredPayloadSchemaError } from './openapi.errors.js';
@@ -94,6 +96,13 @@ const PAYLOAD_COMPONENTS: ReadonlyMap<z.ZodTypeAny, string> = new Map<
   [apiKeySchema, 'ApiKey'],
   [apiKeyListSchema, 'ApiKeyList'],
   [createApiKeySchema, 'CreateApiKey'],
+  // `UpdateApiKey` is a **request** component (AIS-108): `envelopeOf()` never
+  // wraps it, but `payloadComponentName()` resolves the request body's `$ref`
+  // through this same table, so it has to be named here.
+  [updateApiKeySchema, 'UpdateApiKey'],
+  // `NoPayload` is the `null` of a call that has nothing to return, e.g. the
+  // `DELETE` payload — see `no-payload.schema.ts`.
+  [noPayloadSchema, 'NoPayload'],
 ]);
 
 /**

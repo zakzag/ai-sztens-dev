@@ -19,20 +19,35 @@ import {
   toPaginationMeta,
   type ApiKey,
   type ApiKeyListQuery,
+  type ApiErrorDetail,
   type CreateApiKeyInput,
+  type UpdateApiKeyInput,
 } from '@callback/shared';
 import { API_KEYS_REPOSITORY } from './api-keys.const.js';
 import { ApiKeyIdentifierConflictError } from './api-keys.errors.js';
 import type { PaginatedApiKeys } from './api-keys.interface.js';
-import { toApiKeyResponse, toNewApiKeyRow } from './api-keys.mapper.js';
+import { isPastDate } from './api-keys.logic.js';
+import {
+  toApiKeyPatch,
+  toApiKeyResponse,
+  toNewApiKeyRow,
+} from './api-keys.mapper.js';
 import type { ApiKeysRepository } from './api-keys.repository.interface.js';
 import {
   ConflictAppError,
   NotFoundAppError,
+  SemanticValidationAppError,
+  StaleWriteAppError,
 } from '../common/http/app-error.js';
 
 /** Field-level detail sent with an identifier conflict. */
 const IDENTIFIER_CONFLICT_DETAIL = 'This identifier is already taken.';
+
+/** Field-level detail sent when `expiresAt` is already behind us. */
+const EXPIRY_IN_PAST_DETAIL: ApiErrorDetail = {
+  path: 'expiresAt',
+  message: 'The expiry must not be in the past.',
+};
 
 @Injectable()
 export class ApiKeysService {
@@ -103,5 +118,117 @@ export class ApiKeysService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Applies a partial update, guarded by the client's last known version.
+   *
+   * The order of the three steps is the contract, not an implementation
+   * detail:
+   *
+   * 1. **Semantics first** — an impossible payload is a `422` regardless of
+   *    versions, so it is rejected before any write is attempted. Checking it
+   *    after the update would turn a data bug into a `409` and make the retry
+   *    advice wrong.
+   * 2. **One atomic write** — the repository's `UPDATE … WHERE updated_at =
+   *    expected` either matches or it does not; there is no read-compare-write
+   *    window (plan `D5`).
+   * 3. **Classify a miss** — `null` means “absent”, “deleted” or “stale”, and
+   *    only one extra read can tell those apart.
+   *
+   * @param identifier - the row to update (the address; never patched).
+   * @param input - body validated by `updateApiKeySchema`.
+   * @param now - reference instant for the expiry rule, injected so the rule
+   *   and its tests share one clock.
+   * @returns the updated key, as stored.
+   * @throws {SemanticValidationAppError} `422` when `expiresAt` is in the past.
+   * @throws {NotFoundAppError} `404` when no live row owns the identifier.
+   * @throws {StaleWriteAppError} `409` when the stored version differs.
+   */
+  async update(
+    identifier: string,
+    input: UpdateApiKeyInput,
+    now: Date = new Date(),
+  ): Promise<ApiKey> {
+    if (input.expiresAt !== undefined && input.expiresAt !== null) {
+      if (isPastDate(input.expiresAt, now)) {
+        throw new SemanticValidationAppError(
+          `The expiry "${input.expiresAt}" is already in the past.`,
+          [EXPIRY_IN_PAST_DETAIL],
+        );
+      }
+    }
+
+    const updated = await this.repository.updateByIdentifier(
+      identifier,
+      toApiKeyPatch(input),
+      new Date(input.updatedAt),
+    );
+
+    if (updated !== null) {
+      return toApiKeyResponse(updated);
+    }
+
+    return this.classifyMissedUpdate(identifier, input.updatedAt);
+  }
+
+  /**
+   * Answers a PATCH that matched no row.
+   *
+   * Three outcomes, one read: a row that does not exist at all and a row that
+   * was deleted both answer `404` (a deleted row is invisible everywhere else,
+   * so a `409` here would confirm its existence), and a *live* row with another
+   * version is the lost update the token exists to catch.
+   *
+   * @param identifier - the identifier that matched nothing.
+   * @param expectedUpdatedAt - the version the client sent.
+   * @returns never — always throws.
+   * @throws {NotFoundAppError} when the row is absent or soft-deleted.
+   * @throws {StaleWriteAppError} when it exists, is live, and has another
+   *   version.
+   */
+  private async classifyMissedUpdate(
+    identifier: string,
+    expectedUpdatedAt: string,
+  ): Promise<never> {
+    const row = await this.repository.findAnyByIdentifier(identifier);
+
+    if (row === null || row.deletedAt !== null) {
+      throw new NotFoundAppError(
+        `No API key with identifier "${identifier}" was found.`,
+      );
+    }
+
+    throw new StaleWriteAppError(
+      `The API key with identifier "${identifier}" was updated by someone ` +
+        `else (expected updatedAt ${expectedUpdatedAt}, stored ` +
+        `${row.updatedAt.toISOString()}).`,
+    );
+  }
+
+  /**
+   * Soft-deletes a key.
+   *
+   * A second `DELETE` of the same identifier answers `404`, not `204`: the row
+   * is already invisible to every read, so reporting success would claim an
+   * effect the call did not have (plan §6, scenario 6).
+   *
+   * @param identifier - the row to hide.
+   * @param now - deletion timestamp, injected so the caller owns the clock.
+   * @throws {NotFoundAppError} when no live row owns the identifier.
+   */
+  async remove(identifier: string, now: Date = new Date()): Promise<null> {
+    const deleted = await this.repository.softDeleteByIdentifier(
+      identifier,
+      now,
+    );
+
+    if (deleted === null) {
+      throw new NotFoundAppError(
+        `No API key with identifier "${identifier}" was found.`,
+      );
+    }
+
+    return null;
   }
 }

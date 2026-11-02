@@ -15,13 +15,19 @@
 import { API_KEYS_PATH, API_KEYS_IDENTIFIER_PARAM } from './api-keys.const.js';
 import type { ApiEndpointContract } from '../endpoint.interface.js';
 import { API_ERROR_CODE } from '../error-code.const.js';
+import { noPayloadSchema } from '../no-payload.schema.js';
 import { API_KEY_LIST_QUERY_PARAMETERS } from './api-keys.list-query.js';
-import { VALID_API_KEY, VALID_API_KEY_LIST } from './api-keys.fixture.js';
+import {
+  VALID_API_KEY,
+  VALID_API_KEY_LIST,
+  VALID_UPDATE_API_KEY_REQUEST,
+} from './api-keys.fixture.js';
 import {
   apiKeyListSchema,
   apiKeySchema,
   createApiKeySchema,
 } from './api-keys.schema.js';
+import { updateApiKeySchema } from './api-keys.update.js';
 
 /** Path of the single-resource route, in Nest's `:param` notation. */
 const IDENTIFIER_PATH = `${API_KEYS_PATH}/${API_KEYS_IDENTIFIER_PARAM}`;
@@ -88,6 +94,39 @@ export const API_KEYS_ENDPOINTS: readonly ApiEndpointContract[] = [
       API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT,
       ...COMMON_ERRORS,
     ],
+    envelope: true,
+  },
+  {
+    operationId: 'apiKeys.update',
+    method: 'PATCH',
+    path: IDENTIFIER_PATH,
+    summary: 'Update an API key (partial, guarded by the last known updatedAt)',
+    tag: 'api-keys',
+    successStatus: 200,
+    dataSchema: apiKeySchema,
+    requestSchema: updateApiKeySchema,
+    example: VALID_API_KEY,
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      API_ERROR_CODE.STALE_WRITE,
+      API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'apiKeys.remove',
+    method: 'DELETE',
+    path: IDENTIFIER_PATH,
+    summary: 'Soft-delete an API key; the row disappears from every read',
+    tag: 'api-keys',
+    successStatus: 200,
+    dataSchema: noPayloadSchema,
+    // `null` is the published sample: a `DELETE` has nothing to return, and the
+    // envelope still carries `meta.requestId`.
+    example: null,
+    errors: [API_ERROR_CODE.NOT_FOUND, ...COMMON_ERRORS],
     envelope: true,
   },
 ];

@@ -4,6 +4,7 @@ import { ApiResponseService } from '../common/http/api-response.service.js';
 import type { RequestContext } from '../common/http/request-context.interface.js';
 import { ApiKeysController } from './api-keys.controller.js';
 import { ApiKeysService } from './api-keys.service.js';
+import type { ApiKeyPatch } from './api-keys.interface.js';
 import type {
   ApiKeyPage,
   ApiKeysRepository,
@@ -13,6 +14,7 @@ import {
   buildApiKeyRow,
   buildCreateApiKeyInput,
   buildListQuery,
+  buildUpdateApiKeyInput,
 } from './test/mocks/api-keys.mock.js';
 
 /**
@@ -40,6 +42,19 @@ interface ControllerFixture {
   readonly findByIdentifier: jest.Mock<
     (identifier: string) => Promise<ApiKeyRow | null>
   >;
+  readonly updateByIdentifier: jest.Mock<
+    (
+      identifier: string,
+      patch: ApiKeyPatch,
+      expectedUpdatedAt: Date,
+    ) => Promise<ApiKeyRow | null>
+  >;
+  readonly softDeleteByIdentifier: jest.Mock<
+    (identifier: string, deletedAt: Date) => Promise<ApiKeyRow | null>
+  >;
+  readonly findAnyByIdentifier: jest.Mock<
+    (identifier: string) => Promise<ApiKeyRow | null>
+  >;
 }
 
 function createFixture(): ControllerFixture {
@@ -47,8 +62,29 @@ function createFixture(): ControllerFixture {
   const findPage = jest.fn<(query: unknown) => Promise<ApiKeyPage>>();
   const findByIdentifier =
     jest.fn<(identifier: string) => Promise<ApiKeyRow | null>>();
+  const updateByIdentifier =
+    jest.fn<
+      (
+        identifier: string,
+        patch: ApiKeyPatch,
+        expectedUpdatedAt: Date,
+      ) => Promise<ApiKeyRow | null>
+    >();
+  const softDeleteByIdentifier =
+    jest.fn<
+      (identifier: string, deletedAt: Date) => Promise<ApiKeyRow | null>
+    >();
+  const findAnyByIdentifier =
+    jest.fn<(identifier: string) => Promise<ApiKeyRow | null>>();
 
-  const repository: ApiKeysRepository = { create, findPage, findByIdentifier };
+  const repository: ApiKeysRepository = {
+    create,
+    findPage,
+    findByIdentifier,
+    updateByIdentifier,
+    softDeleteByIdentifier,
+    findAnyByIdentifier,
+  };
   const service = new ApiKeysService(repository);
 
   return {
@@ -56,6 +92,9 @@ function createFixture(): ControllerFixture {
     create,
     findPage,
     findByIdentifier,
+    updateByIdentifier,
+    softDeleteByIdentifier,
+    findAnyByIdentifier,
   };
 }
 
@@ -145,5 +184,51 @@ describe('ApiKeysController', () => {
     await expect(
       fixture.controller.findByIdentifier('vapi-prod', CTX),
     ).rejects.toBe(driverError);
+  });
+
+  it('passes the identifier and the validated body to the update and wraps the row', async () => {
+    const fixture = createFixture();
+    fixture.updateByIdentifier.mockResolvedValue(
+      buildApiKeyRow({ name: 'Vapi production' }),
+    );
+
+    const result = await fixture.controller.update(
+      'vapi-prod',
+      buildUpdateApiKeyInput(),
+      CTX,
+    );
+
+    const [identifier, patch] = fixture.updateByIdentifier.mock.calls[0] ?? [];
+    expect(identifier).toBe('vapi-prod');
+    expect(patch).toEqual({ name: 'Vapi production' });
+    expect(result.data).toEqual(
+      buildApiKeyResponse({ name: 'Vapi production' }),
+    );
+    expect(result.meta.requestId).toBe(CTX.requestId);
+  });
+
+  it('returns `data: null` for a delete and keeps `meta`', async () => {
+    const fixture = createFixture();
+    fixture.softDeleteByIdentifier.mockResolvedValue(buildApiKeyRow());
+
+    const result = await fixture.controller.remove('vapi-prod', CTX);
+
+    // The contract forbids `204`: a success with nothing to return is
+    // `200` + `data: null`, so `meta.requestId` still reaches the client.
+    expect(result).toEqual({
+      data: null,
+      meta: { requestId: CTX.requestId, timestamp: CTX.timestamp },
+    });
+  });
+
+  it('lets a delete 404 bubble up unchanged', async () => {
+    const fixture = createFixture();
+    fixture.softDeleteByIdentifier.mockResolvedValue(null);
+
+    const error = await fixture.controller
+      .remove('missing', CTX)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 });

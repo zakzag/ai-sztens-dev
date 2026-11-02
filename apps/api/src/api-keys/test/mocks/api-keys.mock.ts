@@ -2,6 +2,7 @@ import type {
   ApiKey,
   ApiKeyListQuery,
   CreateApiKeyInput,
+  UpdateApiKeyInput,
 } from '@callback/shared';
 import type { ApiKeyRow } from '../../../db/schema.js';
 
@@ -29,6 +30,9 @@ export const API_KEY_UPDATED_AT = new Date('2026-10-21T11:30:00.000Z');
 /** Fixed expiry timestamp. */
 export const API_KEY_EXPIRES_AT = new Date('2027-01-01T00:00:00.000Z');
 
+/** Fixed deletion timestamp, used by the soft-delete specs (AIS-108). */
+export const API_KEY_DELETED_AT = new Date('2026-11-02T12:00:00.000Z');
+
 /**
  * @param overrides - fields to replace on the default row.
  * @returns a complete `platform.api_keys` row.
@@ -43,6 +47,9 @@ export function buildApiKeyRow(overrides: Partial<ApiKeyRow> = {}): ApiKeyRow {
     expiresAt: API_KEY_EXPIRES_AT,
     createdAt: API_KEY_CREATED_AT,
     updatedAt: API_KEY_UPDATED_AT,
+    // A live row by default; pass `deletedAt: API_KEY_DELETED_AT` for the
+    // soft-deleted branch (AIS-108).
+    deletedAt: null,
     ...overrides,
   };
 }
@@ -94,6 +101,21 @@ export function buildListQuery(
     limit: 20,
     order: 'desc',
     sort: 'createdAt',
+    ...overrides,
+  };
+}
+
+/**
+ * @param overrides - fields to replace on the default `PATCH` body (AIS-108).
+ * @returns a valid `PATCH /api/api-keys/:identifier` body whose `updatedAt`
+ *   matches {@link buildApiKeyRow} by default.
+ */
+export function buildUpdateApiKeyInput(
+  overrides: Partial<UpdateApiKeyInput> = {},
+): UpdateApiKeyInput {
+  return {
+    name: 'Vapi production',
+    updatedAt: API_KEY_UPDATED_AT.toISOString(),
     ...overrides,
   };
 }

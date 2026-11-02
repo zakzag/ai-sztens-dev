@@ -29,6 +29,18 @@ export const API_ERROR_CODE = {
   NOT_FOUND: 'NOT_FOUND',
   /** Generic uniqueness / state conflict. */
   CONFLICT: 'CONFLICT',
+  /**
+   * Optimistic concurrency failure (AIS-108): the payload was written for a
+   * version of the resource that is no longer current, so applying it would
+   * overwrite someone else's change. The client must re-read and retry.
+   */
+  STALE_WRITE: 'STALE_WRITE',
+  /**
+   * The shape is valid, the content is not (AIS-108): e.g. an `expiresAt` in
+   * the past. `details[]` names the offending field, exactly like a shape
+   * error — but the request needs a *value* change, not a *format* change.
+   */
+  SEMANTIC_VALIDATION_FAILED: 'SEMANTIC_VALIDATION_FAILED',
   /** Request body is larger than the configured limit. */
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
   /** Rate limit exceeded. */
@@ -57,7 +69,10 @@ export const API_ERROR_CODE_STATUS: Readonly<Record<ApiErrorCode, number>> = {
   [API_ERROR_CODE.FORBIDDEN]: HTTP_STATUS.FORBIDDEN,
   [API_ERROR_CODE.NOT_FOUND]: HTTP_STATUS.NOT_FOUND,
   [API_ERROR_CODE.CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.STALE_WRITE]: HTTP_STATUS.CONFLICT,
   [API_ERROR_CODE.PAYLOAD_TOO_LARGE]: HTTP_STATUS.PAYLOAD_TOO_LARGE,
+  [API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED]:
+    HTTP_STATUS.UNPROCESSABLE_ENTITY,
   [API_ERROR_CODE.RATE_LIMITED]: HTTP_STATUS.TOO_MANY_REQUESTS,
   [API_ERROR_CODE.INTERNAL_ERROR]: HTTP_STATUS.INTERNAL_SERVER_ERROR,
   [API_ERROR_CODE.SERVICE_UNAVAILABLE]: HTTP_STATUS.SERVICE_UNAVAILABLE,

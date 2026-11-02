@@ -1,7 +1,7 @@
 # API Convention — unified request/response contract
 
 **Utolsó frissítés:** 2026-11-02
-**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107
+**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
 ---
@@ -18,6 +18,8 @@ Every request and response shape is defined **once**, in `packages/shared/src/co
 | `contract/http-status.const.ts`              | `HTTP_STATUS` (shared by server and client)                                       |
 | `contract/api-prefix.const.ts`               | `API_GLOBAL_PREFIX` (`api`) + `API_PATH_PREFIX` (`/api`)                          |
 | `contract/<resource>/<resource>.schema.ts`   | request/response Zod schemas                                                      |
+| `contract/<resource>/<resource>.update.ts`   | `PATCH` body schema of a resource (partial + required `updatedAt`)                 |
+| `contract/no-payload.schema.ts`              | `noPayloadSchema` (`z.null()`) — the payload of a “nothing to return” call         |
 | `contract/<resource>/<resource>.contract.ts` | endpoint registry entries (`operationId`, method, path, `tag`, schemas, `errors`) |
 | `contract/endpoint.registry.ts`              | `API_ENDPOINTS` + `ENVELOPE_EXEMPTIONS`                                           |
 
@@ -32,7 +34,7 @@ One `ApiEndpointContract` per operation, typed so a missing or misspelled field 
 | `operationId`    | Stable `<resource>.<action>` key (`apiKeys.list`); never changes when a route moves     |
 | `method`, `path` | Nest route, **including** `API_PATH_PREFIX` (`/api/api-keys/:identifier`)               |
 | `summary`, `tag` | OpenAPI `summary` and grouping (`api-keys`)                                             |
-| `successStatus`  | `200` read, `201` create                                                                |
+| `successStatus`  | `200` read/update/delete, `201` create                                                  |
 | `dataSchema`     | Zod schema of the **payload** (the envelope is added once by `successEnvelopeSchema()`) |
 | `requestSchema`  | Zod schema of the body; absent for bodyless endpoints                                   |
 | `errors`         | Codes from `API_ERROR_CODE` the route can actually answer with                          |
@@ -92,7 +94,9 @@ One `ApiEndpointContract` per operation, typed so a missing or misspelled field 
 | `NOT_FOUND`                   | 404                  | `NotFoundAppError`                                        |
 | `CONFLICT`                    | 409                  | `ConflictAppError` (generic)                              |
 | `API_KEY_IDENTIFIER_CONFLICT` | 409                  | `api-keys` service (domain-specific)                      |
+| `STALE_WRITE`                 | 409                  | `StaleWriteAppError` — the `PATCH` version no longer matches (AIS-108) |
 | `PAYLOAD_TOO_LARGE`           | 413                  | body-limit handling                                       |
+| `SEMANTIC_VALIDATION_FAILED`  | 422                  | `SemanticValidationAppError` — shape valid, content impossible (AIS-108) |
 | `RATE_LIMITED`                | 429                  | rate limiting                                             |
 | `INTERNAL_ERROR`              | 500                  | any unknown throwable                                     |
 | `SERVICE_UNAVAILABLE`         | 503                  | dependency down                                           |
@@ -111,6 +115,8 @@ One `ApiEndpointContract` per operation, typed so a missing or misspelled field 
 | Nested object absent           | `{}` present               | omitted key                    |
 | Success with nothing to return | `"data": null`, 200        | `204`                          |
 | Duplicate                      | `409` + `code: *_CONFLICT` | silent overwrite               |
+| Stale version (`PATCH`)        | `409` + `code: STALE_WRITE` | silent last-write-wins        |
+| Shape valid, value impossible  | `422` + `code: SEMANTIC_VALIDATION_FAILED` | `400`, `500`        |
 | Validation                     | `400` + `details[]`        | one concatenated string        |
 
 ---
@@ -179,9 +185,53 @@ the `q` field ends in a `transform`, which cannot be rendered as an OpenAPI para
 
 ---
 
+## 4.2 Mutation convention (`PATCH` / `DELETE`)
+
+Every mutable resource follows **one** convention. `api-keys` is the reference implementation (AIS-108).
+
+### 4.2.1 `PATCH /api/<resource>/:identifier` — partial, version-guarded
+
+| Rule                          | Detail                                                                                                                                  |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Addressed by identifier**   | The route parameter is the resource's own lookup key; `:identifier` is **not** patchable — renaming the address is delete + create.      |
+| **Partial body**              | Every mutable field is optional. `undefined` = “leave it”, `null` = “clear it” (only for nullable fields).                              |
+| **`updatedAt` is required**   | It is the optimistic-concurrency token — the client's last known version. A body without it is a `400`, so `{}` cannot silently no-op.  |
+| **`.strict()`**               | `id`, `identifier`, `createdAt`, `updatedAt` and any unknown field are a `400 VALIDATION_FAILED`.                                        |
+| **One atomic guard**          | `UPDATE … SET <only provided columns> WHERE identifier = $1 AND deleted_at IS NULL AND updated_at = $expected RETURNING *`. There is deliberately **no** read-compare-write in the service: that window *is* the lost update. |
+| **Server-owned `updatedAt`**  | The column is maintained by the database (`$onUpdate`). The client value is only compared, never written.                                |
+| **`422` before `409`**        | A semantically impossible payload (e.g. `expiresAt` in the past) is a `422` **before** the version guard, so the retry advice stays correct. Boundary: `expiresAt === now` is allowed; strictly earlier is rejected. |
+| **Miss classification**       | A guard that matched nothing costs one extra read (`findAnyByIdentifier`, deleted rows included): absent → `404`, deleted → `404` (a deleted row is invisible, so `409` would confirm its existence), live with another version → `409 STALE_WRITE` with `details[{ path: 'updatedAt' }]`. |
+
+```jsonc
+// PATCH /api/api-keys/vapi-prod
+{
+  "name": "Vapi production",   // change it
+  "description": null,         // clear it
+  "updatedAt": "2026-11-02T10:00:00.000Z" // the version the client last saw
+}
+```
+
+### 4.2.2 `DELETE /api/<resource>/:identifier` — soft delete
+
+| Rule                     | Detail                                                                                                                            |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Soft delete**          | The row is kept and stamped with `deleted_at`; an audit trail and a future undelete stay possible.                                 |
+| **Invisible everywhere** | Every read and write carries `deleted_at IS NULL` (list, count, lookup, update, delete). A deleted row answers `404`, never `410`.  |
+| **`200` + `data: null`** | Never `204`: a `204` has no body, so it could not carry `meta.requestId`. The payload is described by the shared `noPayloadSchema` (`z.null()`), registered as the `NoPayload` component. |
+| **Idempotency is `404`** | A second `DELETE` of the same identifier answers `404 NOT_FOUND` — the row is already invisible, so reporting success would claim an effect the call did not have. |
+
+### 4.2.3 OpenAPI
+
+`PATCH` and `DELETE` are already part of `ApiHttpMethod` and `VERB_BY_METHOD`, so a registry entry is
+enough. The two schemas the mutation needs are named components: `UpdateApiKey` (request) and
+`NoPayload` (`data` of the delete). `envelopeOf()` can only describe a payload with a component name,
+which is why `noPayloadSchema` exists at all.
+
+---
+
 ## 5. Status codes
 
-`200` read/update/delete · `201` create · `400` malformed/shape · `401` unauthenticated · `403` forbidden · `404` missing · `409` conflict · `413` payload too large · `422` semantic validation (currently normalised to `VALIDATION_FAILED` → `400`) · `429` rate limited · `500` internal · `503` dependency down.
+`200` read/update/delete · `201` create · `400` malformed/shape · `401` unauthenticated · `403` forbidden · `404` missing · `409` conflict (incl. `STALE_WRITE`) · `413` payload too large · `422` semantic validation (`SEMANTIC_VALIDATION_FAILED`) · `429` rate limited · `500` internal · `503` dependency down.
 
 ---
 
@@ -295,6 +345,7 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 6. **Query hook** in `apps/admin/src/features/<use-case>/`, page alert from the hook's error state, field errors from `issues[]`.
 7. **Tests**: pipe, service (`AppError` code + status), controller (`data` + `meta`), transport (envelope unwrap, error envelope → `ApiError.code`), hook.
 8. If the route must stay raw: `@SkipEnvelope()` **and** an entry in `ENVELOPE_EXEMPTIONS` with a reason. No silent exemptions.
+9. **If the resource is mutable** (§4.2): add `<resource>.update.ts` with a `.strict()` partial schema whose `updatedAt` is required; add `update`/`remove` registry entries (`successStatus: 200`, delete payload `noPayloadSchema`); give the repository an **atomic** version-guarded `update…` and a `softDelete…`, both filtered on `deleted_at IS NULL`; map a missed guard to `404` (absent/deleted) or `409 STALE_WRITE` (live, other version) with `details[{ path: 'updatedAt' }]`; put impossible values behind a pure `*.logic.ts` rule and answer `422 SEMANTIC_VALIDATION_FAILED` before the guard.
 
 ---
 
@@ -309,6 +360,9 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 | Same agreement over the discovered `AppModule` controllers                                                                                                    | `apps/api/test/envelope-exemptions.e2e-spec.ts`                                                             |
 | `api-keys` service/controller behaviour                                                                                                                       | `apps/api/src/api-keys/*.spec.ts`                                                                           |
 | Envelope end-to-end (incl. 409 code + `details[0].path`)                                                                                                      | `apps/api/test/api-keys.e2e-spec.ts`                                                                        |
+| Mutation convention (§4.2): `PATCH` version guard, `409 STALE_WRITE`, `422` boundary, soft delete ⇒ `404`, `data: null`                                       | `apps/api/test/api-keys.e2e-spec.ts` (`mutation convention` block)                                          |
+| Pure expiry rule (`isPastDate`, boundary = allowed), patch mapper (`undefined` vs `null`), atomic `update`/`softDelete` SQL                                  | `apps/api/src/api-keys/{api-keys.logic,api-keys.mapper,api-keys.repository}.spec.ts`                        |
+| New error codes resolve to `409` / `422`, every catalogue value has a status                                                                                  | `packages/shared/test/error-code.test.ts`                                                                   |
 | `meta.requestId` ⇄ `X-Request-Id`, inbound pass-through, invalid id replaced, unknown route, `healthz` raw                                                    | `apps/api/test/request-id.e2e-spec.ts`                                                                      |
 | `healthz` / VAPI raw bodies unchanged                                                                                                                         | `apps/api/test/{health,vapi-webhooks}.e2e-spec.ts`                                                          |
 | Client unwrap, drift, legacy fallback                                                                                                                         | `packages/api-client/test/{http-client,api-keys.service}.test.ts`                                           |
@@ -333,7 +387,9 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 
 ## 13. Known gaps / follow-ups
 
-- `422` has no dedicated code yet; a semantic-validation failure reports `VALIDATION_FAILED` / `400`.
+- `packages/api-client` has no `patch`/`delete` transport yet, so the admin UI cannot use the new endpoints until AIS-109 lands. `ETag`/`If-Match`, bulk mutations and idempotency keys are deliberately not part of the `updatedAt` convention.
+- Soft-deleted rows have no undelete endpoint and no purge job; they stay in `platform.api_keys` with a `deleted_at` stamp.
+- The admin's tier-1 field mapping (§10.1) still only accepts `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT`, so a `422` / `409 STALE_WRITE` currently surfaces as a page `Alert`. Extending the gate (`expiresAt` / `updatedAt`) belongs to the admin edit UI (AIS-109 and later).
 - API-key value masking (**show-once**) is a separate security task (AIS-75); these endpoints still return the token.
 - The `api-keys` routes are unauthenticated until AIS-73/74; the `401` code and banner behaviour are prepared but the login flow is not.
 - `/api/openapi.json` is generated from the registry (AIS-98) and served in every env; the Swagger UI at `/api/docs` is mounted only when `isOpenApiDocsEnabled()` (never in prod). The committed baseline + CI drift gate is AIS-99.

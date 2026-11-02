@@ -5,13 +5,14 @@ import type { ApiKeyRow } from '../../../db/schema.js';
 /**
  * Chainable `Database` mock for the repository spec.
  *
- * The repository builds four query shapes:
+ * The repository builds five query shapes:
  *
  * ```text
  * insert(table).values(input).returning()
  * select({ total: count() }).from(table).where(expr)          // count(*) — AIS-107
  * select().from(table).where(expr).limit(n).offset(m)         // one page
  * select().from(table).where(expr).limit(1)                   // single row
+ * update(table).set(patch).where(expr).returning()            // AIS-108
  * ```
  *
  * The last two end at a **different** terminal (`offset` vs `limit`), and the
@@ -69,6 +70,16 @@ export function wrapDrizzleQueryError(cause: unknown): Error {
 export interface DatabaseMockOptions {
   /** Rows resolved by `insert().values().returning()`. */
   readonly insertedRows?: readonly ApiKeyRow[];
+  /**
+   * Rows resolved by `update().set().where().returning()` (AIS-108).
+   *
+   * One list for both mutation paths — a `PATCH` and a soft delete are the same
+   * statement shape — and `[]` models the “nothing matched” case, which is what
+   * the service classifies as `404` or `409`.
+   */
+  readonly updatedRows?: readonly ApiKeyRow[];
+  /** Error rejected by the update chain instead of rows. */
+  readonly updateError?: Error;
   /** Error rejected by `returning()` instead of rows. */
   readonly insertError?: Error;
   /** Rows resolved by the row-selecting chains. */
@@ -124,6 +135,11 @@ export interface DatabaseMock {
   readonly returning: jest.Mock;
   readonly select: jest.Mock;
   readonly from: jest.Mock;
+  readonly update: jest.Mock;
+  readonly set: jest.Mock;
+  /** `where()` of the update chain (a terminal: it exposes `returning`). */
+  readonly updateWhere: jest.Mock;
+  readonly updateReturning: jest.Mock;
   readonly orderBy: jest.Mock;
   readonly where: jest.Mock;
   readonly limit: jest.Mock;
@@ -158,6 +174,18 @@ export function createDatabaseMock(
   const values = jest.fn(() => ({ returning }));
   const insert = jest.fn(() => ({ values }));
 
+  // The update chain (AIS-108) mirrors `insert` but keeps its own spies, so a
+  // spec can assert the patch and the `WHERE` without the insert assertions
+  // seeing the calls.
+  const updateReturning = jest.fn(() =>
+    options.updateError !== undefined
+      ? Promise.reject(options.updateError)
+      : Promise.resolve([...(options.updatedRows ?? [])]),
+  );
+  const updateWhere = jest.fn(() => ({ returning: updateReturning }));
+  const set = jest.fn(() => ({ where: updateWhere }));
+  const update = jest.fn(() => ({ set }));
+
   // `offset` is terminal for a page query, `limit` is terminal for a
   // single-row lookup — so the intermediate nodes resolve the rows *and* carry
   // the next builder step, exactly like drizzle's thenable builder.
@@ -179,9 +207,9 @@ export function createDatabaseMock(
     selectingCount ? { where: countWhere } : { where, orderBy },
   );
 
-  // The real handle is a large Drizzle object; only the two entry points the
+  // The real handle is a large Drizzle object; only the entry points the
   // repository uses are modelled, hence the explicit double assertion.
-  const db = { insert, select } as unknown as Database;
+  const db = { insert, select, update } as unknown as Database;
 
   return {
     db,
@@ -195,5 +223,9 @@ export function createDatabaseMock(
     limit,
     offset,
     countWhere,
+    update,
+    set,
+    updateWhere,
+    updateReturning,
   };
 }

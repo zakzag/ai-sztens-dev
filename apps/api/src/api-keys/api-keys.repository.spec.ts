@@ -9,6 +9,8 @@ import {
 import { toNewApiKeyRow } from './api-keys.mapper.js';
 import { DrizzleApiKeysRepository } from './api-keys.repository.js';
 import {
+  API_KEY_DELETED_AT,
+  API_KEY_UPDATED_AT,
   buildApiKeyRow,
   buildCreateApiKeyInput,
   buildListQuery,
@@ -191,13 +193,33 @@ describe('DrizzleApiKeysRepository', () => {
       );
     });
 
-    it('does not add a WHERE clause without a search term', async () => {
+    it('always excludes soft-deleted rows, even without a search term', async () => {
       const database = createDatabaseMock();
       const repository = new DrizzleApiKeysRepository(database.db);
 
       await repository.findPage(buildListQuery());
 
-      expect(firstArgument(database.where)).toBeUndefined();
+      // AIS-108: the WHERE is never absent any more — visibility is not
+      // optional, so a soft-deleted row cannot leak into the list or the total.
+      expect(readSqlColumnNames(firstArgument(database.where))).toContain(
+        'deleted_at',
+      );
+      expect(readSqlExpression(firstArgument(database.where))).toContain(
+        'is null',
+      );
+    });
+
+    it('applies visibility and the search term to the count query too', async () => {
+      const database = createDatabaseMock();
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.findPage(buildListQuery({ q: 'vapi' }));
+
+      // Same expression object for both queries: `total` can never count rows
+      // the page does not show.
+      expect(database.countWhere.mock.calls[0]?.[0]).toBe(
+        database.where.mock.calls[0]?.[0],
+      );
     });
 
     it('returns an empty page with a zero total when nothing matches', async () => {
@@ -286,6 +308,219 @@ describe('DrizzleApiKeysRepository', () => {
 
       await expect(repository.findByIdentifier('')).resolves.toBeNull();
       expect(database.select).not.toHaveBeenCalled();
+    });
+
+    it('filters on the identifier and on visibility (deleted rows are invisible)', async () => {
+      const database = createDatabaseMock();
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.findByIdentifier('vapi-prod');
+
+      const filter = firstArgument(database.where);
+      expect(readSqlColumnNames(filter)).toEqual(
+        expect.arrayContaining(['identifier', 'deleted_at']),
+      );
+    });
+  });
+
+  describe('updateByIdentifier', () => {
+    it('returns the updated row', async () => {
+      const row = buildApiKeyRow({ name: 'renamed' });
+      const database = createDatabaseMock({ updatedRows: [row] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(
+        repository.updateByIdentifier(
+          'vapi-prod',
+          { name: 'renamed' },
+          API_KEY_UPDATED_AT,
+        ),
+      ).resolves.toEqual(row);
+    });
+
+    it('writes only the provided columns', async () => {
+      const database = createDatabaseMock({ updatedRows: [buildApiKeyRow()] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      const patch = { name: 'renamed', description: null };
+      await repository.updateByIdentifier(
+        'vapi-prod',
+        patch,
+        API_KEY_UPDATED_AT,
+      );
+
+      expect(database.set).toHaveBeenCalledWith(patch);
+    });
+
+    it('never writes updatedAt, even though the token is part of the call', async () => {
+      const database = createDatabaseMock({ updatedRows: [buildApiKeyRow()] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.updateByIdentifier(
+        'vapi-prod',
+        { name: 'renamed' },
+        API_KEY_UPDATED_AT,
+      );
+
+      const [patch] = callArguments(database.set);
+      expect(patch).not.toHaveProperty('updatedAt');
+    });
+
+    it('guards the write with identifier, visibility and the expected version', async () => {
+      const database = createDatabaseMock({ updatedRows: [buildApiKeyRow()] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.updateByIdentifier(
+        'vapi-prod',
+        { name: 'renamed' },
+        API_KEY_UPDATED_AT,
+      );
+
+      const filter = firstArgument(database.updateWhere);
+      const columns = readSqlColumnNames(filter);
+      // All three conditions in one statement: there is no read-compare-write
+      // window, which is the entire reason the update is a single query.
+      expect(columns).toEqual(
+        expect.arrayContaining(['identifier', 'deleted_at', 'updated_at']),
+      );
+      expect(readSqlExpression(filter)).toContain('is null');
+    });
+
+    it('returns null when no row matched (absent, deleted or stale)', async () => {
+      const database = createDatabaseMock({ updatedRows: [] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(
+        repository.updateByIdentifier(
+          'missing',
+          { name: 'renamed' },
+          API_KEY_UPDATED_AT,
+        ),
+      ).resolves.toBeNull();
+    });
+
+    it('propagates a driver error unchanged', async () => {
+      const driverError = new PostgresErrorMock('40001');
+      const database = createDatabaseMock({ updateError: driverError });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(
+        repository.updateByIdentifier(
+          'vapi-prod',
+          { name: 'renamed' },
+          API_KEY_UPDATED_AT,
+        ),
+      ).rejects.toBe(driverError);
+    });
+  });
+
+  describe('softDeleteByIdentifier', () => {
+    it('sets deleted_at and returns the row', async () => {
+      const row = buildApiKeyRow({ deletedAt: API_KEY_DELETED_AT });
+      const database = createDatabaseMock({ updatedRows: [row] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      const result = await repository.softDeleteByIdentifier(
+        'vapi-prod',
+        API_KEY_DELETED_AT,
+      );
+
+      expect(result).toEqual(row);
+      expect(database.set).toHaveBeenCalledWith({
+        deletedAt: API_KEY_DELETED_AT,
+      });
+    });
+
+    it('matches only a live row', async () => {
+      const database = createDatabaseMock({
+        updatedRows: [buildApiKeyRow({ deletedAt: API_KEY_DELETED_AT })],
+      });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.softDeleteByIdentifier('vapi-prod', API_KEY_DELETED_AT);
+
+      const columns = readSqlColumnNames(firstArgument(database.updateWhere));
+      expect(columns).toEqual(
+        expect.arrayContaining(['identifier', 'deleted_at']),
+      );
+    });
+
+    it('returns null when the row is absent or already deleted', async () => {
+      const database = createDatabaseMock({ updatedRows: [] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(
+        repository.softDeleteByIdentifier('missing', API_KEY_DELETED_AT),
+      ).resolves.toBeNull();
+    });
+
+    it('propagates a driver error unchanged', async () => {
+      const driverError = new PostgresErrorMock('57014');
+      const database = createDatabaseMock({ updateError: driverError });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(
+        repository.softDeleteByIdentifier('vapi-prod', API_KEY_DELETED_AT),
+      ).rejects.toBe(driverError);
+    });
+  });
+
+  describe('findAnyByIdentifier', () => {
+    it('returns a deleted row too (that is the point)', async () => {
+      const row = buildApiKeyRow({ deletedAt: API_KEY_DELETED_AT });
+      const database = createDatabaseMock({ selectedRows: [row] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(
+        repository.findAnyByIdentifier('vapi-prod'),
+      ).resolves.toEqual(row);
+    });
+
+    it('does not filter on visibility', async () => {
+      const database = createDatabaseMock();
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.findAnyByIdentifier('vapi-prod');
+
+      expect(readSqlColumnNames(firstArgument(database.where))).not.toContain(
+        'deleted_at',
+      );
+    });
+
+    it('returns null when no row ever existed', async () => {
+      const database = createDatabaseMock({ selectedRows: [] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(
+        repository.findAnyByIdentifier('missing'),
+      ).resolves.toBeNull();
+    });
+
+    it('trims the search key before querying', async () => {
+      const database = createDatabaseMock({ selectedRows: [buildApiKeyRow()] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.findAnyByIdentifier('  vapi-prod  ');
+
+      expect(database.limit).toHaveBeenCalledWith(1);
+    });
+
+    it('short-circuits a blank identifier without issuing a query', async () => {
+      const database = createDatabaseMock({ selectedRows: [buildApiKeyRow()] });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(repository.findAnyByIdentifier('   ')).resolves.toBeNull();
+      expect(database.select).not.toHaveBeenCalled();
+    });
+
+    it('propagates a driver error unchanged', async () => {
+      const driverError = new PostgresErrorMock('42P01');
+      const database = createDatabaseMock({ selectError: driverError });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(repository.findAnyByIdentifier('vapi-prod')).rejects.toBe(
+        driverError,
+      );
     });
   });
 });

@@ -43,10 +43,15 @@ export function renderWithProviders(
 ): RenderWithProvidersResult {
   const client = createTestQueryClient();
 
+  // `initialEntries` is a mutable `InitialEntry[]` on the react-router side, so
+  // a `readonly string[]` has to be copied instead of passed through (AIS-122:
+  // `tsc --noEmit` failed with TS4104 here, which made `pnpm -r build` red).
+  const initialEntries = [...(options.initialEntries ?? ['/'])];
+
   const utils = render(
     <QueryClientProvider client={client}>
       <SessionProvider>
-        <MemoryRouter initialEntries={options.initialEntries ?? ['/']}>
+        <MemoryRouter initialEntries={initialEntries}>
           {ui}
         </MemoryRouter>
       </SessionProvider>

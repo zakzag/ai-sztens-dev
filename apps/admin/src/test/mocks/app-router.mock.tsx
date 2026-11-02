@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   render,
+  renderHook,
+  type RenderHookResult,
   type RenderOptions,
   type RenderResult,
 } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { AuthProvider } from '../../auth/AuthContext.js';
 import { SessionContext } from '../../app/providers/session-provider.js';
 import type { SessionState } from '../../app/session/session.interface.js';
@@ -97,5 +99,66 @@ export function createMockSession(
     isAuthenticated: true,
     logout: () => undefined,
     ...overrides,
+  };
+}
+
+/** Options of {@link renderHookWithRouter}. */
+export interface RenderHookWithRouterOptions {
+  /** The initial URL the memory router starts at. */
+  readonly initialEntries?: string[];
+}
+
+/**
+ * Result of {@link renderHookWithRouter}: the standard `renderHook` result plus
+ * a reader for the current URL, so a test can assert what `setSearchParams`
+ * actually wrote without rendering a whole component.
+ */
+export interface RenderHookWithRouterResult<Result> extends RenderHookResult<
+  Result,
+  undefined
+> {
+  /** The current `location.search` (the `?...` part), updated on navigation. */
+  readonly getSearch: () => string;
+}
+
+/**
+ * Renders a hook inside a memory router and exposes the live URL.
+ *
+ * A `useSearchParams`/`useLocation` hook needs a router ancestor; `renderHook`
+ * does not supply one. This wrapper does, and a probe records the current
+ * `location.search` so the test can prove the URL ownership behaviour (defaults
+ * omitted, page reset, `resetParams` emptying the URL).
+ *
+ * @param callback - the hook under test.
+ * @param options - see {@link RenderHookWithRouterOptions}.
+ * @returns the `renderHook` result plus {@link RenderHookWithRouterResult.getSearch}.
+ */
+export function renderHookWithRouter<Result>(
+  callback: () => Result,
+  options: RenderHookWithRouterOptions = {},
+): RenderHookWithRouterResult<Result> {
+  const { initialEntries = ['/'] } = options;
+  const locationRef: { search: string } = { search: '' };
+
+  function LocationProbe(): null {
+    const location = useLocation();
+    locationRef.search = location.search;
+    return null;
+  }
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <MemoryRouter initialEntries={initialEntries}>
+        <LocationProbe />
+        {children}
+      </MemoryRouter>
+    );
+  }
+
+  const result = renderHook(callback, { wrapper: Wrapper });
+
+  return {
+    ...result,
+    getSearch: () => locationRef.search,
   };
 }

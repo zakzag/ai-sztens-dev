@@ -23,6 +23,29 @@ import type { ApiErrorCode } from './error-code.const.js';
 export type ApiHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /**
+ * One documented **query-string** parameter (AIS-107).
+ *
+ * `schema` is a JSON-Schema fragment, not a zod schema, because the runtime
+ * validation schema of a list query ends in a `transform` and cannot be
+ * rendered as a parameter. The fragments are built from the same constants the
+ * validation uses (see `list-query.parameters.ts`), so the document and the
+ * `400` cannot disagree about a bound.
+ */
+export interface ApiQueryParameterContract {
+  /** Query parameter name, e.g. `limit`. */
+  readonly name: string;
+
+  /** One sentence shown in Swagger UI. */
+  readonly description: string;
+
+  /** `true` only for a parameter the request cannot omit. */
+  readonly required: boolean;
+
+  /** JSON-Schema fragment (`type`, `enum`, bounds, `default`). */
+  readonly schema: Readonly<Record<string, unknown>>;
+}
+
+/**
  * One documented endpoint.
  *
  * `operationId` is stable and namespaced (`apiKeys.list`) so generated clients
@@ -54,6 +77,29 @@ export interface ApiEndpointContract {
   readonly example?: unknown;
   /** Schema of the request body; absent for bodyless endpoints. */
   readonly requestSchema?: z.ZodTypeAny;
+
+  /**
+   * Query-string parameters the endpoint accepts, in publication order.
+   *
+   * Absent for endpoints that take none. Documented from
+   * {@link ApiQueryParameterContract} descriptors — never generated from the
+   * validation schema, see that type's docblock.
+   */
+  readonly queryParameters?: readonly ApiQueryParameterContract[];
+
+  /**
+   * `meta.pagination` of the published example.
+   *
+   * Only meaningful together with `envelope: true` on a paginated list: without
+   * it the sample body would show a paged endpoint as if it had no paging
+   * block.
+   */
+  readonly examplePagination?: {
+    readonly page: number;
+    readonly limit: number;
+    readonly total: number;
+    readonly totalPages: number;
+  };
   /**
    * Error codes the endpoint can answer with, taken **from the catalogue**
    * (`API_ERROR_CODE`) rather than from free text, so the generated spec and

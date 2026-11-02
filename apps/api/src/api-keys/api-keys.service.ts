@@ -16,11 +16,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   API_ERROR_CODE,
+  toPaginationMeta,
   type ApiKey,
+  type ApiKeyListQuery,
   type CreateApiKeyInput,
 } from '@callback/shared';
 import { API_KEYS_REPOSITORY } from './api-keys.const.js';
 import { ApiKeyIdentifierConflictError } from './api-keys.errors.js';
+import type { PaginatedApiKeys } from './api-keys.interface.js';
 import { toApiKeyResponse, toNewApiKeyRow } from './api-keys.mapper.js';
 import type { ApiKeysRepository } from './api-keys.repository.interface.js';
 import {
@@ -39,13 +42,23 @@ export class ApiKeysService {
   ) {}
 
   /**
-   * Lists every stored key, newest first.
+   * Lists one page of stored keys.
    *
-   * @returns the full list, mapped to the wire contract (empty array allowed).
+   * The paging arithmetic is **not** the controller's job and not the SQL's
+   * either: the repository returns the page plus the total, and
+   * {@link toPaginationMeta} — a pure shared function, so the client's pager
+   * computes the same numbers — turns that into `meta.pagination`.
+   *
+   * @param query - the validated list query (`ZodQueryPipe` output).
+   * @returns the mapped rows of the page and the paging block.
    */
-  async list(): Promise<ApiKey[]> {
-    const rows = await this.repository.findAll();
-    return rows.map(toApiKeyResponse);
+  async list(query: ApiKeyListQuery): Promise<PaginatedApiKeys> {
+    const page = await this.repository.findPage(query);
+
+    return {
+      items: page.rows.map(toApiKeyResponse),
+      pagination: toPaginationMeta(query, page.total),
+    };
   }
 
   /**

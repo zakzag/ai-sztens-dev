@@ -70,4 +70,14 @@ describe('createListQuerySchema', () => {
 
     expect(() => schema.parse({ page: '0' })).toThrow();
   });
+
+  it('keeps `sort` as the allow-list union instead of widening it to string', () => {
+    const schema = createListQuerySchema(SORTABLE);
+
+    // The assignment is the assertion: if the factory returned
+    // `ListQuery & { sort: string }`, this line would not compile (AIS-107 D5).
+    const sort: 'name' | 'createdAt' = schema.parse({ sort: 'createdAt' }).sort;
+
+    expect(sort).toBe('createdAt');
+  });
 });

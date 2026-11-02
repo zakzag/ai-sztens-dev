@@ -1,7 +1,7 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-10-30
-**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106
+**Utolsó frissítés:** 2026-11-02
+**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
 ---
@@ -133,18 +133,25 @@ for the resource-specific `sort` allow-list), so the browser and the server cann
 different sets of numbers.
 
 ```ts
-// server: the same schema validates the query string
+// server: the resource schema validates (and defaults) the query string
 @Get()
 async list(
-  @Query(new ZodQueryPipe(listQuerySchema)) query: ListQuery,
+  @Query(new ZodQueryPipe(apiKeyListQuerySchema)) query: ApiKeyListQuery,
   @ReqCtx() ctx: RequestContext,
 ): Promise<ApiEnvelope<readonly ApiKey[]>> {
-  // ...
+  const { items, pagination } = await this.apiKeys.list(query);
+  return this.responses.ok(items, ctx, pagination);
 }
 
 // client: the same shape, with the defaults left out of the URL
 const params = toListQueryParams(query); // → '?page=3&limit=50' — never '?page=1'
 ```
+
+**Per-resource sort allow-list (as of today).**
+
+| Resource   | `sort` values                                               | Default     | `q` matches                      |
+| ---------- | ----------------------------------------------------------- | ----------- | -------------------------------- |
+| `api-keys` | `name`, `identifier`, `createdAt`, `updatedAt`, `expiresAt` | `createdAt` | `name` **or** `identifier` (ILIKE) |
 
 **The response.** The wire format does **not** change: `data` stays an array and `meta.pagination`
 carries the paging block (see §2). What the client gets is a **type**: `ApiResult<TRows>` pairs
@@ -153,9 +160,22 @@ digging through the envelope and without a type assertion. A paginated response 
 `meta.pagination` is a contract violation — the parse fails rather than silently treating it as a
 single page.
 
-**No server-side paging yet.** `findAll` is deliberately unpaginated (the tables hold provider
-credentials, a handful of rows); the paginated endpoint is a separate change that turns
-`findAll` into `findPage`.
+**Server-side paging is real.** `GET /api/api-keys` is the reference implementation (AIS-107):
+
+- the repository exposes `findPage(query)` → `{ rows, total }` (a `count(*)` over the **same**
+  filter plus a `limit`/`offset` slice), so `findAll` no longer exists;
+- every `orderBy` ends with `asc(id)` as a tie-breaker, so a page boundary never skips or repeats
+  a row when two rows share the sort value;
+- `meta.pagination` is computed by the pure `toPaginationMeta(query, total)` helper — the same
+  function the client pager uses, so the two cannot disagree;
+- an empty result is `200` + `data: []` + `total: 0` / `totalPages: 0`, never a `404`;
+- an unknown `sort`, `limit=0`, `limit=101` or a fractional `page` is a `400`
+  `VALIDATION_FAILED` with the offending field in `details[].path`.
+
+The generated OpenAPI document lists the five query parameters of a list endpoint. They are
+**descriptors derived from the same constants** the validation schema uses
+(`list-query.parameters.ts`, `api-keys.list-query.ts`) rather than generated from the zod schema:
+the `q` field ends in a `transform`, which cannot be rendered as an OpenAPI parameter.
 
 ---
 

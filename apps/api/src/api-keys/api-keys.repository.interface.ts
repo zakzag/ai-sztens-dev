@@ -12,7 +12,22 @@
  *   every other failure is propagated unchanged so the original stack survives.
  */
 
+import type { ApiKeyListQuery } from '@callback/shared';
 import type { ApiKeyRow, NewApiKeyRow } from '../db/schema.js';
+
+/**
+ * One page of stored keys plus the size of the whole result set.
+ *
+ * `total` is counted with a second query over the **same** filter, so the
+ * client's pager can compute `totalPages` without walking the table itself.
+ */
+export interface ApiKeyPage {
+  /** The rows of the requested page (empty when the page is past the end). */
+  readonly rows: readonly ApiKeyRow[];
+
+  /** Matching rows across all pages. */
+  readonly total: number;
+}
 
 export interface ApiKeysRepository {
   /**
@@ -26,12 +41,21 @@ export interface ApiKeysRepository {
   create(input: NewApiKeyRow): Promise<ApiKeyRow>;
 
   /**
-   * Returns every row, newest first (`created_at DESC`).
+   * Returns one page of rows plus the total count (AIS-107).
    *
-   * No pagination by design (plan D7): the table holds provider credentials, a
-   * handful of rows, and a stable order keeps the e2e assertions deterministic.
+   * The order is **always** deterministic: the requested column first, then
+   * `id` as the tie-breaker. Without the tie-breaker two rows sharing a
+   * timestamp could swap places between two requests and a page boundary would
+   * silently skip or repeat a row.
+   *
+   * `query.q` is a case-insensitive substring filter over `name` and
+   * `identifier` — it is **applied**, not ignored: the contract accepts the
+   * field, so a silently unfiltered list would be a lie the client cannot see.
+   *
+   * @param query - the validated list query (paging, sort, filter).
+   * @returns the page and the total number of matching rows.
    */
-  findAll(): Promise<ApiKeyRow[]>;
+  findPage(query: ApiKeyListQuery): Promise<ApiKeyPage>;
 
   /**
    * Looks a row up by its unique `identifier`.

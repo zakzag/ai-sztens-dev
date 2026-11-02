@@ -2,6 +2,7 @@ import {
   LIST_QUERY_DEFAULTS,
   mergeListQuery,
   toListQueryParams,
+  toPaginationMeta,
 } from '../src/contract/list-query.helper.js';
 
 /**
@@ -162,5 +163,48 @@ describe('toListQueryParams', () => {
     expect(params.toString()).toBe(
       'page=2&limit=50&order=asc&q=acme&sort=name',
     );
+  });
+});
+
+describe('toPaginationMeta', () => {
+  it('computes totalPages from the page size and the total', () => {
+    expect(toPaginationMeta({ page: 1, limit: 10 }, 12)).toEqual({
+      page: 1,
+      limit: 10,
+      total: 12,
+      totalPages: 2,
+    });
+  });
+
+  it('reports zero pages when nothing matches', () => {
+    expect(toPaginationMeta({ page: 1, limit: 20 }, 0)).toEqual({
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 0,
+    });
+  });
+
+  it('does not invent a page for an exact division', () => {
+    expect(toPaginationMeta({ page: 3, limit: 25 }, 75).totalPages).toBe(3);
+  });
+
+  it('echoes the requested page instead of clamping it to the last one', () => {
+    // A page past the end is an empty slice of a real result set, not a 404 and
+    // not a silent jump back to the last page.
+    expect(toPaginationMeta({ page: 99, limit: 20 }, 42)).toEqual({
+      page: 99,
+      limit: 20,
+      total: 42,
+      totalPages: 3,
+    });
+  });
+
+  it('treats a negative total as an empty result (defensive)', () => {
+    expect(toPaginationMeta({ page: 1, limit: 20 }, -1).totalPages).toBe(0);
+  });
+
+  it('keeps a single full page at one page', () => {
+    expect(toPaginationMeta({ page: 1, limit: 20 }, 20).totalPages).toBe(1);
   });
 });

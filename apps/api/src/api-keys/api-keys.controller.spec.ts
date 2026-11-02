@@ -4,11 +4,15 @@ import { ApiResponseService } from '../common/http/api-response.service.js';
 import type { RequestContext } from '../common/http/request-context.interface.js';
 import { ApiKeysController } from './api-keys.controller.js';
 import { ApiKeysService } from './api-keys.service.js';
-import type { ApiKeysRepository } from './api-keys.repository.interface.js';
+import type {
+  ApiKeyPage,
+  ApiKeysRepository,
+} from './api-keys.repository.interface.js';
 import {
   buildApiKeyResponse,
   buildApiKeyRow,
   buildCreateApiKeyInput,
+  buildListQuery,
 } from './test/mocks/api-keys.mock.js';
 
 /**
@@ -32,7 +36,7 @@ const CTX: RequestContext = {
 interface ControllerFixture {
   readonly controller: ApiKeysController;
   readonly create: jest.Mock<(input: NewApiKeyRow) => Promise<ApiKeyRow>>;
-  readonly findAll: jest.Mock<() => Promise<ApiKeyRow[]>>;
+  readonly findPage: jest.Mock<(query: unknown) => Promise<ApiKeyPage>>;
   readonly findByIdentifier: jest.Mock<
     (identifier: string) => Promise<ApiKeyRow | null>
   >;
@@ -40,45 +44,68 @@ interface ControllerFixture {
 
 function createFixture(): ControllerFixture {
   const create = jest.fn<(input: NewApiKeyRow) => Promise<ApiKeyRow>>();
-  const findAll = jest.fn<() => Promise<ApiKeyRow[]>>();
+  const findPage = jest.fn<(query: unknown) => Promise<ApiKeyPage>>();
   const findByIdentifier =
     jest.fn<(identifier: string) => Promise<ApiKeyRow | null>>();
 
-  const repository: ApiKeysRepository = { create, findAll, findByIdentifier };
+  const repository: ApiKeysRepository = { create, findPage, findByIdentifier };
   const service = new ApiKeysService(repository);
 
   return {
     controller: new ApiKeysController(service, new ApiResponseService()),
     create,
-    findAll,
+    findPage,
     findByIdentifier,
   };
 }
 
 describe('ApiKeysController', () => {
-  it('wraps the list in `data` and echoes the request context in `meta`', async () => {
+  it('wraps the page in `data` and the paging block in `meta.pagination`', async () => {
     const fixture = createFixture();
-    fixture.findAll.mockResolvedValue([
-      buildApiKeyRow({ identifier: 'one' }),
-      buildApiKeyRow({ identifier: 'two' }),
-    ]);
+    fixture.findPage.mockResolvedValue({
+      rows: [
+        buildApiKeyRow({ identifier: 'one' }),
+        buildApiKeyRow({ identifier: 'two' }),
+      ],
+      total: 12,
+    });
 
-    const result = await fixture.controller.list(CTX);
+    const result = await fixture.controller.list(
+      buildListQuery({ page: 2, limit: 10 }),
+      CTX,
+    );
 
     expect(result.data?.map((item) => item.identifier)).toEqual(['one', 'two']);
     expect(result.meta).toEqual({
       requestId: CTX.requestId,
       timestamp: CTX.timestamp,
+      pagination: { page: 2, limit: 10, total: 12, totalPages: 2 },
     });
   });
 
-  it('returns an empty list as `data: []`, never null', async () => {
+  it('passes the validated query through to the service', async () => {
     const fixture = createFixture();
-    fixture.findAll.mockResolvedValue([]);
+    fixture.findPage.mockResolvedValue({ rows: [], total: 0 });
+    const query = buildListQuery({ sort: 'name', order: 'asc', q: 'vapi' });
 
-    const result = await fixture.controller.list(CTX);
+    await fixture.controller.list(query, CTX);
+
+    expect(fixture.findPage).toHaveBeenCalledWith(query);
+  });
+
+  it('returns an empty page as `data: []`, never null', async () => {
+    const fixture = createFixture();
+    fixture.findPage.mockResolvedValue({ rows: [], total: 0 });
+
+    const result = await fixture.controller.list(buildListQuery(), CTX);
 
     expect(result.data).toEqual([]);
+    expect(result.meta.pagination).toEqual({
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 0,
+    });
   });
 
   it('passes the path parameter through to the lookup and wraps the result', async () => {

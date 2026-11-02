@@ -11,6 +11,7 @@ import { DrizzleApiKeysRepository } from './api-keys.repository.js';
 import {
   buildApiKeyRow,
   buildCreateApiKeyInput,
+  buildListQuery,
 } from './test/mocks/api-keys.mock.js';
 import {
   createDatabaseMock,
@@ -40,6 +41,17 @@ function firstArgument(spy: {
     throw new Error('expected the spy to be called at least once');
   }
   return call[0];
+}
+
+/** @returns every argument of the first call of a spy. */
+function callArguments(spy: {
+  readonly mock: { readonly calls: readonly unknown[][] };
+}): readonly unknown[] {
+  const [call] = spy.mock.calls;
+  if (call === undefined) {
+    throw new Error('expected the spy to be called at least once');
+  }
+  return call;
 }
 
 describe('DrizzleApiKeysRepository', () => {
@@ -118,41 +130,115 @@ describe('DrizzleApiKeysRepository', () => {
     });
   });
 
-  describe('findAll', () => {
-    it('returns the selected rows and orders by created_at DESC', async () => {
+  describe('findPage', () => {
+    it('returns the page and the total from the count query', async () => {
       const rows = [
         buildApiKeyRow({ identifier: 'newer' }),
         buildApiKeyRow({ identifier: 'older' }),
       ];
-      const database = createDatabaseMock({ selectedRows: rows });
+      const database = createDatabaseMock({ selectedRows: rows, total: 42 });
       const repository = new DrizzleApiKeysRepository(database.db);
 
-      const result = await repository.findAll();
+      const result = await repository.findPage(
+        buildListQuery({ page: 3, limit: 10 }),
+      );
 
-      expect(result).toEqual(rows);
-      expect(database.select).toHaveBeenCalledTimes(1);
-      expect(database.from).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ rows, total: 42 });
+      // One select for the count, one for the page itself.
+      expect(database.select).toHaveBeenCalledTimes(2);
+      expect(database.from).toHaveBeenCalledTimes(2);
+      expect(database.limit).toHaveBeenCalledWith(10);
+      expect(database.offset).toHaveBeenCalledWith(20);
+    });
 
-      const orderByExpression = firstArgument(database.orderBy);
+    it('orders by the requested column with the id tie-breaker', async () => {
+      const database = createDatabaseMock();
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.findPage(buildListQuery({ sort: 'name', order: 'asc' }));
+
+      const [sortExpression, tieBreaker] = callArguments(database.orderBy);
       // The direction is SQL text, the column is a `Column` object (see the
       // helper's docblock), so both are asserted separately.
-      expect(readSqlExpression(orderByExpression)).toContain('desc');
-      expect(readSqlColumnNames(orderByExpression)).toContain('created_at');
+      expect(readSqlExpression(sortExpression)).toContain('asc');
+      expect(readSqlColumnNames(sortExpression)).toContain('name');
+      // Without the tie-breaker two rows sharing a timestamp could swap places
+      // between requests, and a page boundary would skip a row (plan D6).
+      expect(readSqlColumnNames(tieBreaker)).toEqual(['id']);
     });
 
-    it('returns an empty array when the table is empty', async () => {
-      const database = createDatabaseMock({ selectedRows: [] });
+    it('sorts by created_at descending by default', async () => {
+      const database = createDatabaseMock();
       const repository = new DrizzleApiKeysRepository(database.db);
 
-      await expect(repository.findAll()).resolves.toEqual([]);
+      await repository.findPage(buildListQuery());
+
+      const [sortExpression] = callArguments(database.orderBy);
+      expect(readSqlExpression(sortExpression)).toContain('desc');
+      expect(readSqlColumnNames(sortExpression)).toContain('created_at');
     });
 
-    it('propagates a select error unchanged', async () => {
+    it('filters on name and identifier when a search term is given', async () => {
+      const database = createDatabaseMock();
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.findPage(buildListQuery({ q: 'vapi' }));
+
+      const [filter] = callArguments(database.where);
+      expect(readSqlExpression(filter)).toContain('ilike');
+      expect(readSqlColumnNames(filter)).toEqual(
+        expect.arrayContaining(['name', 'identifier']),
+      );
+    });
+
+    it('does not add a WHERE clause without a search term', async () => {
+      const database = createDatabaseMock();
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await repository.findPage(buildListQuery());
+
+      expect(firstArgument(database.where)).toBeUndefined();
+    });
+
+    it('returns an empty page with a zero total when nothing matches', async () => {
+      const database = createDatabaseMock({ selectedRows: [], total: 0 });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(repository.findPage(buildListQuery())).resolves.toEqual({
+        rows: [],
+        total: 0,
+      });
+    });
+
+    it('reports a zero total when the driver returns no count row', async () => {
+      const database = createDatabaseMock();
+      database.countWhere.mockResolvedValueOnce([]);
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(repository.findPage(buildListQuery())).resolves.toEqual({
+        rows: [],
+        total: 0,
+      });
+    });
+
+    it('propagates a page-query error unchanged', async () => {
       const driverError = new PostgresErrorMock('42P01');
       const database = createDatabaseMock({ selectError: driverError });
       const repository = new DrizzleApiKeysRepository(database.db);
 
-      await expect(repository.findAll()).rejects.toBe(driverError);
+      await expect(repository.findPage(buildListQuery())).rejects.toBe(
+        driverError,
+      );
+    });
+
+    it('propagates a count-query error unchanged', async () => {
+      const driverError = new PostgresErrorMock('57014');
+      const database = createDatabaseMock({ countError: driverError });
+      const repository = new DrizzleApiKeysRepository(database.db);
+
+      await expect(repository.findPage(buildListQuery())).rejects.toBe(
+        driverError,
+      );
     });
   });
 

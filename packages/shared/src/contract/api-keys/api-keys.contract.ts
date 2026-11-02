@@ -15,6 +15,7 @@
 import { API_KEYS_PATH, API_KEYS_IDENTIFIER_PARAM } from './api-keys.const.js';
 import type { ApiEndpointContract } from '../endpoint.interface.js';
 import { API_ERROR_CODE } from '../error-code.const.js';
+import { API_KEY_LIST_QUERY_PARAMETERS } from './api-keys.list-query.js';
 import { VALID_API_KEY, VALID_API_KEY_LIST } from './api-keys.fixture.js';
 import {
   apiKeyListSchema,
@@ -31,18 +32,33 @@ const COMMON_ERRORS = [
   API_ERROR_CODE.SERVICE_UNAVAILABLE,
 ] as const;
 
+/**
+ * Sample `meta.pagination` of the list endpoint.
+ *
+ * One key, one page: the smallest honest example. A bigger number would make
+ * the published body look as if the table always holds more than it does.
+ */
+const LIST_EXAMPLE_PAGINATION = {
+  page: 1,
+  limit: 20,
+  total: 1,
+  totalPages: 1,
+} as const;
+
 /** All documented endpoints of the `api-keys` feature. */
 export const API_KEYS_ENDPOINTS: readonly ApiEndpointContract[] = [
   {
     operationId: 'apiKeys.list',
     method: 'GET',
     path: API_KEYS_PATH,
-    summary: 'List every stored API key, newest first',
+    summary: 'List stored API keys, paginated and sorted, newest first by default',
     tag: 'api-keys',
     successStatus: 200,
     dataSchema: apiKeyListSchema,
     example: VALID_API_KEY_LIST,
-    errors: [...COMMON_ERRORS],
+    queryParameters: API_KEY_LIST_QUERY_PARAMETERS,
+    examplePagination: LIST_EXAMPLE_PAGINATION,
+    errors: [API_ERROR_CODE.VALIDATION_FAILED, ...COMMON_ERRORS],
     envelope: true,
   },
   {

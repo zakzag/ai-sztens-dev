@@ -7,13 +7,17 @@ import {
 } from '../common/http/app-error.js';
 import { ApiKeyIdentifierConflictError } from './api-keys.errors.js';
 import { ApiKeysService } from './api-keys.service.js';
-import type { ApiKeysRepository } from './api-keys.repository.interface.js';
+import type {
+  ApiKeyPage,
+  ApiKeysRepository,
+} from './api-keys.repository.interface.js';
 import {
   API_KEY_CREATED_AT,
   API_KEY_EXPIRES_AT,
   buildApiKeyResponse,
   buildApiKeyRow,
   buildCreateApiKeyInput,
+  buildListQuery,
 } from './test/mocks/api-keys.mock.js';
 
 /**
@@ -29,7 +33,7 @@ import {
 interface RepositoryMock {
   readonly repository: ApiKeysRepository;
   readonly create: jest.Mock<(input: NewApiKeyRow) => Promise<ApiKeyRow>>;
-  readonly findAll: jest.Mock<() => Promise<ApiKeyRow[]>>;
+  readonly findPage: jest.Mock<(query: unknown) => Promise<ApiKeyPage>>;
   readonly findByIdentifier: jest.Mock<
     (identifier: string) => Promise<ApiKeyRow | null>
   >;
@@ -37,14 +41,14 @@ interface RepositoryMock {
 
 function createRepositoryMock(): RepositoryMock {
   const create = jest.fn<(input: NewApiKeyRow) => Promise<ApiKeyRow>>();
-  const findAll = jest.fn<() => Promise<ApiKeyRow[]>>();
+  const findPage = jest.fn<(query: unknown) => Promise<ApiKeyPage>>();
   const findByIdentifier =
     jest.fn<(identifier: string) => Promise<ApiKeyRow | null>>();
 
   return {
-    repository: { create, findAll, findByIdentifier },
+    repository: { create, findPage, findByIdentifier },
     create,
-    findAll,
+    findPage,
     findByIdentifier,
   };
 }
@@ -131,25 +135,51 @@ describe('ApiKeysService', () => {
   });
 
   describe('list', () => {
-    it('maps every row and preserves the repository order', async () => {
+    it('forwards the query and maps the rows of the page', async () => {
       const mocks = createRepositoryMock();
-      mocks.findAll.mockResolvedValue([
-        buildApiKeyRow({ identifier: 'newer' }),
-        buildApiKeyRow({ identifier: 'older' }),
-      ]);
+      mocks.findPage.mockResolvedValue({
+        rows: [
+          buildApiKeyRow({ identifier: 'newer' }),
+          buildApiKeyRow({ identifier: 'older' }),
+        ],
+        total: 2,
+      });
       const service = new ApiKeysService(mocks.repository);
 
-      const result = await service.list();
+      const query = buildListQuery({ page: 1, limit: 20, sort: 'name' });
+      const result = await service.list(query);
 
-      expect(result.map((item) => item.identifier)).toEqual(['newer', 'older']);
+      expect(mocks.findPage).toHaveBeenCalledWith(query);
+      expect(result.items.map((item) => item.identifier)).toEqual([
+        'newer',
+        'older',
+      ]);
     });
 
-    it('returns an empty array when there are no rows', async () => {
+    it('turns the total into `meta.pagination` for the current page', async () => {
       const mocks = createRepositoryMock();
-      mocks.findAll.mockResolvedValue([]);
+      mocks.findPage.mockResolvedValue({ rows: [], total: 42 });
       const service = new ApiKeysService(mocks.repository);
 
-      await expect(service.list()).resolves.toEqual([]);
+      const result = await service.list(buildListQuery({ page: 3, limit: 10 }));
+
+      expect(result.pagination).toEqual({
+        page: 3,
+        limit: 10,
+        total: 42,
+        totalPages: 5,
+      });
+    });
+
+    it('answers an empty page as `items: []` with a zero total', async () => {
+      const mocks = createRepositoryMock();
+      mocks.findPage.mockResolvedValue({ rows: [], total: 0 });
+      const service = new ApiKeysService(mocks.repository);
+
+      await expect(service.list(buildListQuery())).resolves.toEqual({
+        items: [],
+        pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+      });
     });
   });
 

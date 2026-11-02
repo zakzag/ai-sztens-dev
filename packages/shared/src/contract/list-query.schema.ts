@@ -29,8 +29,22 @@ export const LIST_QUERY_MAX_LIMIT = 100;
 /** Largest length of the free-text search term. */
 export const LIST_QUERY_MAX_SEARCH_LENGTH = 200;
 
+/** The sort-direction values a list request may carry. */
+export const LIST_QUERY_ORDER_VALUES = ['asc', 'desc'] as const;
+
 /** The sort direction of a list request. */
-export const listQueryOrderSchema = z.enum(['asc', 'desc']).default('desc');
+export type ListQueryOrder = (typeof LIST_QUERY_ORDER_VALUES)[number];
+
+/** The sort direction used when the request does not specify one. */
+export const LIST_QUERY_DEFAULT_ORDER: ListQueryOrder = 'desc';
+
+/** The sort direction of a list request. */
+export const listQueryOrderSchema = z
+  .enum(LIST_QUERY_ORDER_VALUES)
+  .default(LIST_QUERY_DEFAULT_ORDER);
+
+/** The first page number. */
+export const LIST_QUERY_DEFAULT_PAGE = 1;
 
 /**
  * The `page` field — 1-based, coerced from the query string.
@@ -38,7 +52,11 @@ export const listQueryOrderSchema = z.enum(['asc', 'desc']).default('desc');
  * The default is filled in **by the schema**, so the server does not have to
  * default it separately and the client and the server cannot disagree.
  */
-export const listQueryPageSchema = z.coerce.number().int().min(1).default(1);
+export const listQueryPageSchema = z.coerce
+  .number()
+  .int()
+  .min(LIST_QUERY_DEFAULT_PAGE)
+  .default(LIST_QUERY_DEFAULT_PAGE);
 
 /**
  * The `limit` field — between 1 and {@link LIST_QUERY_MAX_LIMIT}, coerced from
@@ -93,15 +111,30 @@ export type ListQuery = z.infer<typeof listQuerySchema>;
  * with the allowed set in the message, instead of a server-side `500` when the
  * value reaches the database.
  *
+ * The type parameter keeps `sort` as the resource's **literal union**
+ * (`'name' | 'createdAt' | …`) instead of widening it to `string`. Without it
+ * every consumer would have to narrow the parsed value again — or, worse, cast
+ * it (AIS-107, plan `D5`).
+ *
  * @param sortBy - the sortable columns of the resource; must not be empty.
  * @param defaultSort - the column used when the request does not specify one.
  * @returns the schema of the resource's list query.
  */
-export function createListQuerySchema(
-  sortBy: readonly [string, ...string[]],
-  defaultSort: string = sortBy[0],
-): z.ZodType<ListQuery & { readonly sort: string }, z.ZodTypeDef, unknown> {
-  return listQuerySchema.extend({
+export function createListQuerySchema<TSort extends string>(
+  sortBy: readonly [TSort, ...TSort[]],
+  defaultSort: TSort = sortBy[0],
+): z.ZodType<ListQuery & { readonly sort: TSort }, z.ZodTypeDef, unknown> {
+  const schema = listQuerySchema.extend({
     sort: z.enum(sortBy).default(defaultSort),
   });
+
+  // Zod infers `sort` as `TSort | undefined` here: it cannot prove that a
+  // `.default()` over a *generic* enum always yields a value, so the inferred
+  // output marks it optional. The cast restates what the runtime already
+  // guarantees (a default is filled in, `list-query-factory.test.ts` proves it).
+  return schema as z.ZodType<
+    ListQuery & { readonly sort: TSort },
+    z.ZodTypeDef,
+    unknown
+  >;
 }

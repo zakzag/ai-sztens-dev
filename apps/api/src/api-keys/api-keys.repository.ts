@@ -10,17 +10,23 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import type { ApiKeyListQuery } from '@callback/shared';
+import { asc, count, desc, eq } from 'drizzle-orm';
 import { DATABASE } from '../db/database.const.js';
 import type { Database } from '../db/database.interface.js';
 import { apiKeys } from '../db/schema.js';
 import type { ApiKeyRow, NewApiKeyRow } from '../db/schema.js';
+import { API_KEY_SORT_COLUMNS } from './api-keys.const.js';
 import { isIdentifierConflict } from './api-keys.error-guard.js';
+import { apiKeySearchFilter } from './api-keys.filter.js';
 import {
   ApiKeyIdentifierConflictError,
   ApiKeyRowMissingError,
 } from './api-keys.errors.js';
-import type { ApiKeysRepository } from './api-keys.repository.interface.js';
+import type {
+  ApiKeyPage,
+  ApiKeysRepository,
+} from './api-keys.repository.interface.js';
 
 /**
  * Postgres-backed storage for `platform.api_keys`.
@@ -56,12 +62,33 @@ export class DrizzleApiKeysRepository implements ApiKeysRepository {
     return row;
   }
 
-  /** {@inheritDoc ApiKeysRepository.findAll} */
-  findAll(): Promise<ApiKeyRow[]> {
-    return this.db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt));
+  /** {@inheritDoc ApiKeysRepository.findPage} */
+  async findPage(query: ApiKeyListQuery): Promise<ApiKeyPage> {
+    const where = apiKeySearchFilter(query.q);
+    const direction = query.order === 'asc' ? asc : desc;
+
+    // Two round trips, deliberately: `count(*)` cannot be derived from the page
+    // itself (`rows.length` is the page size, not the result size), and the
+    // client's pager needs `total` before it can render page numbers.
+    const [counted, rows] = await Promise.all([
+      this.db.select({ total: count() }).from(apiKeys).where(where),
+      this.db
+        .select()
+        .from(apiKeys)
+        .where(where)
+        .orderBy(direction(API_KEY_SORT_COLUMNS[query.sort]), asc(apiKeys.id))
+        .limit(query.limit)
+        .offset((query.page - 1) * query.limit),
+    ]);
+
+    // The driver may report `count(*)` as a string on bigint columns, so the
+    // value is normalised here instead of leaking an `unknown` type upwards.
+    return { rows, total: Number(counted[0]?.total ?? 0) };
   }
 
-  /** {@inheritDoc ApiKeysRepository.findByIdentifier} */
+  /**
+   * {@inheritDoc ApiKeysRepository.findByIdentifier}
+   */
   async findByIdentifier(identifier: string): Promise<ApiKeyRow | null> {
     const search = identifier.trim();
 

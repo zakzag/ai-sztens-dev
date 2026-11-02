@@ -13,6 +13,7 @@
  * test and on the server.
  */
 
+import type { PaginationMeta } from './envelope.interface.js';
 import {
   LIST_QUERY_DEFAULT_LIMIT,
   LIST_QUERY_MAX_SEARCH_LENGTH,
@@ -65,6 +66,35 @@ export function mergeListQuery<TFilters extends Record<string, unknown>>(
     order: query.order,
     ...(query.q === undefined ? {} : { q: query.q }),
     ...(query.sort === undefined ? {} : { sort: query.sort }),
+  };
+}
+
+/**
+ * Builds `meta.pagination` of a paginated list response.
+ *
+ * The arithmetic lives here, in a pure function, because **both** sides need
+ * it: the server puts it into the envelope, and the client's pager recomputes
+ * the same numbers when it renders. Duplicating the `ceil` in two places would
+ * eventually disagree at the boundaries.
+ *
+ * `totalPages` is `0` when nothing matches (`total === 0`) and `page` is echoed
+ * back as requested — a page past the end is not an error, it is an empty slice
+ * of a real result set, and rewriting it to the last page would move the user
+ * without them asking.
+ *
+ * @param query - the query that was served (`page` and `limit` are what matter).
+ * @param total - number of matching rows, across **all** pages.
+ * @returns the `meta.pagination` block.
+ */
+export function toPaginationMeta(
+  query: Pick<ListQuery, 'page' | 'limit'>,
+  total: number,
+): PaginationMeta {
+  return {
+    page: query.page,
+    limit: query.limit,
+    total,
+    totalPages: total <= 0 ? 0 : Math.ceil(total / query.limit),
   };
 }
 

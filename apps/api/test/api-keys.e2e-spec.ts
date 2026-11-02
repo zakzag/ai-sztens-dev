@@ -42,9 +42,18 @@ interface ApiKeyBody {
   readonly updatedAt: string;
 }
 
+/** `meta.pagination` of a paginated list (AIS-107). */
+interface PaginationMetaBody {
+  readonly page: number;
+  readonly limit: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
 interface ResponseMetaBody {
   readonly requestId: string;
   readonly timestamp: string;
+  readonly pagination?: PaginationMetaBody;
 }
 
 interface SuccessEnvelopeBody<T> {
@@ -137,6 +146,16 @@ describe('ApiKeysController (e2e)', () => {
   const identifier = `e2e-${randomUUID()}`;
   const otherIdentifier = `e2e-${randomUUID()}`;
 
+  /**
+   * Prefix of the seeded pagination fixtures.
+   *
+   * The table is shared with the dev stack, so an unfiltered list is not
+   * deterministic: every pagination assertion below filters on this prefix
+   * (`?q=`), which is exactly the feature the ticket adds.
+   */
+  const pagePrefix = `e2e-${randomUUID()}`;
+  const seededCount = 12;
+
   beforeAll(async () => {
     const booted = await bootApp();
     if (booted === null) return;
@@ -155,6 +174,24 @@ describe('ApiKeysController (e2e)', () => {
 
     app = booted;
     database = handle;
+  });
+
+  beforeAll(async () => {
+    if (database === null) return;
+
+    // Twelve rows so a 10-row page boundary is observable: page 2 holds the
+    // last two, and `totalPages` is 2 (AIS-107 DoD).
+    await database.insert(apiKeys).values(
+      Array.from({ length: seededCount }, (_, index) => {
+        const suffix = String(index + 1).padStart(2, '0');
+
+        return {
+          name: `${pagePrefix}-${suffix}`,
+          identifier: `${pagePrefix}-${suffix}`,
+          apiKey: `tok_page_${suffix}`,
+        };
+      }),
+    );
   });
 
   afterAll(async () => {
@@ -240,12 +277,13 @@ describe('ApiKeysController (e2e)', () => {
     expect(envelope.data.expiresAt).toBeNull();
   });
 
-  it('GET /api/api-keys lists the created keys inside `data`', async () => {
+  it('GET /api/api-keys lists the created keys inside `data` with `meta.pagination`', async () => {
     if (app === null) return;
 
     const response = await app.inject({
       method: 'GET',
-      url: '/api/api-keys',
+      // `limit=100` keeps the assertion independent of the table's other rows.
+      url: '/api/api-keys?limit=100',
       // A valid inbound id must survive end-to-end (proxy/client trace chaining).
       headers: { [REQUEST_ID_HEADER]: 'test-123' },
     });
@@ -255,12 +293,92 @@ describe('ApiKeysController (e2e)', () => {
     const envelope = readEnvelope<unknown>(response.json());
     expect(envelope.meta.requestId).toBe('test-123');
     expect(readHeader(response.headers[REQUEST_ID_HEADER])).toBe('test-123');
+    expect(envelope.meta.pagination).toEqual(
+      expect.objectContaining({ page: 1, limit: 100 }),
+    );
     expect(isApiKeyList(envelope.data)).toBe(true);
     if (!isApiKeyList(envelope.data)) return;
 
     const identifiers = envelope.data.map((item) => item.identifier);
     expect(identifiers).toContain(identifier);
     expect(identifiers).toContain(otherIdentifier);
+  });
+
+  it('GET /api/api-keys serves page 2 of a filtered, name-ascending list', async () => {
+    if (app === null) return;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/api-keys?q=${pagePrefix}&page=2&limit=10&sort=name&order=asc`,
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const envelope = readEnvelope<unknown>(response.json());
+    expect(isApiKeyList(envelope.data)).toBe(true);
+    if (!isApiKeyList(envelope.data)) return;
+
+    // Sorted by name ascending, the 12 seeded rows put `-11` and `-12` on page 2.
+    expect(envelope.data.map((item) => item.name)).toEqual([
+      `${pagePrefix}-11`,
+      `${pagePrefix}-12`,
+    ]);
+    expect(envelope.meta.pagination).toEqual({
+      page: 2,
+      limit: 10,
+      total: seededCount,
+      totalPages: 2,
+    });
+  });
+
+  it('GET /api/api-keys answers an empty result with 200, `data: []` and `total: 0`', async () => {
+    if (app === null) return;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/api-keys?q=${pagePrefix}-does-not-exist`,
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const envelope = readEnvelope<unknown>(response.json());
+    expect(envelope.data).toEqual([]);
+    expect(envelope.meta.pagination).toEqual({
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 0,
+    });
+  });
+
+  it('GET /api/api-keys rejects limit=101 with 400 + a `limit` detail', async () => {
+    if (app === null) return;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/api-keys?limit=101',
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    const body = readError(response.json());
+    expect(body.error.code).toBe('VALIDATION_FAILED');
+    expect(body.error.details[0]?.path).toBe('limit');
+  });
+
+  it('GET /api/api-keys rejects an unknown sort column with 400 + a `sort` detail', async () => {
+    if (app === null) return;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/api-keys?sort=passwordHash',
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    const body = readError(response.json());
+    expect(body.error.code).toBe('VALIDATION_FAILED');
+    expect(body.error.details[0]?.path).toBe('sort');
   });
 
   it('GET /api/api-keys/:identifier returns the key inside `data`', async () => {

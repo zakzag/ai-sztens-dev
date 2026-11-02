@@ -1,4 +1,8 @@
-import type { ApiKey, CreateApiKeyInput } from '@callback/shared';
+import type {
+  ApiKey,
+  ApiKeyListQuery,
+  CreateApiKeyInput,
+} from '@callback/shared';
 import type { ApiKeyRow } from '../../../db/schema.js';
 
 /**
@@ -74,6 +78,22 @@ export function buildCreateApiKeyInput(
     description: 'primary',
     apiKey: 'tok_123',
     expiresAt: API_KEY_EXPIRES_AT.toISOString(),
+    ...overrides,
+  };
+}
+
+/**
+ * @param overrides - fields to replace on the default list query (AIS-107).
+ * @returns the query a request without parameters produces.
+ */
+export function buildListQuery(
+  overrides: Partial<ApiKeyListQuery> = {},
+): ApiKeyListQuery {
+  return {
+    page: 1,
+    limit: 20,
+    order: 'desc',
+    sort: 'createdAt',
     ...overrides,
   };
 }

@@ -5,22 +5,30 @@ import type { ApiKeyRow } from '../../../db/schema.js';
 /**
  * Chainable `Database` mock for the repository spec.
  *
- * The repository builds three query shapes:
+ * The repository builds four query shapes:
  *
  * ```text
  * insert(table).values(input).returning()
- * select().from(table).orderBy(expr)
- * select().from(table).where(expr).limit(1)
+ * select({ total: count() }).from(table).where(expr)          // count(*) — AIS-107
+ * select().from(table).where(expr).limit(n).offset(m)         // one page
+ * select().from(table).where(expr).limit(1)                   // single row
  * ```
  *
- * Each of those is scripted here instead of being reached through a real
+ * The last two end at a **different** terminal (`offset` vs `limit`), and the
+ * count query has no terminal at all, so the intermediate nodes are *hybrids*:
+ * awaiting them yields the rows **and** they still expose the next builder.
+ * That is exactly what the (thenable) Drizzle query builder does, which is why
+ * `await db.select()…where(expr)` is legal in the repository.
+ *
+ * Each of those steps is scripted here instead of being reached through a real
  * driver: the coding standard demands mocked dependencies, and a real
  * connection would need `DATABASE_URL` plus a migrated table just to unit-test
  * a `try/catch`.
  *
  * The mock only promises *contract-level* assertions — “`insert` was called”,
- * “`returning` was awaited”, “`select` was **not** called” — never Drizzle's
- * internal call order, which is free to change between minor versions.
+ * “`returning` was awaited”, “the offset is `(page - 1) * limit`” — never
+ * Drizzle's internal call order, which is free to change between minor
+ * versions.
  */
 
 /**
@@ -63,10 +71,48 @@ export interface DatabaseMockOptions {
   readonly insertedRows?: readonly ApiKeyRow[];
   /** Error rejected by `returning()` instead of rows. */
   readonly insertError?: Error;
-  /** Rows resolved by `select()…orderBy()` and `select()…where().limit()`. */
+  /** Rows resolved by the row-selecting chains. */
   readonly selectedRows?: readonly ApiKeyRow[];
-  /** Error rejected by the select chain instead of rows. */
+  /** Error rejected by the row-selecting chains instead of rows. */
   readonly selectError?: Error;
+  /** `total` reported by the `count(*)` query; defaults to `0`. */
+  readonly total?: number;
+  /** Error rejected by the `count(*)` query instead of a number. */
+  readonly countError?: Error;
+}
+
+/** A promise that still exposes the next builder step (see the docblock). */
+type Chainable<TRow, TNext> = Promise<TRow> & TNext;
+
+/**
+ * Builds a **lazy** thenable that also exposes the next builder step.
+ *
+ * Lazy matters: `Promise.resolve(rejected)` created eagerly and then abandoned
+ * (because the test chains `.orderBy()` on top of it) is an *unhandled
+ * rejection*, which kills the Jest worker instead of failing one test. Here the
+ * row promise is only created when something actually awaits the node.
+ *
+ * @param resolveValue - produces the rows (or the scripted error) on demand.
+ * @param next - the builder methods this node exposes.
+ * @returns a thenable carrying `next`.
+ */
+function chainable<TRow, TNext extends object>(
+  resolveValue: () => Promise<TRow>,
+  next: TNext,
+): Chainable<TRow, TNext> {
+  const thenable = {
+    then: (
+      onFulfilled?: ((value: TRow) => unknown) | null,
+      onRejected?: ((reason: unknown) => unknown) | null,
+    ) => resolveValue().then(onFulfilled, onRejected),
+    catch: (onRejected?: ((reason: unknown) => unknown) | null) =>
+      resolveValue().catch(onRejected),
+    finally: (onFinally?: (() => void) | null) =>
+      resolveValue().finally(onFinally),
+    [Symbol.toStringTag]: 'Promise',
+  };
+
+  return Object.assign(thenable, next) as Chainable<TRow, TNext>;
 }
 
 /** Handle exposing both the injected value and the spies. */
@@ -81,16 +127,29 @@ export interface DatabaseMock {
   readonly orderBy: jest.Mock;
   readonly where: jest.Mock;
   readonly limit: jest.Mock;
+  readonly offset: jest.Mock;
+  /** `where()` of the `count(*)` chain (a terminal: it resolves the count). */
+  readonly countWhere: jest.Mock;
 }
 
 /**
  * Builds a fresh mock (no state shared between tests).
  *
- * @param options - scripted rows/errors; defaults are “no rows, no error”.
+ * @param options - scripted rows/errors/total; defaults are “no rows, no error”.
  */
 export function createDatabaseMock(
   options: DatabaseMockOptions = {},
 ): DatabaseMock {
+  const rows = (): Promise<ApiKeyRow[]> =>
+    options.selectError !== undefined
+      ? Promise.reject(options.selectError)
+      : Promise.resolve([...(options.selectedRows ?? [])]);
+
+  const counted = (): Promise<{ readonly total: number }[]> =>
+    options.countError !== undefined
+      ? Promise.reject(options.countError)
+      : Promise.resolve([{ total: options.total ?? 0 }]);
+
   const returning = jest.fn(() =>
     options.insertError !== undefined
       ? Promise.reject(options.insertError)
@@ -99,20 +158,42 @@ export function createDatabaseMock(
   const values = jest.fn(() => ({ returning }));
   const insert = jest.fn(() => ({ values }));
 
-  const resolveSelect = () =>
-    options.selectError !== undefined
-      ? Promise.reject(options.selectError)
-      : Promise.resolve([...(options.selectedRows ?? [])]);
+  // `offset` is terminal for a page query, `limit` is terminal for a
+  // single-row lookup — so the intermediate nodes resolve the rows *and* carry
+  // the next builder step, exactly like drizzle's thenable builder.
+  const offset = jest.fn(rows);
+  const limit = jest.fn(() => chainable(rows, { offset }));
+  const orderBy = jest.fn(() => ({ limit }));
+  const where = jest.fn(() => chainable(rows, { orderBy, limit }));
+  // The count chain stops at `where`, exactly like drizzle's builder does.
+  const countWhere = jest.fn(counted);
 
-  const limit = jest.fn(resolveSelect);
-  const orderBy = jest.fn(resolveSelect);
-  const where = jest.fn(() => ({ limit }));
-  const from = jest.fn(() => ({ orderBy, where }));
-  const select = jest.fn(() => ({ from }));
+  // `select()` with a field map is the count query, `select()` without one is a
+  // row query. The flag is safe because each chain is built synchronously.
+  let selectingCount = false;
+  const select = jest.fn((fields?: unknown) => {
+    selectingCount = fields !== undefined;
+    return { from };
+  });
+  const from = jest.fn(() =>
+    selectingCount ? { where: countWhere } : { where, orderBy },
+  );
 
   // The real handle is a large Drizzle object; only the two entry points the
   // repository uses are modelled, hence the explicit double assertion.
   const db = { insert, select } as unknown as Database;
 
-  return { db, insert, values, returning, select, from, orderBy, where, limit };
+  return {
+    db,
+    insert,
+    values,
+    returning,
+    select,
+    from,
+    orderBy,
+    where,
+    limit,
+    offset,
+    countWhere,
+  };
 }

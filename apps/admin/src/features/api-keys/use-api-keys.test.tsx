@@ -1,29 +1,30 @@
 /**
  * Tests of the `api-keys` hooks.
  *
- * The service module is replaced at the module boundary, so every assertion
- * runs without a network, without timers and without a real backend. Covered
- * branches: loading, success, query error, mutation success (invalidation +
- * `onCreated`), mutation conflict (field-level mapping), mutation failure of
- * another kind, and `reset`.
+ * The mock point is the **network**, not the service (decision `D1` of the MSW
+ * harness): the hooks run the real `apiKeysService` + `httpClient`, so the
+ * envelope unwrap and the `ApiError` creation are exercised too, and only the
+ * wire is replaced by the handlers in `test/mocks/handlers`.
+ *
+ * Covered branches: loading, success (two rows), success (empty), query error
+ * (500), query error (offline), refetch after a failure, mutation success
+ * (invalidation + `onCreated`), mutation conflict (field mapping), mutation
+ * transport failure, and `reset`.
  */
 
 import type { QueryClient } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CreateApiKeyInput } from '@callback/shared';
+import { VALID_API_KEY_PAIR } from '@callback/shared';
 import {
-  createConflictError,
-  createNetworkError,
-  createServerError,
-  createServerErrorWithRequestId,
-} from '../../test/mocks/api-error.mock.js';
-import {
-  API_KEYS_SERVICE_MOCK,
-  API_KEY_FIXTURES,
-  CREATE_API_KEY_INPUT_FIXTURE,
-  CREATED_API_KEY_FIXTURE,
-  resetApiKeysServiceMock,
-} from '../../test/mocks/api-keys.mock.js';
+  apiKeysCreateConflict,
+  apiKeysCreateNetworkError,
+  apiKeysListEmpty,
+  apiKeysListNetworkError,
+  apiKeysListServerError,
+} from '../../test/mocks/handlers/api-keys.handlers.js';
+import { server } from '../../test/mocks/server.js';
 import {
   createTestQueryClient,
   TestQueryProvider,
@@ -40,19 +41,12 @@ import {
 import { toFieldErrors } from './api-keys.logic.js';
 import { useApiKeysQuery, useCreateApiKeyMutation } from './use-api-keys.js';
 
-/**
- * Replaces the composition root so the hooks talk to the double.
- *
- * The factory has to import the mock module dynamically: `vi.mock` calls are
- * hoisted above the static imports, so a top-level binding would be `undefined`
- * at factory time.
- */
-vi.mock('../../services/api-client.js', async () => {
-  const { API_KEYS_SERVICE_MOCK: serviceMock } =
-    await import('../../test/mocks/api-keys.mock.js');
-
-  return { apiKeysService: serviceMock.service };
-});
+/** Minimal valid create payload every mutation test submits. */
+const CREATE_INPUT: CreateApiKeyInput = {
+  name: 'Vapi staging',
+  identifier: 'vapi-staging',
+  apiKey: 'sk-stage-42',
+};
 
 /**
  * @param client - the query client of the test.
@@ -72,7 +66,7 @@ describe('useApiKeysQuery', () => {
   let client: QueryClient;
 
   beforeEach(() => {
-    resetApiKeysServiceMock();
+    server.resetHandlers();
     client = createTestQueryClient();
   });
 
@@ -98,16 +92,30 @@ describe('useApiKeysQuery', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.apiKeys).toEqual(API_KEY_FIXTURES);
+    expect(result.current.apiKeys).toEqual(VALID_API_KEY_PAIR);
     expect(result.current.isFetching).toBe(false);
     expect(result.current.error).toBeNull();
     expect(result.current.errorMessage).toBeNull();
     expect(result.current.errorSurface).toBeNull();
-    expect(API_KEYS_SERVICE_MOCK.listMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes an empty list for an empty payload', async () => {
+    server.use(apiKeysListEmpty);
+
+    const { result } = renderHook(() => useApiKeysQuery(), {
+      wrapper: createWrapper(client),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.apiKeys).toEqual([]);
+    expect(result.current.error).toBeNull();
   });
 
   it('routes a request without a response to the banner and keeps the raw error', async () => {
-    API_KEYS_SERVICE_MOCK.listMock.mockRejectedValueOnce(createNetworkError());
+    server.use(apiKeysListNetworkError);
 
     const { result } = renderHook(() => useApiKeysQuery(), {
       wrapper: createWrapper(client),
@@ -125,9 +133,7 @@ describe('useApiKeysQuery', () => {
   });
 
   it('routes a 500 to the page tier and keeps the requestId for the log tier', async () => {
-    API_KEYS_SERVICE_MOCK.listMock.mockRejectedValueOnce(
-      createServerErrorWithRequestId(),
-    );
+    server.use(apiKeysListServerError);
 
     const { result } = renderHook(() => useApiKeysQuery(), {
       wrapper: createWrapper(client),
@@ -142,7 +148,7 @@ describe('useApiKeysQuery', () => {
   });
 
   it('re-reads the list on refetch, including after a failure', async () => {
-    API_KEYS_SERVICE_MOCK.listMock.mockRejectedValueOnce(createServerError());
+    server.use(apiKeysListServerError);
 
     const { result } = renderHook(() => useApiKeysQuery(), {
       wrapper: createWrapper(client),
@@ -151,6 +157,10 @@ describe('useApiKeysQuery', () => {
     await waitFor(() => {
       expect(result.current.errorSurface).toBe('page');
     });
+
+    // The user-triggered retry: restore the default success handler, then ask
+    // the hook to re-read the list (automatic retry stays disabled by config).
+    server.resetHandlers();
 
     act(() => {
       result.current.refetch();
@@ -161,8 +171,7 @@ describe('useApiKeysQuery', () => {
     });
 
     expect(result.current.errorSurface).toBeNull();
-    expect(result.current.apiKeys).toEqual(API_KEY_FIXTURES);
-    expect(API_KEYS_SERVICE_MOCK.listMock).toHaveBeenCalledTimes(2);
+    expect(result.current.apiKeys).toEqual(VALID_API_KEY_PAIR);
   });
 });
 
@@ -170,7 +179,7 @@ describe('useCreateApiKeyMutation', () => {
   let client: QueryClient;
 
   beforeEach(() => {
-    resetApiKeysServiceMock();
+    server.resetHandlers();
     client = createTestQueryClient();
   });
 
@@ -184,17 +193,20 @@ describe('useCreateApiKeyMutation', () => {
     );
 
     await act(async () => {
-      await result.current.createApiKey(CREATE_API_KEY_INPUT_FIXTURE);
+      await result.current.createApiKey(CREATE_INPUT);
     });
 
-    expect(API_KEYS_SERVICE_MOCK.createMock).toHaveBeenCalledWith(
-      CREATE_API_KEY_INPUT_FIXTURE,
-    );
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: API_KEYS_QUERY_KEYS.all,
     });
     await waitFor(() => {
-      expect(onCreated).toHaveBeenCalledWith(CREATED_API_KEY_FIXTURE);
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: CREATE_INPUT.name,
+          identifier: CREATE_INPUT.identifier,
+          apiKey: CREATE_INPUT.apiKey,
+        }),
+      );
     });
 
     expect(result.current.isPending).toBe(false);
@@ -203,9 +215,7 @@ describe('useCreateApiKeyMutation', () => {
   });
 
   it('rejects a duplicate identifier and maps it onto the field', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
-      createConflictError(),
-    );
+    server.use(apiKeysCreateConflict);
 
     const { result } = renderHook(() => useCreateApiKeyMutation(), {
       wrapper: createWrapper(client),
@@ -215,7 +225,7 @@ describe('useCreateApiKeyMutation', () => {
 
     await act(async () => {
       try {
-        await result.current.createApiKey(CREATE_API_KEY_INPUT_FIXTURE);
+        await result.current.createApiKey(CREATE_INPUT);
       } catch (error) {
         caught = error;
       }
@@ -235,9 +245,7 @@ describe('useCreateApiKeyMutation', () => {
   });
 
   it('rejects with the original error and reports a transport failure', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
-      createNetworkError(),
-    );
+    server.use(apiKeysCreateNetworkError);
 
     const { result } = renderHook(() => useCreateApiKeyMutation(), {
       wrapper: createWrapper(client),
@@ -247,7 +255,7 @@ describe('useCreateApiKeyMutation', () => {
 
     await act(async () => {
       try {
-        await result.current.createApiKey(CREATE_API_KEY_INPUT_FIXTURE);
+        await result.current.createApiKey(CREATE_INPUT);
       } catch (error) {
         caught = error;
       }
@@ -264,9 +272,7 @@ describe('useCreateApiKeyMutation', () => {
   });
 
   it('clears error and success state on reset', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
-      createConflictError(),
-    );
+    server.use(apiKeysCreateConflict);
 
     const { result } = renderHook(() => useCreateApiKeyMutation(), {
       wrapper: createWrapper(client),
@@ -274,7 +280,7 @@ describe('useCreateApiKeyMutation', () => {
 
     await act(async () => {
       try {
-        await result.current.createApiKey(CREATE_API_KEY_INPUT_FIXTURE);
+        await result.current.createApiKey(CREATE_INPUT);
       } catch {
         // Intentional: the failure is asserted through `result.current.error`.
       }

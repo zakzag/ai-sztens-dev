@@ -27,3 +27,36 @@ export const VALID_API_KEY: ApiKey = {
 
 /** Payload example of `GET /api/api-keys` (a one-element list). */
 export const VALID_API_KEY_LIST: readonly ApiKey[] = [VALID_API_KEY];
+
+/**
+ * A fully filled row — the “filled” branch the admin UI exercises.
+ *
+ * Derived from {@link VALID_API_KEY} so the shared identity (id, createdAt,
+ * updatedAt) stays defined once; only the optional fields become present.
+ */
+export const FILLED_API_KEY: ApiKey = {
+  ...VALID_API_KEY,
+  description: 'Production voice provider token',
+  expiresAt: '2027-01-31T23:00:00.000Z',
+};
+
+/** A second row with the optional fields missing, for the empty-value branch. */
+export const SECOND_API_KEY: ApiKey = {
+  id: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
+  name: 'Vapi dev',
+  identifier: 'vapi-dev',
+  description: null,
+  apiKey: 'sk-test-987654',
+  expiresAt: null,
+  createdAt: '2026-10-20T09:30:00.000Z',
+  updatedAt: '2026-10-20T09:30:00.000Z',
+};
+
+/**
+ * Two-element list used by the admin test handlers and display tests: it
+ * carries one row for the filled branch and one for the empty-value branch.
+ */
+export const VALID_API_KEY_PAIR: readonly ApiKey[] = [
+  FILLED_API_KEY,
+  SECOND_API_KEY,
+];

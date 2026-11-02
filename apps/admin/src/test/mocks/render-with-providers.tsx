@@ -1,0 +1,57 @@
+/**
+ * One render call with the full provider chain of the admin app.
+ *
+ * Mirrors [`app/providers/app-providers.tsx`](../../app/providers/app-providers.tsx)
+ * but swaps the production entry points for their test counterparts:
+ * an isolated query client (no retries, no cache between tests) and a
+ * `MemoryRouter` so components that read the URL state render without a browser.
+ *
+ * The notification provider is intentionally absent: AIS-84 has not landed yet;
+ * add it here the moment it does, so every component test inherits it without a
+ * per-test wrapper.
+ */
+
+import { QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
+import { render, type RenderResult } from '@testing-library/react';
+import { SessionProvider } from '../../app/providers/session-provider.js';
+import { createTestQueryClient } from './query-client.mock.js';
+
+/** Options of {@link renderWithProviders}. */
+export interface RenderWithProvidersOptions {
+  /** Initial history entries; defaults to `['/']`. */
+  readonly initialEntries?: readonly string[];
+}
+
+/** Result of {@link renderWithProviders}: the render result plus the client. */
+export interface RenderWithProvidersResult extends RenderResult {
+  /** The isolated query client the tree is wrapped in. */
+  readonly client: ReturnType<typeof createTestQueryClient>;
+}
+
+/**
+ * Renders `ui` inside the query + session + router providers.
+ *
+ * @param ui - the component under test.
+ * @param options - optional initial router entries.
+ * @returns the testing-library result plus the query client.
+ */
+export function renderWithProviders(
+  ui: ReactNode,
+  options: RenderWithProvidersOptions = {},
+): RenderWithProvidersResult {
+  const client = createTestQueryClient();
+
+  const utils = render(
+    <QueryClientProvider client={client}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={options.initialEntries ?? ['/']}>
+          {ui}
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  );
+
+  return { ...utils, client };
+}

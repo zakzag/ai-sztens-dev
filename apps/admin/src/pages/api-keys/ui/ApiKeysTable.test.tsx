@@ -6,17 +6,18 @@
  * here: it belongs to the page (`PageErrorState`), see its own test file.
  *
  * The negative assertion — the token must not appear in the DOM — is checked
- * against the fixture the view models were built from.
+ * against the fixtures the view models were built from. Fixtures come from the
+ * shared contract (`@callback/shared`), the single source of sample rows.
  */
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { toApiKeyViewModels } from '../../../entities/api-key/api-key.mapper.js';
 import {
-  API_KEY_FIXTURE,
-  API_KEY_FIXTURES,
-  SECOND_API_KEY_FIXTURE,
-} from '../../../test/mocks/api-keys.mock.js';
+  FILLED_API_KEY,
+  SECOND_API_KEY,
+  VALID_API_KEY_PAIR,
+} from '@callback/shared';
+import { toApiKeyViewModels } from '../../../entities/api-key/api-key.mapper.js';
 import {
   API_KEYS_EMPTY_MESSAGE,
   API_KEYS_LOADING_MESSAGE,
@@ -25,7 +26,7 @@ import {
 import { ApiKeysTable } from './ApiKeysTable.js';
 
 /** View models of both fixtures, as the page would pass them. */
-const VIEW_MODELS = toApiKeyViewModels(API_KEY_FIXTURES);
+const VIEW_MODELS = toApiKeyViewModels(VALID_API_KEY_PAIR);
 
 describe('ApiKeysTable', () => {
   it('renders the loading message and no table', () => {
@@ -59,11 +60,9 @@ describe('ApiKeysTable', () => {
     ).toBeInTheDocument();
 
     expect(screen.getAllByRole('row')).toHaveLength(VIEW_MODELS.length + 1);
-    expect(screen.getByText(API_KEY_FIXTURE.name)).toBeInTheDocument();
-    expect(screen.getByText(API_KEY_FIXTURE.identifier)).toBeInTheDocument();
-    expect(
-      screen.getByText(SECOND_API_KEY_FIXTURE.identifier),
-    ).toBeInTheDocument();
+    expect(screen.getByText(FILLED_API_KEY.name)).toBeInTheDocument();
+    expect(screen.getByText(FILLED_API_KEY.identifier)).toBeInTheDocument();
+    expect(screen.getByText(SECOND_API_KEY.identifier)).toBeInTheDocument();
   });
 
   it('renders the fallback for a key without description and without expiry', () => {
@@ -78,7 +77,7 @@ describe('ApiKeysTable', () => {
       <ApiKeysTable apiKeys={VIEW_MODELS} isLoading={false} />,
     );
 
-    expect(container.textContent).not.toContain(API_KEY_FIXTURE.apiKey);
-    expect(container.textContent).not.toContain(SECOND_API_KEY_FIXTURE.apiKey);
+    expect(container.textContent).not.toContain(FILLED_API_KEY.apiKey);
+    expect(container.textContent).not.toContain(SECOND_API_KEY.apiKey);
   });
 });

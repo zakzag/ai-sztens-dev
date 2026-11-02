@@ -1,16 +1,19 @@
 /**
  * Tests of the create form.
  *
- * The service module is replaced at the boundary, so the form is exercised
- * against the shared double and no request is made. Covered: client-side
- * validation (nothing is submitted), the exact payload of a successful submit,
- * the form reset, the field-level 409, a page-level 5xx and the pending state.
+ * The mock point is the **network**, not the service (MSW harness, decision
+ * `D1`): the form runs the real mutation hook + transport, and only the wire is
+ * replaced by the handlers in `test/mocks/handlers`. A request recorder captures
+ * the intercepted payload where the old service double used to assert the call.
+ *
+ * Covered: client-side validation (nothing is submitted), the exact payload of
+ * a successful submit, the form reset, the field-level 409, a page-level 5xx
+ * and the pending state.
  */
 
-import type { QueryClient } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { API_KEY_IDENTIFIER_CONFLICT_MESSAGE } from '../../../features/api-keys/api-keys.const.js';
 import {
   FIELD_INVALID_MESSAGE,
@@ -18,20 +21,15 @@ import {
   VALIDATION_MESSAGE,
 } from '../../../lib/error-message.const.js';
 import {
-  createConflictError,
-  createLegacyConflictError,
-  createMultiFieldValidationError,
-  createServerError,
-  createValidationError,
-} from '../../../test/mocks/api-error.mock.js';
-import {
-  API_KEYS_SERVICE_MOCK,
-  resetApiKeysServiceMock,
-} from '../../../test/mocks/api-keys.mock.js';
-import {
-  createTestQueryClient,
-  TestQueryProvider,
-} from '../../../test/mocks/query-client.mock.js';
+  apiKeysCreateConflict,
+  apiKeysCreateFieldValidation,
+  apiKeysCreateLegacyConflict,
+  apiKeysCreateMultiFieldValidation,
+  apiKeysCreatePending,
+  apiKeysCreateServerError,
+} from '../../../test/mocks/handlers/api-keys.handlers.js';
+import { createRequestRecorder } from '../../../test/mocks/request-recorder.js';
+import { server } from '../../../test/mocks/server.js';
 import {
   API_KEY_FORM_ERROR_TITLE,
   API_KEY_FORM_LABELS,
@@ -41,36 +39,14 @@ import {
   API_KEY_FORM_VALIDATION_MESSAGES,
 } from '../api-keys.const.js';
 import { ApiKeyForm } from './ApiKeyForm.js';
+import { renderWithProviders } from '../../../test/mocks/render-with-providers.js';
 
-/**
- * Replaces the composition root so the mutation talks to the double. The factory
- * imports the mock module dynamically because `vi.mock` calls are hoisted.
- */
-vi.mock('../../../services/api-client.js', async () => {
-  const { API_KEYS_SERVICE_MOCK: serviceMock } =
-    await import('../../../test/mocks/api-keys.mock.js');
-
-  return { apiKeysService: serviceMock.service };
-});
-
-/**
- * @returns the rendered form inside an isolated query context.
- */
-function renderForm(): { client: QueryClient } {
-  const client = createTestQueryClient();
-
-  render(
-    <TestQueryProvider client={client}>
-      <ApiKeyForm />
-    </TestQueryProvider>,
-  );
-
-  return { client };
+/** Renders the form inside the full provider chain. */
+function renderForm() {
+  return renderWithProviders(<ApiKeyForm />);
 }
 
-/**
- * @returns the submit button of the form.
- */
+/** @returns the submit button of the form. */
 function getSubmitButton(): HTMLElement {
   return screen.getByRole('button', { name: API_KEY_FORM_SUBMIT_LABEL });
 }
@@ -103,10 +79,12 @@ async function fillRequiredFields(
 
 describe('ApiKeyForm', () => {
   beforeEach(() => {
-    resetApiKeysServiceMock();
+    server.resetHandlers();
   });
 
   it('blocks the submit and reports every missing required field', async () => {
+    const recorder = createRequestRecorder();
+
     renderForm();
 
     await userEvent.click(getSubmitButton());
@@ -120,10 +98,14 @@ describe('ApiKeyForm', () => {
     expect(
       screen.getByText(API_KEY_FORM_VALIDATION_MESSAGES.apiKeyRequired),
     ).toBeInTheDocument();
-    expect(API_KEYS_SERVICE_MOCK.createMock).not.toHaveBeenCalled();
+    expect(recorder.requests).toHaveLength(0);
+
+    recorder.stop();
   });
 
   it('rejects an identifier that the backend would refuse', async () => {
+    const recorder = createRequestRecorder();
+
     renderForm();
 
     await fillRequiredFields({ identifier: 'vapi staging' });
@@ -134,36 +116,47 @@ describe('ApiKeyForm', () => {
         API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid,
       ),
     ).toBeInTheDocument();
-    expect(API_KEYS_SERVICE_MOCK.createMock).not.toHaveBeenCalled();
+    expect(recorder.requests).toHaveLength(0);
+
+    recorder.stop();
   });
 
   it('submits the mapped payload, shows the success alert and resets the fields', async () => {
+    const recorder = createRequestRecorder();
+
     renderForm();
 
     await fillRequiredFields();
     await userEvent.click(getSubmitButton());
 
-    await waitFor(() => {
-      expect(API_KEYS_SERVICE_MOCK.createMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(API_KEYS_SERVICE_MOCK.createMock).toHaveBeenCalledWith({
-      name: 'Vapi staging',
-      identifier: 'vapi-staging',
-      apiKey: 'sk-stage-42',
-    });
-
     expect(
       await screen.findByText(API_KEY_FORM_SUCCESS_MESSAGE),
     ).toBeInTheDocument();
+
+    await waitFor(() => {
+      const posts = recorder.requests.filter(
+        (record) => record.method === 'POST',
+      );
+      expect(posts).toHaveLength(1);
+      expect(posts[0]?.body).toEqual({
+        name: 'Vapi staging',
+        identifier: 'vapi-staging',
+        apiKey: 'sk-stage-42',
+      });
+    });
+
     expect(screen.getByLabelText(API_KEY_FORM_LABELS.name)).toHaveValue('');
     expect(screen.getByLabelText(API_KEY_FORM_LABELS.identifier)).toHaveValue(
       '',
     );
     expect(screen.getByLabelText(API_KEY_FORM_LABELS.apiKey)).toHaveValue('');
+
+    recorder.stop();
   });
 
   it('sends the description and the expiry as an ISO instant when they are filled', async () => {
+    const recorder = createRequestRecorder();
+
     renderForm();
 
     await fillRequiredFields();
@@ -176,11 +169,16 @@ describe('ApiKeyForm', () => {
     });
     await userEvent.click(getSubmitButton());
 
+    await screen.findByText(API_KEY_FORM_SUCCESS_MESSAGE);
+
     await waitFor(() => {
-      expect(API_KEYS_SERVICE_MOCK.createMock).toHaveBeenCalledTimes(1);
+      const post = recorder.requests.find((record) => record.method === 'POST');
+      expect(post).toBeDefined();
     });
 
-    const payload = API_KEYS_SERVICE_MOCK.createMock.mock.calls[0]?.[0];
+    const payload = recorder.requests.find(
+      (record) => record.method === 'POST',
+    )?.body as { readonly description?: string; readonly expiresAt?: string };
 
     expect(payload?.description).toBe('Éles kulcs');
     expect(payload?.expiresAt).toBeDefined();
@@ -190,12 +188,12 @@ describe('ApiKeyForm', () => {
     expect(expiry.getFullYear()).toBe(2027);
     expect(expiry.getMonth()).toBe(0);
     expect(expiry.getDate()).toBe(31);
+
+    recorder.stop();
   });
 
   it('maps a 409 onto the identifier field instead of the page', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
-      createConflictError(),
-    );
+    server.use(apiKeysCreateConflict);
 
     renderForm();
 
@@ -214,7 +212,7 @@ describe('ApiKeyForm', () => {
   });
 
   it('shows a page-level error for a non-conflict failure', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(createServerError());
+    server.use(apiKeysCreateServerError);
 
     renderForm();
 
@@ -234,9 +232,7 @@ describe('ApiKeyForm', () => {
   });
 
   it('keeps a legacy 409 without details on the identifier field', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
-      createLegacyConflictError(),
-    );
+    server.use(apiKeysCreateLegacyConflict);
 
     renderForm();
 
@@ -255,9 +251,7 @@ describe('ApiKeyForm', () => {
   });
 
   it('puts every addressable field of a 400 on its own input', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
-      createMultiFieldValidationError(),
-    );
+    server.use(apiKeysCreateMultiFieldValidation);
 
     renderForm();
 
@@ -282,9 +276,7 @@ describe('ApiKeyForm', () => {
   });
 
   it('shows no page alert when the server blamed a field only', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
-      createValidationError(),
-    );
+    server.use(apiKeysCreateFieldValidation);
 
     renderForm();
 
@@ -301,9 +293,7 @@ describe('ApiKeyForm', () => {
   });
 
   it('re-enables the submit button after a field-level failure', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
-      createConflictError(),
-    );
+    server.use(apiKeysCreateConflict);
 
     renderForm();
 
@@ -318,9 +308,7 @@ describe('ApiKeyForm', () => {
   });
 
   it('never renders the server text of a 5xx', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockRejectedValueOnce(
-      createServerError(500, true),
-    );
+    server.use(apiKeysCreateServerError);
 
     renderForm();
 
@@ -334,9 +322,7 @@ describe('ApiKeyForm', () => {
   });
 
   it('disables the submit and shows the pending label while the request is in flight', async () => {
-    API_KEYS_SERVICE_MOCK.createMock.mockImplementationOnce(
-      () => new Promise(() => undefined),
-    );
+    server.use(apiKeysCreatePending);
 
     renderForm();
 

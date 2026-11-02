@@ -1,6 +1,6 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-10-30 (AIS-118: az `src/app/` réteg — route registry, layout, provider-lánc, error boundary)
+**Utolsó frissítés:** 2026-11-02 (AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; előtte AIS-118: az `src/app/` réteg — route registry, layout, provider-lánc, error boundary)
 **Status:** living document — describes the _current_ state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -41,7 +41,7 @@ what exists in `apps/admin` today, so nobody mistakes a planned folder for an ex
 | `services`            | composition root (client instance + token supplier)              | **exists**: `services/api-client.ts` + `services/api-client.const.ts`                                                                                                                                                                                                                                                                                                                                 |
 | `lib`                 | pure helpers and formatters                                      | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts` (+ their `*.const.ts` / `.interface.ts`)                                                                                                                                                                                                                                                                              |
 | `components`          | generic presentational shells (no data access)                   | **exists**: `components/BuildInfoFooter.tsx`, `components/error/PageErrorState.tsx`, `components/error/AppErrorBanner.tsx` (the latter is a thin container: all decisions live in `features/error-surface` + `lib/error-surface.*`)                                                                                                                                                                   |
-| `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/api-keys.mock.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                                                                                                                                                                               |
+| `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/handlers/` (MSW network doubles: `api-keys.handlers.ts`, `generic.handlers.ts`, `handler-envelope.ts`), `server.ts`, `render-with-providers.tsx`, `request-recorder.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                              |
 
 `apps/web` is out of scope for this document's layer map: it has no features/entities
 folders yet and is not migrated to `packages/ui` tokens.
@@ -220,6 +220,14 @@ Adding a page means adding a row here in the same change (rule §0.10). If a pag
 page-wide UI state, it gets a page-local store factory inside its own folder — never a
 global store; the only global store is the session store.
 
+**List state lives in the URL (AIS-119), not in a store.** A list's filter, sort and page are
+read from and written back to the URL through [`features/api/use-list-params.ts`](../../apps/admin/src/features/api/use-list-params.ts:1)
+(`useListParams(schema)`), so they are **not** page UI state and never enter a Zustand store.
+The hook is generic and takes the resource's shared list-query schema as a parameter; the
+parsed `params` is what a future `useApiList` (AIS-114) feeds into a TanStack Query key.
+`zustand` therefore stays **uninstalled** — add it to §7 only when a page genuinely needs
+transient UI state (open drawer, selected row, column filters).
+
 ## 6. New page recipe
 
 The rule file's §12 in repo terms. Every step is a review checkpoint.
@@ -256,6 +264,7 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 | `react-router-dom`                                                                                      | `apps/admin`                             | routing                                                                                                         | installed                                                                                                                                  |
 | `@callback/shared`, `@callback/ui`, `@callback/api-client`                                              | `apps/admin`                             | workspace packages                                                                                              | installed                                                                                                                                  |
 | `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` | `packages/ui`, `apps/admin`              | component + hook tests                                                                                          | installed                                                                                                                                  |
+| `msw`                                                                                                   | `apps/admin`                             | network-boundary doubles for hook/component tests (service boundary is the mock point, not the service)         | installed (`^2.15.0`)                                                                                                                      |
 | `@vitest/coverage-v8`                                                                                   | `packages/ui`, `apps/admin`              | LCOV coverage for the SonarQube report (`test:cov` → `pnpm sonar:coverage`, see [`SonarQube.md`](SonarQube.md)) | installed (`^3.2.4`)                                                                                                                       |
 | `jest`, `ts-jest`, `@types/jest`                                                                        | `packages/shared`, `packages/api-client` | framework-free package tests (D13)                                                                              | installed                                                                                                                                  |
 | `eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`, `@eslint/js`                                | `apps/admin`                             | lint harness                                                                                                    | installed                                                                                                                                  |

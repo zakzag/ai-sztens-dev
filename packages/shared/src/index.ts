@@ -111,8 +111,11 @@ export {
 } from './contract/api-keys/api-keys.const.js';
 
 export {
+  FILLED_API_KEY,
+  SECOND_API_KEY,
   VALID_API_KEY,
   VALID_API_KEY_LIST,
+  VALID_API_KEY_PAIR,
 } from './contract/api-keys/api-keys.fixture.js';
 
 export {

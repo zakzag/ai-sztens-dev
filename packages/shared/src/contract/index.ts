@@ -106,8 +106,11 @@ export {
 } from './api-keys/api-keys.schema.js';
 
 export {
+  FILLED_API_KEY,
+  SECOND_API_KEY,
   VALID_API_KEY,
   VALID_API_KEY_LIST,
+  VALID_API_KEY_PAIR,
 } from './api-keys/api-keys.fixture.js';
 
 export type {

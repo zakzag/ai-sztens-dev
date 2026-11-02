@@ -13,6 +13,10 @@
 #     admin, api). The root script is the canonical list; the CI does not
 #     spell out per-package commands, so a new package is picked up here
 #     automatically instead of drifting in two places (AIS-121).
+#   * the static quality gates succeed (AIS-122): layer rules, dead code,
+#     design tokens and the field-error rule. They run in their own job after
+#     `build-test`, one step per gate, plus `pnpm test:quality` first so a rule
+#     that silently stopped firing turns the job red even on a clean repo.
 
 name: CI
 
@@ -167,3 +171,65 @@ jobs:
       # whose body leaks, or a mapper that drifts from the shared schema.
       - name: E2E tests (envelope, OpenAPI, contract gate)
         run: pnpm --filter @callback/api test:e2e
+
+  # Static quality gates (AIS-122). A separate job on purpose: it needs no
+  # database and no build, so it reports in about a minute, and because every
+  # gate is its own step the red step names the failing gate instead of burying
+  # it in a log. No new triggers — the `pull_request` block above already makes
+  # this run on every PR into `main`/`dev`.
+  #
+  # What each gate enforces:
+  #   * quality:layers       — app → pages → features → entities → services → lib,
+  #                            no page→page, no feature→feature (dependency-cruiser)
+  #   * quality:dead-code    — unused files / exports / dependencies (knip)
+  #   * quality:tokens       — no colour literal, no Tailwind palette utility and
+  #                            no arbitrary colour in apps/*/src + packages/ui/src
+  #   * quality:field-errors — no `error.status ===` / `error.code ===` /
+  #                            `instanceof ApiError` outside `*.logic.ts`
+  #
+  # `pnpm test:quality` runs the gates' own negative/positive fixtures first: if
+  # a rule stops firing, this job goes red even when the repo happens to be clean.
+  quality-gates:
+    name: Quality gates (layers, dead code, tokens, field errors)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      # Node 24 to match `build-test`: dependency-cruiser's TypeScript parser and
+      # the gates' `import.meta.resolve` call are both proven on this runtime.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # knip and dependency-cruiser resolve the workspace packages' types
+      # (`@callback/shared` ships `dist/`), so shared is built before the gates.
+      - name: Build shared
+        run: pnpm --filter @callback/shared build
+
+      - name: Gate tests (negative + positive fixtures)
+        run: pnpm test:quality
+
+      - name: Layer gate
+        run: pnpm quality:layers
+
+      - name: Dead-code gate
+        run: pnpm quality:dead-code
+
+      - name: Token (palette) gate
+        run: pnpm quality:tokens
+
+      - name: Field-error gate
+        run: pnpm quality:field-errors

@@ -1,7 +1,25 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# pnpm settings live here, not in package.json: from pnpm 10/11 on, the `pnpm`
+# field of package.json is no longer read, and a lockfile written under the old
+# location makes `pnpm <script>` fail with ERR_PNPM_VERIFY_DEPS_BEFORE_RUN
+# ("installing would drop pnpm.overrides ... because the pnpm field in
+# package.json is no longer read by pnpm"). AIS-122 moved the block here.
+
+# `light-my-request` ships a broken/floating range through Fastify; pinning it
+# keeps the API's inject-based tests deterministic across installs.
+overrides:
+  light-my-request: 6.6.0
+
+# Explicit "known, deliberately not built" list. pnpm 12 treats an *unlisted*
+# dependency with an install script as an error (ERR_PNPM_IGNORED_BUILDS), so
+# every such package has to be named here. `msw` ships a setup helper the test
+# harness does not use — its registry handler is imported directly in
+# `apps/admin/src/test/mocks/server.ts`.
 allowBuilds:
   '@parcel/watcher': false
   esbuild: false
+  msw: false
   unrs-resolver: false

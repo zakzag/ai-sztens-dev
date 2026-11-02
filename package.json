@@ -5,6 +5,12 @@
   "description": "AIsztens monorepo: NestJS+Fastify API, React public site, React admin SPA",
   "scripts": {
     "predev": "pnpm --filter @callback/shared build",
+    "quality:layers": "depcruise apps/admin/src --config .dependency-cruiser.cjs --output-type err",
+    "quality:dead-code": "knip",
+    "quality:tokens": "node scripts/quality/palette-gate.mjs",
+    "quality:field-errors": "node scripts/quality/field-error-gate.mjs",
+    "quality": "pnpm quality:layers && pnpm quality:dead-code && pnpm quality:tokens && pnpm quality:field-errors",
+    "test:quality": "node --test scripts/quality/",
     "dev": "concurrently -k -n shared,api,web,admin -c yellow,blue,green,magenta \"pnpm --filter @callback/shared dev\" \"pnpm --filter @callback/api start:dev\" \"pnpm --filter @callback/web dev\" \"pnpm --filter @callback/admin dev\"",
     "db:up": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml up -d",
     "db:down": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml down",
@@ -26,12 +32,9 @@
   "devDependencies": {
     "@sonar/scan": "^4.4.0",
     "concurrently": "^9.2.4",
+    "dependency-cruiser": "^16",
+    "knip": "^5",
     "prettier": "^3.9.9"
-  },
-  "pnpm": {
-    "overrides": {
-      "light-my-request": "6.6.0"
-    }
   },
   "packageManager": "pnpm@12.16.1+sha512.091d1dee7927575661b25dab3c2ae31cafc1c54d6b71ed6a6600cf0c1cb10434a447eae14015f1b23e2e6bedeed79df94a932e2164d2832280dce3fb32f656d1"
 }

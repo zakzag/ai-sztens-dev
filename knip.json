@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+
+  "ignoreWorkspaces": ["apps/api"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": ["tailwindcss"],
+
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/lib/agent-artifacts/generate.mjs"],
+      "project": "scripts/**/*.mjs"
+    },
+    "apps/admin": { "project": "src/**/*.{ts,tsx}" },
+    "apps/web": { "project": "src/**/*.{ts,tsx}" },
+    "packages/shared": { "project": "src/**/*.ts" },
+    "packages/api-client": { "project": "src/**/*.ts" },
+    "packages/ui": { "project": "src/**/*.{ts,tsx}" }
+  }
+}

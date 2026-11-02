@@ -25,9 +25,6 @@ export const EMITTABLE = Object.freeze([
   'cursor-rule',
 ]);
 
-/** Emitted when a mode has no explicit `emit` list. */
-export const DEFAULT_EMIT = EMITTABLE;
-
 /**
  * @typedef {object} ModeOverride
  * @property {string[]} [emit] artefacts to generate for this mode

@@ -15,6 +15,7 @@ import type { ApiKeyListQuery } from '@callback/shared';
 import {
   API_KEYS_DETAIL_PATH,
   API_KEYS_PATH,
+  clientPathOf,
   createApiKeysService,
   toApiKeyDetailPath,
   UNEXPECTED_PAYLOAD_CODE,
@@ -24,15 +25,18 @@ import { createHttpClient } from '../src/http-client.js';
 import type { RecordedCall } from './mocks/fetch.mock.js';
 import {
   createSequenceFetchMock,
+  emptyResponse,
   errorResponse,
   paginatedResponse,
   successResponse,
 } from './mocks/fetch.mock.js';
 import {
   SECOND_API_KEY,
+  UPDATED_API_KEY,
   VALID_API_KEY,
   VALID_API_KEY_LIST,
   VALID_CREATE_INPUT,
+  VALID_UPDATE_INPUT,
 } from './mocks/api-key.mock.js';
 
 const BASE_URL = 'http://api.test/api';
@@ -78,6 +82,13 @@ describe('API_KEYS_PATH', () => {
 
   it('keeps the identifier placeholder on the detail path', () => {
     expect(API_KEYS_DETAIL_PATH).toBe('/api-keys/:identifier');
+  });
+});
+
+describe('detail path parity (AIS-110)', () => {
+  it('serves findByIdentifier, update and remove from the same route', () => {
+    expect(clientPathOf('apiKeys.update')).toBe(API_KEYS_DETAIL_PATH);
+    expect(clientPathOf('apiKeys.remove')).toBe(API_KEYS_DETAIL_PATH);
   });
 });
 
@@ -294,5 +305,181 @@ describe('createApiKeysService — create', () => {
     expect((error as ApiError).details).toEqual([
       'identifier: must be URL-safe',
     ]);
+  });
+});
+
+describe('createApiKeysService — update (AIS-110)', () => {
+  it('PATCHes the identified row with the payload unchanged', async () => {
+    const { service, fetchMock } = setup([successResponse(UPDATED_API_KEY)]);
+
+    const result = await service.update(
+      VALID_API_KEY.identifier,
+      VALID_UPDATE_INPUT,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/api-keys/${VALID_API_KEY.identifier}`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('PATCH');
+    expect(readBody(fetchMock.calls[0])).toEqual(VALID_UPDATE_INPUT);
+    expect(result.updatedAt).toBe(UPDATED_API_KEY.updatedAt);
+    expect(result.name).toBe(UPDATED_API_KEY.name);
+  });
+
+  it('sends the required updatedAt concurrency token', async () => {
+    const { service, fetchMock } = setup([successResponse(UPDATED_API_KEY)]);
+
+    await service.update(VALID_API_KEY.identifier, VALID_UPDATE_INPUT);
+
+    const body = readBody(fetchMock.calls[0]) as Record<string, unknown>;
+
+    expect(body.updatedAt).toBe(VALID_API_KEY.updatedAt);
+  });
+
+  it('keeps an explicit null instead of dropping the key', async () => {
+    const { service, fetchMock } = setup([successResponse(UPDATED_API_KEY)]);
+
+    await service.update(VALID_API_KEY.identifier, VALID_UPDATE_INPUT);
+
+    const body = readBody(fetchMock.calls[0]) as Record<string, unknown>;
+
+    expect(Object.hasOwn(body, 'description')).toBe(true);
+    expect(body.description).toBeNull();
+  });
+
+  it('rejects a malformed updated row instead of returning a half-typed object', async () => {
+    const { service } = setup([
+      successResponse({ ...UPDATED_API_KEY, updatedAt: '2026-11-03' }),
+    ]);
+
+    await expect(
+      service.update(VALID_API_KEY.identifier, VALID_UPDATE_INPUT),
+    ).rejects.toMatchObject({ name: 'ApiError' });
+  });
+
+  it('surfaces a stale version as 409 STALE_WRITE on the updatedAt path', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'STALE_WRITE',
+        status: 409,
+        message: 'The resource changed since it was read',
+        details: [{ path: 'updatedAt', message: 'stale version' }],
+      }),
+    ]);
+
+    const error = await service
+      .update(VALID_API_KEY.identifier, VALID_UPDATE_INPUT)
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(409);
+    expect((error as ApiError).code).toBe('STALE_WRITE');
+    expect((error as ApiError).issues[0]?.path).toBe('updatedAt');
+  });
+
+  it('surfaces an unknown identifier as a coded 404', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'API key "ghost" was not found',
+      }),
+    ]);
+
+    const error = await service
+      .update('ghost', VALID_UPDATE_INPUT)
+      .catch((cause: unknown) => cause);
+
+    expect((error as ApiError).status).toBe(404);
+    expect((error as ApiError).code).toBe('NOT_FOUND');
+  });
+
+  it('surfaces a semantic violation as 422 SEMANTIC_VALIDATION_FAILED', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'SEMANTIC_VALIDATION_FAILED',
+        status: 422,
+        message: 'expiresAt must be in the future',
+        details: [{ path: 'expiresAt', message: 'must be in the future' }],
+      }),
+    ]);
+
+    const error = await service
+      .update(VALID_API_KEY.identifier, VALID_UPDATE_INPUT)
+      .catch((cause: unknown) => cause);
+
+    expect((error as ApiError).status).toBe(422);
+    expect((error as ApiError).code).toBe('SEMANTIC_VALIDATION_FAILED');
+    expect((error as ApiError).issues[0]?.path).toBe('expiresAt');
+  });
+});
+
+describe('createApiKeysService — remove (AIS-110)', () => {
+  it('DELETEs the identified row without a body and resolves to null', async () => {
+    const { service, fetchMock } = setup([successResponse(null)]);
+
+    const result = await service.remove(VALID_API_KEY.identifier);
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/api-keys/${VALID_API_KEY.identifier}`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('DELETE');
+    expect(fetchMock.calls[0]?.init?.body).toBeUndefined();
+    expect(result).toBeNull();
+  });
+
+  it('advertises no Content-Type when there is no body', async () => {
+    const { service, fetchMock } = setup([successResponse(null)]);
+
+    await service.remove(VALID_API_KEY.identifier);
+
+    const headers = (fetchMock.calls[0]?.init?.headers ?? {}) as Record<
+      string,
+      string
+    >;
+
+    expect(Object.hasOwn(headers, 'Content-Type')).toBe(false);
+    expect(headers.Accept).toBe('application/json');
+  });
+
+  it('surfaces an unknown identifier as a coded 404', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'API key "ghost" was not found',
+      }),
+    ]);
+
+    const error = await service
+      .remove('ghost')
+      .catch((cause: unknown) => cause);
+
+    expect((error as ApiError).status).toBe(404);
+    expect((error as ApiError).code).toBe('NOT_FOUND');
+  });
+
+  it('rejects a non-null delete payload as contract drift', async () => {
+    const { service } = setup([successResponse({})]);
+
+    const error = await service
+      .remove(VALID_API_KEY.identifier)
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).code).toBe(UNEXPECTED_PAYLOAD_CODE);
+    expect((error as ApiError).issues.length).toBeGreaterThan(0);
+  });
+
+  it('rejects the 204 shortcut because it cannot carry meta.requestId', async () => {
+    const { service } = setup([emptyResponse(204)]);
+
+    const error = await service
+      .remove(VALID_API_KEY.identifier)
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(204);
+    expect((error as ApiError).code).toBe(UNEXPECTED_PAYLOAD_CODE);
   });
 });

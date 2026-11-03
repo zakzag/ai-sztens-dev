@@ -1,7 +1,7 @@
 # API Convention — unified request/response contract
 
 **Utolsó frissítés:** 2026-11-03
-**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109
+**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109; client binding of every registered operation + registry ⇄ service coverage gate + resource template: AIS-110
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
 ---
@@ -302,6 +302,8 @@ The resolved id appears as `meta.requestId` / `error.requestId` **and** as the `
 - **Query building.** `toQueryString(filters, defaults?)` (pure) drops `undefined`/`null`/`''`/empty arrays and values still equal to their default, repeats the key for an array (`tag=a&tag=b`) and returns `''` when nothing is left — never a bare `?`. `getList` instead delegates to the shared `toListQueryParams(...)`, so the “is this field still at its default” rule exists in one place (`page=1`, `limit`, `order`, `q`, resource `sort`).
 - **Typed request body.** `RequestBodyOf<'apiKeys.update'>` (`packages/shared/src/contract/endpoint.body.ts`) derives the body type from the registry `requestSchema` with `z.infer`, so a service that sends a wrong payload fails to compile instead of failing at runtime with a `400`. Both registry arrays are `as const satisfies readonly ApiEndpointContract[]` for that reason: without it `requestSchema` widens to `z.ZodTypeAny`.
 - **Unresolved path guard.** `clientPathOf('apiKeys.remove')` yields `/api-keys/:identifier`; the transport rejects a path that still contains a `:parameter` with `UnresolvedPathParameterError` **before** calling `fetch`, so a forgotten substitution cannot reach the server as a literal `:identifier`.
+- **Service binding (AIS-110).** `createApiKeysService` covers **all five** registered operations (`list`, `findByIdentifier`, `create`, `update`, `remove`). `update`/`remove` reuse the one detail path derived from `apiKeys.findByIdentifier` — a test asserts the three ids resolve to the same template, so a registry divergence fails instead of silently addressing another route. `remove` resolves to `null` because `data` is `null` by convention; a `204`, a missing `data` key or an object payload is an `UNEXPECTED_PAYLOAD` drift.
+- **Coverage gate.** `packages/api-client/test/service-coverage.test.ts` compares `API_ENDPOINTS` with the services built by `src/service.registry.ts`: a registered operation without a service method (`missing`) or a service method without a registered operation (`orphan`) turns the suite red. The expected method name is derived from the `operationId`, so a new resource needs one line in the factory map and no test edit.
 - **`onEvent` (optional).** Every finished attempt may be reported as `HttpEvent { method, path, status, durationMs, outcome }` — no header, token or body field exists on the type, so a listener cannot leak credentials. `outcome: 'success'` requires a parsed body, so a `2xx` contract drift is an `error`. Without a listener the transport behaves exactly as before; a throwing listener never fails a request.
 - `ApiError` carries `status`, `code`, `requestId`, `issues[]` **and** the legacy `details: string[]` (rendered lines), so existing callers keep working.
 - `api-error.const.ts` re-exports `HTTP_STATUS`, `API_ERROR_CODE` and the `ApiErrorCode` type from `@callback/shared`, so a consumer compares `code` against the catalogue instead of re-typing strings.
@@ -344,15 +346,20 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 
 ## 11. Recipe — adding an endpoint
 
-1. **Schema** in `packages/shared/src/contract/<resource>/<resource>.schema.ts` (request: `.strict()`, response: tolerant).
-2. **Registry entry** in `<resource>.contract.ts` (`operationId: '<resource>.<action>'`, method, path, `tag`, `successStatus`, `dataSchema`, optional `requestSchema`, `errors` from the catalogue) — and a sample payload for it in `packages/shared/test/endpoint-registry.test.ts`.
-3. **Domain service** in `apps/api/src/<feature>/`: returns plain data, throws `AppError` subclasses (add a new subclass or a domain code if the failure mode is new).
-4. **Controller**: `@Body(new ZodBodyPipe(schema))` + `@ReqCtx()`, returns `this.responses.ok(await service…, ctx)`; `@HttpCode(HTTP_STATUS.CREATED)` for a create.
-5. **Client service** in `packages/api-client/src/<resource>/`: the path comes from `clientPathOf('<operationId>')`, never from a literal; then `client.get(path, schema)` / `client.post(path, body, schema)`.
-6. **Query hook** in `apps/admin/src/features/<use-case>/`, page alert from the hook's error state, field errors from `issues[]`.
-7. **Tests**: pipe, service (`AppError` code + status), controller (`data` + `meta`), transport (envelope unwrap, error envelope → `ApiError.code`), hook.
-8. If the route must stay raw: `@SkipEnvelope()` **and** an entry in `ENVELOPE_EXEMPTIONS` with a reason. No silent exemptions.
-9. **If the resource is mutable** (§4.2): add `<resource>.update.ts` with a `.strict()` partial schema whose `updatedAt` is required; add `update`/`remove` registry entries (`successStatus: 200`, delete payload `noPayloadSchema`); give the repository an **atomic** version-guarded `update…` and a `softDelete…`, both filtered on `deleted_at IS NULL`; map a missed guard to `404` (absent/deleted) or `409 STALE_WRITE` (live, other version) with `details[{ path: 'updatedAt' }]`; put impossible values behind a pure `*.logic.ts` rule and answer `422 SEMANTIC_VALIDATION_FAILED` before the guard.
+The **per-layer file checklist** — shared contract → `api-client` service → Nest module → admin
+feature/entity/page, plus the one mandatory line in `packages/api-client/src/service.registry.ts` —
+lives in one place: [`Admin-Data-Flow.md`](Admin-Data-Flow.md) §3 („New resource template”).
+It is deliberately **not** repeated here; `api-keys` is the reference implementation to copy.
+
+Two rules stay in this document, because they are about the HTTP contract rather than about
+layering:
+
+1. **Raw routes.** If a route must stay raw: `@SkipEnvelope()` **and** an entry in
+   `ENVELOPE_EXEMPTIONS` with a reason. No silent exemptions.
+2. **Mutable resources** (§4.2): add `<resource>.update.ts` with a `.strict()` partial schema whose `updatedAt` is required; add `update`/`remove` registry entries (`successStatus: 200`, delete payload `noPayloadSchema`); give the repository an **atomic** version-guarded `update…` and a `softDelete…`, both filtered on `deleted_at IS NULL`; map a missed guard to `404` (absent/deleted) or `409 STALE_WRITE` (live, other version) with `details[{ path: 'updatedAt' }]`; put impossible values behind a pure `*.logic.ts` rule and answer `422 SEMANTIC_VALIDATION_FAILED` before the guard.
+
+The endpoint is only **done** when the client can actually call it: a registry entry without a
+service method fails `packages/api-client/test/service-coverage.test.ts` (§12).
 
 ---
 
@@ -373,6 +380,7 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 | `meta.requestId` ⇄ `X-Request-Id`, inbound pass-through, invalid id replaced, unknown route, `healthz` raw                                                    | `apps/api/test/request-id.e2e-spec.ts`                                                                      |
 | `healthz` / VAPI raw bodies unchanged                                                                                                                         | `apps/api/test/{health,vapi-webhooks}.e2e-spec.ts`                                                          |
 | Client unwrap, drift, legacy fallback                                                                                                                         | `packages/api-client/test/{http-client,api-keys.service}.test.ts`                                           |
+| Registry ⇄ client service coverage (missing method, missing service, orphan method, malformed `operationId`)                                                  | `packages/api-client/test/service-coverage.test.ts`                                                         |
 | Pure envelope unwrap + payload-relative paths                                                                                                                 | `packages/api-client/test/envelope.logic.test.ts`                                                           |
 | Error-body parsing, `details`/`issues` consistency, guards                                                                                                    | `packages/api-client/test/api-error.test.ts`                                                                |
 | Client path derivation from the registry (`toClientPath`, `clientPathOf`)                                                                                     | `packages/api-client/test/endpoint-path.test.ts`                                                            |
@@ -394,7 +402,7 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 
 ## 13. Known gaps / follow-ups
 
-- The transport is complete (`PUT`/`PATCH`/`DELETE`, `getList`, `toQueryString`, `RequestBodyOf`, `onEvent` — AIS-109), but no **service** consumes the mutation verbs yet: `ApiKeysService` still exposes `list`/`create`. Wiring `findByIdentifier`/`update`/`remove` and switching `list` to `getList` is AIS-110 and the admin list/pagination work. `ETag`/`If-Match`, bulk mutations and idempotency keys are deliberately not part of the `updatedAt` convention.
+- The transport is complete (`PUT`/`PATCH`/`DELETE`, `getList`, `toQueryString`, `RequestBodyOf`, `onEvent` — AIS-109) and `ApiKeysService` now covers **every** registered operation (`list`, `findByIdentifier`, `create`, `update`, `remove` — AIS-110), kept in sync by the coverage gate (§12). What is still missing is the **consumer**: the admin has no edit/delete UI yet, so `update`/`remove` are bound and tested at the service layer only. `ETag`/`If-Match`, bulk mutations and idempotency keys are deliberately not part of the `updatedAt` convention.
 - Soft-deleted rows have no undelete endpoint and no purge job; they stay in `platform.api_keys` with a `deleted_at` stamp.
 - The admin's tier-1 field mapping (§10.1) still only accepts `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT`, so a `422` / `409 STALE_WRITE` currently surfaces as a page `Alert`. Extending the gate (`expiresAt` / `updatedAt`) belongs to the admin edit UI (AIS-109 and later).
 - API-key value masking (**show-once**) is a separate security task (AIS-75); these endpoints still return the token.

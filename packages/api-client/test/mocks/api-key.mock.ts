@@ -6,7 +6,11 @@
  * uuid for `id`.
  */
 
-import type { ApiKey, CreateApiKeyInput } from '@callback/shared';
+import type {
+  ApiKey,
+  CreateApiKeyInput,
+  UpdateApiKeyInput,
+} from '@callback/shared';
 
 /** One valid response row. */
 export const VALID_API_KEY: ApiKey = {
@@ -43,4 +47,32 @@ export const VALID_CREATE_INPUT: CreateApiKeyInput = {
   name: 'Vapi staging',
   identifier: 'vapi-staging',
   apiKey: 'sk-stage-42',
+};
+
+/**
+ * A valid `PATCH /api/api-keys/:identifier` body (AIS-108/AIS-110).
+ *
+ * `updatedAt` repeats {@link VALID_API_KEY}'s version on purpose: the body is
+ * what a client sends *after* reading that row, and the two values belonging
+ * together is the whole point of the concurrency token. `description: null` is
+ * the “clear it” half of the `undefined` / `null` rule, so the test can prove
+ * the wire body keeps the explicit `null` instead of dropping the key.
+ */
+export const VALID_UPDATE_INPUT: UpdateApiKeyInput = {
+  name: 'Vapi production',
+  description: null,
+  updatedAt: VALID_API_KEY.updatedAt,
+};
+
+/**
+ * The version the server reports after a successful `update`.
+ *
+ * Different from {@link VALID_API_KEY.updatedAt} so a test can tell the patched
+ * row from the row that was read.
+ */
+export const UPDATED_API_KEY: ApiKey = {
+  ...VALID_API_KEY,
+  name: 'Vapi production',
+  description: null,
+  updatedAt: '2026-11-03T15:00:00.000Z',
 };

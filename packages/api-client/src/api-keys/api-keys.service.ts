@@ -11,15 +11,22 @@
  * only exists on the list response, and dropping it here would make it
  * unobservable for every consumer above — the generic hook layer (AIS-114) reads
  * exactly that block.
+ *
+ * `update` and `remove` (AIS-110) are the two mutation verbs the registry
+ * publishes but nothing consumed yet. Both address the **same** detail route as
+ * `findByIdentifier`, so they reuse `toApiKeyDetailPath` instead of declaring a
+ * second path constant: one route, one place that knows how `:identifier` looks.
  */
 
 import {
   apiKeyListSchema,
   apiKeySchema,
+  noPayloadSchema,
   type ApiKey,
   type ApiKeyListQuery,
   type ApiResult,
   type CreateApiKeyInput,
+  type UpdateApiKeyInput,
 } from '@callback/shared';
 import {
   API_KEYS_PATH,
@@ -59,5 +66,29 @@ export function createApiKeysService(client: HttpClient): ApiKeysService {
       options?: RequestOptions,
     ): Promise<ApiKey> =>
       client.post(API_KEYS_PATH, input, apiKeySchema, options),
+
+    // `PATCH`, not `PUT`: the convention is a partial update guarded by
+    // `updatedAt`, and the transport validates the response with the same schema
+    // as the reads, so a drift in the updated row surfaces here.
+    update: async (
+      identifier: string,
+      input: UpdateApiKeyInput,
+      options?: RequestOptions,
+    ): Promise<ApiKey> =>
+      client.patch(
+        toApiKeyDetailPath(identifier),
+        input,
+        apiKeySchema,
+        options,
+      ),
+
+    // `noPayloadSchema` is `z.null()`: the transport re-validates `data` with the
+    // bare schema, so a `204`, a missing `data` key or an object payload is a
+    // contract violation instead of a silent success.
+    remove: async (
+      identifier: string,
+      options?: RequestOptions,
+    ): Promise<null> =>
+      client.delete(toApiKeyDetailPath(identifier), noPayloadSchema, options),
   };
 }

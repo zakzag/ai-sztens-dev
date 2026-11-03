@@ -19,9 +19,9 @@
  */
 
 import { ApiError, HTTP_STATUS } from '@callback/api-client';
+import { ERROR_CODE_MESSAGE } from './api-error-code.const.js';
 import {
   CONFLICT_MESSAGE,
-  ERROR_CODE_MESSAGE,
   FORBIDDEN_MESSAGE,
   NETWORK_ERROR_USER_MESSAGE,
   NOT_FOUND_MESSAGE,

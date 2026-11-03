@@ -3,7 +3,6 @@ import {
   type ApiKey,
   type ApiKeyListQuery,
 } from '@callback/shared';
-import { FIELD_SURFACE_CODES } from '../../lib/error-surface.const.js';
 import type { ApiKeyFormFieldName } from './api-keys.interface.js';
 
 /**
@@ -49,19 +48,6 @@ export { API_KEY_IDENTIFIER_FIELD_MESSAGE as API_KEY_IDENTIFIER_CONFLICT_MESSAGE
  */
 export const API_KEY_FIELD_PATHS: readonly ApiKeyFormFieldName[] =
   Object.freeze(['name', 'identifier', 'description', 'apiKey', 'expiresAt']);
-
-/**
- * The only error codes allowed to produce field errors (plan `D1`).
- *
- * Everything else — a `409` from a proxy, a `500`, a forged `CONFLICT` with
- * suspicious paths — stays page-level, because a field error claims “this
- * specific input is wrong”, which only these two codes can honestly say.
- *
- * Re-exported from [`error-surface.const.ts`](../../lib/error-surface.const.ts):
- * `toErrorSurface` classifies the same codes into the `field` tier, so the list
- * has exactly one definition and the two decisions cannot drift apart.
- */
-export const FIELD_ERROR_CODES: readonly string[] = FIELD_SURFACE_CODES;
 
 /**
  * Path a code blames when the server sent no `details[]` (plan `D2`).

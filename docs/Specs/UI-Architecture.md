@@ -1,6 +1,6 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-11-03 (a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
+**Utolsó frissítés:** 2026-11-03 (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **Status:** living document — describes the _current_ state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -42,7 +42,7 @@ what exists in `apps/admin` today, so nobody mistakes a planned folder for an ex
 | `features/<use-case>` | query/mutation hooks, pure `*.logic.ts`                          | **exists**: `features/api-keys/` (`api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `use-api-keys.ts`) and `features/error-surface/` (`use-online-status.ts`, `use-app-error-banner.ts`, `query-error.store.ts`)                                                                                                                                                                                     |
 | `entities/<entity>`   | domain types, pure mappers, display components                   | **exists**: `entities/api-key/` (`api-key.interface.ts`, `api-key.mapper.ts`, `api-key.const.ts`) — mappers only, no display components yet                                                                                                                                                                                                                                                           |
 | `services`            | composition root (client instance + token supplier)              | **exists**: `services/api-client.ts` + `services/api-client.const.ts`                                                                                                                                                                                                                                                                                                                                 |
-| `lib`                 | pure helpers and formatters                                      | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts` (+ their `*.const.ts` / `.interface.ts`)                                                                                                                                                                                                                                                                              |
+| `lib`                 | pure helpers and formatters                                      | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts`, `lib/api-error-code.const.ts` (single code→copy catalogue), `lib/field-errors.logic.ts` (generic failure→form mapping) (+ their `*.const.ts` / `.interface.ts`)                                                                                                                                                        |
 | `components`          | generic presentational shells (no data access)                   | **exists**: `components/BuildInfoFooter.tsx`, `components/error/PageErrorState.tsx`, `components/error/AppErrorBanner.tsx` (the latter is a thin container: all decisions live in `features/error-surface` + `lib/error-surface.*`)                                                                                                                                                                   |
 | `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/handlers/` (MSW network doubles: `api-keys.handlers.ts`, `generic.handlers.ts`, `handler-envelope.ts`), `server.ts`, `render-with-providers.tsx`, `request-recorder.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                         |
 
@@ -162,7 +162,7 @@ no I/O — so no component inspects `status`, `code` or the server `message`.
 | `status === null` (offline, DNS, CORS)              | `banner`             | `AppErrorBanner`        |
 | `401`                                               | `banner` (login CTA) | `AppErrorBanner`        |
 | `503`                                               | `banner`             | `AppErrorBanner`        |
-| field code with `issues[]`                          | `field`              | RHF `setError` (AIS-95) |
+| field code with `issues[]` (§4.1.1)                 | `field`              | RHF `setError` (AIS-95) |
 | everything else (`400`, `403`, `404`, `409`, `5xx`) | `page`               | `PageErrorState`        |
 
 Banner state is derived, never stored: `useOnlineStatus()` mirrors `navigator.onLine`
@@ -171,6 +171,42 @@ Banner state is derived, never stored: `useOnlineStatus()` mirrors `navigator.on
 (a stable snapshot, so React does not loop). Precedence: offline → `401` → `503`; only one
 condition is ever rendered. The only local state is the dismissal flag, reset when the set
 of cached errors changes. Copy: `lib/error-surface.const.ts`; messages: `toErrorMessage`.
+
+#### 4.1.1 One code catalogue (AIS-111)
+
+`lib/api-error-code.const.ts` holds the **single** `code → copy` table.
+`ERROR_CODE_CATALOGUE` is a **total** `Record<ApiErrorCode, ApiErrorCodeCopy>` over the
+shared `API_ERROR_CODE` catalogue, and both derived artefacts are computed from it — they
+are never written by hand:
+
+| Derived export        | Consumed by                                            | Rule                        |
+| --------------------- | ------------------------------------------------------ | --------------------------- |
+| `ERROR_CODE_MESSAGE`  | `toErrorMessage` (page/alert copy)                     | one Hungarian sentence/code |
+| `FIELD_SURFACE_CODES` | `toErrorSurface` (`field` tier) and `toFieldErrors`     | `fieldMessage !== null`     |
+
+Consequence: adding a code to `packages/shared` is a **compile error** here until copy and a
+field decision exist for it. That gap is what the old pair of hand-maintained tables (plus a
+feature re-export) silently hid — `STALE_WRITE` and `SEMANTIC_VALIDATION_FAILED` (AIS-108)
+rendered the generic `409`/`422` sentences until AIS-111.
+
+Field-capable today: `VALIDATION_FAILED`, `SEMANTIC_VALIDATION_FAILED`,
+`API_KEY_IDENTIFIER_CONFLICT`. `STALE_WRITE` is deliberately **not** field-capable: it
+blames `updatedAt`, a hidden concurrency token, so it stays page-level with reload copy.
+
+#### 4.1.2 Failure → form (`lib/field-errors.logic.ts`)
+
+`toFieldErrors<F extends string>(error, { fieldPaths, defaultPathByCode })` is the only
+implementation of “which inputs are wrong, with what copy”. The caller passes the paths its
+form owns; the code→path default (`409` → `identifier`) stays in the **feature**, because
+only it knows its own field names. Rules, in order:
+
+1. cancellation → nothing at all (`silent`, same value as `toErrorSurface`);
+2. not an `ApiError`, or a code outside `FIELD_SURFACE_CODES` → page copy only;
+3. `issues[]` present → one message per owned path (first issue per path wins); an
+   unaddressable path adds one page copy;
+4. `issues[]` empty → `defaultPathByCode` when it names an owned path, otherwise page copy.
+
+The server's `issue.message` is English developer text and is never rendered.
 
 ### 4.1 The `app/` layer (`apps/admin/src/app/`)
 
@@ -412,6 +448,9 @@ Both are dependency-free Node ESM scripts in `scripts/quality/`, sharing a posix
 - **Field-error gate**: the allowlist _is_ the rule — `apps/*/src/lib/error-surface.logic.ts`,
   `apps/*/src/lib/error-message.ts` and `apps/*/src/**/*.logic.ts`. Test code
   (`*.test.ts(x)`, `apps/*/src/test/**`) is out of scope, and exclusion wins over the allowlist.
+  Since AIS-111 the decision functions are `error-surface.logic.ts`, `error-message.ts` and
+  `field-errors.logic.ts`; the catalogue (`api-error-code.const.ts`) holds data only, so it
+  needs no allowlist entry.
 
 ### 9.4 The proof (negative fixtures)
 

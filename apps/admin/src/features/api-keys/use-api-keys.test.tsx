@@ -41,9 +41,11 @@ import {
 } from '../../lib/error-message.const.js';
 import {
   API_KEYS_QUERY_KEYS,
+  API_KEY_FIELD_PATHS,
   API_KEY_IDENTIFIER_CONFLICT_MESSAGE,
+  DEFAULT_FIELD_PATH_BY_CODE,
 } from './api-keys.const.js';
-import { toFieldErrors } from './api-keys.logic.js';
+import { toFieldErrors } from '../../lib/field-errors.logic.js';
 import { useApiKeysQuery, useCreateApiKeyMutation } from './use-api-keys.js';
 
 /** Minimal valid create payload every mutation test submits. */
@@ -60,6 +62,12 @@ const LIST_PARAMS: ApiKeyListQuery = {
   sort: 'createdAt',
   order: 'desc',
 };
+
+/** The field target the create form passes to the shared mapper. */
+const API_KEY_FORM_TARGET = {
+  fieldPaths: API_KEY_FIELD_PATHS,
+  defaultPathByCode: DEFAULT_FIELD_PATH_BY_CODE,
+} as const;
 
 /**
  * @param client - the query client of the test.
@@ -276,7 +284,7 @@ describe('useCreateApiKeyMutation', () => {
       }
     });
 
-    expect(toFieldErrors(caught)).toEqual({
+    expect(toFieldErrors(caught, API_KEY_FORM_TARGET)).toEqual({
       fields: { identifier: API_KEY_IDENTIFIER_CONFLICT_MESSAGE },
       form: null,
     });
@@ -307,7 +315,7 @@ describe('useCreateApiKeyMutation', () => {
     });
 
     expect(caught).toBeInstanceOf(Error);
-    expect(toFieldErrors(caught)).toEqual({
+    expect(toFieldErrors(caught, API_KEY_FORM_TARGET)).toEqual({
       fields: {},
       form: NETWORK_ERROR_USER_MESSAGE,
     });

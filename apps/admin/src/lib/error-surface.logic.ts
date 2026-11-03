@@ -10,12 +10,12 @@
  */
 
 import { ApiError, HTTP_STATUS } from '@callback/api-client';
+import { FIELD_SURFACE_CODES } from './api-error-code.const.js';
 import {
   ABORT_LIKE_ERROR_NAMES,
   BANNER_CONDITION_PRIORITY,
   BANNER_COPY,
   BANNER_DISMISS_LABEL,
-  FIELD_SURFACE_CODES,
 } from './error-surface.const.js';
 import type {
   BannerCondition,

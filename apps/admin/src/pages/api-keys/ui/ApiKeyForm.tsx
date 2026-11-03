@@ -2,9 +2,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Card, Input, Textarea } from '@callback/ui';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { API_KEY_FIELD_PATHS } from '../../../features/api-keys/api-keys.const.js';
-import { toFieldErrors } from '../../../features/api-keys/api-keys.logic.js';
+import {
+  API_KEY_FIELD_PATHS,
+  DEFAULT_FIELD_PATH_BY_CODE,
+} from '../../../features/api-keys/api-keys.const.js';
 import { useCreateApiKeyMutation } from '../../../features/api-keys/use-api-keys.js';
+import { toFieldErrors } from '../../../lib/field-errors.logic.js';
 import {
   API_KEY_FORM_DEFAULTS,
   API_KEY_FORM_ERROR_TITLE,
@@ -28,8 +31,9 @@ import { apiKeyFormSchema, toCreateApiKeyInput } from '../api-keys.logic.js';
  * is where the fields are cleared.
  *
  * Error routing (plan decisions D1, D11 tier 1, D13):
- * - `toFieldErrors` decides: allowed `code` + addressable `details[].path` →
- *   `setError(path)`, one message per input;
+ * - the shared `toFieldErrors` (`lib/field-errors.logic.ts`) decides: allowed
+ *   `code` + addressable `issues[].path` → `setError(path)`, one message per
+ *   input;
  * - whatever the mapping could not address (or a code outside the allow-list) →
  *   the page-level `Alert`, text mapped by `toErrorMessage`.
  *
@@ -76,7 +80,10 @@ export function ApiKeyForm() {
     try {
       await createApiKey(toCreateApiKeyInput(values));
     } catch (error) {
-      const { fields, form } = toFieldErrors(error);
+      const { fields, form } = toFieldErrors(error, {
+        fieldPaths: API_KEY_FIELD_PATHS,
+        defaultPathByCode: DEFAULT_FIELD_PATH_BY_CODE,
+      });
 
       // Iterating the declared field order makes the focus deterministic: the
       // first invalid input in visual order is the one that gets it.

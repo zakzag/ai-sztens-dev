@@ -15,27 +15,17 @@ import type { ErrorSurface } from '../../lib/error-surface.interface.js';
 /**
  * The inputs the create form owns.
  *
- * Declared in the feature layer (not in the page) because `toFieldErrors` has to
- * decide whether a server `path` is addressable; the page derives its
- * `ApiKeyFormValues` from this union, so the two can never drift apart while the
- * import still only flows `pages → features`.
+ * Declared in the feature layer (not in the page) because the shared
+ * `toFieldErrors` has to decide whether a server `path` is addressable; the page
+ * derives its `ApiKeyFormValues` from this union, so the two can never drift
+ * apart while the import still only flows `pages → features`.
+ *
+ * The failure → field mapping itself is generic
+ * (`lib/field-errors.logic.ts`): this union is the target it receives, and the
+ * result type is `FieldErrorMapping<ApiKeyFormFieldName>`.
  */
 export type ApiKeyFormFieldName =
   'name' | 'identifier' | 'description' | 'apiKey' | 'expiresAt';
-
-/**
- * Result of mapping a failure onto the form.
- *
- * `fields` holds one message per identified input, `form` the single message the
- * page `Alert` renders (plan `D11`, tiers 1 and 2). The two are exclusive per
- * failure part: a path that maps produces no page copy.
- */
-export interface ApiKeyFieldErrors {
-  /** Field-level messages, keyed by react-hook-form field name. */
-  readonly fields: Partial<Record<ApiKeyFormFieldName, string>>;
-  /** Page-level message, or `null` when every issue landed on a field. */
-  readonly form: string | null;
-}
 
 /**
  * Read side: the stored keys plus everything the four UI states need.

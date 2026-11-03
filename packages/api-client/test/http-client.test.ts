@@ -13,6 +13,8 @@ import {
   isValidationError,
 } from '../src/api-error.js';
 import { createHttpClient, joinUrl } from '../src/http-client.js';
+import { UnresolvedPathParameterError } from '../src/endpoint-path.js';
+import type { HttpEvent } from '../src/http-client.interface.js';
 import type { RecordedCall } from './mocks/fetch.mock.js';
 import {
   TEST_META,
@@ -21,6 +23,7 @@ import {
   emptyResponse,
   errorResponse,
   jsonResponse,
+  paginatedResponse,
   successResponse,
   textResponse,
 } from './mocks/fetch.mock.js';
@@ -531,5 +534,434 @@ describe('createHttpClient — transport failures', () => {
       .catch((caught: unknown) => caught);
 
     expect((error as ApiError).cause).toBe(rootCause);
+  });
+});
+
+describe('createHttpClient — PUT', () => {
+  it('serialises the body, advertises JSON and unwraps the envelope', async () => {
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'replaced' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const result = await client.put(
+      '/items/1',
+      { name: 'replaced' },
+      itemSchema,
+    );
+
+    expect(result).toEqual({ id: '1', name: 'replaced' });
+    expect(fetchMock.calls[0]?.init?.method).toBe('PUT');
+    expect(readBody(fetchMock.calls[0])).toEqual({ name: 'replaced' });
+    expect(readHeader(fetchMock.calls[0], 'Content-Type')).toBe(
+      'application/json',
+    );
+  });
+
+  it('maps a 404 to a not-found ApiError', async () => {
+    const fetchMock = createSequenceFetchMock([
+      errorResponse({ code: 'NOT_FOUND', status: 404, message: 'gone' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const error = await client
+      .put('/items/1', {}, itemSchema)
+      .catch((caught: unknown) => caught);
+
+    expect(isNotFoundError(error)).toBe(true);
+    expect((error as ApiError).status).toBe(404);
+  });
+});
+
+describe('createHttpClient — PATCH', () => {
+  it('sends only the changed fields plus the concurrency token', async () => {
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'renamed' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const result = await client.patch(
+      '/items/1',
+      { name: 'renamed', updatedAt: '2026-10-21T15:00:00.000Z' },
+      itemSchema,
+    );
+
+    expect(result.name).toBe('renamed');
+    expect(fetchMock.calls[0]?.init?.method).toBe('PATCH');
+    expect(readBody(fetchMock.calls[0])).toEqual({
+      name: 'renamed',
+      updatedAt: '2026-10-21T15:00:00.000Z',
+    });
+  });
+
+  it('exposes a 409 STALE_WRITE code with its field issue', async () => {
+    const fetchMock = createSequenceFetchMock([
+      errorResponse({
+        code: 'STALE_WRITE',
+        status: 409,
+        message: 'The row changed since it was read.',
+        details: [{ path: 'updatedAt', message: 'stale version' }],
+      }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const error = await client
+      .patch('/items/1', { name: 'x', updatedAt: 'old' }, itemSchema)
+      .catch((caught: unknown) => caught);
+
+    expect(isConflict(error)).toBe(true);
+    expect((error as ApiError).code).toBe('STALE_WRITE');
+    expect((error as ApiError).issues[0]?.path).toBe('updatedAt');
+  });
+});
+
+describe('createHttpClient — DELETE', () => {
+  it('sends no body and no Content-Type', async () => {
+    const fetchMock = createSequenceFetchMock([successResponse(null)]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    await expect(client.delete('/items/1', z.null())).resolves.toBeNull();
+
+    expect(fetchMock.calls[0]?.init?.method).toBe('DELETE');
+    expect(fetchMock.calls[0]?.init?.body).toBeUndefined();
+    expect(readHeader(fetchMock.calls[0], 'Content-Type')).toBeUndefined();
+  });
+
+  it('maps a 404 of a soft-deleted row to a not-found ApiError', async () => {
+    const fetchMock = createSequenceFetchMock([
+      errorResponse({ code: 'NOT_FOUND', status: 404, message: 'gone' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const error = await client
+      .delete('/items/1', z.null())
+      .catch((caught: unknown) => caught);
+
+    expect(isNotFoundError(error)).toBe(true);
+  });
+
+  it('rejects a 200 body that is not `data: null`', async () => {
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'still here' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    await expect(client.delete('/items/1', z.null())).rejects.toMatchObject({
+      code: UNEXPECTED_PAYLOAD_CODE,
+    });
+  });
+});
+
+describe('createHttpClient — getList', () => {
+  it('returns the rows and the pagination block', async () => {
+    const fetchMock = createSequenceFetchMock([
+      paginatedResponse([{ id: '1', name: 'first' }], {
+        total: 42,
+        totalPages: 3,
+      }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const result = await client.getList('/items', z.array(itemSchema), {
+      query: { page: 1, limit: 20, order: 'desc' },
+    });
+
+    expect(result.data).toEqual([{ id: '1', name: 'first' }]);
+    expect(result.meta.pagination).toEqual({
+      page: 1,
+      limit: 20,
+      total: 42,
+      totalPages: 3,
+    });
+    expect(fetchMock.calls[0]?.init?.method).toBe('GET');
+  });
+
+  it('sends no query string when every field is at its default', async () => {
+    const fetchMock = createSequenceFetchMock([paginatedResponse([])]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    await client.getList('/items', z.array(itemSchema), {
+      query: { page: 1, limit: 20, order: 'desc' },
+    });
+
+    expect(fetchMock.calls[0]?.url).toBe(`${BASE_URL}/items`);
+  });
+
+  it('encodes only the changed fields', async () => {
+    const fetchMock = createSequenceFetchMock([paginatedResponse([])]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    await client.getList('/items', z.array(itemSchema), {
+      query: { page: 2, limit: 20, order: 'desc', sort: 'name' },
+    });
+
+    expect(fetchMock.calls[0]?.url).toBe(`${BASE_URL}/items?page=2&sort=name`);
+  });
+
+  it('omits the resource default sort', async () => {
+    const fetchMock = createSequenceFetchMock([paginatedResponse([])]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    await client.getList('/items', z.array(itemSchema), {
+      query: { page: 1, limit: 20, order: 'desc', sort: 'name' },
+      defaults: { limit: 20, order: 'desc', sort: 'name' },
+    });
+
+    expect(fetchMock.calls[0]?.url).toBe(`${BASE_URL}/items`);
+  });
+
+  it('turns null rows into an empty page', async () => {
+    const fetchMock = createSequenceFetchMock([
+      paginatedResponse(null, { total: 0, totalPages: 0 }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const result = await client.getList('/items', z.array(itemSchema), {
+      query: { page: 1, limit: 20, order: 'desc' },
+    });
+
+    expect(result.data).toEqual([]);
+  });
+
+  it('fails with UNEXPECTED_PAYLOAD when meta.pagination is missing', async () => {
+    const fetchMock = createSequenceFetchMock([
+      successResponse([{ id: '1', name: 'first' }]),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const error = await client
+      .getList('/items', z.array(itemSchema), {
+        query: { page: 1, limit: 20, order: 'desc' },
+      })
+      .catch((caught: unknown) => caught);
+
+    expect((error as ApiError).code).toBe(UNEXPECTED_PAYLOAD_CODE);
+    expect((error as ApiError).issues[0]?.path).toBe('meta.pagination');
+  });
+
+  it('maps a 400 of the query validation to a validation error', async () => {
+    const fetchMock = createSequenceFetchMock([
+      errorResponse({
+        code: 'VALIDATION_FAILED',
+        status: 400,
+        message: 'The request payload does not match the API contract.',
+        details: [{ path: 'limit', message: 'Too big' }],
+      }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    const error = await client
+      .getList('/items', z.array(itemSchema), {
+        query: { page: 1, limit: 20, order: 'desc' },
+      })
+      .catch((caught: unknown) => caught);
+
+    expect(isValidationError(error)).toBe(true);
+    expect((error as ApiError).details).toEqual(['limit: Too big']);
+  });
+});
+
+describe('createHttpClient — onEvent', () => {
+  it('reports a successful attempt without leaking the request', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'first' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      getToken: () => 'session-token',
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      method: 'GET',
+      path: '/items',
+      status: 200,
+      outcome: 'success',
+    });
+    expect(Number.isFinite(events[0]?.durationMs)).toBe(true);
+    expect(events[0]?.durationMs).toBeGreaterThanOrEqual(0);
+    // The event carries exactly these keys: there is no header, token or body
+    // field on the type, so a listener cannot leak the request.
+    expect(Object.keys(events[0] ?? {}).sort()).toEqual([
+      'durationMs',
+      'method',
+      'outcome',
+      'path',
+      'status',
+    ]);
+  });
+
+  it('reports a failed status as an error with the status kept', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      errorResponse({ code: 'NOT_FOUND', status: 404, message: 'gone' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema).catch(() => undefined);
+
+    expect(events[0]).toMatchObject({
+      method: 'GET',
+      status: 404,
+      outcome: 'error',
+    });
+  });
+
+  it('reports a dead network with a null status', async () => {
+    const events: HttpEvent[] = [];
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: createRejectingFetchMock().fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema).catch(() => undefined);
+
+    expect(events[0]).toMatchObject({ status: null, outcome: 'error' });
+  });
+
+  it('reports a contract drift as an error even though the status is 2xx', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      jsonResponse({ id: '1', name: 'first' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema).catch(() => undefined);
+
+    expect(events[0]).toMatchObject({ status: 200, outcome: 'error' });
+  });
+
+  it('reports the path without the query string', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([paginatedResponse([])]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.getList('/items', z.array(itemSchema), {
+      query: { page: 3, limit: 20, order: 'desc' },
+    });
+
+    expect(events[0]?.path).toBe('/items');
+  });
+
+  it('does not fail the request when the listener throws', async () => {
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'first' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: () => {
+        throw new Error('sink is down');
+      },
+    });
+
+    await expect(client.get('/items', itemSchema)).resolves.toEqual({
+      id: '1',
+      name: 'first',
+    });
+  });
+
+  it('emits nothing when no listener is configured', async () => {
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'first' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    await expect(client.get('/items', itemSchema)).resolves.toBeDefined();
+  });
+});
+
+describe('createHttpClient — unresolved path parameter', () => {
+  it('rejects before fetching anything', async () => {
+    const fetchMock = createSequenceFetchMock([successResponse(null)]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+    });
+
+    await expect(
+      client.delete('/items/:identifier', z.null()),
+    ).rejects.toBeInstanceOf(UnresolvedPathParameterError);
+
+    expect(fetchMock.calls).toHaveLength(0);
+  });
+
+  it('emits no event for a path it never called', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([successResponse(null)]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client
+      .patch('/items/:identifier', {}, itemSchema)
+      .catch(() => undefined);
+
+    expect(events).toEqual([]);
   });
 });

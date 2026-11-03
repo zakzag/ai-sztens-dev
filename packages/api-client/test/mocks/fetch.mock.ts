@@ -73,6 +73,44 @@ export function successResponse(data: unknown, status = 200): Response {
   return jsonResponse({ data, meta: TEST_META }, status);
 }
 
+/** Fixed `meta.pagination` used by the list doubles (one row, one page). */
+export const TEST_PAGINATION = {
+  page: 1,
+  limit: 20,
+  total: 1,
+  totalPages: 1,
+} as const;
+
+/**
+ * Builds the `meta` block of a paginated response.
+ *
+ * @param overrides - pagination values to override (e.g. `{ total: 0 }`).
+ */
+export function paginatedMeta(
+  overrides: Partial<typeof TEST_PAGINATION> = {},
+): typeof TEST_META & { pagination: typeof TEST_PAGINATION } {
+  return {
+    ...TEST_META,
+    pagination: { ...TEST_PAGINATION, ...overrides },
+  };
+}
+
+/**
+ * Builds a paginated success response (`{ data, meta.pagination }`).
+ *
+ * @param data - rows of the current page (`null` is a server bug, kept for the
+ *   drift tests).
+ * @param overrides - pagination values to override.
+ * @param status - HTTP status (default 200).
+ */
+export function paginatedResponse(
+  data: unknown,
+  overrides: Partial<typeof TEST_PAGINATION> = {},
+  status = 200,
+): Response {
+  return jsonResponse({ data, meta: paginatedMeta(overrides) }, status);
+}
+
 /** Input of {@link errorResponse}: the facts a test wants to assert on. */
 export interface ErrorResponseInput {
   readonly code: string;

@@ -51,13 +51,22 @@ const LIST_EXAMPLE_PAGINATION = {
   totalPages: 1,
 } as const;
 
-/** All documented endpoints of the `api-keys` feature. */
-export const API_KEYS_ENDPOINTS: readonly ApiEndpointContract[] = [
+/**
+ * All documented endpoints of the `api-keys` feature.
+ *
+ * The `as const satisfies` pair matters (AIS-109): `satisfies` proves the array
+ * is still a valid endpoint list, while `as const` keeps the **literal** type of
+ * every entry — including the concrete zod type of `requestSchema`. Without it
+ * the annotation would widen `requestSchema` to `z.ZodTypeAny`, and
+ * {@link RequestBodyOf} could not derive a request-body type from the registry.
+ */
+export const API_KEYS_ENDPOINTS = [
   {
     operationId: 'apiKeys.list',
     method: 'GET',
     path: API_KEYS_PATH,
-    summary: 'List stored API keys, paginated and sorted, newest first by default',
+    summary:
+      'List stored API keys, paginated and sorted, newest first by default',
     tag: 'api-keys',
     successStatus: 200,
     dataSchema: apiKeyListSchema,
@@ -129,4 +138,4 @@ export const API_KEYS_ENDPOINTS: readonly ApiEndpointContract[] = [
     errors: [API_ERROR_CODE.NOT_FOUND, ...COMMON_ERRORS],
     envelope: true,
   },
-];
+] as const satisfies readonly ApiEndpointContract[];

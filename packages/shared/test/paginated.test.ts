@@ -73,6 +73,19 @@ describe('paginatedSchema', () => {
     expect(() => schema.parse({ data: [], meta: META })).toThrow();
   });
 
+  it('reports a missing meta.pagination with its issue path', () => {
+    // AIS-109: the client maps this path onto the pager, so the failure has to
+    // be an ordinary zod issue at `meta.pagination` — not a thrown error, which
+    // zod reports with an empty path.
+    const parsed = schema.safeParse({ data: [], meta: META });
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.success === false && parsed.error.issues[0]?.path).toEqual([
+      'meta',
+      'pagination',
+    ]);
+  });
+
   it('rejects a response without a meta at all', () => {
     expect(() => schema.parse({ data: [] })).toThrow();
   });

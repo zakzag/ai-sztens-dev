@@ -12,7 +12,24 @@
 
 import { z } from 'zod';
 import type { ApiResult } from './api-result.interface.js';
-import { responseMetaSchema } from './envelope.schema.js';
+import { paginationMetaSchema, responseMetaSchema } from './envelope.schema.js';
+
+/**
+ * `meta` of a paginated response: the shared meta **plus a required pagination**.
+ *
+ * Deriving it with `.extend()` instead of re-declaring the fields keeps
+ * `requestId`/`timestamp` validated by exactly the same schema as every other
+ * response. Overriding `pagination` from `.optional()` to required is what makes
+ * a missing block a normal zod issue at path `meta.pagination` (AIS-109).
+ *
+ * Why it is not a `throw` inside the transform any more: zod reports a thrown
+ * error as a `custom` issue with an **empty** path, so a client could only find
+ * out *where* the contract broke by matching the message string. A required
+ * field produces the path for free.
+ */
+const paginatedMetaSchema = responseMetaSchema.extend({
+  pagination: paginationMetaSchema,
+});
 
 /**
  * Builds the schema of one paginated list response.
@@ -37,16 +54,10 @@ export function paginatedSchema<TRows>(
   return z
     .object({
       data: rowsSchema.nullable(),
-      meta: responseMetaSchema,
+      meta: paginatedMetaSchema,
     })
-    .transform((body): ApiResult<TRows> => {
-      if (body.meta.pagination === undefined) {
-        throw new Error('a paginated response must carry meta.pagination');
-      }
-
-      return {
-        data: body.data ?? ([] as unknown as TRows),
-        meta: { ...body.meta, pagination: body.meta.pagination },
-      };
-    });
+    .transform((body): ApiResult<TRows> => ({
+      data: body.data ?? ([] as unknown as TRows),
+      meta: body.meta,
+    }));
 }

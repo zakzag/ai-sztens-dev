@@ -109,6 +109,8 @@ export type {
   ApiQueryParameterContract,
 } from './contract/endpoint.interface.js';
 
+export type { RequestBodyOf } from './contract/endpoint.body.js';
+
 export { API_KEYS_ENDPOINTS } from './contract/api-keys/api-keys.contract.js';
 
 export {

@@ -1,6 +1,9 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
 **Utolsó frissítés:** 2026-11-03 (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
+**AIS-116 (2026-11-03):** hét data-display primitív — `Skeleton`, `Spinner`, `EmptyState`,
+`DescriptionList`, `StatusBadge`, `Pagination`, `DataTable` (lásd §4) —, és a teljes `api-keys`
+oldal rájuk állítva: lap/lapméret/rendezés az URL-ben, működő lapozóval (§5).
 **Status:** living document — describes the _current_ state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -145,9 +148,19 @@ three rules above; see §9 for its negative fixture and its exemption list.
 | `Badge`                                                                            | `variant`: `neutral` \| `info` \| `success` \| `warning` \| `danger`                                  | Variant names are the shared vocabulary for domain mappers.                                                                                                                                                                                                                                                                                                                        |
 | `Alert`                                                                            | `variant`: `info` \| `success` \| `warning` \| `danger`, `title`                                      | `danger` is announced as `role="alert"`, the others as `role="status"`.                                                                                                                                                                                                                                                                                                            |
 | `Banner`                                                                           | `variant`: `info` \| `warning` \| `danger`, `title`, `action`, `onDismiss` + `dismissLabel`           | App-level, full-width strip for a _persistent condition_ (offline / expired session / 503). `danger` → `role="alert"`, the others → `role="status"`. The props type makes `dismissLabel` mandatory whenever `onDismiss` is given, so the close control always has an accessible name. No timer: the banner disappears only when the condition ends or the user closes it (AIS-96). |
+| `Skeleton`                                                                         | `shape`: `line` \| `field` \| `row`; `lines`                                                          | Static placeholder (**D3**): sunken surface + inset shadow, **no** pulse — `theme.css` carries no motion token for it. The whole tree is `aria-hidden`; the loading sentence belongs to the surrounding region.                                                                                                                                                                   |
+| `Spinner`                                                                          | `size`: `sm` \| `md`; `label` (default `Betöltés…`)                                                   | `role="status"` on the wrapper, the ring is `aria-hidden`, the label is `sr-only`. Ring drawn from border tokens only (`border-border-strong` + `border-t-primary`).                                                                                                                                                                                                               |
+| `EmptyState`                                                                       | `title`, `description`, `action?: { label, onAction }`                                                | The “success, but no rows” state. Root is `role="status" aria-label={title}`; the CTA's `aria-label` is `` `${label} — ${title}` `` so a repeated button text stays unambiguous. Works without a CTA.                                                                                                                                                                              |
+| `DescriptionList`                                                                  | `items: { label, value }[]`, `isLoading`, `empty`, `columns`: `1` \| `2`                              | A real `<dl>`/`<dt>`/`<dd>` (each pair in a `div`, allowed since HTML 5.2). `isLoading` renders skeleton rows and **no** `dd`; empty renders the `empty` slot (or one neutral line).                                                                                                                                                                                              |
+| `StatusBadge`                                                                      | `status`, `label`, `variant` (the `Badge` vocabulary)                                                 | `<Badge variant data-status={status}>`. Adds **no** colour: the `status → variant` mapper stays in `entities/`.                                                                                                                                                                                                                                                                   |
+| `Pagination`                                                                       | `meta: PaginationMeta`, `onPageChange`, `onLimitChange?`, `limitOptions?`, `ariaLabel?`               | Structurally typed (**D1**) so `meta.pagination` from `@callback/shared` is assignable without a mapper — the UI package does not depend on the contract. `<nav>`, `aria-current="page"`, labelled prev/next, `<label>` + `<select>` for the page size. Pure rules in `pagination.logic.ts` (`toVisiblePages`, `toRangeLabel`, `clampLimit`).                                        |
+| `DataTable`                                                                        | `rows`, `columns`, `rowKey`, `sort`, `onSortChange`, `isLoading`, `loadingRowCount`, `empty`, `caption`, `rowActions` | Composes the six `Table*` primitives (**Út A**, no `@tanstack/react-table`). It **never sorts locally** (**D2**) — it reports intent, the server owns the order. Sortable header = `<button>` inside the `<th>`, `aria-sort` on the `<th>`. Loading keeps the header and renders placeholders; empty renders the `empty` slot (default `EmptyState`).                    |
 
 Exports are explicit from `packages/ui/src/index.ts` (no `export *`). `cn()` is
 exported too so pages can merge caller classes with the recipe classes.
+The seven data-display primitives above arrived with **AIS-116**; the accessible names the
+pager uses (`PAGINATION_NEXT_LABEL`, …) are exported as well, so a page test asserts against
+the same constant the component renders.
 
 ### 4.1 Error surfaces (AIS-96)
 
@@ -265,9 +278,26 @@ global store; the only global store is the session store.
 read from and written back to the URL through [`features/api/use-list-params.ts`](../../apps/admin/src/features/api/use-list-params.ts:1)
 (`useListParams(schema)`), so they are **not** page UI state and never enter a Zustand store.
 The hook is generic and takes the resource's shared list-query schema as a parameter; the
-parsed `params` is what a future `useApiList` (AIS-114) feeds into a TanStack Query key.
+parsed `params` is what the generic `useApiList` (AIS-114) feeds into a TanStack Query key.
 `zustand` therefore stays **uninstalled** — add it to §7 only when a page genuinely needs
 transient UI state (open drawer, selected row, column filters).
+
+**AIS-116 closed the loop on `pages/api-keys`:** the page now *renders* what the URL says and
+*writes* back what the user asks for, so the row above still holds “no page store”:
+
+| Interaction | URL write | UI |
+| ----------- | --------- | -- |
+| next/previous page, page number | `setParam('page', n)` | `Pagination` (`meta.pagination`) |
+| page size | `setParam('limit', n)` (`API_KEYS_LIMIT_OPTIONS`: 20 / 50 / 100) | `Pagination` limit `<select>` |
+| sortable header click | `setParams(toSortParams(sort))` — **one** write for `sort` + `order`, page reset to 1 (**D4**) | `DataTable` `aria-sort` |
+
+Two `setParam` calls would each rebuild the URL from the same pre-render `params`, so the first
+change would be lost (and two history entries created). That is why `setParams(patch)` exists and
+why `toSortParams` returns a patch instead of writing twice. The same change fixed the write path
+in `useListParams`: the URL builder now compares against the **schema** defaults, not against the
+candidate's own values — otherwise `sort`, `order` and `limit` were silently dropped from the URL.
+The table still owns nothing: the failure stays `PageErrorState` (`D11`), and the sorted column is
+`toTableSort(params)` computed from the URL on every render.
 
 ## 6. New page recipe
 
@@ -318,6 +348,12 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 
 Adding a dependency requires updating this table in the same change. Rows marked
 _planned_ must not be read as available.
+
+**AIS-116 added no dependency at all** (decision **Út A**): the data-display primitives compose the
+existing `Table*` components instead of adopting `@tanstack/react-table`, because both the sorting
+and the paging are **server-side** (`sort`/`order`/`page` are query fields) and the API caps a page
+at 100 rows — a client-side sorting engine and virtualisation would be dead code plus a second
+table implementation to migrate. `packages/ui/package.json` is unchanged.
 
 ## 8. Verification commands
 

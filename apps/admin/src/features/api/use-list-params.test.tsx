@@ -104,4 +104,39 @@ describe('useListParams', () => {
 
     expect(getSearch()).not.toContain('sort');
   });
+
+  it('writes a two-field patch as one URL state and resets the page', () => {
+    const schema = createListQuerySchema(['name', 'createdAt'], 'createdAt');
+    const { result, getSearch } = renderHookWithRouter(
+      () => useListParams(schema),
+      { initialEntries: ['/api-keys?page=3'] },
+    );
+
+    act(() => {
+      result.current.setParams({ sort: 'name', order: 'asc' });
+    });
+
+    // Both fields in the same URL state is the proof of the single write
+    // (AIS-116 D4): a second write built from the pre-render `params` would have
+    // replaced the first, leaving only `order` behind.
+    const searchParams = new URLSearchParams(getSearch());
+    expect(searchParams.get('sort')).toBe('name');
+    expect(searchParams.get('order')).toBe('asc');
+    expect(searchParams.get('page')).toBeNull();
+    expect(result.current.params.page).toBe(1);
+  });
+
+  it('drops an invalid patch value back to its default', () => {
+    const { result, getSearch } = renderHookWithRouter(
+      () => useListParams(listQuerySchema),
+      { initialEntries: ['/api-keys'] },
+    );
+
+    act(() => {
+      result.current.setParams({ limit: 999 });
+    });
+
+    expect(result.current.params.limit).toBe(20);
+    expect(getSearch()).not.toContain('limit=999');
+  });
 });

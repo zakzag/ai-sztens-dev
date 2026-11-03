@@ -121,6 +121,67 @@ export function applyPageReset<TParams extends ListParams>(
 }
 
 /**
+ * Applies a **multi-field** patch in one step (AIS-116 decision D4).
+ *
+ * A sort header click changes two fields at once (`sort` and `order`). Two
+ * consecutive single-field writes would build the second URL from the stale
+ * query of the first render, so the first field would be lost — and the browser
+ * would also get two history entries for one interaction. This function is the
+ * merge, so the hook can perform exactly one `setSearchParams` call.
+ *
+ * The returned object is a fresh one; neither input is mutated.
+ *
+ * @param params - the current query.
+ * @param patch - the fields to change.
+ * @param pageField - the query field that is a page number; defaults to
+ *   {@link LIST_PARAMS_PAGE_FIELD}.
+ * @returns the query with the patch applied and the page reset where required.
+ */
+export function applyListParamsPatch<TParams extends ListParams>(
+  params: TParams,
+  patch: Partial<TParams>,
+  pageField: string = LIST_PARAMS_PAGE_FIELD,
+): TParams {
+  // The generic spread cannot be narrowed into a concrete `page` override without
+  // a cast; `page` is a known member of `ListParams`, so the cast here restates
+  // what the type parameter already guarantees.
+  const merged = { ...params, ...patch } as TParams;
+  const onlyPageChanged = Object.keys(patch).every((name) => name === pageField);
+
+  if (onlyPageChanged) {
+    return merged;
+  }
+
+  return { ...merged, page: LIST_PARAMS_DEFAULT_PAGE } as TParams;
+}
+
+/**
+ * Puts the patched fields back to their schema defaults.
+ *
+ * Used when the merged candidate failed the schema: plan D5 says an invalid
+ * value is *dropped* (the field returns to its default), never thrown, and never
+ * left in the URL in a state the server would reject.
+ *
+ * @param params - the current query (the untouched fields).
+ * @param patch - the fields that were attempted.
+ * @param defaults - the schema defaults every field falls back to.
+ * @returns the query with the patched fields defaulted.
+ */
+export function applyPatchDefaults<TParams extends ListParams>(
+  params: TParams,
+  patch: Partial<TParams>,
+  defaults: TParams,
+): TParams {
+  const fallback: Partial<TParams> = {};
+
+  for (const name of Object.keys(patch) as (keyof TParams)[]) {
+    fallback[name] = defaults[name];
+  }
+
+  return { ...params, ...fallback };
+}
+
+/**
  * Serialises a parsed query into URL search params, omitting the defaults.
  *
  * @param params - the query to write.

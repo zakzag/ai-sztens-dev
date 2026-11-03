@@ -13,7 +13,9 @@ import type {
   ListParamsSchema,
 } from './use-list-params.interface.js';
 import {
+  applyListParamsPatch,
   applyPageReset,
+  applyPatchDefaults,
   ListParamsError,
   parseListParams,
   parseListParamsDefaults,
@@ -99,6 +101,73 @@ describe('applyPageReset', () => {
 
   it('keeps the page when the page itself changes', () => {
     expect(applyPageReset(query, 'page')).toEqual(query);
+  });
+});
+
+describe('applyListParamsPatch', () => {
+  const query: ListParams = {
+    page: 3,
+    limit: 20,
+    order: 'desc',
+    q: undefined,
+  };
+
+  it('applies several fields in one step and resets the page', () => {
+    expect(applyListParamsPatch(query, { order: 'asc', q: 'x' })).toEqual({
+      page: 1,
+      limit: 20,
+      order: 'asc',
+      q: 'x',
+    });
+  });
+
+  it('keeps the page when only the page is patched', () => {
+    expect(applyListParamsPatch(query, { page: 5 })).toEqual({
+      ...query,
+      page: 5,
+    });
+  });
+
+  it('accepts a custom page field name', () => {
+    expect(applyListParamsPatch(query, { page: 5 }, 'page').page).toBe(5);
+  });
+
+  it('does not mutate the query it was given', () => {
+    const original: ListParams = { ...query };
+
+    applyListParamsPatch(query, { order: 'asc' });
+
+    expect(query).toEqual(original);
+  });
+});
+
+describe('applyPatchDefaults', () => {
+  const defaults: ListParams = {
+    page: 1,
+    limit: 20,
+    order: 'desc',
+    q: undefined,
+  };
+  const query: ListParams = {
+    page: 3,
+    limit: 50,
+    order: 'asc',
+    q: 'abc',
+  };
+
+  it('puts every patched field back to its default', () => {
+    expect(applyPatchDefaults(query, { limit: 999, q: 'x' }, defaults)).toEqual({
+      page: 3,
+      limit: 20,
+      order: 'asc',
+      q: undefined,
+    });
+  });
+
+  it('keeps the fields the patch did not touch', () => {
+    expect(applyPatchDefaults(query, { limit: 999 }, defaults).order).toBe(
+      'asc',
+    );
   });
 });
 

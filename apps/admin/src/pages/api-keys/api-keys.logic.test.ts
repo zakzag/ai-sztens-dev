@@ -9,9 +9,17 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { ApiKeyListQuery } from '@callback/shared';
+import type { DataTableSort } from '@callback/ui';
 import { API_KEY_FORM_VALIDATION_MESSAGES } from './api-keys.const.js';
 import type { ApiKeyFormValues } from './api-keys.interface.js';
-import { apiKeyFormSchema, toCreateApiKeyInput } from './api-keys.logic.js';
+import {
+  apiKeyFormSchema,
+  isApiKeySortable,
+  toCreateApiKeyInput,
+  toSortParams,
+  toTableSort,
+} from './api-keys.logic.js';
 
 /** Minimal, valid values; individual tests override one field at a time. */
 const VALID_VALUES: ApiKeyFormValues = {
@@ -196,5 +204,48 @@ describe('toCreateApiKeyInput', () => {
     expect(() =>
       toCreateApiKeyInput(withValues({ expiresAt: '2027-13-01' })),
     ).toThrow(RangeError);
+  });
+});
+
+describe('isApiKeySortable', () => {
+  it('accepts a column of the contract allow-list', () => {
+    expect(isApiKeySortable('name')).toBe(true);
+    expect(isApiKeySortable('expiresAt')).toBe(true);
+  });
+
+  it('rejects a column that is not sortable', () => {
+    expect(isApiKeySortable('description')).toBe(false);
+    expect(isApiKeySortable('metadata')).toBe(false);
+  });
+});
+
+describe('toTableSort', () => {
+  it('maps the parsed URL query onto the table sort', () => {
+    const params: ApiKeyListQuery = {
+      page: 1,
+      limit: 20,
+      order: 'asc',
+      q: undefined,
+      sort: 'name',
+    };
+
+    expect(toTableSort(params)).toEqual({ columnId: 'name', order: 'asc' });
+  });
+});
+
+describe('toSortParams', () => {
+  it('maps a table sort back onto the URL query fields', () => {
+    const sort: DataTableSort = { columnId: 'identifier', order: 'desc' };
+
+    expect(toSortParams(sort)).toEqual({
+      sort: 'identifier',
+      order: 'desc',
+    });
+  });
+
+  it('falls back to the contract default for an unknown column', () => {
+    const sort: DataTableSort = { columnId: 'description', order: 'asc' };
+
+    expect(toSortParams(sort).sort).toBe('createdAt');
   });
 });

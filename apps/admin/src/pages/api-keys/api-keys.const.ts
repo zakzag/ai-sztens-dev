@@ -6,6 +6,10 @@
  * same constant the UI renders instead of a hard-coded string.
  */
 
+import {
+  LIST_QUERY_DEFAULT_LIMIT,
+  LIST_QUERY_MAX_LIMIT,
+} from '@callback/shared';
 import type { ApiKeyFormFieldName } from '../../features/api-keys/api-keys.interface.js';
 import type { ApiKeyFormValues } from './api-keys.interface.js';
 
@@ -32,6 +36,20 @@ export const API_KEY_COLUMNS = {
   description: 'Leírás',
   expiresAt: 'Lejárat',
 } as const;
+
+/**
+ * Page sizes the pager offers: the contract default, a middle value and the
+ * contract maximum.
+ *
+ * Declared by the **page**, not by `@callback/ui`: the primitive must not import
+ * `@callback/shared`, so the numbers are injected here, where the contract is
+ * already known (AIS-116 §7.3).
+ */
+export const API_KEYS_LIMIT_OPTIONS: readonly number[] = Object.freeze([
+  LIST_QUERY_DEFAULT_LIMIT,
+  50,
+  LIST_QUERY_MAX_LIMIT,
+]);
 
 /** Form section. */
 export const API_KEY_FORM_TITLE = 'Új API kulcs felvitele';

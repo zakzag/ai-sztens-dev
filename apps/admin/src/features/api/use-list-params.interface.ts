@@ -39,6 +39,14 @@ export interface UseListParamsResult<TParams extends ListParams> {
     name: K,
     value: TParams[K],
   ) => void;
+  /**
+   * Writes several fields with **one** URL write.
+   *
+   * Required for interactions that change more than one field at a time — a sort
+   * header click sets `sort` and `order` — because two consecutive `setParam`
+   * calls would each rebuild the URL from the same stale `params` (AIS-116 D4).
+   */
+  readonly setParams: (patch: Partial<TParams>) => void;
   /** Removes every list param from the URL (defaults stay implied). */
   readonly resetParams: () => void;
 }

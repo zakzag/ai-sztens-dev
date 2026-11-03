@@ -1,6 +1,6 @@
 # Admin Data Flow — contract → transport → service → hook → UI
 
-**Utolsó frissítés:** 2026-11-03 (AIS-110: „New resource template” szekció + registry ⇄ service lefedettségi kapu)
+**Utolsó frissítés:** 2026-11-03 (AIS-116: a lista-recept — `useListParams → useApiList → DataTable`/`Pagination`; AIS-110: „New resource template” szekció + registry ⇄ service lefedettségi kapu)
 **Story:** AIS-102 (data flow), AIS-110 (client operation coverage + resource template)
 **Status:** living document — a jelenlegi állapotot írja le, nem pillanatképet.
 
@@ -115,6 +115,38 @@ SEMANTIC_VALIDATION_FAILED`, soft delete → `404`) a [`API-Convention.md`](API-
 A mapper és a display-komponensek az `entities`-ben, a kompozíció a `pages`-ben. Az „új oldal” recept
 lépésről lépésre a [`UI-Architecture.md`](UI-Architecture.md) §12-ben van — ott a state-tábla sorát is
 fel kell venni.
+
+### 3.6 Egy lista adatfolyama (AIS-116)
+
+Egy lapozott lista **egy** vonalon fut, és minden lépésnek megvan a maga helye. Az `api-keys` a
+referencia:
+
+```text
+URL (?page=&limit=&sort=&order=&q=)
+  → useListParams(apiKeyListQuerySchema)      features/api/use-list-params.ts   (parse + write, egy setParams = egy URL-írás)
+  → useApiKeysQuery(params)                   features/api-keys/use-api-keys.ts (a params a query key-ben)
+  → useApiList { data, meta, isLoading, … }    features/api/use-api-list.ts
+  → toApiKeyViewModels(apiKeys)                entities/api-key/api-key.mapper.ts
+  → <DataTable rows columns sort onSortChange> + <Pagination meta={meta.pagination}>   packages/ui
+  → onPageChange / onLimitChange / onSortChange → vissza az URL-be (setParam / setParams)
+```
+
+Négy szabály, ami ezt a vonalat egyben tartja:
+
+1. **A lap/lapméret/rendezés az URL-ben él**, nem store-ban és nem `useState`-ben — ezért a
+   `DataTable` és a `Pagination` **soha** nem tárol oldalt, csak jelez (`onPageChange`, `onSortChange`).
+2. **A `DataTable` nem rendez helyben.** A sorrend a szerveré; a tábla a kért rendezést jelenti
+   (`DataTableSort`), a page pedig a `pages/<page>/<page>.logic.ts`-ben fordítja vissza query-vá
+   (`toSortParams`), és egyetlen `setParams` hívással írja ki — két mező (`sort` + `order`) egy
+   írásban, különben a második felülírná az elsőt.
+3. **A lapozó a `meta.pagination`-t fogyasztja.** A `Pagination` meta-típusa strukturális
+   (`packages/ui` nem függ a `@callback/shared`-től), ezért a hook `meta.pagination`-ja közvetlenül
+   átadható; a lapméret-opciókat a **page** adja (`API_KEYS_LIMIT_OPTIONS`).
+4. **Hiba → page szint.** A lista hibája nem a tábláé: `errorSurface === 'page'` → `PageErrorState`
+   retry-jal, a `banner` feltételeket a layout mutatja (lásd `UI-Architecture.md` §4.1).
+
+A négy megjelenítési állapot így oszlik meg: loading → skeleton sorok (fejléc marad) + `sr-only`
+státuszszöveg; üres → `EmptyState`; siker → sorok + lapozó; hiba → `PageErrorState`.
 
 ---
 

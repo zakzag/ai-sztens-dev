@@ -1,6 +1,6 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-11-02 (AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; `apps/web` átállt a tokenekre; előtte AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
+**Utolsó frissítés:** 2026-11-03 (a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **Status:** living document — describes the _current_ state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -27,7 +27,10 @@ only build `@callback/shared`.
 app → pages → features → entities → services → lib
 ```
 
-Imports flow downwards only — no page→page, no feature→feature imports.
+Imports flow downwards only — no page→page, no feature→feature imports. The two
+**shared infrastructure features** (`features/api`, `features/error-surface`) are the
+only exception: any page and any feature may import them, because they hold generic
+plumbing (TanStack Query adapters, error surface) and no use-case business logic.
 
 The rule file describes the **target** structure. The table below shows both the target and
 what exists in `apps/admin` today, so nobody mistakes a planned folder for an existing one.
@@ -42,6 +45,11 @@ what exists in `apps/admin` today, so nobody mistakes a planned folder for an ex
 | `lib`                 | pure helpers and formatters                                      | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts` (+ their `*.const.ts` / `.interface.ts`)                                                                                                                                                                                                                                                                              |
 | `components`          | generic presentational shells (no data access)                   | **exists**: `components/BuildInfoFooter.tsx`, `components/error/PageErrorState.tsx`, `components/error/AppErrorBanner.tsx` (the latter is a thin container: all decisions live in `features/error-surface` + `lib/error-surface.*`)                                                                                                                                                                   |
 | `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/handlers/` (MSW network doubles: `api-keys.handlers.ts`, `generic.handlers.ts`, `handler-envelope.ts`), `server.ts`, `render-with-providers.tsx`, `request-recorder.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                         |
+
+Besides the per-page use cases, `features/api/` holds the shared TanStack Query adapters
+(`use-api-list.ts`, `use-api-detail.ts`, `use-api-mutation.ts`, `use-list-params.ts`,
+`api-hooks.logic.ts`). `features/api-keys` is a thin adapter over them — that is why
+`features/api` counts as shared infrastructure, not as another page's use case.
 
 `apps/web` is out of scope for this document's **layer map**: it has no features/entities
 folders yet, so `pnpm quality:layers` cruises `apps/admin/src` only. The site _is_ on
@@ -339,12 +347,12 @@ pnpm test:quality     # the gates' own tests (negative + positive fixtures)
 Nothing here builds or runs tests: every gate is a static file walk plus one
 `dependency-cruiser` run, which is why the whole job reports in about a minute.
 
-| Command                     | Enforces                                                                                          | Scope                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `pnpm quality:layers`       | `app → pages → features → entities → services → lib`; no page→page, no feature→feature, no cycles | `apps/admin/src` (the only app with layers)            |
-| `pnpm quality:dead-code`    | no unused file, export, exported type or dependency                                               | `apps/{admin,web}` + `packages/{ui,api-client,shared}` |
-| `pnpm quality:tokens`       | no colour literal, no Tailwind palette utility, no arbitrary colour value                         | `apps/*/src` **and** `packages/ui/src`                 |
-| `pnpm quality:field-errors` | no `error.status ===` / `error.code ===` / `instanceof ApiError` outside a pure decision function | `apps/*/src`                                           |
+| Command                     | Enforces                                                                                                                  | Scope                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `pnpm quality:layers`       | `app → pages → features → entities → services → lib`; no page→page, no feature→feature (shared infra excepted), no cycles | `apps/admin/src` (the only app with layers)            |
+| `pnpm quality:dead-code`    | no unused file, export, exported type or dependency                                                                       | `apps/{admin,web}` + `packages/{ui,api-client,shared}` |
+| `pnpm quality:tokens`       | no colour literal, no Tailwind palette utility, no arbitrary colour value                                                 | `apps/*/src` **and** `packages/ui/src`                 |
+| `pnpm quality:field-errors` | no `error.status ===` / `error.code ===` / `instanceof ApiError` outside a pure decision function                         | `apps/*/src`                                           |
 
 ### 9.1 Layer gate (`dependency-cruiser`)
 
@@ -358,6 +366,11 @@ The rules live in **one module**, `.dependency-cruiser.rules.cjs`, imported by t
 
 Element patterns are written **location-agnostically** (`(?:^|/)src/pages/([^/]+)/`), which is
 what lets one rules module match both the real tree and a fixture tree.
+
+The only legal cross-feature edges are the **shared infrastructure features**, defined once
+as `SHARED_FEATURES` in the rules module: `features/api` and `features/error-surface`. A page
+may import its own feature plus these; a feature may import its own modules plus these.
+Everything else still trips `no-feature-to-feature` or `no-feature-to-higher-layer`.
 
 Documented grandfathers — visible in the module with a one-line reason each:
 
@@ -412,4 +425,6 @@ Every gate is proven to **fire**, not just to be green — a gate that cannot fa
 | Field errors | `fixtures/field-errors/negative` (a component and a hook branching on `status` / `code` / `instanceof ApiError`)             | `fixtures/field-errors/positive` (the allowlisted decision file, a clean component, a `*.test.tsx` asserting on error shape) |
 
 `pnpm test:quality` runs both directions plus unit tests for the walker, the reporter and each rule
-(`*.test.mjs` next to the code, `node --test`).
+(`*.test.mjs` next to the code, `node --test`). The positive fixture deliberately contains a
+`features/alpha → features/api` edge, so the shared-feature exception is proven by the same test
+that proves the gate is red on a real violation.

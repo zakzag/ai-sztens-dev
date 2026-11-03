@@ -64,8 +64,15 @@ export interface ApiEndpointContract {
   readonly tag: string;
   /** Status of a successful call (`200` read, `201` create). */
   readonly successStatus: number;
-  /** Schema of the payload (`data` when enveloped, the whole body when not). */
-  readonly dataSchema: z.ZodTypeAny;
+  /**
+   * Schema of the payload (`data` when enveloped, the whole body when not).
+   *
+   * The payload type is deliberately `unknown`: the registry treats schemas as
+   * opaque (it publishes them and re-validates against them), and typing them
+   * as `z.ZodTypeAny` would leak `any` into every consumer — the response
+   * assertion tripped over exactly that (`no-unsafe-argument`).
+   */
+  readonly dataSchema: z.ZodType<unknown, z.ZodTypeDef, unknown>;
   /**
    * Sample payload, published as the OpenAPI `example` of the success response.
    *

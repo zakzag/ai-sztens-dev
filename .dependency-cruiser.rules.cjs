@@ -164,12 +164,11 @@ function buildLayerRules() {
     {
       name: 'no-feature-to-feature',
       severity: 'error',
-      comment:
-        'A feature never imports another feature (except the shared `error-surface` infrastructure).',
+      comment: `A feature never imports another feature (except the shared infrastructure features, ${SHARED_FEATURES}).`,
       from: { path: FEATURE_FOLDER },
       to: {
         path: FEATURE_FOLDER,
-        pathNot: '(?:^|/)src/features/(?:$1|error-surface)/',
+        pathNot: `(?:^|/)src/features/(?:$1|${SHARED_FEATURES})/`,
       },
     },
     {

@@ -27,7 +27,7 @@ OpenAPI document and the client all read one table.
 
 | File | Change |
 | --- | --- |
-| [`db/schema.ts`](../../apps/api/src/db/schema.ts:1) | nullable `deleted_at` + `api_keys_deleted_at_idx`; migration `0003_organic_firedrake.sql` + snapshot committed |
+| [`db/schema.ts`](../../apps/api/src/db/schema.ts:1) | nullable `deleted_at` + `api_keys_deleted_at_idx` (migration `0003`); every timestamp narrowed to `timestamp(3)` (migration `0004`), see decision 6 |
 | [`api-keys/api-keys.filter.ts`](../../apps/api/src/api-keys/api-keys.filter.ts:1) | `apiKeyNotDeletedFilter()` (`deleted_at IS NULL`) composed into every read/write |
 | [`api-keys/api-keys.repository.ts`](../../apps/api/src/api-keys/api-keys.repository.ts:1) | `updateByIdentifier` (one atomic `UPDATE … WHERE updated_at = $expected RETURNING *`), `softDeleteByIdentifier`, `findAnyByIdentifier` (deleted rows included, used for miss classification) |
 | [`api-keys/api-keys.logic.ts`](../../apps/api/src/api-keys/api-keys.logic.ts:1) (new) | pure `isPastDate(iso, now)` — the `422` rule, `now` injected |
@@ -49,14 +49,24 @@ OpenAPI document and the client all read one table.
 4. **`DELETE` is `200 { data: null }`**, never `204` (a `204` could not carry `meta.requestId`), described by
    `noPayloadSchema` → the `NoPayload` component.
 5. **PATCH-only schemas live in new files**, so AIS-75's edits to `api-keys.schema.ts` do not collide.
+6. **Millisecond timestamps (`timestamp(3)`).** The first *live* run of the new e2e block failed with `409 STALE_WRITE`
+   on a **correct** `PATCH`. Root cause: `now()` stores microseconds (`…123456Z`) while `updatedAt` travels as
+   `toISOString()` (`…123Z`), so the echoed token could never equal the stored value — the guard would have rejected
+   every real update. The fix is on the storage side (migration `0004` narrows all four timestamp columns), not in the
+   comparison: the database must not hold a value the wire contract cannot express. This was invisible on Node 20
+   because the suite self-skipped there.
 
-## Verification (run on 2026-11-03, Node v20.19.2)
+## Verification (run on 2026-11-03, **Node v26.0.0** `C:\Progs\nodejs` + dev Postgres)
+
+> The first pass ran in a VSCode terminal whose `PATH` shadowed Node with a WebStorm-bundled **v20.19.2**
+> (`…\WebStorm2025.2\zoocode-node\…`). On Node < 24.9 the `AppModule` e2e suites self-skip, which is exactly why the
+> `STALE_WRITE` precision bug below stayed hidden. Re-run with `set "PATH=C:\Progs\nodejs;%PATH%"`.
 
 | Command | Result |
 | --- | --- |
 | `pnpm --filter @callback/shared test` | **12 suites / 206 tests passed** |
-| `pnpm --filter @callback/api test` | **39 suites / 431 tests passed** |
-| `pnpm --filter @callback/api test:e2e` | **11 suites / 59 tests passed** — the `AppModule`-based suites (incl. the new `mutation convention` block) **self-skip** on Node < 24.9 (CommonJS `@nestjs/config` + Jest ESM) |
+| `pnpm --filter @callback/api test` | **39 suites / 433 tests passed** (incl. the timestamp-precision guards) |
+| `pnpm --filter @callback/api test:e2e` | **11 suites / 59 tests passed**, nothing skipped — the `mutation convention` block ran against real Postgres: `PATCH` `200`, replayed `PATCH` `409 STALE_WRITE` + `details[0].path === 'updatedAt'`, past `expiresAt` `422`, `.strict()` `400`, `DELETE` → `data: null`, then `GET`/`PATCH`/second `DELETE` → `404`, deleted row absent from `total` |
 | `pnpm --filter @callback/api lint` | clean (one pre-existing warning in `response-assert.logic.ts`, from AIS-98) |
 | `pnpm --filter @callback/api build` | passes |
 | `pnpm --filter @callback/admin test` | **23 files / 195 tests passed** (no admin change in this ticket) |

@@ -48,6 +48,19 @@ import {
 export const platformSchema = pgSchema('platform');
 
 /**
+ * Every timestamp is stored with **millisecond** precision (AIS-108).
+ *
+ * The wire contract is `Date.prototype.toISOString()` (millisecond resolution),
+ * so a column with Postgres' default microsecond precision holds values the
+ * client can never express: the `updated_at` optimistic-concurrency token is
+ * echoed back by the client as milliseconds, and `WHERE updated_at = $expected`
+ * would then never match the stored `…123456Z` row — every update would be a
+ * spurious `409 STALE_WRITE`. Storing what the contract can represent keeps the
+ * comparison exact.
+ */
+const TIMESTAMP_PRECISION = 3;
+
+/**
  * Stored credentials for external AI providers and internal integrations.
  *
  * `api_key` holds the token value itself (AIS-39 scope). Hashing and rotation
@@ -61,11 +74,20 @@ export const apiKeys = platformSchema.table(
     identifier: text('identifier').notNull(),
     description: text('description'),
     apiKey: text('api_key').notNull(),
-    expiresAt: timestamp('expires_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true })
+    expiresAt: timestamp('expires_at', {
+      withTimezone: true,
+      precision: TIMESTAMP_PRECISION,
+    }),
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      precision: TIMESTAMP_PRECISION,
+    })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+      precision: TIMESTAMP_PRECISION,
+    })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
@@ -76,7 +98,10 @@ export const apiKeys = platformSchema.table(
      * not a hard `DELETE`: the moment of deletion is the piece an audit trail
      * needs, and hiding a row is a read-side decision that stays reversible.
      */
-    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    deletedAt: timestamp('deleted_at', {
+      withTimezone: true,
+      precision: TIMESTAMP_PRECISION,
+    }),
   },
   (table) => [
     unique('api_keys_identifier_key').on(table.identifier),

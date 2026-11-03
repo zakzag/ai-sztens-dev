@@ -43,7 +43,7 @@ value always comes from the database, the client's copy is only compared.
 | `packages/shared/src/contract/no-payload.schema.ts` (new) | `noPayloadSchema = z.null()` for the DELETE body |
 | `packages/shared/src/contract/api-keys/api-keys.update.ts` (new) | `updateApiKeySchema`: partial fields + **required** `updatedAt`, `.strict()`, nullable clear-fields |
 | `packages/shared/src/contract/api-keys/api-keys.contract.ts` | `apiKeys.update` (`PATCH`) and `apiKeys.remove` (`DELETE`) entries |
-| `apps/api/src/db/schema.ts` | `deletedAt` column + index → migration `0003` |
+| `apps/api/src/db/schema.ts` | `deletedAt` column + index → migration `0003`; all timestamps narrowed to `timestamp(3)` → migration `0004` |
 | `apps/api/src/api-keys/api-keys.filter.ts` | `apiKeyNotDeletedFilter()` composed into every read |
 | `apps/api/src/api-keys/api-keys.repository.ts` | `updateByIdentifier`, `softDeleteByIdentifier`, `findAnyByIdentifier` |
 | `apps/api/src/common/http/app-error.ts` | `StaleWriteAppError`, `SemanticValidationAppError` |
@@ -66,9 +66,15 @@ curl -s -X PATCH localhost:3000/api/api-keys/<id> -H 'content-type: application/
   -d '{"name":"x","updatedAt":"2020-01-01T00:00:00.000Z"}'
 ```
 
-**Measured on 2026-11-03 (Node v20.19.2):** `@callback/shared` 206 tests, `@callback/api` 431 tests, both green;
-`test:e2e` 59 tests green with the `AppModule`-based suites self-skipping (Node < 24.9), lint and build clean, `knip`
-exit `0`. The skipped `PATCH`/`DELETE` scenarios need Node ≥ 24.9 and the dev Postgres.
+**Measured on 2026-11-03 (Node v26.0.0 + dev Postgres):** `@callback/shared` 206 tests, `@callback/api` 433 tests,
+`test:e2e` 59 tests — all green, **nothing skipped**; lint and build clean, `knip` exit `0`.
+
+**The live run found a real bug.** The first pass used a WebStorm-bundled Node v20.19.2 that shadowed the system
+Node, and on < 24.9 the `AppModule` suites self-skip — so the defect only appeared once the suite really ran: a
+correct `PATCH` answered `409 STALE_WRITE`, because `now()` stores microseconds (`…123456Z`) while the token travels as
+`toISOString()` (`…123Z`), making the guard's equality unsatisfiable. Fixed on the storage side (migration `0004`,
+`timestamp(3)`), not by loosening the comparison — the database must not hold a value the wire contract cannot express.
+Lesson for future tickets: a green `test:e2e` that skipped the interesting suites is not evidence.
 
 ## Follow-ups
 

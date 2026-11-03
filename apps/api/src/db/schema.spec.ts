@@ -41,6 +41,11 @@ const SOFT_DELETE_MIGRATION_FILE = fileURLToPath(
   new URL('../../drizzle/0003_organic_firedrake.sql', import.meta.url),
 );
 
+/** Migration that narrowed every timestamp to millisecond precision (AIS-108). */
+const TIMESTAMP_PRECISION_MIGRATION_FILE = fileURLToPath(
+  new URL('../../drizzle/0004_numerous_gunslinger.sql', import.meta.url),
+);
+
 describe('apiKeys table identity', () => {
   it('lives in the platform schema', () => {
     expect(platformSchema.schemaName).toBe('platform');
@@ -197,5 +202,32 @@ describe('generated migration 0003', () => {
       'deleted_at" timestamp with time zone NOT NULL',
     );
     expect(migration).not.toContain('DEFAULT now()');
+  });
+});
+
+describe('apiKeys timestamp precision (AIS-108)', () => {
+  it('stores every timestamp with millisecond precision', () => {
+    // The wire contract is `toISOString()` (milliseconds). A microsecond column
+    // could hold a value the client cannot echo back, which would make every
+    // `WHERE updated_at = $expected` a spurious `409 STALE_WRITE`.
+    expect(apiKeys.createdAt.precision).toBe(3);
+    expect(apiKeys.updatedAt.precision).toBe(3);
+    expect(apiKeys.expiresAt.precision).toBe(3);
+    expect(apiKeys.deletedAt.precision).toBe(3);
+  });
+
+  it('narrows the existing columns in migration 0004', () => {
+    const migration = readFileSync(TIMESTAMP_PRECISION_MIGRATION_FILE, 'utf8');
+
+    for (const column of [
+      'created_at',
+      'updated_at',
+      'expires_at',
+      'deleted_at',
+    ]) {
+      expect(migration).toContain(
+        `ALTER COLUMN "${column}" SET DATA TYPE timestamp (3) with time zone`,
+      );
+    }
   });
 });

@@ -1,5 +1,8 @@
-import { API_ERROR_CODE } from '@callback/shared';
-import type { ApiKey } from '@callback/shared';
+import {
+  API_ERROR_CODE,
+  type ApiKey,
+  type ApiKeyListQuery,
+} from '@callback/shared';
 import { FIELD_SURFACE_CODES } from '../../lib/error-surface.const.js';
 import type { ApiKeyFormFieldName } from './api-keys.interface.js';
 
@@ -10,17 +13,22 @@ import type { ApiKeyFormFieldName } from './api-keys.interface.js';
  * a hook would silently break the cache invalidation after a successful create
  * (TanStack Query matches prefixes, so it only works while the literals agree).
  *
- * `all` is the prefix of every `api-keys` query, `list` is the concrete list
- * query — invalidating `all` therefore refreshes the list without knowing its
- * shape.
+ * `all` is the prefix of every `api-keys` query, `list` and `detail` are the
+ * concrete queries — invalidating `all` therefore refreshes both without knowing
+ * their shape. `list` is a **factory**, because the list response depends on the
+ * query (page, sort, filter): a key that ignored those would serve page 1 for
+ * page 2.
  */
 
 /** Cache keys of the `api-keys` queries. */
 export const API_KEYS_QUERY_KEYS = {
   /** Prefix shared by every `api-keys` query; use it for invalidation. */
   all: ['api-keys'] as const,
-  /** `GET /api/api-keys`. */
-  list: ['api-keys', 'list'] as const,
+  /** `GET /api/api-keys?page=…&sort=…` — one key per distinct query. */
+  list: (params: ApiKeyListQuery) =>
+    ['api-keys', 'list', { ...params }] as const,
+  /** `GET /api/api-keys/:identifier`. */
+  detail: (identifier: string) => ['api-keys', 'detail', identifier] as const,
 } as const;
 
 /**

@@ -11,6 +11,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UNEXPECTED_PAYLOAD_CODE } from '@callback/api-client';
+import type { ApiKeyListQuery } from '@callback/shared';
 import { apiKeysListMalformedPayload } from '../../test/mocks/handlers/api-keys.handlers.js';
 import { server } from '../../test/mocks/server.js';
 import {
@@ -19,6 +20,14 @@ import {
 } from '../../test/mocks/query-client.mock.js';
 import { UNEXPECTED_PAYLOAD_USER_MESSAGE } from '../../lib/error-message.const.js';
 import { useApiKeysQuery } from './use-api-keys.js';
+
+/** The list query every read test starts from (the contract defaults). */
+const LIST_PARAMS: ApiKeyListQuery = {
+  page: 1,
+  limit: 20,
+  sort: 'createdAt',
+  order: 'desc',
+};
 
 describe('useApiKeysQuery — contract drift', () => {
   let client: QueryClient;
@@ -31,7 +40,7 @@ describe('useApiKeysQuery — contract drift', () => {
   it('turns a non-envelope 200 body into an UNEXPECTED_PAYLOAD ApiError', async () => {
     server.use(apiKeysListMalformedPayload);
 
-    const { result } = renderHook(() => useApiKeysQuery(), {
+    const { result } = renderHook(() => useApiKeysQuery(LIST_PARAMS), {
       wrapper: ({ children }) => (
         <TestQueryProvider client={client}>{children}</TestQueryProvider>
       ),

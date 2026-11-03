@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
+import { apiKeyListQuerySchema } from '@callback/shared';
 import { PageErrorState } from '../../components/error/PageErrorState.js';
 import { toApiKeyViewModels } from '../../entities/api-key/api-key.mapper.js';
 import { useApiKeysQuery } from '../../features/api-keys/use-api-keys.js';
+import { useListParams } from '../../features/api/use-list-params.js';
 import {
   API_KEYS_ERROR_TITLE,
   API_KEYS_PAGE_SUBTITLE,
@@ -19,6 +21,12 @@ import { ApiKeysTable } from './ui/ApiKeysTable.js';
  * selection, no drawer), which is why there is no Zustand store here — see the
  * state table in `docs/Specs/UI-Architecture.md`.
  *
+ * The list query (page, limit, sort, order, search) lives in the **URL**
+ * (AIS-119): `useListParams` parses it through the shared schema and hands it to
+ * the hook, which uses it both as the request and as the query key. A deep link
+ * such as `/api-keys?page=2&sort=name` therefore works without any page state,
+ * and the visible pager controls arrive with the primitives in AIS-116.
+ *
  * Failure routing (plan `D11`): the hook reports the *surface* the failure
  * belongs to. Only `page` is rendered here, as `PageErrorState` with a retry;
  * `banner` conditions (offline, `401`, `503`) are shown once by the layout shell,
@@ -27,6 +35,7 @@ import { ApiKeysTable } from './ui/ApiKeysTable.js';
  * @returns the page content.
  */
 export function ApiKeysPage() {
+  const { params } = useListParams(apiKeyListQuerySchema);
   const {
     apiKeys,
     isLoading,
@@ -34,7 +43,7 @@ export function ApiKeysPage() {
     errorMessage,
     errorSurface,
     refetch,
-  } = useApiKeysQuery();
+  } = useApiKeysQuery(params);
   const viewModels = useMemo(() => toApiKeyViewModels(apiKeys), [apiKeys]);
   const pageErrorMessage = errorSurface === 'page' ? errorMessage : null;
 

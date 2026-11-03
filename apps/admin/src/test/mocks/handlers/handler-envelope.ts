@@ -6,12 +6,16 @@
  * response is byte-identical to what the API sends, and a contract change breaks
  * one helper instead of nine hand-written bodies.
  *
+ * A list response additionally carries `meta.pagination` (AIS-114): the client
+ * transport validates that block as a **required** field, so a handler that
+ * forgets it produces an `UNEXPECTED_PAYLOAD` instead of an empty pager.
+ *
  * Nothing here touches the clock: the request id and timestamp are fixed
  * constants so assertions stay deterministic.
  */
 
 import { HttpResponse } from 'msw';
-import type { ApiErrorDetail } from '@callback/shared';
+import type { ApiErrorDetail, PaginationMeta } from '@callback/shared';
 import { toErrorEnvelope, toSuccessEnvelope } from '@callback/shared';
 
 /** Correlation id every handler stamps into its envelope. */
@@ -26,13 +30,21 @@ export interface SuccessResponseOptions {
   readonly status?: number;
   /** Envelope `requestId`; defaults to {@link TEST_REQUEST_ID}. */
   readonly requestId?: string;
+  /**
+   * `meta.pagination` — supply it for a **list** response only.
+   *
+   * Omitted for a detail/mutation body: the transport's single-resource unwrap
+   * does not require the block, and inventing one would make the fixture lie
+   * about the endpoint.
+   */
+  readonly pagination?: PaginationMeta;
 }
 
 /**
  * Builds a `2xx` response wrapped in the shared success envelope.
  *
  * @param data - the `data` payload of the envelope.
- * @param options - optional status and request id overrides.
+ * @param options - optional status, request id and pagination overrides.
  * @returns an MSW JSON response ready to be returned from a handler.
  */
 export function successResponse(
@@ -43,6 +55,9 @@ export function successResponse(
     toSuccessEnvelope(data, {
       requestId: options.requestId ?? TEST_REQUEST_ID,
       timestamp: TEST_TIMESTAMP,
+      ...(options.pagination === undefined
+        ? {}
+        : { pagination: options.pagination }),
     }),
     { status: options.status ?? 200 },
   );

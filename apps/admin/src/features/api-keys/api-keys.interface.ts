@@ -9,6 +9,7 @@
 
 import type { ApiError } from '@callback/api-client';
 import type { ApiKey, CreateApiKeyInput } from '@callback/shared';
+import type { PaginatedMeta } from '../api/api-hooks.interface.js';
 import type { ErrorSurface } from '../../lib/error-surface.interface.js';
 
 /**
@@ -46,8 +47,15 @@ export interface ApiKeyFieldErrors {
  * banner's sentence a second time inside an alert.
  */
 export interface UseApiKeysQueryResult {
-  /** The keys, newest first; `[]` while loading and after a failure. */
+  /** The keys of the current page; `[]` while loading and after a failure. */
   readonly apiKeys: readonly ApiKey[];
+  /**
+   * `meta.pagination` of the current page, or `null` until a response arrives.
+   *
+   * Exposed since AIS-114: the pager primitives (AIS-116) read `total` and
+   * `totalPages` from here, so no page has to re-derive them.
+   */
+  readonly meta: PaginatedMeta<readonly ApiKey[]> | null;
   /** `true` until the first response (or failure) arrives. */
   readonly isLoading: boolean;
   /** `true` while any request is in flight, including a manual refetch. */

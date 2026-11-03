@@ -77,7 +77,13 @@ export type {
   PaginatedUnwrapSuccess,
 } from './paginated-envelope.logic.interface.js';
 
-export { API_KEYS_PATH } from './api-keys/api-keys.const.js';
+export {
+  API_KEYS_DETAIL_PATH,
+  API_KEYS_PATH,
+  API_KEY_LIST_QUERY_DEFAULTS,
+} from './api-keys/api-keys.const.js';
+
+export { toApiKeyDetailPath } from './api-keys/api-keys.path.js';
 
 export { createApiKeysService } from './api-keys/api-keys.service.js';
 

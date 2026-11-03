@@ -6,22 +6,27 @@
  * envelope unwrap and the `ApiError` creation are exercised too, and only the
  * wire is replaced by the handlers in `test/mocks/handlers`.
  *
- * Covered branches: loading, success (two rows), success (empty), query error
- * (500), query error (offline), refetch after a failure, mutation success
- * (invalidation + `onCreated`), mutation conflict (field mapping), mutation
- * transport failure, and `reset`.
+ * Since AIS-114 the state wiring lives in the generic hooks, so this suite also
+ * guards the migration: the public result shape (`apiKeys`, `createApiKey`,
+ * `error` as copy) is unchanged, and the pager block is now exposed as `meta`.
+ *
+ * Covered branches: loading, success (two rows + `meta.pagination`), success
+ * (empty), second page, query error (500), query error (offline), refetch after
+ * a failure, mutation success (invalidation + `onCreated`), mutation conflict
+ * (field mapping), mutation transport failure, and `reset`.
  */
 
 import type { QueryClient } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CreateApiKeyInput } from '@callback/shared';
+import type { ApiKeyListQuery, CreateApiKeyInput } from '@callback/shared';
 import { VALID_API_KEY_PAIR } from '@callback/shared';
 import {
   apiKeysCreateConflict,
   apiKeysCreateNetworkError,
   apiKeysListEmpty,
   apiKeysListNetworkError,
+  apiKeysListPageTwo,
   apiKeysListServerError,
 } from '../../test/mocks/handlers/api-keys.handlers.js';
 import { server } from '../../test/mocks/server.js';
@@ -48,6 +53,14 @@ const CREATE_INPUT: CreateApiKeyInput = {
   apiKey: 'sk-stage-42',
 };
 
+/** The list query every read test starts from (the contract defaults). */
+const LIST_PARAMS: ApiKeyListQuery = {
+  page: 1,
+  limit: 20,
+  sort: 'createdAt',
+  order: 'desc',
+};
+
 /**
  * @param client - the query client of the test.
  * @returns a `renderHook` wrapper that provides the query context.
@@ -71,20 +84,21 @@ describe('useApiKeysQuery', () => {
   });
 
   it('reports loading before the first response', () => {
-    const { result } = renderHook(() => useApiKeysQuery(), {
+    const { result } = renderHook(() => useApiKeysQuery(LIST_PARAMS), {
       wrapper: createWrapper(client),
     });
 
     expect(result.current.isLoading).toBe(true);
     expect(result.current.isFetching).toBe(true);
     expect(result.current.apiKeys).toEqual([]);
+    expect(result.current.meta).toBeNull();
     expect(result.current.error).toBeNull();
     expect(result.current.errorMessage).toBeNull();
     expect(result.current.errorSurface).toBeNull();
   });
 
-  it('exposes the keys after a successful read', async () => {
-    const { result } = renderHook(() => useApiKeysQuery(), {
+  it('exposes the keys and meta.pagination after a successful read', async () => {
+    const { result } = renderHook(() => useApiKeysQuery(LIST_PARAMS), {
       wrapper: createWrapper(client),
     });
 
@@ -93,6 +107,13 @@ describe('useApiKeysQuery', () => {
     });
 
     expect(result.current.apiKeys).toEqual(VALID_API_KEY_PAIR);
+    expect(result.current.meta?.pagination).toEqual({
+      page: 1,
+      limit: 20,
+      total: VALID_API_KEY_PAIR.length,
+      totalPages: 1,
+    });
+    expect(result.current.meta?.requestId).toBeTruthy();
     expect(result.current.isFetching).toBe(false);
     expect(result.current.error).toBeNull();
     expect(result.current.errorMessage).toBeNull();
@@ -102,7 +123,7 @@ describe('useApiKeysQuery', () => {
   it('exposes an empty list for an empty payload', async () => {
     server.use(apiKeysListEmpty);
 
-    const { result } = renderHook(() => useApiKeysQuery(), {
+    const { result } = renderHook(() => useApiKeysQuery(LIST_PARAMS), {
       wrapper: createWrapper(client),
     });
 
@@ -111,13 +132,36 @@ describe('useApiKeysQuery', () => {
     });
 
     expect(result.current.apiKeys).toEqual([]);
+    expect(result.current.meta?.pagination.total).toBe(0);
     expect(result.current.error).toBeNull();
+  });
+
+  it('keeps the requested page in meta.pagination', async () => {
+    server.use(apiKeysListPageTwo);
+
+    const pageTwo: ApiKeyListQuery = { ...LIST_PARAMS, page: 2, limit: 1 };
+
+    const { result } = renderHook(() => useApiKeysQuery(pageTwo), {
+      wrapper: createWrapper(client),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.apiKeys).toHaveLength(1);
+    expect(result.current.meta?.pagination).toEqual({
+      page: 2,
+      limit: 1,
+      total: 2,
+      totalPages: 2,
+    });
   });
 
   it('routes a request without a response to the banner and keeps the raw error', async () => {
     server.use(apiKeysListNetworkError);
 
-    const { result } = renderHook(() => useApiKeysQuery(), {
+    const { result } = renderHook(() => useApiKeysQuery(LIST_PARAMS), {
       wrapper: createWrapper(client),
     });
 
@@ -130,12 +174,13 @@ describe('useApiKeysQuery', () => {
     expect(result.current.error?.status).toBeNull();
     expect(result.current.isLoading).toBe(false);
     expect(result.current.apiKeys).toEqual([]);
+    expect(result.current.meta).toBeNull();
   });
 
   it('routes a 500 to the page tier and keeps the requestId for the log tier', async () => {
     server.use(apiKeysListServerError);
 
-    const { result } = renderHook(() => useApiKeysQuery(), {
+    const { result } = renderHook(() => useApiKeysQuery(LIST_PARAMS), {
       wrapper: createWrapper(client),
     });
 
@@ -150,7 +195,7 @@ describe('useApiKeysQuery', () => {
   it('re-reads the list on refetch, including after a failure', async () => {
     server.use(apiKeysListServerError);
 
-    const { result } = renderHook(() => useApiKeysQuery(), {
+    const { result } = renderHook(() => useApiKeysQuery(LIST_PARAMS), {
       wrapper: createWrapper(client),
     });
 

@@ -13,11 +13,18 @@
  */
 
 import { delay, http, HttpResponse } from 'msw';
-import type { ApiKey, CreateApiKeyInput } from '@callback/shared';
+import type {
+  ApiKey,
+  CreateApiKeyInput,
+  PaginationMeta,
+} from '@callback/shared';
 import {
   API_ERROR_CODE,
   API_KEYS_PATH,
+  SECOND_API_KEY,
+  VALID_API_KEY,
   VALID_API_KEY_PAIR,
+  toPaginationMeta,
 } from '@callback/shared';
 import { errorResponse, successResponse } from './handler-envelope.js';
 
@@ -47,14 +54,52 @@ function createdApiKey(input: CreateApiKeyInput): ApiKey {
   };
 }
 
-/** `200` list with one filled and one empty-value row. */
-export const apiKeysListSuccess = http.get(API_KEYS_PATH, () =>
-  successResponse(VALID_API_KEY_PAIR),
+/** Path template of the single-resource route, as MSW matches it. */
+export const API_KEYS_DETAIL_PATH_PATTERN = `${API_KEYS_PATH}/:identifier`;
+
+/**
+ * Pagination block of the default list response.
+ *
+ * Both fixture rows fit on one page, so `totalPages` is `1` — the value a pager
+ * would render. Handlers that answer a *slice* of the data set compute their own
+ * block instead.
+ */
+const DEFAULT_LIST_PAGINATION: PaginationMeta = toPaginationMeta(
+  { page: 1, limit: 20 },
+  VALID_API_KEY_PAIR.length,
 );
 
-/** `200` empty list. */
+/** `200` list with one filled and one empty-value row. */
+export const apiKeysListSuccess = http.get(API_KEYS_PATH, () =>
+  successResponse(VALID_API_KEY_PAIR, { pagination: DEFAULT_LIST_PAGINATION }),
+);
+
+/** `200` empty list — `totalPages` is `0`, never `1`. */
 export const apiKeysListEmpty = http.get(API_KEYS_PATH, () =>
-  successResponse([]),
+  successResponse([], {
+    pagination: toPaginationMeta({ page: 1, limit: 20 }, 0),
+  }),
+);
+
+/** `200` second page of a two-page result set (one row per page). */
+export const apiKeysListPageTwo = http.get(API_KEYS_PATH, () =>
+  successResponse([SECOND_API_KEY], {
+    pagination: { page: 2, limit: 1, total: 2, totalPages: 2 },
+  }),
+);
+
+/** `200` detail of the first fixture key. */
+export const apiKeysDetailSuccess = http.get(API_KEYS_DETAIL_PATH_PATTERN, () =>
+  successResponse(VALID_API_KEY),
+);
+
+/** `404` for an identifier that is not stored. */
+export const apiKeysDetailNotFound = http.get(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.NOT_FOUND, 'API key was not found', {
+      path: `${API_KEYS_PATH}/ghost`,
+    }),
 );
 
 /** `500` list failure with a correlation id the log tier can assert. */
@@ -164,5 +209,6 @@ export const apiKeysCreatePending = http.post(API_KEYS_PATH, () =>
 /** Default handler set registered by the global server. */
 export const apiKeysHandlers = [
   apiKeysListSuccess,
+  apiKeysDetailSuccess,
   apiKeysCreateSuccess,
 ] as const;

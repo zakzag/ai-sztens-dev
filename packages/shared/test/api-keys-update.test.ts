@@ -35,7 +35,10 @@ describe('updateApiKeySchema', () => {
     it('accepts a body with only the token and one field', () => {
       const result = updateApiKeySchema.parse(MINIMAL_BODY);
 
-      expect(result).toEqual({ name: 'Vapi production', updatedAt: UPDATED_AT });
+      expect(result).toEqual({
+        name: 'Vapi production',
+        updatedAt: UPDATED_AT,
+      });
     });
 
     it('accepts a body that only carries the token', () => {
@@ -115,9 +118,9 @@ describe('updateApiKeySchema', () => {
       // lists them — so a client can still point at the field it must drop.
       const issue = result.error.issues[0];
       expect(issue?.code).toBe('unrecognized_keys');
-      expect(
-        issue !== undefined && 'keys' in issue ? issue.keys : [],
-      ).toEqual(['identifier']);
+      expect(issue !== undefined && 'keys' in issue ? issue.keys : []).toEqual([
+        'identifier',
+      ]);
     });
   });
 

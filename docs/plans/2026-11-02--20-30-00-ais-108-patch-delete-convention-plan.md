@@ -20,20 +20,20 @@ the client decide from one table.
 
 ## 2. Audited starting point
 
-| Fact | Where | Consequence |
-| --- | --- | --- |
-| No `PATCH`/`DELETE` route exists; controller has `@Get`, `@Get(':identifier')`, `@Post` only | [`api-keys.controller.ts:59`](../../apps/api/src/api-keys/api-keys.controller.ts:59) | Two new handlers |
-| Catalogue has no `STALE_WRITE` / `SEMANTIC_VALIDATION_FAILED`; `422` is documented as "currently normalised to `VALIDATION_FAILED`" | [`error-code.const.ts:21`](../../packages/shared/src/contract/error-code.const.ts:21), [`API-Convention.md:184`](../Specs/API-Convention.md:184) | Catalogue + status map + living doc change |
-| `HTTP_STATUS.UNPROCESSABLE_ENTITY` (422) already exists and `CANONICAL_ERROR_STATUSES` already documents 422 for every operation | [`http-status.const.ts:30`](../../packages/shared/src/contract/http-status.const.ts:30), [`zod-openapi.ts:112`](../../apps/api/src/common/openapi/zod-openapi.ts:112) | No OpenAPI status work |
-| `PATCH`/`DELETE` already exist in `ApiHttpMethod` and `VERB_BY_METHOD` | [`endpoint.interface.ts:23`](../../packages/shared/src/contract/endpoint.interface.ts:23), [`openapi.registry.ts:50`](../../apps/api/src/common/openapi/openapi.registry.ts:50) | Registry entries are enough |
-| `envelopeOf()` requires the `dataSchema` to be a **named** component (`PAYLOAD_COMPONENTS`) | [`zod-openapi.ts:90`](../../apps/api/src/common/openapi/zod-openapi.ts:90) | The `null` DELETE payload needs one new entry |
-| `platform.api_keys` has **no** `deleted_at` column; `updated_at` is maintained by Drizzle `$onUpdate` | [`schema.ts:43`](../../apps/api/src/db/schema.ts:43) | Migration 0003 |
-| `findPage` filters only by `q`; `findByIdentifier` only by `identifier` | [`api-keys.repository.ts:66`](../../apps/api/src/api-keys/api-keys.repository.ts:66) | Both must gain `deleted_at IS NULL` |
-| `AppError` hierarchy already derives status from the catalogue; `ConflictAppError` accepts a code | [`app-error.ts:66`](../../apps/api/src/common/http/app-error.ts:66) | New codes need only subclasses |
-| `AppErrorStatus`-driven response is the only wrapping point (`responses.ok`) | [`api-response.service.ts`](../../apps/api/src/common/http/api-response.service.ts:1) | Controller stays a router |
-| The controller audit fails any enveloped route missing from `API_ENDPOINTS` (verb **and** path) | [`controller-audit.ts:132`](../../apps/api/test/lib/controller-audit.ts:132) | Both new routes must be registered or the e2e suite goes red |
-| `Database` mock models `insert`/`select` chains only — no `update` | [`database.mock.ts:140`](../../apps/api/src/api-keys/test/mocks/database.mock.ts:140) | Mock must grow an `update…set…where…returning` chain |
-| `ERROR_CODE_MESSAGE` is `Record<string, string>` (not exhaustive) | [`error-message.const.ts:89`](../../apps/admin/src/lib/error-message.const.ts:89) | No admin compile break |
+| Fact                                                                                                                                | Where                                                                                                                                                                           | Consequence                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| No `PATCH`/`DELETE` route exists; controller has `@Get`, `@Get(':identifier')`, `@Post` only                                        | [`api-keys.controller.ts:59`](../../apps/api/src/api-keys/api-keys.controller.ts:59)                                                                                            | Two new handlers                                             |
+| Catalogue has no `STALE_WRITE` / `SEMANTIC_VALIDATION_FAILED`; `422` is documented as "currently normalised to `VALIDATION_FAILED`" | [`error-code.const.ts:21`](../../packages/shared/src/contract/error-code.const.ts:21), [`API-Convention.md:184`](../Specs/API-Convention.md:184)                                | Catalogue + status map + living doc change                   |
+| `HTTP_STATUS.UNPROCESSABLE_ENTITY` (422) already exists and `CANONICAL_ERROR_STATUSES` already documents 422 for every operation    | [`http-status.const.ts:30`](../../packages/shared/src/contract/http-status.const.ts:30), [`zod-openapi.ts:112`](../../apps/api/src/common/openapi/zod-openapi.ts:112)           | No OpenAPI status work                                       |
+| `PATCH`/`DELETE` already exist in `ApiHttpMethod` and `VERB_BY_METHOD`                                                              | [`endpoint.interface.ts:23`](../../packages/shared/src/contract/endpoint.interface.ts:23), [`openapi.registry.ts:50`](../../apps/api/src/common/openapi/openapi.registry.ts:50) | Registry entries are enough                                  |
+| `envelopeOf()` requires the `dataSchema` to be a **named** component (`PAYLOAD_COMPONENTS`)                                         | [`zod-openapi.ts:90`](../../apps/api/src/common/openapi/zod-openapi.ts:90)                                                                                                      | The `null` DELETE payload needs one new entry                |
+| `platform.api_keys` has **no** `deleted_at` column; `updated_at` is maintained by Drizzle `$onUpdate`                               | [`schema.ts:43`](../../apps/api/src/db/schema.ts:43)                                                                                                                            | Migration 0003                                               |
+| `findPage` filters only by `q`; `findByIdentifier` only by `identifier`                                                             | [`api-keys.repository.ts:66`](../../apps/api/src/api-keys/api-keys.repository.ts:66)                                                                                            | Both must gain `deleted_at IS NULL`                          |
+| `AppError` hierarchy already derives status from the catalogue; `ConflictAppError` accepts a code                                   | [`app-error.ts:66`](../../apps/api/src/common/http/app-error.ts:66)                                                                                                             | New codes need only subclasses                               |
+| `AppErrorStatus`-driven response is the only wrapping point (`responses.ok`)                                                        | [`api-response.service.ts`](../../apps/api/src/common/http/api-response.service.ts:1)                                                                                           | Controller stays a router                                    |
+| The controller audit fails any enveloped route missing from `API_ENDPOINTS` (verb **and** path)                                     | [`controller-audit.ts:132`](../../apps/api/test/lib/controller-audit.ts:132)                                                                                                    | Both new routes must be registered or the e2e suite goes red |
+| `Database` mock models `insert`/`select` chains only — no `update`                                                                  | [`database.mock.ts:140`](../../apps/api/src/api-keys/test/mocks/database.mock.ts:140)                                                                                           | Mock must grow an `update…set…where…returning` chain         |
+| `ERROR_CODE_MESSAGE` is `Record<string, string>` (not exhaustive)                                                                   | [`error-message.const.ts:89`](../../apps/admin/src/lib/error-message.const.ts:89)                                                                                               | No admin compile break                                       |
 
 ---
 
@@ -64,7 +64,11 @@ patchable** (renaming the address = delete + create).
 export const updateApiKeySchema = z
   .object({
     name: z.string().min(1).max(API_KEY_NAME_MAX_LENGTH).optional(),
-    description: z.string().max(API_KEY_DESCRIPTION_MAX_LENGTH).nullable().optional(),
+    description: z
+      .string()
+      .max(API_KEY_DESCRIPTION_MAX_LENGTH)
+      .nullable()
+      .optional(),
     apiKey: z.string().min(1).max(API_KEY_VALUE_MAX_LENGTH).optional(),
     expiresAt: isoDateTimeSchema.nullable().optional(),
     updatedAt: isoDateTimeSchema, // the concurrency token, always required
@@ -90,10 +94,10 @@ RETURNING *;
 the check and the write — exactly the lost update the ticket exists to prevent. The service then classifies a `null`
 result with one `findAnyByIdentifier` read (includes deleted rows):
 
-| Classification read | Answer |
-| --- | --- |
-| row is `null` | `404 NOT_FOUND` |
-| `deletedAt !== null` | `404 NOT_FOUND` (a deleted row is invisible) |
+| Classification read                     | Answer                                              |
+| --------------------------------------- | --------------------------------------------------- |
+| row is `null`                           | `404 NOT_FOUND`                                     |
+| `deletedAt !== null`                    | `404 NOT_FOUND` (a deleted row is invisible)        |
 | row exists, live, different `updatedAt` | `409 STALE_WRITE`, `details[{ path: 'updatedAt' }]` |
 
 `updatedAt` on the wire comes from the DB (`$onUpdate`), never from the client — the client value is only compared.
@@ -114,8 +118,12 @@ alternative (returning the soft-deleted row) would change `apiKeySchema` for eve
 ### D8 — Errors: two new `AppError` subclasses, no filter change
 
 ```ts
-export class StaleWriteAppError extends AppError { /* code: STALE_WRITE, details: updatedAt */ }
-export class SemanticValidationAppError extends AppError { /* code: SEMANTIC_VALIDATION_FAILED */ }
+export class StaleWriteAppError extends AppError {
+  /* code: STALE_WRITE, details: updatedAt */
+}
+export class SemanticValidationAppError extends AppError {
+  /* code: SEMANTIC_VALIDATION_FAILED */
+}
 ```
 
 Both added to [`app-error.ts`](../../apps/api/src/common/http/app-error.ts:1); the status is derived from the
@@ -123,10 +131,10 @@ catalogue (`409`, `422`), so `ApiExceptionFilter` is untouched.
 
 ### D9 — Registry: two entries, one new payload component
 
-| `operationId` | Verb / path | `successStatus` | `dataSchema` | `requestSchema` | `errors` |
-| --- | --- | --- | --- | --- | --- |
-| `apiKeys.update` | `PATCH /api/api-keys/:identifier` | `200` | `apiKeySchema` | `updateApiKeySchema` | `VALIDATION_FAILED`, `NOT_FOUND`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED` + common |
-| `apiKeys.remove` | `DELETE /api/api-keys/:identifier` | `200` | `noPayloadSchema` | — | `NOT_FOUND` + common |
+| `operationId`    | Verb / path                        | `successStatus` | `dataSchema`      | `requestSchema`      | `errors`                                                                               |
+| ---------------- | ---------------------------------- | --------------- | ----------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| `apiKeys.update` | `PATCH /api/api-keys/:identifier`  | `200`           | `apiKeySchema`    | `updateApiKeySchema` | `VALIDATION_FAILED`, `NOT_FOUND`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED` + common |
+| `apiKeys.remove` | `DELETE /api/api-keys/:identifier` | `200`           | `noPayloadSchema` | —                    | `NOT_FOUND` + common                                                                   |
 
 `PAYLOAD_COMPONENTS` gains `['UpdateApiKey', updateApiKeySchema]` and `['NoPayload', noPayloadSchema]`.
 
@@ -196,31 +204,31 @@ flowchart LR
 
 ## 6. Tests (mocks only, every branch)
 
-| File | Coverage |
-| --- | --- |
-| `packages/shared/test/error-code.test.ts` (new) | both new codes resolve to `409` / `422`; every catalogue value has a status entry; unknown code → `500` |
-| `packages/shared/test/api-keys-update.test.ts` (new) | minimal valid body; missing `updatedAt` → 400; unknown field (`identifier`, `id`) → 400; `description: null` / `expiresAt: null` accepted; empty string name rejected; non-ISO `updatedAt` rejected |
-| `packages/shared/test/endpoint-registry.test.ts` | new ops registered, ids `<resource>.<action>`, sample payload for each `operationId`, `apiKeys.update` request schema parses the fixture, `apiKeys.remove` payload is `null` |
-| `apps/api/src/common/http/app-error.spec.ts` | `StaleWriteAppError.status === 409` + detail path, `SemanticValidationAppError.status === 422` |
-| `apps/api/src/api-keys/api-keys.logic.spec.ts` (new) | `isPastDate`: past, equal-to-now (allowed), future |
-| `apps/api/src/api-keys/api-keys.mapper.spec.ts` | `toApiKeyPatch`: omitted keys stay absent, `null` clears, `expiresAt` string → `Date`, `updatedAt` never in the patch |
-| `apps/api/src/api-keys/api-keys.repository.spec.ts` | `findPage`/`findByIdentifier` WHERE contains the not-deleted filter; `updateByIdentifier` WHERE carries identifier + not-deleted + `updatedAt` equality, `set` excludes `updatedAt`/`updatedAt`-from-body, `null` when no row; `softDeleteByIdentifier` sets `deleted_at`, filters not-deleted, `null` when no row; driver errors propagate unchanged |
-| `apps/api/src/api-keys/api-keys.service.spec.ts` | update success; 422 past `expiresAt` (and that the repository is **not** called); 409 when classification read shows a live row with another `updatedAt`; 404 when the read is `null`; 404 when the read shows `deletedAt`; remove success; remove 404 |
-| `apps/api/src/api-keys/api-keys.controller.spec.ts` | PATCH returns the service payload inside the envelope with `meta.requestId`; DELETE returns `data: null` with `200` |
-| `apps/api/test/api-keys.e2e-spec.ts` | see below |
+| File                                                 | Coverage                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/shared/test/error-code.test.ts` (new)      | both new codes resolve to `409` / `422`; every catalogue value has a status entry; unknown code → `500`                                                                                                                                                                                                                                               |
+| `packages/shared/test/api-keys-update.test.ts` (new) | minimal valid body; missing `updatedAt` → 400; unknown field (`identifier`, `id`) → 400; `description: null` / `expiresAt: null` accepted; empty string name rejected; non-ISO `updatedAt` rejected                                                                                                                                                   |
+| `packages/shared/test/endpoint-registry.test.ts`     | new ops registered, ids `<resource>.<action>`, sample payload for each `operationId`, `apiKeys.update` request schema parses the fixture, `apiKeys.remove` payload is `null`                                                                                                                                                                          |
+| `apps/api/src/common/http/app-error.spec.ts`         | `StaleWriteAppError.status === 409` + detail path, `SemanticValidationAppError.status === 422`                                                                                                                                                                                                                                                        |
+| `apps/api/src/api-keys/api-keys.logic.spec.ts` (new) | `isPastDate`: past, equal-to-now (allowed), future                                                                                                                                                                                                                                                                                                    |
+| `apps/api/src/api-keys/api-keys.mapper.spec.ts`      | `toApiKeyPatch`: omitted keys stay absent, `null` clears, `expiresAt` string → `Date`, `updatedAt` never in the patch                                                                                                                                                                                                                                 |
+| `apps/api/src/api-keys/api-keys.repository.spec.ts`  | `findPage`/`findByIdentifier` WHERE contains the not-deleted filter; `updateByIdentifier` WHERE carries identifier + not-deleted + `updatedAt` equality, `set` excludes `updatedAt`/`updatedAt`-from-body, `null` when no row; `softDeleteByIdentifier` sets `deleted_at`, filters not-deleted, `null` when no row; driver errors propagate unchanged |
+| `apps/api/src/api-keys/api-keys.service.spec.ts`     | update success; 422 past `expiresAt` (and that the repository is **not** called); 409 when classification read shows a live row with another `updatedAt`; 404 when the read is `null`; 404 when the read shows `deletedAt`; remove success; remove 404                                                                                                |
+| `apps/api/src/api-keys/api-keys.controller.spec.ts`  | PATCH returns the service payload inside the envelope with `meta.requestId`; DELETE returns `data: null` with `200`                                                                                                                                                                                                                                   |
+| `apps/api/test/api-keys.e2e-spec.ts`                 | see below                                                                                                                                                                                                                                                                                                                                             |
 
 ### e2e scenarios (real Postgres, self-cleaning)
 
-| # | Request | Expectation |
-| --- | --- | --- |
-| 1 | `PATCH` with a fresh `updatedAt` + new `name` | `200`, `data.name` updated, `data.updatedAt` > request `updatedAt`, `meta` present |
-| 2 | `PATCH` replayed with the **old** `updatedAt` | `409`, `code: STALE_WRITE`, `details[0].path === 'updatedAt'` |
-| 3 | `PATCH` with `expiresAt` in the past | `422`, `code: SEMANTIC_VALIDATION_FAILED`, `details[0].path === 'expiresAt'` |
-| 4 | `PATCH` with `{ "identifier": "x", "updatedAt": … }` | `400`, `code: VALIDATION_FAILED` (`.strict()`) |
-| 5 | `DELETE`, then `GET` and `PATCH` | `DELETE` → `200` + `data: null`; `GET` → `404`; `PATCH` → `404` |
-| 6 | `DELETE` a second time | `404` (idempotency is `404`, not `204`) |
-| 7 | `GET /api/api-keys?q=<deleted prefix>` | deleted row absent from `data` and from `total` |
-| — | dev `ResponseAssertInterceptor` | DELETE body validates against `NoPayload`, PATCH against `ApiKey` (covered by the running dev stack, no extra test) |
+| #   | Request                                              | Expectation                                                                                                         |
+| --- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 1   | `PATCH` with a fresh `updatedAt` + new `name`        | `200`, `data.name` updated, `data.updatedAt` > request `updatedAt`, `meta` present                                  |
+| 2   | `PATCH` replayed with the **old** `updatedAt`        | `409`, `code: STALE_WRITE`, `details[0].path === 'updatedAt'`                                                       |
+| 3   | `PATCH` with `expiresAt` in the past                 | `422`, `code: SEMANTIC_VALIDATION_FAILED`, `details[0].path === 'expiresAt'`                                        |
+| 4   | `PATCH` with `{ "identifier": "x", "updatedAt": … }` | `400`, `code: VALIDATION_FAILED` (`.strict()`)                                                                      |
+| 5   | `DELETE`, then `GET` and `PATCH`                     | `DELETE` → `200` + `data: null`; `GET` → `404`; `PATCH` → `404`                                                     |
+| 6   | `DELETE` a second time                               | `404` (idempotency is `404`, not `204`)                                                                             |
+| 7   | `GET /api/api-keys?q=<deleted prefix>`               | deleted row absent from `data` and from `total`                                                                     |
+| —   | dev `ResponseAssertInterceptor`                      | DELETE body validates against `NoPayload`, PATCH against `ApiKey` (covered by the running dev stack, no extra test) |
 
 ---
 

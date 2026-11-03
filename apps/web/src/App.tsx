@@ -11,7 +11,10 @@ export function App() {
             AIsztens
           </Link>
           <div className="flex items-center gap-4 text-sm">
-            <Link to="/" className="text-text-secondary hover:text-text-primary">
+            <Link
+              to="/"
+              className="text-text-secondary hover:text-text-primary"
+            >
               Kezdőlap
             </Link>
           </div>

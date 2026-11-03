@@ -9,18 +9,18 @@
 
 ## 1. Audited starting point
 
-| Fact | Where | Consequence |
-| --- | --- | --- |
-| `ZodQueryPipe` exists and is tested, but **no controller uses it** (`@Query(` → 0 hits) | [`zod.pipe.ts:60`](../../apps/api/src/common/http/zod.pipe.ts:60) | This ticket is the first production use, not a new introduction |
-| `ApiResponseService.ok(data, ctx, pagination?)` already emits `meta.pagination` | [`api-response.service.ts:36`](../../apps/api/src/common/http/api-response.service.ts:36) | The envelope layer needs **no change** |
-| `paginationMetaSchema` = `page/limit/total/totalPages` (all ints, `totalPages` may be `0`) | [`envelope.schema.ts:15`](../../packages/shared/src/contract/envelope.schema.ts:15) | `total: 0` ⇒ `totalPages: 0` is legal |
-| The shared list-query contract already exists (defaults filled by the schema, `page≥1`, `limit` 1..100, `q` trimmed/empty→`undefined`) | [`list-query.schema.ts:78`](../../packages/shared/src/contract/list-query.schema.ts:78) | Nothing about the *shape* of the query must be invented here |
-| `createListQuerySchema` returns `z.ZodType<ListQuery & { sort: string }>` | [`list-query.schema.ts:100`](../../packages/shared/src/contract/list-query.schema.ts:100) | `sort` loses its literal type; see D5 |
-| Repository exposes `findAll(): Promise<ApiKeyRow[]>` and its docblock explicitly says *“No pagination by design (plan D7)”* | [`api-keys.repository.interface.ts:34`](../../apps/api/src/api-keys/api-keys.repository.interface.ts:34) | Breaking interface change **and** a docblock to rewrite |
-| The repository spec's `Database` mock models exactly 3 chains — no `offset()`, no `count()` | [`database.mock.ts:91`](../../apps/api/src/api-keys/test/mocks/database.mock.ts:91) | The mock must grow, otherwise `findPage` is untestable |
-| The OpenAPI registry has **no query-parameter support** (`ApiEndpointContract` has `path`/`dataSchema`/`requestSchema` only) | [`endpoint.interface.ts:31`](../../packages/shared/src/contract/endpoint.interface.ts:31) | See D3 — this is the only genuinely new design decision |
-| `apiKeys.list` documents `summary: 'List every stored API key, newest first'` and an example **without** `meta.pagination` | [`api-keys.contract.ts:36`](../../packages/shared/src/contract/api-keys/api-keys.contract.ts:36) | The spec would describe an endpoint that no longer exists |
-| `packages/api-client` `list()` sends **no** query and does not read `meta.pagination` | [`api-keys.service.ts:28`](../../packages/api-client/src/api-keys/api-keys.service.ts:28) | Out of scope (AIS-109 owns the parametrised transport) |
+| Fact                                                                                                                                   | Where                                                                                                    | Consequence                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `ZodQueryPipe` exists and is tested, but **no controller uses it** (`@Query(` → 0 hits)                                                | [`zod.pipe.ts:60`](../../apps/api/src/common/http/zod.pipe.ts:60)                                        | This ticket is the first production use, not a new introduction |
+| `ApiResponseService.ok(data, ctx, pagination?)` already emits `meta.pagination`                                                        | [`api-response.service.ts:36`](../../apps/api/src/common/http/api-response.service.ts:36)                | The envelope layer needs **no change**                          |
+| `paginationMetaSchema` = `page/limit/total/totalPages` (all ints, `totalPages` may be `0`)                                             | [`envelope.schema.ts:15`](../../packages/shared/src/contract/envelope.schema.ts:15)                      | `total: 0` ⇒ `totalPages: 0` is legal                           |
+| The shared list-query contract already exists (defaults filled by the schema, `page≥1`, `limit` 1..100, `q` trimmed/empty→`undefined`) | [`list-query.schema.ts:78`](../../packages/shared/src/contract/list-query.schema.ts:78)                  | Nothing about the _shape_ of the query must be invented here    |
+| `createListQuerySchema` returns `z.ZodType<ListQuery & { sort: string }>`                                                              | [`list-query.schema.ts:100`](../../packages/shared/src/contract/list-query.schema.ts:100)                | `sort` loses its literal type; see D5                           |
+| Repository exposes `findAll(): Promise<ApiKeyRow[]>` and its docblock explicitly says _“No pagination by design (plan D7)”_            | [`api-keys.repository.interface.ts:34`](../../apps/api/src/api-keys/api-keys.repository.interface.ts:34) | Breaking interface change **and** a docblock to rewrite         |
+| The repository spec's `Database` mock models exactly 3 chains — no `offset()`, no `count()`                                            | [`database.mock.ts:91`](../../apps/api/src/api-keys/test/mocks/database.mock.ts:91)                      | The mock must grow, otherwise `findPage` is untestable          |
+| The OpenAPI registry has **no query-parameter support** (`ApiEndpointContract` has `path`/`dataSchema`/`requestSchema` only)           | [`endpoint.interface.ts:31`](../../packages/shared/src/contract/endpoint.interface.ts:31)                | See D3 — this is the only genuinely new design decision         |
+| `apiKeys.list` documents `summary: 'List every stored API key, newest first'` and an example **without** `meta.pagination`             | [`api-keys.contract.ts:36`](../../packages/shared/src/contract/api-keys/api-keys.contract.ts:36)         | The spec would describe an endpoint that no longer exists       |
+| `packages/api-client` `list()` sends **no** query and does not read `meta.pagination`                                                  | [`api-keys.service.ts:28`](../../packages/api-client/src/api-keys/api-keys.service.ts:28)                | Out of scope (AIS-109 owns the parametrised transport)          |
 
 ---
 
@@ -54,13 +54,13 @@ No `GROUP BY`/`DISTINCT` interplay: a single `WHERE` expression, used by both th
 The list endpoint accepts `page/limit/sort/order/q`; leaving the spec silent is exactly the drift
 [`API-Convention.md`](../Specs/API-Convention.md:1) forbids.
 
-| Option | Mechanism | Cost |
-| --- | --- | --- |
-| **A (recommended)** | new optional `queryParameters: readonly ApiQueryParameterContract[]` on `ApiEndpointContract`; descriptors live in the shared list-query contract, generated from `LIST_QUERY_MAX_LIMIT` / defaults / `API_KEY_SORT_FIELDS` | small change in `endpoint.interface.ts`, `zod-openapi.ts`, `openapi.registry.ts` |
-| B | pass the zod schema to `registerPath({ request: { query } })` | **not viable** — `q` is a `ZodEffects` (transform), which zod-to-openapi v7 cannot render for a parameter |
-| C | defer to AIS-99 / a follow-up ticket | registry untouched, but the published spec is wrong for one release |
+| Option              | Mechanism                                                                                                                                                                                                                   | Cost                                                                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **A (recommended)** | new optional `queryParameters: readonly ApiQueryParameterContract[]` on `ApiEndpointContract`; descriptors live in the shared list-query contract, generated from `LIST_QUERY_MAX_LIMIT` / defaults / `API_KEY_SORT_FIELDS` | small change in `endpoint.interface.ts`, `zod-openapi.ts`, `openapi.registry.ts`                          |
+| B                   | pass the zod schema to `registerPath({ request: { query } })`                                                                                                                                                               | **not viable** — `q` is a `ZodEffects` (transform), which zod-to-openapi v7 cannot render for a parameter |
+| C                   | defer to AIS-99 / a follow-up ticket                                                                                                                                                                                        | registry untouched, but the published spec is wrong for one release                                       |
 
-Option A is chosen because a hand-written descriptor list is *derived* from the same constants that validate the
+Option A is chosen because a hand-written descriptor list is _derived_ from the same constants that validate the
 request, and it is deterministic (no generator surprises). The `apiKeys.list` example also gains
 `meta.pagination` so the published sample shows the paged body.
 
@@ -90,12 +90,12 @@ tie-breaker two rows with the same timestamp can swap between pages and a row wo
 
 ### D7 — Where the new pieces live
 
-| Piece | Location | Why |
-| --- | --- | --- |
-| `API_KEY_SORT_FIELDS`, `apiKeyListQuerySchema`, `ApiKeyListQuery` | new `packages/shared/src/contract/api-keys/api-keys.list-query.ts` | **new file on purpose** — AIS-75 also edits `api-keys.schema.ts`; this keeps the two tickets conflict-free |
-| `toPaginationMeta` | existing `list-query.helper.ts` | pure, reusable by the client's pager |
-| Drizzle column map `API_KEY_SORT_COLUMNS: Record<ApiKeySortField, PgColumn>` | `apps/api/src/api-keys/api-keys.const.ts` | a missing column becomes a compile error, not a `500` |
-| `PaginatedApiKeys` view type | new `apps/api/src/api-keys/api-keys.interface.ts` | the feature has no interface file yet; the service must not export an inline type |
+| Piece                                                                        | Location                                                           | Why                                                                                                        |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `API_KEY_SORT_FIELDS`, `apiKeyListQuerySchema`, `ApiKeyListQuery`            | new `packages/shared/src/contract/api-keys/api-keys.list-query.ts` | **new file on purpose** — AIS-75 also edits `api-keys.schema.ts`; this keeps the two tickets conflict-free |
+| `toPaginationMeta`                                                           | existing `list-query.helper.ts`                                    | pure, reusable by the client's pager                                                                       |
+| Drizzle column map `API_KEY_SORT_COLUMNS: Record<ApiKeySortField, PgColumn>` | `apps/api/src/api-keys/api-keys.const.ts`                          | a missing column becomes a compile error, not a `500`                                                      |
+| `PaginatedApiKeys` view type                                                 | new `apps/api/src/api-keys/api-keys.interface.ts`                  | the feature has no interface file yet; the service must not export an inline type                          |
 
 Both export indexes (`contract/index.ts` **and** `src/index.ts`) get the new symbols — the repo duplicates the
 lists deliberately (AIS-106 D8).
@@ -159,29 +159,29 @@ flowchart LR
 
 ## 5. Tests (every branch, mocks only, no network)
 
-| File | Coverage |
-| --- | --- |
-| `packages/shared/test/list-query-helper.test.ts` | `toPaginationMeta`: `total 0` → `totalPages 0`; exact division; remainder; page past the end keeps `page` as requested |
-| `packages/shared/test/list-query-factory.test.ts` | generic factory: `sort` inferred as the literal union; unknown `sort` still fails |
-| `packages/shared/test/api-keys-list-query.test.ts` (new) | defaults (`page 1`, `limit 20`, `sort createdAt`, `order desc`), allowed + rejected `sort`, `q` empty → `undefined` |
-| `apps/api/src/api-keys/api-keys.repository.spec.ts` | `findPage`: limit/offset passed, `orderBy` carries the sort column **and** the `id` tie-breaker, `q` omitted ⇒ no `where` on the slice, `q` present ⇒ `ILIKE` on `name`/`identifier`, `total` from the count query, empty result, count error propagated unchanged |
-| `apps/api/src/api-keys/api-keys.service.spec.ts` | `list` forwards the query, maps rows, returns `pagination` from `toPaginationMeta`, empty page ⇒ `items: []` |
-| `apps/api/src/api-keys/api-keys.controller.spec.ts` | `meta.pagination` present with the service's numbers; `meta` still carries `requestId`/`timestamp` |
-| `apps/api/src/api-keys/test/mocks/database.mock.ts` | **extend**: `offset()`, and a count script (`countRows`) distinguished by `select({ ... })` receiving a field map |
-| `apps/api/src/api-keys/test/mocks/api-keys.mock.ts` | `buildListQuery(overrides)` fixture (no inline literals in specs) |
-| `apps/api/test/api-keys.e2e-spec.ts` | see below |
+| File                                                     | Coverage                                                                                                                                                                                                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/shared/test/list-query-helper.test.ts`         | `toPaginationMeta`: `total 0` → `totalPages 0`; exact division; remainder; page past the end keeps `page` as requested                                                                                                                                             |
+| `packages/shared/test/list-query-factory.test.ts`        | generic factory: `sort` inferred as the literal union; unknown `sort` still fails                                                                                                                                                                                  |
+| `packages/shared/test/api-keys-list-query.test.ts` (new) | defaults (`page 1`, `limit 20`, `sort createdAt`, `order desc`), allowed + rejected `sort`, `q` empty → `undefined`                                                                                                                                                |
+| `apps/api/src/api-keys/api-keys.repository.spec.ts`      | `findPage`: limit/offset passed, `orderBy` carries the sort column **and** the `id` tie-breaker, `q` omitted ⇒ no `where` on the slice, `q` present ⇒ `ILIKE` on `name`/`identifier`, `total` from the count query, empty result, count error propagated unchanged |
+| `apps/api/src/api-keys/api-keys.service.spec.ts`         | `list` forwards the query, maps rows, returns `pagination` from `toPaginationMeta`, empty page ⇒ `items: []`                                                                                                                                                       |
+| `apps/api/src/api-keys/api-keys.controller.spec.ts`      | `meta.pagination` present with the service's numbers; `meta` still carries `requestId`/`timestamp`                                                                                                                                                                 |
+| `apps/api/src/api-keys/test/mocks/database.mock.ts`      | **extend**: `offset()`, and a count script (`countRows`) distinguished by `select({ ... })` receiving a field map                                                                                                                                                  |
+| `apps/api/src/api-keys/test/mocks/api-keys.mock.ts`      | `buildListQuery(overrides)` fixture (no inline literals in specs)                                                                                                                                                                                                  |
+| `apps/api/test/api-keys.e2e-spec.ts`                     | see below                                                                                                                                                                                                                                                          |
 
 ### e2e scenarios (real Postgres, self-cleaning)
 
 Seed **12** rows named/identified `e2e-<uuid>-NN` in `beforeAll`, then:
 
-| # | Request | Expectation |
-| --- | --- | --- |
-| 1 | `?q=<prefix>&limit=10&page=2&sort=name&order=asc` | 200, `data` = rows 11–12 of the name-ascending slice, `meta.pagination = { page: 2, limit: 10, total: 12, totalPages: 2 }` |
-| 2 | `?q=<prefix-with-no-match>` | **200**, `data: []`, `total: 0`, `totalPages: 0` (not `404`, not `null`) |
-| 3 | `?limit=101` | **400**, `code: VALIDATION_FAILED`, `details[0].path === 'limit'` |
-| 4 | `?sort=does-not-exist` | **400** `VALIDATION_FAILED`, `details[0].path === 'sort'` (proves `ZodQueryPipe` + enum allow-list) |
-| — | existing `GET /api/api-keys` test | reworked to `?limit=100` (or `?q=<identifier>`) so it is deterministic against a non-empty table; `meta.pagination` is asserted there too |
+| #   | Request                                           | Expectation                                                                                                                               |
+| --- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `?q=<prefix>&limit=10&page=2&sort=name&order=asc` | 200, `data` = rows 11–12 of the name-ascending slice, `meta.pagination = { page: 2, limit: 10, total: 12, totalPages: 2 }`                |
+| 2   | `?q=<prefix-with-no-match>`                       | **200**, `data: []`, `total: 0`, `totalPages: 0` (not `404`, not `null`)                                                                  |
+| 3   | `?limit=101`                                      | **400**, `code: VALIDATION_FAILED`, `details[0].path === 'limit'`                                                                         |
+| 4   | `?sort=does-not-exist`                            | **400** `VALIDATION_FAILED`, `details[0].path === 'sort'` (proves `ZodQueryPipe` + enum allow-list)                                       |
+| —   | existing `GET /api/api-keys` test                 | reworked to `?limit=100` (or `?q=<identifier>`) so it is deterministic against a non-empty table; `meta.pagination` is asserted there too |
 
 ---
 

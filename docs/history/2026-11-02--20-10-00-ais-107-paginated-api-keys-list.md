@@ -51,14 +51,14 @@
 
 ## Tests
 
-| Suite | Result |
-| --- | --- |
-| `pnpm --filter @callback/shared test` | 10 suites / **167 tests** green (new: `api-keys-list-query.test.ts`, `toPaginationMeta` block, generic-factory type assertion) |
-| `pnpm --filter @callback/api test` | 38 suites / **370 tests** green (repository `findPage` + `q` filter + tie-breaker, service pagination, controller `meta.pagination`, OpenAPI query parameters) |
-| `pnpm --filter @callback/admin test` | 23 files / **195 tests** green (guard: the shared factory change did not break AIS-119) |
-| `pnpm --filter @callback/api build` | green |
-| `pnpm --filter @callback/api lint` | 0 errors (1 pre-existing `no-unsafe-argument` warning in the OpenAPI bridge) |
-| `pnpm knip` | clean |
+| Suite                                 | Result                                                                                                                                                         |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @callback/shared test` | 10 suites / **167 tests** green (new: `api-keys-list-query.test.ts`, `toPaginationMeta` block, generic-factory type assertion)                                 |
+| `pnpm --filter @callback/api test`    | 38 suites / **370 tests** green (repository `findPage` + `q` filter + tie-breaker, service pagination, controller `meta.pagination`, OpenAPI query parameters) |
+| `pnpm --filter @callback/admin test`  | 23 files / **195 tests** green (guard: the shared factory change did not break AIS-119)                                                                        |
+| `pnpm --filter @callback/api build`   | green                                                                                                                                                          |
+| `pnpm --filter @callback/api lint`    | 0 errors (1 pre-existing `no-unsafe-argument` warning in the OpenAPI bridge)                                                                                   |
+| `pnpm knip`                           | clean                                                                                                                                                          |
 
 The `Database` mock gained `offset()`, a scripted `count(*)` (`countWhere`) and **lazy** thenable
 chain nodes: an eagerly created rejected promise that a test chains over is an unhandled rejection

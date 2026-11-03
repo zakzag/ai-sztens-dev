@@ -14,7 +14,11 @@
 
 import { delay, http, HttpResponse } from 'msw';
 import type { ApiKey, CreateApiKeyInput } from '@callback/shared';
-import { API_ERROR_CODE, API_KEYS_PATH, VALID_API_KEY_PAIR } from '@callback/shared';
+import {
+  API_ERROR_CODE,
+  API_KEYS_PATH,
+  VALID_API_KEY_PAIR,
+} from '@callback/shared';
 import { errorResponse, successResponse } from './handler-envelope.js';
 
 /** Developer text of a duplicate-identifier response (for logs only). */
@@ -128,7 +132,10 @@ export const apiKeysCreateMultiFieldValidation = http.post(API_KEYS_PATH, () =>
     'The request payload does not match the API contract.',
     {
       details: [
-        { path: 'name', message: 'String must contain at least 1 character(s)' },
+        {
+          path: 'name',
+          message: 'String must contain at least 1 character(s)',
+        },
         {
           path: 'apiKey',
           message: 'String must contain at least 8 character(s)',

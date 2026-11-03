@@ -15,27 +15,27 @@ OpenAPI document and the client all read one table.
 
 ### `packages/shared`
 
-| File | Change |
-| --- | --- |
-| [`contract/error-code.const.ts`](../../packages/shared/src/contract/error-code.const.ts:1) | `STALE_WRITE` → `409`, `SEMANTIC_VALIDATION_FAILED` → `422` in `API_ERROR_CODE` **and** `API_ERROR_CODE_STATUS` |
-| [`contract/no-payload.schema.ts`](../../packages/shared/src/contract/no-payload.schema.ts:1) (new) | `noPayloadSchema = z.null()` — the payload of a call with nothing to return |
+| File                                                                                                             | Change                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| [`contract/error-code.const.ts`](../../packages/shared/src/contract/error-code.const.ts:1)                       | `STALE_WRITE` → `409`, `SEMANTIC_VALIDATION_FAILED` → `422` in `API_ERROR_CODE` **and** `API_ERROR_CODE_STATUS`                         |
+| [`contract/no-payload.schema.ts`](../../packages/shared/src/contract/no-payload.schema.ts:1) (new)               | `noPayloadSchema = z.null()` — the payload of a call with nothing to return                                                             |
 | [`contract/api-keys/api-keys.update.ts`](../../packages/shared/src/contract/api-keys/api-keys.update.ts:1) (new) | `updateApiKeySchema`: partial fields, **required** `updatedAt`, `.strict()`, `nullable` clear-fields; `API_KEY_UPDATE_FORBIDDEN_FIELDS` |
-| [`contract/api-keys/api-keys.contract.ts`](../../packages/shared/src/contract/api-keys/api-keys.contract.ts:1) | `apiKeys.update` (`PATCH`) and `apiKeys.remove` (`DELETE`) registry entries |
-| [`contract/api-keys/api-keys.fixture.ts`](../../packages/shared/src/contract/api-keys/api-keys.fixture.ts:1) | `VALID_UPDATE_API_KEY_REQUEST` — the published example is the same value the tests parse |
+| [`contract/api-keys/api-keys.contract.ts`](../../packages/shared/src/contract/api-keys/api-keys.contract.ts:1)   | `apiKeys.update` (`PATCH`) and `apiKeys.remove` (`DELETE`) registry entries                                                             |
+| [`contract/api-keys/api-keys.fixture.ts`](../../packages/shared/src/contract/api-keys/api-keys.fixture.ts:1)     | `VALID_UPDATE_API_KEY_REQUEST` — the published example is the same value the tests parse                                                |
 
 ### `apps/api`
 
-| File | Change |
-| --- | --- |
-| [`db/schema.ts`](../../apps/api/src/db/schema.ts:1) | nullable `deleted_at` + `api_keys_deleted_at_idx` (migration `0003`); every timestamp narrowed to `timestamp(3)` (migration `0004`), see decision 6 |
-| [`api-keys/api-keys.filter.ts`](../../apps/api/src/api-keys/api-keys.filter.ts:1) | `apiKeyNotDeletedFilter()` (`deleted_at IS NULL`) composed into every read/write |
+| File                                                                                      | Change                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`db/schema.ts`](../../apps/api/src/db/schema.ts:1)                                       | nullable `deleted_at` + `api_keys_deleted_at_idx` (migration `0003`); every timestamp narrowed to `timestamp(3)` (migration `0004`), see decision 6                                          |
+| [`api-keys/api-keys.filter.ts`](../../apps/api/src/api-keys/api-keys.filter.ts:1)         | `apiKeyNotDeletedFilter()` (`deleted_at IS NULL`) composed into every read/write                                                                                                             |
 | [`api-keys/api-keys.repository.ts`](../../apps/api/src/api-keys/api-keys.repository.ts:1) | `updateByIdentifier` (one atomic `UPDATE … WHERE updated_at = $expected RETURNING *`), `softDeleteByIdentifier`, `findAnyByIdentifier` (deleted rows included, used for miss classification) |
-| [`api-keys/api-keys.logic.ts`](../../apps/api/src/api-keys/api-keys.logic.ts:1) (new) | pure `isPastDate(iso, now)` — the `422` rule, `now` injected |
-| [`api-keys/api-keys.mapper.ts`](../../apps/api/src/api-keys/api-keys.mapper.ts:1) | `toApiKeyPatch` — omitted key = column untouched, explicit `null` = cleared |
-| [`common/http/app-error.ts`](../../apps/api/src/common/http/app-error.ts:1) | `StaleWriteAppError`, `SemanticValidationAppError` (status derived from the catalogue) |
-| [`api-keys/api-keys.service.ts`](../../apps/api/src/api-keys/api-keys.service.ts:1) | `update` (422 → atomic guard → 404/409 classification), `remove` (404 when nothing was live) |
-| [`api-keys/api-keys.controller.ts`](../../apps/api/src/api-keys/api-keys.controller.ts:1) | `@Patch(':identifier')`, `@Delete(':identifier')`; `DELETE` answers `200` + `data: null` |
-| [`common/openapi/zod-openapi.ts`](../../apps/api/src/common/openapi/zod-openapi.ts:1) | `UpdateApiKey` and `NoPayload` payload components registered |
+| [`api-keys/api-keys.logic.ts`](../../apps/api/src/api-keys/api-keys.logic.ts:1) (new)     | pure `isPastDate(iso, now)` — the `422` rule, `now` injected                                                                                                                                 |
+| [`api-keys/api-keys.mapper.ts`](../../apps/api/src/api-keys/api-keys.mapper.ts:1)         | `toApiKeyPatch` — omitted key = column untouched, explicit `null` = cleared                                                                                                                  |
+| [`common/http/app-error.ts`](../../apps/api/src/common/http/app-error.ts:1)               | `StaleWriteAppError`, `SemanticValidationAppError` (status derived from the catalogue)                                                                                                       |
+| [`api-keys/api-keys.service.ts`](../../apps/api/src/api-keys/api-keys.service.ts:1)       | `update` (422 → atomic guard → 404/409 classification), `remove` (404 when nothing was live)                                                                                                 |
+| [`api-keys/api-keys.controller.ts`](../../apps/api/src/api-keys/api-keys.controller.ts:1) | `@Patch(':identifier')`, `@Delete(':identifier')`; `DELETE` answers `200` + `data: null`                                                                                                     |
+| [`common/openapi/zod-openapi.ts`](../../apps/api/src/common/openapi/zod-openapi.ts:1)     | `UpdateApiKey` and `NoPayload` payload components registered                                                                                                                                 |
 
 ## Decisions that shaped the implementation
 
@@ -49,7 +49,7 @@ OpenAPI document and the client all read one table.
 4. **`DELETE` is `200 { data: null }`**, never `204` (a `204` could not carry `meta.requestId`), described by
    `noPayloadSchema` → the `NoPayload` component.
 5. **PATCH-only schemas live in new files**, so AIS-75's edits to `api-keys.schema.ts` do not collide.
-6. **Millisecond timestamps (`timestamp(3)`).** The first *live* run of the new e2e block failed with `409 STALE_WRITE`
+6. **Millisecond timestamps (`timestamp(3)`).** The first _live_ run of the new e2e block failed with `409 STALE_WRITE`
    on a **correct** `PATCH`. Root cause: `now()` stores microseconds (`…123456Z`) while `updatedAt` travels as
    `toISOString()` (`…123Z`), so the echoed token could never equal the stored value — the guard would have rejected
    every real update. The fix is on the storage side (migration `0004` narrows all four timestamp columns), not in the
@@ -62,15 +62,15 @@ OpenAPI document and the client all read one table.
 > (`…\WebStorm2025.2\zoocode-node\…`). On Node < 24.9 the `AppModule` e2e suites self-skip, which is exactly why the
 > `STALE_WRITE` precision bug below stayed hidden. Re-run with `set "PATH=C:\Progs\nodejs;%PATH%"`.
 
-| Command | Result |
-| --- | --- |
-| `pnpm --filter @callback/shared test` | **12 suites / 206 tests passed** |
-| `pnpm --filter @callback/api test` | **39 suites / 433 tests passed** (incl. the timestamp-precision guards) |
+| Command                                | Result                                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @callback/shared test`  | **12 suites / 206 tests passed**                                                                                                                                                                                                                                                                                                                     |
+| `pnpm --filter @callback/api test`     | **39 suites / 433 tests passed** (incl. the timestamp-precision guards)                                                                                                                                                                                                                                                                              |
 | `pnpm --filter @callback/api test:e2e` | **11 suites / 59 tests passed**, nothing skipped — the `mutation convention` block ran against real Postgres: `PATCH` `200`, replayed `PATCH` `409 STALE_WRITE` + `details[0].path === 'updatedAt'`, past `expiresAt` `422`, `.strict()` `400`, `DELETE` → `data: null`, then `GET`/`PATCH`/second `DELETE` → `404`, deleted row absent from `total` |
-| `pnpm --filter @callback/api lint` | clean (one pre-existing warning in `response-assert.logic.ts`, from AIS-98) |
-| `pnpm --filter @callback/api build` | passes |
-| `pnpm --filter @callback/admin test` | **23 files / 195 tests passed** (no admin change in this ticket) |
-| `pnpm knip` | exit `0`, no unused exports/files |
+| `pnpm --filter @callback/api lint`     | clean (one pre-existing warning in `response-assert.logic.ts`, from AIS-98)                                                                                                                                                                                                                                                                          |
+| `pnpm --filter @callback/api build`    | passes                                                                                                                                                                                                                                                                                                                                               |
+| `pnpm --filter @callback/admin test`   | **23 files / 195 tests passed** (no admin change in this ticket)                                                                                                                                                                                                                                                                                     |
+| `pnpm knip`                            | exit `0`, no unused exports/files                                                                                                                                                                                                                                                                                                                    |
 
 Two lint errors were found and fixed during verification:
 

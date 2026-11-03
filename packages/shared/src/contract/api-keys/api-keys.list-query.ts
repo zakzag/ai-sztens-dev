@@ -18,10 +18,7 @@ import {
   LIST_QUERY_PAGE_PARAMETER,
   LIST_QUERY_SEARCH_PARAMETER,
 } from '../list-query.parameters.js';
-import {
-  createListQuerySchema,
-  type ListQuery,
-} from '../list-query.schema.js';
+import { createListQuerySchema, type ListQuery } from '../list-query.schema.js';
 
 /**
  * The columns `GET /api/api-keys` can be sorted by.

@@ -41,10 +41,10 @@ what exists in `apps/admin` today, so nobody mistakes a planned folder for an ex
 | `services`            | composition root (client instance + token supplier)              | **exists**: `services/api-client.ts` + `services/api-client.const.ts`                                                                                                                                                                                                                                                                                                                                 |
 | `lib`                 | pure helpers and formatters                                      | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts` (+ their `*.const.ts` / `.interface.ts`)                                                                                                                                                                                                                                                                              |
 | `components`          | generic presentational shells (no data access)                   | **exists**: `components/BuildInfoFooter.tsx`, `components/error/PageErrorState.tsx`, `components/error/AppErrorBanner.tsx` (the latter is a thin container: all decisions live in `features/error-surface` + `lib/error-surface.*`)                                                                                                                                                                   |
-| `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/handlers/` (MSW network doubles: `api-keys.handlers.ts`, `generic.handlers.ts`, `handler-envelope.ts`), `server.ts`, `render-with-providers.tsx`, `request-recorder.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                              |
+| `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/handlers/` (MSW network doubles: `api-keys.handlers.ts`, `generic.handlers.ts`, `handler-envelope.ts`), `server.ts`, `render-with-providers.tsx`, `request-recorder.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                         |
 
 `apps/web` is out of scope for this document's **layer map**: it has no features/entities
-folders yet, so `pnpm quality:layers` cruises `apps/admin/src` only. The site *is* on
+folders yet, so `pnpm quality:layers` cruises `apps/admin/src` only. The site _is_ on
 `packages/ui` tokens and primitives since AIS-122, and `pnpm quality:tokens` covers it.
 
 ## 3. Design tokens (`packages/ui/src/styles/theme.css`)
@@ -339,21 +339,21 @@ pnpm test:quality     # the gates' own tests (negative + positive fixtures)
 Nothing here builds or runs tests: every gate is a static file walk plus one
 `dependency-cruiser` run, which is why the whole job reports in about a minute.
 
-| Command                   | Enforces                                                                   | Scope                                                   |
-| ------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `pnpm quality:layers`     | `app → pages → features → entities → services → lib`; no page→page, no feature→feature, no cycles | `apps/admin/src` (the only app with layers)              |
-| `pnpm quality:dead-code`  | no unused file, export, exported type or dependency                        | `apps/{admin,web}` + `packages/{ui,api-client,shared}`   |
-| `pnpm quality:tokens`     | no colour literal, no Tailwind palette utility, no arbitrary colour value   | `apps/*/src` **and** `packages/ui/src`                  |
-| `pnpm quality:field-errors` | no `error.status ===` / `error.code ===` / `instanceof ApiError` outside a pure decision function | `apps/*/src`                          |
+| Command                     | Enforces                                                                                          | Scope                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `pnpm quality:layers`       | `app → pages → features → entities → services → lib`; no page→page, no feature→feature, no cycles | `apps/admin/src` (the only app with layers)            |
+| `pnpm quality:dead-code`    | no unused file, export, exported type or dependency                                               | `apps/{admin,web}` + `packages/{ui,api-client,shared}` |
+| `pnpm quality:tokens`       | no colour literal, no Tailwind palette utility, no arbitrary colour value                         | `apps/*/src` **and** `packages/ui/src`                 |
+| `pnpm quality:field-errors` | no `error.status ===` / `error.code ===` / `instanceof ApiError` outside a pure decision function | `apps/*/src`                                           |
 
 ### 9.1 Layer gate (`dependency-cruiser`)
 
 The rules live in **one module**, `.dependency-cruiser.rules.cjs`, imported by two configs so
 "the gate" and "the proof of the gate" cannot drift:
 
-| Config                           | Target                                    |
-| -------------------------------- | ----------------------------------------- |
-| `.dependency-cruiser.cjs`        | `apps/admin/src` (the real tree)          |
+| Config                             | Target                                                |
+| ---------------------------------- | ----------------------------------------------------- |
+| `.dependency-cruiser.cjs`          | `apps/admin/src` (the real tree)                      |
 | `.dependency-cruiser.fixtures.cjs` | `scripts/quality/fixtures/layers/{negative,positive}` |
 
 Element patterns are written **location-agnostically** (`(?:^|/)src/pages/([^/]+)/`), which is
@@ -361,10 +361,10 @@ what lets one rules module match both the real tree and a fixture tree.
 
 Documented grandfathers — visible in the module with a one-line reason each:
 
-| Edge                              | Why                                                                  | Removed by |
-| --------------------------------- | -------------------------------------------------------------------- | ---------- |
-| `components → features/error-surface` | `AppErrorBanner` is a deliberate thin container (AIS-96)         | AIS-96 follow-up |
-| `auth` as its own element         | three files import it legitimately; it ranks with `services`          | AIS-74 (`auth/` → `app/session`) |
+| Edge                                  | Why                                                          | Removed by                       |
+| ------------------------------------- | ------------------------------------------------------------ | -------------------------------- |
+| `components → features/error-surface` | `AppErrorBanner` is a deliberate thin container (AIS-96)     | AIS-96 follow-up                 |
+| `auth` as its own element             | three files import it legitimately; it ranks with `services` | AIS-74 (`auth/` → `app/session`) |
 
 The repo imports its own modules with **explicit `.js` specifiers**; `dependency-cruiser` resolves
 them to `.ts`/`.tsx` natively through `enhancedResolveOptions.extensions`. Two options are absent
@@ -376,12 +376,12 @@ on purpose: `extensionAlias` (not in its config schema — it rejects the whole 
 
 `knip.json` configures five workspaces and one **exclusion**:
 
-| Entry                          | Reason                                                                                        |
-| ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `ignoreWorkspaces: ["apps/api"]` | Nest DI resolves providers at runtime and `apps/api/drizzle/**` is generated — triaging those false positives is its own ticket. A gate that cries wolf gets switched off. |
-| `entry: scripts/lib/agent-artifacts/generate.mjs` | The CLI is invoked from `scripts/init.sh` / `init.ps1`, which `knip` cannot see. |
-| `ignoreDependencies: ["tailwindcss"]` | Used only from CSS (`@import "tailwindcss"`), never imported from TypeScript.          |
-| `ignoreExportsUsedInFile: true` | Mock helpers and constants are exported for readability but used in their own file; a real orphan is still reported as an unused **file**. |
+| Entry                                             | Reason                                                                                                                                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ignoreWorkspaces: ["apps/api"]`                  | Nest DI resolves providers at runtime and `apps/api/drizzle/**` is generated — triaging those false positives is its own ticket. A gate that cries wolf gets switched off. |
+| `entry: scripts/lib/agent-artifacts/generate.mjs` | The CLI is invoked from `scripts/init.sh` / `init.ps1`, which `knip` cannot see.                                                                                           |
+| `ignoreDependencies: ["tailwindcss"]`             | Used only from CSS (`@import "tailwindcss"`), never imported from TypeScript.                                                                                              |
+| `ignoreExportsUsedInFile: true`                   | Mock helpers and constants are exported for readability but used in their own file; a real orphan is still reported as an unused **file**.                                 |
 
 Triage happened in the same change: the orphan barrel `packages/shared/src/contract/index.ts` was
 deleted (it duplicated `packages/shared/src/index.ts`), and the `DEFAULT_EMIT` duplicate alias in
@@ -394,9 +394,9 @@ Both are dependency-free Node ESM scripts in `scripts/quality/`, sharing a posix
 
 - **Token gate**: three rules — colour literal (`#…`, `rgb(`, `hsl(`, `oklch(`, …), Tailwind
   palette utility (incl. `text-white` / `bg-black` and `/50` modifiers), arbitrary colour value.
-  The **only** exemption is `packages/ui/src/styles/theme.css` from the literal rule (it *is* the
+  The **only** exemption is `packages/ui/src/styles/theme.css` from the literal rule (it _is_ the
   palette); a palette utility inside that file still fails.
-- **Field-error gate**: the allowlist *is* the rule — `apps/*/src/lib/error-surface.logic.ts`,
+- **Field-error gate**: the allowlist _is_ the rule — `apps/*/src/lib/error-surface.logic.ts`,
   `apps/*/src/lib/error-message.ts` and `apps/*/src/**/*.logic.ts`. Test code
   (`*.test.ts(x)`, `apps/*/src/test/**`) is out of scope, and exclusion wins over the allowlist.
 
@@ -404,12 +404,12 @@ Both are dependency-free Node ESM scripts in `scripts/quality/`, sharing a posix
 
 Every gate is proven to **fire**, not just to be green — a gate that cannot fail is not a gate:
 
-| Gate         | Negative fixture                                                                | Positive fixture                          |
-| ------------ | ------------------------------------------------------------------------------- | ----------------------------------------- |
-| Layers       | `fixtures/layers/negative` → exit ≠ 0 and names `no-page-to-page`, `no-feature-to-feature`, `no-lib-to-higher-layer` | `fixtures/layers/positive` → exit 0 (`no-page-to-foreign-feature` proves a page may import its *own* feature) |
-| Dead code    | (no fixture: `knip` is a tool, the gate is its exit code)                        | —                                         |
-| Tokens       | `fixtures/palette/negative` (a `bg-slate-800` + `text-white/80` + `bg-[#101010]` component, a `#101010`/`rgb(…)` stylesheet) | `fixtures/palette/positive` (token classes, `grid-cols-[2fr_1fr]`, `#main`) |
-| Field errors | `fixtures/field-errors/negative` (a component and a hook branching on `status` / `code` / `instanceof ApiError`) | `fixtures/field-errors/positive` (the allowlisted decision file, a clean component, a `*.test.tsx` asserting on error shape) |
+| Gate         | Negative fixture                                                                                                             | Positive fixture                                                                                                             |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Layers       | `fixtures/layers/negative` → exit ≠ 0 and names `no-page-to-page`, `no-feature-to-feature`, `no-lib-to-higher-layer`         | `fixtures/layers/positive` → exit 0 (`no-page-to-foreign-feature` proves a page may import its _own_ feature)                |
+| Dead code    | (no fixture: `knip` is a tool, the gate is its exit code)                                                                    | —                                                                                                                            |
+| Tokens       | `fixtures/palette/negative` (a `bg-slate-800` + `text-white/80` + `bg-[#101010]` component, a `#101010`/`rgb(…)` stylesheet) | `fixtures/palette/positive` (token classes, `grid-cols-[2fr_1fr]`, `#main`)                                                  |
+| Field errors | `fixtures/field-errors/negative` (a component and a hook branching on `status` / `code` / `instanceof ApiError`)             | `fixtures/field-errors/positive` (the allowlisted decision file, a clean component, a `*.test.tsx` asserting on error shape) |
 
 `pnpm test:quality` runs both directions plus unit tests for the walker, the reporter and each rule
 (`*.test.mjs` next to the code, `node --test`).

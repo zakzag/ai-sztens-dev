@@ -176,9 +176,8 @@ describe('ApiKeyForm', () => {
       expect(post).toBeDefined();
     });
 
-    const payload = recorder.requests.find(
-      (record) => record.method === 'POST',
-    )?.body as { readonly description?: string; readonly expiresAt?: string };
+    const payload = recorder.requests.find((record) => record.method === 'POST')
+      ?.body as { readonly description?: string; readonly expiresAt?: string };
 
     expect(payload?.description).toBe('Éles kulcs');
     expect(payload?.expiresAt).toBeDefined();

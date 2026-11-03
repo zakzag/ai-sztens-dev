@@ -27,7 +27,11 @@ export const LIST_QUERY_PAGE_PARAMETER: ApiQueryParameterContract = {
   name: 'page',
   description: 'Page number, 1-based.',
   required: false,
-  schema: { type: 'integer', minimum: LIST_QUERY_DEFAULT_PAGE, default: LIST_QUERY_DEFAULT_PAGE },
+  schema: {
+    type: 'integer',
+    minimum: LIST_QUERY_DEFAULT_PAGE,
+    default: LIST_QUERY_DEFAULT_PAGE,
+  },
 };
 
 /** The `limit` query parameter. */

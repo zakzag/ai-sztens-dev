@@ -67,7 +67,9 @@ describe('apiKeyListQuerySchema', () => {
   });
 
   it('rejects a fractional page number', () => {
-    expect(apiKeyListQuerySchema.safeParse({ page: '1.5' }).success).toBe(false);
+    expect(apiKeyListQuerySchema.safeParse({ page: '1.5' }).success).toBe(
+      false,
+    );
   });
 
   it('rejects an unknown sort direction', () => {

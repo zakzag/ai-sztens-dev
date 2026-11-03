@@ -37,9 +37,9 @@ describe('API_ERROR_CODE catalogue', () => {
     expect(
       API_ERROR_CODE_STATUS[API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED],
     ).toBe(HTTP_STATUS.UNPROCESSABLE_ENTITY);
-    expect(resolveApiErrorStatus(API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED)).toBe(
-      422,
-    );
+    expect(
+      resolveApiErrorStatus(API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED),
+    ).toBe(422);
   });
 
   it('keeps the two mutation codes distinct from the generic CONFLICT', () => {
@@ -79,6 +79,8 @@ describe('API_ERROR_CODE catalogue', () => {
     expect(resolveApiErrorStatus('SOMETHING_NEW')).toBe(
       UNKNOWN_API_ERROR_CODE_STATUS,
     );
-    expect(UNKNOWN_API_ERROR_CODE_STATUS).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    expect(UNKNOWN_API_ERROR_CODE_STATUS).toBe(
+      HTTP_STATUS.INTERNAL_SERVER_ERROR,
+    );
   });
 });

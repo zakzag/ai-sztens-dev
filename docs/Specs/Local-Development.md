@@ -44,10 +44,10 @@ and `infra/.env.{local,dev,prod}` paths in addition to the existing `.env`.
 
 The repo pins **Node 24** two ways, and both matter:
 
-| Artefact | Purpose |
-| --- | --- |
+| Artefact                                                                   | Purpose                                                                                                      |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | [`package.json`](../../package.json) → `"engines": { "node": ">=24.9.0" }` | documents the requirement; `pnpm` warns (`ERR_PNPM_UNSUPPORTED_ENGINE`) when the shell runs an older runtime |
-| [`.node-version`](../../.node-version) (`24.22.2`) | what `fnm` / `nvm` switch to; `fnm use` and `fnm install` read it |
+| [`.node-version`](../../.node-version) (`24.22.2`)                         | what `fnm` / `nvm` switch to; `fnm use` and `fnm install` read it                                            |
 
 Why it is not cosmetic: Jest runs these apps in **native ESM**, and only Node ≥ 24.9 can
 `require()` the CommonJS-only `@nestjs/config`. Below that, every e2e suite that boots

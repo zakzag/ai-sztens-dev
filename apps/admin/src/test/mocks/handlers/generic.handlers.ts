@@ -20,7 +20,9 @@ export const anyUrlServerError = http.get('*/api/*', ({ request }) =>
 );
 
 /** Any API GET answered with a network failure (`status: null`). */
-export const anyUrlNetworkError = http.get('*/api/*', () => HttpResponse.error());
+export const anyUrlNetworkError = http.get('*/api/*', () =>
+  HttpResponse.error(),
+);
 
 /**
  * Any API GET answered after a delay — proves the loading state of a consumer.

@@ -51,9 +51,7 @@ export function renderWithProviders(
   const utils = render(
     <QueryClientProvider client={client}>
       <SessionProvider>
-        <MemoryRouter initialEntries={initialEntries}>
-          {ui}
-        </MemoryRouter>
+        <MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>
       </SessionProvider>
     </QueryClientProvider>,
   );

@@ -25,16 +25,16 @@ so an empty record parse yields the canonical defaults.
 
 ## 4. Solution / implementation
 
-| File | Change |
-| ---- | ------ |
-| `apps/admin/src/features/api/use-list-params.interface.ts` | `ListParams`, `ListParamsSchema`, `UseListParamsResult` |
-| `apps/admin/src/features/api/use-list-params.const.ts` | `page` field name, default page, error message |
-| `apps/admin/src/features/api/use-list-params.logic.ts` | pure parse/default/reset/URL-building + `ListParamsError` |
-| `apps/admin/src/features/api/use-list-params.ts` | `useListParams(schema)` hook (memo on `searchParams.toString()`) |
-| `apps/admin/src/features/api/use-list-params.logic.test.ts` | 13 pure-logic tests |
-| `apps/admin/src/features/api/use-list-params.test.tsx` | 7 hook tests through a memory router |
-| `apps/admin/src/test/mocks/app-router.mock.tsx` | `renderHookWithRouter` + `getSearch()` |
-| `docs/Specs/UI-Architecture.md` | §5 note: list state lives in the URL, `zustand` stays out |
+| File                                                        | Change                                                           |
+| ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| `apps/admin/src/features/api/use-list-params.interface.ts`  | `ListParams`, `ListParamsSchema`, `UseListParamsResult`          |
+| `apps/admin/src/features/api/use-list-params.const.ts`      | `page` field name, default page, error message                   |
+| `apps/admin/src/features/api/use-list-params.logic.ts`      | pure parse/default/reset/URL-building + `ListParamsError`        |
+| `apps/admin/src/features/api/use-list-params.ts`            | `useListParams(schema)` hook (memo on `searchParams.toString()`) |
+| `apps/admin/src/features/api/use-list-params.logic.test.ts` | 13 pure-logic tests                                              |
+| `apps/admin/src/features/api/use-list-params.test.tsx`      | 7 hook tests through a memory router                             |
+| `apps/admin/src/test/mocks/app-router.mock.tsx`             | `renderHookWithRouter` + `getSearch()`                           |
+| `docs/Specs/UI-Architecture.md`                             | §5 note: list state lives in the URL, `zustand` stays out        |
 
 ## 5. Outcome and how to verify
 

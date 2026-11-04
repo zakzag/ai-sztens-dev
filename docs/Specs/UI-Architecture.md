@@ -219,12 +219,41 @@ props), so nothing in `packages/ui` broke. The a11y gate for all of them is
 `packages/ui/test/form-a11y.test.tsx` (default / hint / error / disabled / open-listbox).
 
 The toast layer arrived with **AIS-81** and is only the *presentation* of the notification
-subsystem. `ToastLevel` is declared in `packages/ui` on purpose: `packages/notifications` does not
-exist yet, so AIS-79 aliases this union instead of re-declaring it and the two packages cannot
-drift. `ToastStackProps.toasts` is **newest first** — the store prepends — and that contract is the
-only reason the trimming keeps the newest cards when the list overflows. The timers, the store, the
-`notify` facade and the `NotificationHost` belong to AIS-79 / AIS-83 and must never leak into these
-two primitives: they hold no `useState`, no `useEffect` and no storage access.
+subsystem. `ToastLevel` is declared in `packages/ui`; the store (`@callback/notifications`, AIS-79)
+declares its own `NotificationLevel` union with the same five literals, because `packages/ui` and
+`packages/notifications` must not import each other (React peer vs. framework-free core). The two
+vocabularies are kept in sync by **pinned tests on both sides** — `NOTIFICATION_LEVELS` in
+`packages/notifications` and the `TOAST_LEVEL_GLYPHS` keys in `packages/ui` — so a change on one side
+without the other fails a suite instead of drifting silently. `ToastStackProps.toasts` is **newest
+first** — the store prepends — and that contract is the only reason the trimming keeps the newest
+cards when the list overflows. The timers, the `notify` facade and the `NotificationHost` belong to
+AIS-83 and must never leak into these two primitives: they hold no `useState`, no `useEffect` and no
+storage access.
+
+#### `packages/notifications` core (AIS-79)
+
+Framework-independent store: the single source of truth for notifications **and** system log entries.
+`createNotificationStore(options?)` is a **factory, not a singleton** — the owning app decides the
+lifetime, so two apps (or two tests) never share state. No React, no DOM, no storage, no `zod`; the
+package's `tsconfig` enables only `lib: ES2022`, so a `window`/`document`/`localStorage` reference
+fails the build instead of leaking in.
+
+| Aspect                | Contract                                                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| API                   | `emit`, `dismiss(id)`, `markAllRead`, `clear`, `subscribe`, `getSnapshot`, `getServerSnapshot`                                                                 |
+| Snapshot              | `{ entries, toasts }`, **both newest first**; referentially stable while nothing changes (what `useSyncExternalStore` requires)                                |
+| Ring buffer           | `NOTIFICATION_MAX_ENTRIES = 500`, the oldest entry dropped                                                                                                    |
+| Toast ids             | `NOTIFICATION_MAX_VISIBLE_TOASTS = 3` (mirror of `TOAST_MAX_VISIBLE`); a 4th toast drops the oldest **id**, its entry stays in the log                        |
+| Dedupe                | identical `level` + `message` within `NOTIFICATION_DEDUPE_WINDOW_MS = 2000` (inclusive) bumps `repeatCount`, refreshes `createdAt`, moves the toast to the front |
+| Toast default         | `toast = level !== 'system'`; an explicit `toast` flag wins                                                                                                   |
+| Redaction             | a `detail` record is redacted by the store (`authorization`, `token`, `password`, `apiKey`, `secret`, …) and only then serialised — no emitter can bypass it  |
+| Restored entries      | `initialEntries` seeds `entries` **only**; `toasts` always starts empty, so a reload never resurrects an expired toast (AIS-80/83)                            |
+| Injected dependencies | `now()` clock, caps, dedupe window; ids come from `createNotificationId(now, sequence)` — deterministic, no `crypto`/`Math.random` in the core                  |
+| Listener errors       | caught **per listener** and forwarded to `onListenerError` (default `console.error`), so one broken subscriber cannot silence the rest                          |
+
+User-facing text is never produced here (no i18n): the emitter supplies the sentence, and
+`notification-event.const.ts` holds only event kinds plus their default `level` / `source` / `toast`
+classification.
 
 ### 4.0 Overlay primitives (AIS-117)
 
@@ -486,6 +515,7 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 | `zod` (direct dependency)                                                                               | `apps/admin`                             | form schema validation                                                                                          | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30). A second zod (4.x) exists only for `knip`; see the `packageExtensions` note below §7.                                             |
 | `@hookform/resolvers`                                                                                   | `apps/admin`                             | `zodResolver` for react-hook-form                                                                               | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3. It declares `zod` as a **peer only**, so `pnpm-workspace.yaml > packageExtensions` injects a real zod 3 dependency; without that, its `.d.ts` resolved knip's zod 4 and `apps/admin`'s `tsc` failed.    |
 | `zustand`                                                                                               | `apps/admin`                             | page-local stores, global session store                                                                         | **planned — added with the first page that needs UI state** (`/api-keys` has none, D9)                                                                                                                                                                                        |
+| `@callback/notifications`                                                                                | `packages/notifications`                 | notification + log store, framework-free (AIS-79)                                                               | **core installed** (`src/core`: no React, no DOM, no storage) — the React bindings and the host arrive with AIS-83                                                                                                                            |
 | `dependency-cruiser`                                                                                    | repo root                                | layer gate: `app → pages → features → entities → services → lib` (§9.1)                                         | installed (`^16`) — dev-only, never shipped                                                                                                                                                                                                                                   |
 | `knip`                                                                                                  | repo root                                | dead-code gate: unused files / exports / dependencies (§9.2)                                                    | installed (`^5`) — dev-only, `apps/api` deliberately out of scope (D8)                                                                                                                                                                                                        |
 

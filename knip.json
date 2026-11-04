@@ -14,6 +14,7 @@
     "apps/web": { "project": "src/**/*.{ts,tsx}" },
     "packages/shared": { "project": "src/**/*.ts" },
     "packages/api-client": { "project": "src/**/*.ts" },
+    "packages/notifications": { "project": "src/**/*.ts" },
     "packages/ui": { "project": "src/**/*.{ts,tsx}" }
   }
 }

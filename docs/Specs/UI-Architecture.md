@@ -6,6 +6,12 @@ törlés `ConfirmDialog`-gal, `409 STALE_WRITE` → oldalszintű újratöltés. 
 döntések (`updatedAt` minta-token, `key={updatedAt}` remount, `404` külön ág) a
 [`Admin-Data-Flow.md`](./Admin-Data-Flow.md) §3.7-ben.
 
+**AIS-80 (2026-11-04):** a notification-log `sessionStorage` tükre — `createNotificationStorage`
+(`load` / `save` / `flush` / `clear`), verziózott envelope (`aisztens.notifications.v1`,
+`{ version: 1, entries }`), cap 200, injektált `StorageLike` és injektált írás-ütemező, csendes
+degradáció hiba esetén. A store-hoz **nincs** bekötve: a bekötés az AIS-83 providere. Részletek a
+`packages/notifications` core §-ban lentebb.
+
 **Utolsó frissítés:** 2026-11-04 (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **AIS-115 (2026-11-04):** a közös form-minta — `features/forms/use-app-form.ts`
 (`useAppForm`) egy helyen fogja össze a zod resolvert, a `toFieldErrors` mezőhiba-leképezést, az
@@ -254,6 +260,28 @@ fails the build instead of leaking in.
 User-facing text is never produced here (no i18n): the emitter supplies the sentence, and
 `notification-event.const.ts` holds only event kinds plus their default `level` / `source` / `toast`
 classification.
+
+#### `sessionStorage` mirror (AIS-80)
+
+`createNotificationStorage({ storage, key, cap, schedule })` is the only part of the subsystem that
+knows a storage exists, and it knows it only through an injected `StorageLike` — the package builds
+with `lib: ["ES2022"]`, so `window`, `sessionStorage` and `requestAnimationFrame` cannot appear in its
+code at all. The adapter is **not** bound to the store: the app restores once with `load()`, seeds
+`createNotificationStore({ initialEntries })` with the result, forwards each `entries` snapshot to
+`save()`, and calls `flush()` from a `pagehide` handler (AIS-83). Nothing throws and nothing is
+reported to the user — losing the mirror is acceptable, breaking the app is not.
+
+| Aspect           | Contract                                                                                                                                                   |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Key / envelope   | `aisztens.notifications.v1`, payload `{ version: 1, entries }` — the version lives in the key *and* in the envelope                                        |
+| Cap              | `NOTIFICATION_STORAGE_MAX_ENTRIES = 200`, oldest dropped (smaller than the 500-entry memory buffer); the cap is also enforced on restore                  |
+| Payload          | `entries` only — never `toasts`, never timers, so a reload cannot resurrect an expired card                                                                |
+| Validation       | all-or-nothing: version, `entries` array, then every entry field (`id`, `level`, `source`, `message`, `detail?`, `createdAt`, `read`, `toast`, `repeatCount`); unknown extra keys are tolerated |
+| Rejection        | `missing` / `malformed-json` / `wrong-version` / `wrong-shape` → the key is removed (except `missing`) and the store starts empty; no migration in phase 1 |
+| Write coalescing | injected `NotificationWriteScheduler`; default is a microtask, AIS-83 passes `requestAnimationFrame`; the pending write always carries the **latest** entries |
+| Duplicate writes | a payload equal to the last written (or restored) one is skipped — a toast dismissal must not cost an `setItem`                                            |
+| Failure modes    | `setItem` throws → memory-only, the payload is **not** marked written so the next save retries; `getItem` throws → empty list, no `removeItem`             |
+| `clear()`        | cancels the pending write **before** `removeItem`, otherwise a queued flush would resurrect the key                                                        |
 
 ### 4.0 Overlay primitives (AIS-117)
 

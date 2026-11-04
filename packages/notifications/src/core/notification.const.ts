@@ -4,6 +4,7 @@ import type {
   NotificationSource,
   NotificationState,
 } from './notification.interface.js';
+import type { PersistedEnvelopeVersion } from './notification.storage.interface.js';
 
 /**
  * Ring-buffer size of the log.
@@ -53,6 +54,31 @@ export const NOTIFICATION_SOURCES: readonly NotificationSource[] = [
   'runtime',
   'manual',
 ];
+
+/**
+ * `sessionStorage` key of the persisted log mirror.
+ *
+ * The schema version is part of the key (`v1`), so a future v2 can sit next to an
+ * old payload instead of guessing what it is reading (AIS-80 decision D2).
+ */
+export const NOTIFICATION_STORAGE_KEY = 'aisztens.notifications.v1';
+
+/**
+ * Schema version written into the persisted envelope.
+ *
+ * A payload carrying any other version is rejected and removed, because phase 1
+ * ships no migration (AIS-80 decisions D3 and D11).
+ */
+export const NOTIFICATION_STORAGE_VERSION: PersistedEnvelopeVersion = 1;
+
+/**
+ * How many entries the `sessionStorage` mirror keeps.
+ *
+ * Deliberately smaller than the in-memory ring buffer (`NOTIFICATION_MAX_ENTRIES`):
+ * the mirror explains what happened before a reload, it is not an archive, and
+ * `sessionStorage` quota is shared with the rest of the app (AIS-80 decision D2).
+ */
+export const NOTIFICATION_STORAGE_MAX_ENTRIES = 200;
 
 /**
  * Replaces the value of a sensitive key.

@@ -484,6 +484,16 @@ pnpm test:quality     # the gates' own tests (negative + positive fixtures)
 Nothing here builds or runs tests: every gate is a static file walk plus one
 `dependency-cruiser` run, which is why the whole job reports in about a minute.
 
+The **whole definition of done in one command** — the same set the CI runs across its jobs,
+sequenced fast-gates-first so a cheap rule violation fails before a five-minute test run:
+
+```bash
+pnpm qa:all   # quality → test:quality → sonar:test → test:agents → build → lint → test
+```
+
+It is the command to run before pushing a branch; it is deliberately *not* wired into
+`prepare`/`pre-commit`, because it takes minutes (the git-hook plan covers the fast subset).
+
 | Command                     | Enforces                                                                                                                  | Scope                                                  |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | `pnpm quality:layers`       | `app → pages → features → entities → services → lib`; no page→page, no feature→feature (shared infra excepted), no cycles | `apps/admin/src` (the only app with layers)            |

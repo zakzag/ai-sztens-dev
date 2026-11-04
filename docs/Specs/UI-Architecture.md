@@ -203,6 +203,8 @@ three rules above; see §9 for its negative fixture and its exemption list.
 | `Switch` | same contract as `Checkbox` | Native checkbox with `role="switch"`: keyboard, form serialisation and react-hook-form keep working with no JS state (**D4**). The visible track is a `peer-*`-styled sibling, the thumb is its `::after`. `aria-checked` follows the controlled `checked`. |
 | `RadioGroup` | `name`, `legend`, `options[]`, `value`, `onChange`, `orientation?`, `invalid?`, `describedBy?`, `disabled?` | Controlled `<fieldset>` group. Arrow keys delegate to the pure `nextOptionValue` (wraps at both ends, skips disabled options); the platform still moves focus, so the two never fight. Tests target `role="group"` + the legend. |
 | `Combobox` | `id`, `options[]`, `value`, `inputValue`, `onSelect`, `onInputValueChange`, `emptyMessage?`, `invalid?`, `describedBy?` | Fully controlled (**D5**): the caller owns value _and_ typed text. Filtering and index maths live in `combobox.logic.ts` (`filterOptions`, `nextActiveIndex`, `clampActiveIndex`, `normalizeQuery` — accent-insensitive). WAI-ARIA combobox pattern with `aria-activedescendant`. Local options only; async search / multi-select are out of scope. |
+| `Toast` (AIS-81) | `level`: `success` \| `error` \| `warning` \| `info` \| `system`, `message`, `detail?`, `repeatCount?`, `onDismiss`, `onPause?`, `onResume?`, `depth?` | One notification card. The accent is the `Alert`/`Banner` border recipe; `error` → `role="alert"`, every other level → `role="status"`. **Stateless by contract**: no timer, no store, no storage — it reports the dismiss intent and forwards `pointerenter`/`pointerleave`, so the auto-dismiss clock belongs to the host (AIS-83). The entry animation is pure CSS through Tailwind's `starting:` variant, and `onPause` is omitted from the DOM attributes so the media event cannot clash with the callback. `detail` renders clamped to two lines with a `title`. |
+| `ToastStack` (AIS-81) | `toasts` (**newest first**), `onDismiss`, `onPause?`, `onResume?` | Fixed bottom-right container and the live region itself (`role="region"`, `aria-live="polite"`, `aria-atomic="false"`, labelled). Renders at most `TOAST_MAX_VISIBLE` (`3`) cards, so the **newest** survive an overflow, and assigns each card its `depth` (`scale`/`opacity`) so older cards read as “behind”. `TOAST_STACK_Z_INDEX` is `z-60` — a toast must stay readable above the dialog/drawer surface (`z-50`). Pure rules in `toast.logic.ts` (`toToastDepth`). |
 
 Exports are explicit from `packages/ui/src/index.ts` (no `export *`). `cn()` is
 exported too so pages can merge caller classes with the recipe classes.
@@ -215,6 +217,14 @@ a form composes `FormSection` → `FormField` → primitive, and `FormActions` f
 `Input`/`Textarea` are intentionally left untouched (they keep their own `label`/`hint`/`error`
 props), so nothing in `packages/ui` broke. The a11y gate for all of them is
 `packages/ui/test/form-a11y.test.tsx` (default / hint / error / disabled / open-listbox).
+
+The toast layer arrived with **AIS-81** and is only the *presentation* of the notification
+subsystem. `ToastLevel` is declared in `packages/ui` on purpose: `packages/notifications` does not
+exist yet, so AIS-79 aliases this union instead of re-declaring it and the two packages cannot
+drift. `ToastStackProps.toasts` is **newest first** — the store prepends — and that contract is the
+only reason the trimming keeps the newest cards when the list overflows. The timers, the store, the
+`notify` facade and the `NotificationHost` belong to AIS-79 / AIS-83 and must never leak into these
+two primitives: they hold no `useState`, no `useEffect` and no storage access.
 
 ### 4.0 Overlay primitives (AIS-117)
 

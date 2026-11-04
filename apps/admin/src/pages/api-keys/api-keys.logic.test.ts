@@ -13,19 +13,28 @@ import {
   API_KEY_DESCRIPTION_MAX_LENGTH,
   API_KEY_NAME_MAX_LENGTH,
   API_KEY_VALUE_MAX_LENGTH,
+  FILLED_API_KEY,
   VALIDATION_ERROR_MAP,
   VALIDATION_MESSAGE_CATALOGUE,
   formatMessage,
   type ApiKeyListQuery,
 } from '@callback/shared';
 import type { DataTableSort } from '@callback/ui';
-import type { ApiKeyFormValues } from './api-keys.interface.js';
+import type {
+  ApiKeyEditFormValues,
+  ApiKeyFormValues,
+} from './api-keys.interface.js';
+import { API_KEY_DETAIL_ROUTE_PATH } from './api-keys.const.js';
 import {
+  apiKeyEditFormSchema,
   apiKeyFormSchema,
   isApiKeySortable,
+  toApiKeyDetailRoute,
+  toApiKeyEditFormValues,
   toCreateApiKeyInput,
   toSortParams,
   toTableSort,
+  toUpdateApiKeyInput,
 } from './api-keys.logic.js';
 
 /** Hungarian copy, i.e. what the admin renders (AIS-112 `D2`). */
@@ -297,5 +306,142 @@ describe('toSortParams', () => {
     const sort: DataTableSort = { columnId: 'description', order: 'asc' };
 
     expect(toSortParams(sort).sort).toBe('createdAt');
+  });
+});
+
+/** Valid values of the edit form; tests override one field at a time. */
+const VALID_EDIT_VALUES: ApiKeyEditFormValues = {
+  name: 'Vapi prod',
+  description: 'Produkciós kulcs',
+  expiresAt: '2027-02-01',
+};
+
+/** The version token every patch body must carry. */
+const UPDATED_AT = '2026-11-04T09:00:00.000Z';
+
+/**
+ * @param patch - fields to override.
+ * @returns the base edit values with the patch applied.
+ */
+function withEditValues(
+  patch: Partial<ApiKeyEditFormValues>,
+): ApiKeyEditFormValues {
+  return { ...VALID_EDIT_VALUES, ...patch };
+}
+
+describe('apiKeyEditFormSchema', () => {
+  it('accepts the three editable fields', () => {
+    expect(apiKeyEditFormSchema.safeParse(VALID_EDIT_VALUES).success).toBe(true);
+  });
+
+  it('rejects an empty name with the shared required copy', () => {
+    const result = apiKeyEditFormSchema.safeParse(
+      withEditValues({ name: '   ' }),
+      { errorMap: VALIDATION_ERROR_MAP },
+    );
+
+    expect(result.success).toBe(false);
+    expect(
+      result.success
+        ? undefined
+        : result.error.issues.find((issue) => issue.path[0] === 'name')
+            ?.message,
+    ).toBe(HUNGARIAN.REQUIRED);
+  });
+
+  it('accepts an empty expiry (the key then never expires)', () => {
+    expect(
+      apiKeyEditFormSchema.safeParse(withEditValues({ expiresAt: '' })).success,
+    ).toBe(true);
+  });
+
+  it('rejects a field the PATCH contract does not accept', () => {
+    // `.strict()` survives `omit`/`extend`, so a caller cannot smuggle the URL
+    // identifier (or the token) into a partial update.
+    expect(
+      apiKeyEditFormSchema.safeParse({ ...VALID_EDIT_VALUES, identifier: 'x' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects the concurrency token as a field of its own', () => {
+    expect(
+      apiKeyEditFormSchema.safeParse({ ...VALID_EDIT_VALUES, updatedAt: UPDATED_AT })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe('toUpdateApiKeyInput', () => {
+  it('sends the values, the expiry as an instant and the version token', () => {
+    const input = toUpdateApiKeyInput(VALID_EDIT_VALUES, UPDATED_AT);
+
+    expect(input.name).toBe('Vapi prod');
+    expect(input.description).toBe('Produkciós kulcs');
+    expect(input.updatedAt).toBe(UPDATED_AT);
+    expect(new Date(input.expiresAt ?? '').getFullYear()).toBe(2027);
+    expect(input).not.toHaveProperty('identifier');
+    expect(input).not.toHaveProperty('apiKey');
+  });
+
+  it('clears the optional fields with null instead of omitting them', () => {
+    // `undefined` means “leave it”, `null` means “clear it”: the form always
+    // shows the whole state, so an emptied field is an instruction.
+    const input = toUpdateApiKeyInput(
+      withEditValues({ description: '', expiresAt: '' }),
+      UPDATED_AT,
+    );
+
+    expect(input.description).toBeNull();
+    expect(input.expiresAt).toBeNull();
+  });
+
+  it('trims the texts before sending them', () => {
+    const input = toUpdateApiKeyInput(
+      withEditValues({ name: '  Vapi prod  ', description: '  kulcs  ' }),
+      UPDATED_AT,
+    );
+
+    expect(input.name).toBe('Vapi prod');
+    expect(input.description).toBe('kulcs');
+  });
+
+  it('throws for a calendar day that does not exist', () => {
+    expect(() =>
+      toUpdateApiKeyInput(withEditValues({ expiresAt: '2027-02-31' }), UPDATED_AT),
+    ).toThrow(RangeError);
+  });
+});
+
+describe('toApiKeyEditFormValues', () => {
+  it('seeds the form with the current values and a date-input expiry', () => {
+    const values = toApiKeyEditFormValues(FILLED_API_KEY);
+
+    expect(values.name).toBe(FILLED_API_KEY.name);
+    expect(values.description).toBe(FILLED_API_KEY.description ?? '');
+    // `YYYY-MM-DD`, the value an `<input type="date">` expects.
+    expect(values.expiresAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('renders an empty expiry for a row without one', () => {
+    const values = toApiKeyEditFormValues({
+      ...FILLED_API_KEY,
+      description: null,
+      expiresAt: null,
+    });
+
+    expect(values.description).toBe('');
+    expect(values.expiresAt).toBe('');
+  });
+});
+
+describe('toApiKeyDetailRoute', () => {
+  it('substitutes and encodes the identifier', () => {
+    expect(toApiKeyDetailRoute('vapi-staging')).toBe('/api-keys/vapi-staging');
+    expect(toApiKeyDetailRoute('a b')).toBe('/api-keys/a%20b');
+  });
+
+  it('keeps the parameter of the route template untouched otherwise', () => {
+    expect(API_KEY_DETAIL_ROUTE_PATH).toBe('/api-keys/:identifier');
   });
 });

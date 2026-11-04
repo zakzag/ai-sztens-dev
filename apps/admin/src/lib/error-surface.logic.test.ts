@@ -9,6 +9,7 @@ import { HTTP_STATUS } from '@callback/api-client';
 import { describe, expect, it } from 'vitest';
 import {
   createAbortError,
+  createCodedError,
   createConflictError,
   createMultiFieldValidationError,
   createNetworkError,
@@ -26,6 +27,8 @@ import {
 } from './error-surface.const.js';
 import {
   isAbortLike,
+  isNotFoundFailure,
+  isStaleWriteFailure,
   toBannerCondition,
   toBannerModel,
   toErrorSurface,
@@ -186,5 +189,60 @@ describe('toBannerModel', () => {
     expect(model.title).toBe(SERVICE_UNAVAILABLE_BANNER_TITLE);
     expect(model.actionLabel).toBeNull();
     expect(model.dismissLabel).toBe(BANNER_DISMISS_LABEL);
+  });
+});
+
+describe('isNotFoundFailure', () => {
+  it('recognises a 404', () => {
+    expect(
+      isNotFoundFailure(
+        createStatusError(HTTP_STATUS.NOT_FOUND, 'NOT_FOUND'),
+      ),
+    ).toBe(true);
+  });
+
+  it('ignores every other failure', () => {
+    expect(isNotFoundFailure(createServerError())).toBe(false);
+    expect(isNotFoundFailure(createConflictError())).toBe(false);
+    expect(isNotFoundFailure(createNetworkError())).toBe(false);
+  });
+
+  it('ignores values that never came from the transport', () => {
+    expect(isNotFoundFailure(null)).toBe(false);
+    expect(isNotFoundFailure(new Error('boom'))).toBe(false);
+  });
+});
+
+describe('isStaleWriteFailure', () => {
+  it('recognises STALE_WRITE regardless of the transport message', () => {
+    expect(
+      isStaleWriteFailure(
+        createCodedError({
+          status: HTTP_STATUS.CONFLICT,
+          code: 'STALE_WRITE',
+          issues: [{ path: 'updatedAt', message: 'Stale write' }],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('does not treat another 409 as a lost update', () => {
+    expect(isStaleWriteFailure(createConflictError())).toBe(false);
+  });
+
+  it('does not treat a semantic validation failure as a lost update', () => {
+    expect(
+      isStaleWriteFailure(
+        createStatusError(
+          HTTP_STATUS.UNPROCESSABLE_ENTITY,
+          'SEMANTIC_VALIDATION_FAILED',
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('ignores values that never came from the transport', () => {
+    expect(isStaleWriteFailure(undefined)).toBe(false);
+    expect(isStaleWriteFailure('STALE_WRITE')).toBe(false);
   });
 });

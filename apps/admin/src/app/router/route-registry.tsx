@@ -1,3 +1,5 @@
+import { ApiKeyDetailPage } from '../../pages/api-keys/ApiKeyDetailPage.js';
+import { API_KEY_DETAIL_ROUTE_PATH } from '../../pages/api-keys/api-keys.const.js';
 import { ApiKeysPage } from '../../pages/api-keys/ApiKeysPage.js';
 import { LoginPage } from '../../pages/LoginPage.js';
 import { PlaceholderPage } from '../../pages/PlaceholderPage.js';
@@ -56,6 +58,18 @@ export const PROTECTED_ROUTE_ENTRIES: readonly RouteEntry[] = [
     path: APP_ROUTE_API_KEYS_PATH,
     navLabel: 'API kulcsok',
     element: <ApiKeysPage />,
+    protected: true,
+  },
+  {
+    // The detail page is reached from the list, never from the navigation, so it
+    // carries no label (AIS-131). `NavLink to="/api-keys"` still marks the
+    // section active on this URL, because React Router matches the prefix.
+    //
+    // The path template comes from the page folder: the table links to it too,
+    // and a page may not import `app`, so the page owns the one literal.
+    path: API_KEY_DETAIL_ROUTE_PATH,
+    navLabel: null,
+    element: <ApiKeyDetailPage />,
     protected: true,
   },
   {

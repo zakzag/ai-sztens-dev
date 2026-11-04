@@ -3,7 +3,10 @@ import {
   type ApiKey,
   type ApiKeyListQuery,
 } from '@callback/shared';
-import type { ApiKeyFormFieldName } from './api-keys.interface.js';
+import type {
+  ApiKeyEditFormFieldName,
+  ApiKeyFormFieldName,
+} from './api-keys.interface.js';
 
 /**
  * Constants of the `api-keys` use case.
@@ -48,6 +51,17 @@ export { API_KEY_IDENTIFIER_FIELD_MESSAGE as API_KEY_IDENTIFIER_CONFLICT_MESSAGE
  */
 export const API_KEY_FIELD_PATHS: readonly ApiKeyFormFieldName[] =
   Object.freeze(['name', 'identifier', 'description', 'apiKey', 'expiresAt']);
+
+/**
+ * Every input the **edit** form owns, in visual order (AIS-131).
+ *
+ * Shorter than {@link API_KEY_FIELD_PATHS} by design: `identifier` is the URL of
+ * the resource and `apiKey` is a secret that is rotated, not edited (decision
+ * `D3` of the AIS-131 plan). The order still drives which field takes focus
+ * after a server rejection.
+ */
+export const API_KEY_EDIT_FIELD_PATHS: readonly ApiKeyEditFormFieldName[] =
+  Object.freeze(['name', 'description', 'expiresAt']);
 
 /**
  * Path a code blames when the server sent no `details[]` (plan `D2`).

@@ -19,15 +19,22 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ApiKeyListQuery, CreateApiKeyInput } from '@callback/shared';
-import { VALID_API_KEY_PAIR } from '@callback/shared';
+import type {
+  ApiKeyListQuery,
+  CreateApiKeyInput,
+  UpdateApiKeyInput,
+} from '@callback/shared';
+import { VALID_API_KEY, VALID_API_KEY_PAIR } from '@callback/shared';
 import {
   apiKeysCreateConflict,
   apiKeysCreateNetworkError,
+  apiKeysDeleteNotFound,
+  apiKeysDetailNotFound,
   apiKeysListEmpty,
   apiKeysListNetworkError,
   apiKeysListPageTwo,
   apiKeysListServerError,
+  apiKeysUpdateStaleWrite,
 } from '../../test/mocks/handlers/api-keys.handlers.js';
 import { server } from '../../test/mocks/server.js';
 import {
@@ -37,7 +44,9 @@ import {
 import {
   IDENTIFIER_CONFLICT_MESSAGE,
   NETWORK_ERROR_USER_MESSAGE,
+  NOT_FOUND_MESSAGE,
   SERVER_ERROR_MESSAGE,
+  STALE_WRITE_MESSAGE,
 } from '../../lib/error-message.const.js';
 import {
   API_KEYS_QUERY_KEYS,
@@ -46,13 +55,25 @@ import {
   DEFAULT_FIELD_PATH_BY_CODE,
 } from './api-keys.const.js';
 import { toFieldErrors } from '../../lib/field-errors.logic.js';
-import { useApiKeysQuery, useCreateApiKeyMutation } from './use-api-keys.js';
+import {
+  useApiKeyDetailQuery,
+  useApiKeysQuery,
+  useCreateApiKeyMutation,
+  useDeleteApiKeyMutation,
+  useUpdateApiKeyMutation,
+} from './use-api-keys.js';
 
 /** Minimal valid create payload every mutation test submits. */
 const CREATE_INPUT: CreateApiKeyInput = {
   name: 'Vapi staging',
   identifier: 'vapi-staging',
   apiKey: 'sk-stage-42',
+};
+
+/** Minimal valid `PATCH` body: one changed field plus the version token. */
+const UPDATE_INPUT: UpdateApiKeyInput = {
+  name: 'Vapi prod renamed',
+  updatedAt: VALID_API_KEY.updatedAt,
 };
 
 /** The list query every read test starts from (the contract defaults). */
@@ -344,12 +365,166 @@ describe('useCreateApiKeyMutation', () => {
     });
 
     act(() => {
-      result.current.reset();
+        result.current.reset();
+      });
+  
+      await waitFor(() => {
+        expect(result.current.error).toBeNull();
+      });
+      expect(result.current.isSuccess).toBe(false);
     });
-
-    await waitFor(() => {
+  });
+  
+  describe('useApiKeyDetailQuery', () => {
+    let client: QueryClient;
+  
+    beforeEach(() => {
+      server.resetHandlers();
+      client = createTestQueryClient();
+    });
+  
+    it('returns the resource of the identifier', async () => {
+      const { result } = renderHook(
+        () => useApiKeyDetailQuery(VALID_API_KEY.identifier),
+        { wrapper: createWrapper(client) },
+      );
+  
+      expect(result.current.data).toBeNull();
+  
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+  
+      expect(result.current.data).toEqual(VALID_API_KEY);
       expect(result.current.error).toBeNull();
     });
-    expect(result.current.isSuccess).toBe(false);
+  
+    it('reports a 404 as a page-tier failure instead of empty data', async () => {
+      server.use(apiKeysDetailNotFound);
+  
+      const { result } = renderHook(
+        () => useApiKeyDetailQuery('ghost'),
+        { wrapper: createWrapper(client) },
+      );
+  
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+  
+      expect(result.current.data).toBeNull();
+      expect(result.current.errorMessage).toBe(NOT_FOUND_MESSAGE);
+      expect(result.current.errorSurface).toBe('page');
+    });
+  
+    it('does not request anything while disabled', () => {
+      const { result } = renderHook(() => useApiKeyDetailQuery('', false), {
+        wrapper: createWrapper(client),
+      });
+  
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.data).toBeNull();
+    });
   });
-});
+  
+  describe('useUpdateApiKeyMutation', () => {
+    let client: QueryClient;
+  
+    beforeEach(() => {
+      server.resetHandlers();
+      client = createTestQueryClient();
+    });
+  
+    it('patches the key and reports success', async () => {
+      const onUpdated = vi.fn();
+      const { result } = renderHook(
+        () =>
+          useUpdateApiKeyMutation(VALID_API_KEY.identifier, { onUpdated }),
+        { wrapper: createWrapper(client) },
+      );
+  
+      await act(async () => {
+        await result.current.updateApiKey(UPDATE_INPUT);
+      });
+  
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+      expect(onUpdated).toHaveBeenCalledTimes(1);
+      expect(result.current.error).toBeNull();
+    });
+  
+    it('keeps the raw error of a stale write on the page tier', async () => {
+      server.use(apiKeysUpdateStaleWrite);
+  
+      const { result } = renderHook(
+        () => useUpdateApiKeyMutation(VALID_API_KEY.identifier),
+        { wrapper: createWrapper(client) },
+      );
+  
+      await act(async () => {
+        try {
+          await result.current.updateApiKey(UPDATE_INPUT);
+        } catch {
+          // Intentional: the failure is asserted through `result.current`.
+        }
+      });
+  
+      await waitFor(() => {
+        expect(result.current.error).not.toBeNull();
+      });
+      expect(result.current.errorMessage).toBe(STALE_WRITE_MESSAGE);
+      expect(result.current.errorSurface).toBe('page');
+    });
+  });
+  
+  describe('useDeleteApiKeyMutation', () => {
+    let client: QueryClient;
+  
+    beforeEach(() => {
+      server.resetHandlers();
+      client = createTestQueryClient();
+    });
+  
+    it('deletes the key and calls onDeleted', async () => {
+      const onDeleted = vi.fn();
+      const { result } = renderHook(
+        () =>
+          useDeleteApiKeyMutation(VALID_API_KEY.identifier, { onDeleted }),
+        { wrapper: createWrapper(client) },
+      );
+  
+      await act(async () => {
+        await result.current.deleteApiKey();
+      });
+  
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+      expect(onDeleted).toHaveBeenCalledTimes(1);
+    });
+  
+    it('reports a failed delete without calling onDeleted', async () => {
+      server.use(apiKeysDeleteNotFound);
+      const onDeleted = vi.fn();
+  
+      const { result } = renderHook(
+        () => useDeleteApiKeyMutation(VALID_API_KEY.identifier, { onDeleted }),
+        { wrapper: createWrapper(client) },
+      );
+  
+      await act(async () => {
+        try {
+          await result.current.deleteApiKey();
+        } catch {
+          // Intentional: the failure is asserted through `result.current`.
+        }
+      });
+  
+      await waitFor(() => {
+        expect(result.current.error).not.toBeNull();
+      });
+      expect(result.current.errorMessage).toBe(NOT_FOUND_MESSAGE);
+      expect(result.current.errorSurface).toBe('page');
+      expect(onDeleted).not.toHaveBeenCalled();
+    });
+  });

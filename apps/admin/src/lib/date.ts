@@ -15,9 +15,11 @@
 
 import { dateOnlyToLocalIsoInstant } from '@callback/shared';
 import {
+  DATETIME_FORMAT_OPTIONS,
   EXPIRY_FORMAT_OPTIONS,
   EXPIRY_LOCALE,
   INVALID_EXPIRY_LABEL,
+  INVALID_TIMESTAMP_LABEL,
   NO_EXPIRY_LABEL,
 } from './date.const.js';
 
@@ -25,6 +27,12 @@ import {
 const expiryFormatter = new Intl.DateTimeFormat(
   EXPIRY_LOCALE,
   EXPIRY_FORMAT_OPTIONS,
+);
+
+/** Stateless formatter of a full timestamp, created once. */
+const dateTimeFormatter = new Intl.DateTimeFormat(
+  EXPIRY_LOCALE,
+  DATETIME_FORMAT_OPTIONS,
 );
 
 /**
@@ -67,4 +75,51 @@ export function formatExpiry(iso: string | null): string {
   }
 
   return expiryFormatter.format(instant);
+}
+
+/**
+ * Renders a `createdAt` / `updatedAt` instant for the UI.
+ *
+ * @param iso - ISO 8601 instant from the API.
+ * @returns the local date and time, or {@link INVALID_TIMESTAMP_LABEL} when the
+ *   value cannot be parsed (visible on purpose: a broken timestamp is a contract
+ *   violation, not something to hide behind an empty cell).
+ */
+export function formatDateTime(iso: string): string {
+  const instant = new Date(iso);
+
+  if (Number.isNaN(instant.getTime())) {
+    return INVALID_TIMESTAMP_LABEL;
+  }
+
+  return dateTimeFormatter.format(instant);
+}
+
+/**
+ * Converts an ISO instant back into a `<input type="date">` value.
+ *
+ * The inverse of {@link toExpiryIso}, and the reason an edit form can round-trip
+ * a stored expiry without shifting the day: both directions use the **browser's**
+ * local calendar, so `2026-11-01` → instant → `2026-11-01`.
+ *
+ * @param iso - ISO 8601 instant, or `null` when there is no expiry.
+ * @returns `YYYY-MM-DD` in local time, or `''` for `null` and for an
+ *   unparsable value (the form then starts empty and the user re-picks a day).
+ */
+export function toDateInputValue(iso: string | null): string {
+  if (iso === null) {
+    return '';
+  }
+
+  const instant = new Date(iso);
+
+  if (Number.isNaN(instant.getTime())) {
+    return '';
+  }
+
+  const year = instant.getFullYear();
+  const month = String(instant.getMonth() + 1).padStart(2, '0');
+  const day = String(instant.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }

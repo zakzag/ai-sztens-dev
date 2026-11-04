@@ -36,6 +36,14 @@ export const APP_ROUTE_LOGIN_PATH = '/login';
 /** Path of the API-key manager. */
 export const APP_ROUTE_API_KEYS_PATH = '/api-keys';
 
+/*
+ * The **detail** route template (`/api-keys/:identifier`) is deliberately *not*
+ * declared here (AIS-131): the table links to it and the route registry mounts
+ * it, and `pages` must not import `app` (`no-page-to-higher-layer`). It
+ * therefore lives in `pages/api-keys/api-keys.const.ts`, and the registry — which
+ * may import a page — takes the template from there. One literal, two consumers.
+ */
+
 /** Path of the (placeholder) calls page. */
 export const APP_ROUTE_CALLS_PATH = '/calls';
 

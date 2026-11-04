@@ -17,6 +17,7 @@ import type {
   ApiKey,
   CreateApiKeyInput,
   PaginationMeta,
+  UpdateApiKeyInput,
 } from '@callback/shared';
 import {
   API_ERROR_CODE,
@@ -99,6 +100,15 @@ export const apiKeysDetailNotFound = http.get(
   () =>
     errorResponse(API_ERROR_CODE.NOT_FOUND, 'API key was not found', {
       path: `${API_KEYS_PATH}/ghost`,
+    }),
+);
+
+/** `500` detail failure with a correlation id the retry tier can assert. */
+export const apiKeysDetailServerError = http.get(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.INTERNAL_ERROR, 'Internal server error', {
+      requestId: 'req-detail-server',
     }),
 );
 
@@ -206,9 +216,107 @@ export const apiKeysCreatePending = http.post(API_KEYS_PATH, () =>
   delay('infinite'),
 );
 
+/**
+ * `updatedAt` a successful `PATCH` answers with.
+ *
+ * Deliberately **different** from the fixture row's value: the detail page keys
+ * the edit form on `updatedAt` (AIS-131 `D5`), so a handler that echoed the same
+ * version could not prove the remount happens.
+ */
+const UPDATED_AT_AFTER_WRITE = '2026-11-04T10:00:00.000Z';
+
+/**
+ * Applies a `PATCH` body to the fixture row, the way the server would.
+ *
+ * @param input - the validated body the client sent.
+ * @returns the stored row with the new values and a newer `updatedAt`.
+ */
+function patchedApiKey(input: UpdateApiKeyInput): ApiKey {
+  return {
+    ...VALID_API_KEY,
+    name: input.name ?? VALID_API_KEY.name,
+    description:
+      input.description === undefined
+        ? VALID_API_KEY.description
+        : input.description,
+    expiresAt:
+      input.expiresAt === undefined ? VALID_API_KEY.expiresAt : input.expiresAt,
+    updatedAt: UPDATED_AT_AFTER_WRITE,
+  };
+}
+
+/** `200` update echoing the patched row with a newer `updatedAt`. */
+export const apiKeysUpdateSuccess = http.patch(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  async ({ request }) => {
+    const input = (await request.json()) as UpdateApiKeyInput;
+
+    return successResponse(patchedApiKey(input));
+  },
+);
+
+/**
+ * `409 STALE_WRITE` — the `updatedAt` the client sent is no longer current.
+ *
+ * The envelope names `updatedAt` on purpose: the client must **not** render that
+ * as a field error (the input does not exist), which is exactly what the page
+ * test asserts.
+ */
+export const apiKeysUpdateStaleWrite = http.patch(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(
+      API_ERROR_CODE.STALE_WRITE,
+      'updatedAt does not match the stored version',
+      {
+        details: [{ path: 'updatedAt', message: 'Stale write' }],
+        requestId: 'req-stale',
+      },
+    ),
+);
+
+/** `422 SEMANTIC_VALIDATION_FAILED` blaming the `expiresAt` field. */
+export const apiKeysUpdateSemanticInvalid = http.patch(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(
+      API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
+      'expiresAt must be in the future',
+      {
+        details: [{ path: 'expiresAt', message: 'Must be in the future' }],
+      },
+    ),
+);
+
+/** `404` update — the identifier is gone. */
+export const apiKeysUpdateNotFound = http.patch(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.NOT_FOUND, 'API key was not found', {
+      path: `${API_KEYS_PATH}/ghost`,
+    }),
+);
+
+/** `200` delete — the success envelope carries `data: null`, never `204`. */
+export const apiKeysDeleteSuccess = http.delete(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  () => successResponse(null),
+);
+
+/** `404` delete — the identifier is gone (already deleted by someone else). */
+export const apiKeysDeleteNotFound = http.delete(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.NOT_FOUND, 'API key was not found', {
+      path: `${API_KEYS_PATH}/ghost`,
+    }),
+);
+
 /** Default handler set registered by the global server. */
 export const apiKeysHandlers = [
   apiKeysListSuccess,
   apiKeysDetailSuccess,
   apiKeysCreateSuccess,
+  apiKeysUpdateSuccess,
+  apiKeysDeleteSuccess,
 ] as const;

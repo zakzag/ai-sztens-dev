@@ -1,6 +1,6 @@
 # Admin Data Flow — contract → transport → service → hook → UI
 
-**Utolsó frissítés:** 2026-11-03 (AIS-116: a lista-recept — `useListParams → useApiList → DataTable`/`Pagination`; AIS-110: „New resource template” szekció + registry ⇄ service lefedettségi kapu)
+**Utolsó frissítés:** 2026-11-04 (AIS-131: a referencia-szelet teljes CRUD — detail olvasás, `PATCH` `updatedAt` tokennel, `ConfirmDialog`-os törlés; AIS-116: a lista-recept — `useListParams → useApiList → DataTable`/`Pagination`; AIS-110: „New resource template” szekció + registry ⇄ service lefedettségi kapu)
 **Story:** AIS-102 (data flow), AIS-110 (client operation coverage + resource template)
 **Status:** living document — a jelenlegi állapotot írja le, nem pillanatképet.
 
@@ -147,6 +147,39 @@ Négy szabály, ami ezt a vonalat egyben tartja:
 
 A négy megjelenítési állapot így oszlik meg: loading → skeleton sorok (fejléc marad) + `sr-only`
 státuszszöveg; üres → `EmptyState`; siker → sorok + lapozó; hiba → `PageErrorState`.
+
+### 3.7 Egy detail + edit + delete adatfolyama (AIS-131)
+
+A referencia-szelet a listán túl a **teljes CRUD**-ot mutatja. Az `api-keys` a minta itt is; a cégek
+(AIS-20/21/22) ezt másolják.
+
+```text
+URL (/api-keys/:identifier)                     a lap azonosítója az URL-ben (useParams)
+  → useApiKeyDetailQuery(identifier)            features/api/use-api-keys.ts
+  → useApiDetail<ApiKey>                        features/api/use-api-detail.ts (query key: API_KEYS_QUERY_KEYS.detail)
+  → toApiKeyDetailViewModel(dto)                entities/api-key/api-key.mapper.ts (token eldobva, időpontok formázva, expiry → StatusBadge)
+  → <DescriptionList> + <StatusBadge>           packages/ui
+  → <ApiKeyEditForm> (useAppForm)               defaultValues a detail-ből; submit = PATCH
+  → useUpdateApiKeyMutation(identifier)         invalidate: API_KEYS_QUERY_KEYS.all
+  → <ApiKeyDeleteDialog> (ConfirmDialog) → useDeleteApiKeyMutation(identifier) → navigate(lista)
+```
+
+Öt szabály, ami a szeletet összetartja:
+
+1. **Egy route, egy registry bejegyzés.** A detail route (`API_KEY_DETAIL_ROUTE_PATH`) a page
+   konstansában él, mert a tábla linkje és a registry is ugyanazt a literált használja; a `pages` nem
+   importálhat `app`-ot. A registry-teszt pineli a lista-path egyezését.
+2. **A `PATCH` mindig viszi az `updatedAt`-et.** A `useAppForm` `submit`-ja a page-en keresztül megy,
+   mert a verzió-token és a `STALE_WRITE` döntés a page-é; a form csak az értékeket adja.
+3. **`409 STALE_WRITE` → page szintű `Alert` + újratöltés, nem mezőhiba.** A döntés a allowlistelt
+   `isStaleWriteFailure` (`lib/error-surface.logic.ts`); komponensben tilos `error.code ===` vizsgálat.
+4. **`422 SEMANTIC_VALIDATION_FAILED` → mezőn.** A `toFieldErrors` a `details[].path` alapján teszi a
+   hibás inputra, és az kap fókuszt.
+5. **Sikeres mentés után a form újramountol** (`key={updatedAt}`), mert a `useAppForm` a
+   `reset(defaultValues)`-szel zár — statikus default-okkal a mentés előtti értékek jönnének vissza.
+
+Törlés: a `ConfirmDialog` csak a döntést jelenti; a dialógus addig marad nyitva, amíg a mutáció nem
+sikerül, hiba esetén a leírása a leképezett hibaüzenet (nem toast, nem eltűnő dialógus).
 
 ---
 

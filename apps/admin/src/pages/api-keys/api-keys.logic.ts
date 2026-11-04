@@ -25,18 +25,27 @@
 import {
   API_KEY_DEFAULT_SORT,
   API_KEY_DESCRIPTION_MAX_LENGTH,
+  API_KEY_NAME_MAX_LENGTH,
   API_KEY_SORT_FIELDS,
   createApiKeySchema,
   dateOnlySchema,
+  nonEmptyTextSchema,
   trimmedStringSchema,
+  updateApiKeySchema,
+  type ApiKey,
   type ApiKeyListQuery,
   type ApiKeySortField,
   type CreateApiKeyInput,
+  type UpdateApiKeyInput,
 } from '@callback/shared';
 import type { DataTableSort } from '@callback/ui';
 import { z } from 'zod';
-import { toExpiryIso } from '../../lib/date.js';
-import type { ApiKeyFormValues } from './api-keys.interface.js';
+import { toDateInputValue, toExpiryIso } from '../../lib/date.js';
+import type {
+  ApiKeyEditFormValues,
+  ApiKeyFormValues,
+} from './api-keys.interface.js';
+import { API_KEY_DETAIL_ROUTE_PATH, API_KEY_DETAIL_PARAM } from './api-keys.const.js';
 
 /**
  * Field rules of the create form.
@@ -75,6 +84,86 @@ export function toCreateApiKeyInput(
     ...(description.length > 0 ? { description } : {}),
     ...(expiresAt === undefined ? {} : { expiresAt }),
   };
+}
+
+/**
+ * Field rules of the **edit** form (AIS-131).
+ *
+ * Derived from the shared `updateApiKeySchema` by removing what a form must not
+ * own — `updatedAt` (a hidden concurrency token, bound at submit time) and
+ * `apiKey` (a secret, rotated elsewhere) — and replacing the two fields whose
+ * form shape differs from the wire shape, exactly like {@link apiKeyFormSchema}
+ * does for create. Limits come from the contract, so the client cannot accept
+ * something the server rejects.
+ */
+export const apiKeyEditFormSchema = updateApiKeySchema
+  .omit({ apiKey: true, updatedAt: true })
+  .extend({
+    name: nonEmptyTextSchema({ max: API_KEY_NAME_MAX_LENGTH }),
+    description: trimmedStringSchema({ max: API_KEY_DESCRIPTION_MAX_LENGTH }),
+    expiresAt: dateOnlySchema.or(z.literal('')),
+  });
+
+/**
+ * Builds the request body of `PATCH /api/api-keys/:identifier`.
+ *
+ * Unlike create, the optional fields are sent **explicitly as `null`** when
+ * empty: `PATCH` distinguishes “leave it” (`undefined`) from “clear it” (`null`),
+ * and the form always shows the whole current state, so an emptied expiry or
+ * description means the user wants it removed.
+ *
+ * @param values - validated form values.
+ * @param updatedAt - the version the user edited; the server's `STALE_WRITE`
+ *   check compares it against the stored value.
+ * @returns the partial body, always carrying the concurrency token.
+ * @throws {RangeError} when `expiresAt` is not a calendar date — unreachable
+ *   behind {@link apiKeyEditFormSchema}, and deliberately loud if it happens.
+ */
+export function toUpdateApiKeyInput(
+  values: ApiKeyEditFormValues,
+  updatedAt: string,
+): UpdateApiKeyInput {
+  const description = values.description.trim();
+  const expiresAt = toExpiryIso(values.expiresAt);
+
+  return {
+    name: values.name.trim(),
+    description: description.length > 0 ? description : null,
+    expiresAt: expiresAt ?? null,
+    updatedAt,
+  };
+}
+
+/**
+ * Seeds the edit form with the values the current version holds.
+ *
+ * @param dto - the row the detail query returned.
+ * @returns form values: the expiry as a local calendar day, so the date input
+ *   shows the same day the user picked when creating the key.
+ */
+export function toApiKeyEditFormValues(dto: ApiKey): ApiKeyEditFormValues {
+  return {
+    name: dto.name,
+    description: dto.description ?? '',
+    expiresAt: toDateInputValue(dto.expiresAt),
+  };
+}
+
+/**
+ * Builds the SPA link of one key.
+ *
+ * The template lives in {@link API_KEY_DETAIL_ROUTE_PATH}, which the route
+ * registry mounts as well: the table links to exactly the path the router
+ * matches, and neither side can drift.
+ *
+ * @param identifier - unique, URL-safe key of the resource.
+ * @returns the route, e.g. `/api-keys/vapi-staging`.
+ */
+export function toApiKeyDetailRoute(identifier: string): string {
+  return API_KEY_DETAIL_ROUTE_PATH.replace(
+    `:${API_KEY_DETAIL_PARAM}`,
+    encodeURIComponent(identifier),
+  );
 }
 
 /**

@@ -29,5 +29,23 @@ export const EXPIRY_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
 /** Rendered when a key has no `expiresAt` (`null` in the wire contract). */
 export const NO_EXPIRY_LABEL = 'nincs lejárat';
 
+/**
+ * Layout of a rendered timestamp (created/updated).
+ *
+ * Date **and** time, because two versions of the same row usually differ by
+ * minutes — a day-only format would render “2026. 11. 04.” twice and hide the
+ * change the `updatedAt` token is about.
+ */
+export const DATETIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+};
+
+/** Rendered when a timestamp is present but not parsable (contract violation). */
+export const INVALID_TIMESTAMP_LABEL = 'érvénytelen időpont';
+
 /** Rendered when `expiresAt` is present but not a parsable timestamp. */
 export const INVALID_EXPIRY_LABEL = 'érvénytelen dátum';

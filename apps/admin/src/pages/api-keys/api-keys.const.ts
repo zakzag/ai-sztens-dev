@@ -10,7 +10,10 @@ import {
   LIST_QUERY_DEFAULT_LIMIT,
   LIST_QUERY_MAX_LIMIT,
 } from '@callback/shared';
-import type { ApiKeyFormFieldName } from '../../features/api-keys/api-keys.interface.js';
+import type {
+  ApiKeyEditFormFieldName,
+  ApiKeyFormFieldName,
+} from '../../features/api-keys/api-keys.interface.js';
 import type { ApiKeyFormValues } from './api-keys.interface.js';
 
 /** Page header. */
@@ -110,4 +113,105 @@ export const API_KEY_FORM_DEFAULTS: ApiKeyFormValues = {
   apiKey: '',
   expiresAt: '',
 };
+
+/**
+ * Route template of the detail page (AIS-131).
+ *
+ * Declared here, not in `app/app.const.ts`: the **table** links to it and a page
+ * must not import `app`, while the route registry (which may import a page)
+ * mounts exactly the same literal. The parameter name matches the API route
+ * (`/api/api-keys/:identifier`), so the page can pass it straight through.
+ */
+export const API_KEY_DETAIL_ROUTE_PATH = '/api-keys/:identifier';
+
+/** Name of the detail route's URL parameter, shared by the router and the page. */
+export const API_KEY_DETAIL_PARAM = 'identifier';
+
+/** Detail page header. */
+export const API_KEY_DETAIL_TITLE = 'API kulcs';
+export const API_KEY_DETAIL_SUBTITLE =
+  'A kulcs adatai. Az azonosító és a kulcs értéke itt nem módosítható.';
+
+/** Label/state texts of the detail page. */
+export const API_KEY_DETAIL_LOADING_MESSAGE = 'API kulcs betöltése…';
+export const API_KEY_DETAIL_ERROR_TITLE = 'Az API kulcs betöltése nem sikerült.';
+export const API_KEY_DETAIL_NOT_FOUND_TITLE = 'Az API kulcs nem található.';
+export const API_KEY_DETAIL_NOT_FOUND_MESSAGE =
+  'Lehet, hogy közben törölték. Térj vissza a listához, és ellenőrizd az azonosítót.';
+export const API_KEY_DETAIL_BACK_LABEL = 'Vissza a listához';
+export const API_KEY_DETAIL_BACK_ARIA_LABEL = 'Vissza az API kulcsok listájához';
+
+/** Labels of the `DescriptionList` rows, in render order. */
+export const API_KEY_DETAIL_FIELD_LABELS = {
+  name: 'Név',
+  identifier: 'Azonosító',
+  description: 'Leírás',
+  expiresAt: 'Lejárat',
+  expiry: 'Állapot',
+  createdAt: 'Létrehozva',
+  updatedAt: 'Utoljára módosítva',
+} as const;
+
+/**
+ * Copy of the lost-update case (409 `STALE_WRITE`).
+ *
+ * A reload is the only useful action: the blamed `updatedAt` is a hidden
+ * concurrency token, so retrying the same payload would fail identically.
+ */
+export const API_KEY_DETAIL_STALE_WRITE_TITLE =
+  'Az adatot közben valaki más módosította.';
+export const API_KEY_DETAIL_STALE_WRITE_MESSAGE =
+  'A mentés nem történt meg, mert a kulcs azóta megváltozott. Töltsd újra az adatokat, és vidd fel újra a módosítást.';
+export const API_KEY_DETAIL_STALE_WRITE_ACTION = 'Adatok újratöltése';
+
+/** Delete affordance. */
+export const API_KEY_DELETE_LABEL = 'Kulcs törlése';
+export const API_KEY_DELETE_DIALOG_TITLE = 'Biztosan törlöd ezt az API kulcsot?';
+export const API_KEY_DELETE_DIALOG_DESCRIPTION =
+  'A kulcs azonnal érvénytelenné válik, és a listából is eltűnik. Ez a művelet nem vonható vissza.';
+export const API_KEY_DELETE_CONFIRM_LABEL = 'Törlés';
+export const API_KEY_DELETE_CANCEL_LABEL = 'Mégsem';
+
+/** Edit form. */
+export const API_KEY_EDIT_FORM_TITLE = 'API kulcs szerkesztése';
+export const API_KEY_EDIT_FORM_SUBMIT_LABEL = 'Módosítások mentése';
+export const API_KEY_EDIT_FORM_PENDING_LABEL = 'Mentés…';
+export const API_KEY_EDIT_FORM_SUCCESS_MESSAGE = 'A módosítások elmentve.';
+export const API_KEY_EDIT_FORM_ERROR_TITLE =
+  'A módosítások mentése nem sikerült.';
+
+/** DOM ids of the edit controls — also the `htmlFor`/`error` wiring keys. */
+export const API_KEY_EDIT_FORM_FIELD_IDS: Readonly<
+  Record<ApiKeyEditFormFieldName, string>
+> = {
+  name: 'api-key-edit-name',
+  description: 'api-key-edit-description',
+  expiresAt: 'api-key-edit-expires-at',
+};
+
+/** Visible labels, one per edit field. */
+export const API_KEY_EDIT_FORM_LABELS: Readonly<
+  Record<ApiKeyEditFormFieldName, string>
+> = {
+  name: 'Név',
+  description: 'Leírás',
+  expiresAt: 'Lejárat',
+};
+
+/** Helper texts under the edit fields, mirroring the create form. */
+export const API_KEY_EDIT_FORM_HINTS: Readonly<
+  Record<ApiKeyEditFormFieldName, string>
+> = {
+  name: 'Emberi olvasásra szánt név, legfeljebb 200 karakter.',
+  description: 'Opcionális, legfeljebb 2000 karakter.',
+  expiresAt: 'Opcionális. Üresen hagyva a kulcs nem jár le.',
+};
+
+/**
+ * List route the detail page returns to after a delete.
+ *
+ * A page must not import `app`, so the literal is repeated here; the route
+ * registry test pins it to `APP_ROUTE_API_KEYS_PATH`, so the two cannot drift.
+ */
+export const API_KEYS_LIST_ROUTE_PATH = '/api-keys';
 

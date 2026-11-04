@@ -1,5 +1,6 @@
 import { Card, DataTable, EmptyState } from '@callback/ui';
 import type { DataTableColumn } from '@callback/ui';
+import { Link } from 'react-router-dom';
 import type { ApiKeyViewModel } from '../../../entities/api-key/api-key.interface.js';
 import {
   API_KEYS_EMPTY_MESSAGE,
@@ -8,7 +9,7 @@ import {
   API_KEY_COLUMNS,
 } from '../api-keys.const.js';
 import type { ApiKeysTableProps } from '../api-keys.interface.js';
-import { isApiKeySortable } from '../api-keys.logic.js';
+import { isApiKeySortable, toApiKeyDetailRoute } from '../api-keys.logic.js';
 
 /**
  * Columns of the list, in render order.
@@ -20,9 +21,19 @@ import { isApiKeySortable } from '../api-keys.logic.js';
  */
 const API_KEY_TABLE_COLUMNS: readonly DataTableColumn<ApiKeyViewModel>[] = [
   {
+    // The name is the way into the detail page (AIS-131). The link is built by
+    // `toApiKeyDetailRoute`, from the same template the router mounts, so a row
+    // can never point at a path the router does not serve.
     id: 'name',
     header: API_KEY_COLUMNS.name,
-    cell: (apiKey) => apiKey.name,
+    cell: (apiKey) => (
+      <Link
+        to={toApiKeyDetailRoute(apiKey.identifier)}
+        className="text-text-primary underline-offset-4 hover:underline"
+      >
+        {apiKey.name}
+      </Link>
+    ),
     sortable: isApiKeySortable('name'),
   },
   {

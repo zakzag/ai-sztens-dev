@@ -13,6 +13,7 @@
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import {
   FILLED_API_KEY,
@@ -42,14 +43,18 @@ const SORT: DataTableSort = { columnId: 'name', order: 'asc' };
  * @returns the testing-library render result.
  */
 function renderTable(overrides: Partial<ApiKeysTableProps> = {}) {
+  // The name cell is a `<Link>` since AIS-131, so the table needs a router
+  // context even though nothing here navigates.
   return render(
-    <ApiKeysTable
-      apiKeys={VIEW_MODELS}
-      isLoading={false}
-      sort={SORT}
-      onSortChange={() => undefined}
-      {...overrides}
-    />,
+    <MemoryRouter>
+      <ApiKeysTable
+        apiKeys={VIEW_MODELS}
+        isLoading={false}
+        sort={SORT}
+        onSortChange={() => undefined}
+        {...overrides}
+      />
+    </MemoryRouter>,
   );
 }
 
@@ -150,5 +155,22 @@ describe('ApiKeysTable', () => {
 
     expect(container.textContent).not.toContain(FILLED_API_KEY.apiKey);
     expect(container.textContent).not.toContain(SECOND_API_KEY.apiKey);
+  });
+
+  it('links the name cell to the detail route of that key', () => {
+    renderTable();
+
+    expect(
+      screen.getByRole('link', { name: FILLED_API_KEY.name }),
+    ).toHaveAttribute('href', `/api-keys/${FILLED_API_KEY.identifier}`);
+  });
+
+  it('keeps the identifier a plain text cell', () => {
+    renderTable();
+
+    expect(
+      screen.queryByRole('link', { name: FILLED_API_KEY.identifier }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(FILLED_API_KEY.identifier)).toBeInTheDocument();
   });
 });

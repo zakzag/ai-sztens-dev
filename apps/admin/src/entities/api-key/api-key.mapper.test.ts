@@ -10,8 +10,22 @@
 
 import { describe, expect, it } from 'vitest';
 import { FILLED_API_KEY, SECOND_API_KEY } from '@callback/shared';
-import { EMPTY_VALUE_LABEL } from './api-key.const.js';
-import { toApiKeyViewModel, toApiKeyViewModels } from './api-key.mapper.js';
+import { INVALID_EXPIRY_LABEL } from '../../lib/date.const.js';
+import {
+  EMPTY_VALUE_LABEL,
+  EXPIRY_ACTIVE_LABEL,
+  EXPIRY_EXPIRED_LABEL,
+  EXPIRY_NONE_LABEL,
+} from './api-key.const.js';
+import {
+  toApiKeyDetailViewModel,
+  toApiKeyViewModel,
+  toApiKeyViewModels,
+  toExpiryBadge,
+} from './api-key.mapper.js';
+
+/** Fixed clock of the expiry tests, so no assertion depends on the real date. */
+const NOW = Date.parse('2026-11-04T12:00:00.000Z');
 
 describe('toApiKeyViewModel', () => {
   it('maps the display fields and formats the expiry', () => {
@@ -69,5 +83,75 @@ describe('toApiKeyViewModels', () => {
 
   it('returns an empty list for an empty payload', () => {
     expect(toApiKeyViewModels([])).toEqual([]);
+  });
+});
+
+describe('toExpiryBadge', () => {
+  it('marks a future expiry as active', () => {
+    expect(toExpiryBadge('2027-01-31T23:00:00.000Z', NOW)).toEqual({
+      status: 'active',
+      label: EXPIRY_ACTIVE_LABEL,
+      variant: 'success',
+    });
+  });
+
+  it('marks a past expiry as expired', () => {
+    expect(toExpiryBadge('2026-01-01T00:00:00.000Z', NOW)).toEqual({
+      status: 'expired',
+      label: EXPIRY_EXPIRED_LABEL,
+      variant: 'warning',
+    });
+  });
+
+  it('treats the exact boundary instant as still active', () => {
+    // `< now` and not `<= now`: a key that expires *right now* is valid for the
+    // request being made at this instant.
+    expect(toExpiryBadge(new Date(NOW).toISOString(), NOW).status).toBe('active');
+  });
+
+  it('reports a missing expiry as a neutral badge', () => {
+    expect(toExpiryBadge(null, NOW)).toEqual({
+      status: 'none',
+      label: EXPIRY_NONE_LABEL,
+      variant: 'neutral',
+    });
+  });
+
+  it('flags an unparsable timestamp instead of calling it expired', () => {
+    expect(toExpiryBadge('not-a-date', NOW)).toEqual({
+      status: 'unknown',
+      label: INVALID_EXPIRY_LABEL,
+      variant: 'warning',
+    });
+  });
+});
+
+describe('toApiKeyDetailViewModel', () => {
+  it('maps the display fields and formats both timestamps', () => {
+    const viewModel = toApiKeyDetailViewModel(FILLED_API_KEY, NOW);
+
+    expect(viewModel.name).toBe(FILLED_API_KEY.name);
+    expect(viewModel.identifier).toBe(FILLED_API_KEY.identifier);
+    expect(viewModel.description).toBe(FILLED_API_KEY.description);
+    expect(viewModel.createdAtLabel).not.toBe('');
+    expect(viewModel.updatedAtLabel).not.toBe('');
+    expect(viewModel.expiry.status).toBe('active');
+  });
+
+  it('never copies the apiKey token into the detail view model', () => {
+    const viewModel = toApiKeyDetailViewModel(FILLED_API_KEY, NOW);
+
+    expect(JSON.stringify(viewModel)).not.toContain(FILLED_API_KEY.apiKey);
+  });
+
+  it('renders the fallbacks for a row without description and expiry', () => {
+    const viewModel = toApiKeyDetailViewModel(SECOND_API_KEY, NOW);
+
+    expect(viewModel.description).toBe(EMPTY_VALUE_LABEL);
+    expect(viewModel.expiry).toEqual({
+      status: 'none',
+      label: EXPIRY_NONE_LABEL,
+      variant: 'neutral',
+    });
   });
 });

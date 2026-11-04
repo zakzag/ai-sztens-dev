@@ -58,20 +58,26 @@ describe('ApiKeyDetailCard', () => {
   it('renders the expiry verdict as a status badge', () => {
     renderCard();
 
-    expect(screen.getByText(EXPIRY_ACTIVE_LABEL)).toBeInTheDocument();
-    expect(screen.getByText(EXPIRY_ACTIVE_LABEL)).toHaveAttribute(
-      'data-status',
-      'active',
-    );
+    const badge = screen.getByText(EXPIRY_ACTIVE_LABEL, {
+      selector: '[data-status]',
+    });
+
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute('data-status', 'active');
   });
 
   it('renders the no-expiry verdict for a key without expiry', () => {
     renderCard({ viewModel: toApiKeyDetailViewModel(SECOND_API_KEY, NOW) });
 
-    expect(screen.getByText(EXPIRY_NONE_LABEL)).toHaveAttribute(
-      'data-status',
-      'none',
-    );
+    // The "no expiry" sentence appears twice by design: once as the badge label
+    // and once as the `expiresAt` value of the description list. The selector
+    // pins the assertion to the badge, not to whichever node comes first.
+    const badge = screen.getByText(EXPIRY_NONE_LABEL, {
+      selector: '[data-status]',
+    });
+
+    expect(badge).toHaveAttribute('data-status', 'none');
+    expect(screen.getAllByText(EXPIRY_NONE_LABEL)).toHaveLength(2);
   });
 
   it('reports the delete request instead of performing it', async () => {

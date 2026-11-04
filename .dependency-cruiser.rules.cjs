@@ -35,8 +35,19 @@ const PAGE_FLAT = '(?:^|/)src/pages/([^/]+)\\.tsx?$';
 /** Feature folders: `src/features/<name>/…` (capture group 1 = feature name). */
 const FEATURE_FOLDER = '(?:^|/)src/features/([^/]+)/';
 
-/** Features any page may import: shared infrastructure, not a page's own use case. */
-const SHARED_FEATURES = '(?:api|error-surface)';
+/**
+ * Features any page or feature may import: shared infrastructure, not a page's
+ * own use case.
+ *
+ * - `api` — query/mutation plumbing and the list-params hook.
+ * - `error-surface` — the error → surface decision (AIS-96 / AIS-111).
+ * - `forms` — `useAppForm`, the single form pattern every page composes
+ *   (AIS-115). It is a hook, so it cannot live in `lib` (React + RHF), and
+ *   re-implementing it per page is exactly what AIS-115 removed. AIS-131 was the
+ *   first cross-page consumer and tripped `no-page-to-foreign-feature` until the
+ *   allow-list named it.
+ */
+const SHARED_FEATURES = '(?:api|error-surface|forms)';
 
 /**
  * The element model of `apps/admin/src`, exported for documentation and tests.

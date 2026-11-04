@@ -4,7 +4,10 @@
 (`/api-keys/:identifier`): detail olvasás `useApiDetail`-en, inline `PATCH` szerkesztés `useAppForm`-mal,
 törlés `ConfirmDialog`-gal, `409 STALE_WRITE` → oldalszintű újratöltés. A state-tábla új sora §5-ben, a
 döntések (`updatedAt` minta-token, `key={updatedAt}` remount, `404` külön ág) a
-[`Admin-Data-Flow.md`](./Admin-Data-Flow.md) §3.7-ben.
+[`Admin-Data-Flow.md`](./Admin-Data-Flow.md) §3.7-ben. Ugyanennek a szeletnek a záró javítása: a
+`features/forms` bekerült a `SHARED_FEATURES` allow-listbe (§9.1), mert a `useAppForm` közös
+infrastruktúra, nem egy oldal use-case-e; a detail-card teszt pedig a `data-status` selectorral
+címzi a badge-et, mert a „nincs lejárat" szöveg szándékosan kétszer szerepel a kártyán.
 
 **AIS-80 (2026-11-04):** a notification-log `sessionStorage` tükre — `createNotificationStorage`
 (`load` / `save` / `flush` / `clear`), verziózott envelope (`aisztens.notifications.v1`,
@@ -679,9 +682,16 @@ Element patterns are written **location-agnostically** (`(?:^|/)src/pages/([^/]+
 what lets one rules module match both the real tree and a fixture tree.
 
 The only legal cross-feature edges are the **shared infrastructure features**, defined once
-as `SHARED_FEATURES` in the rules module: `features/api` and `features/error-surface`. A page
-may import its own feature plus these; a feature may import its own modules plus these.
-Everything else still trips `no-feature-to-feature` or `no-feature-to-higher-layer`.
+as `SHARED_FEATURES` in the rules module: `features/api`, `features/error-surface` and
+`features/forms`. A page may import its own feature plus these; a feature may import its own
+modules plus these. Everything else still trips `no-feature-to-feature` or
+`no-feature-to-higher-layer`.
+
+`features/forms` joined the list with the AIS-131 fix: `useAppForm` is the one form pattern
+every page composes (AIS-115), it is a hook and therefore cannot live in `lib` (React + RHF), and
+re-implementing it per page is exactly what AIS-115 removed. The AIS-131 slice was the first
+cross-page consumer (`pages/api-keys/ui/ApiKeyEditForm.tsx`) and the gate was right to complain —
+the missing piece was the allow-list entry, not the import.
 
 Documented grandfathers — visible in the module with a one-line reason each:
 

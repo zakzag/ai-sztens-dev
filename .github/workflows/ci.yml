@@ -7,6 +7,9 @@
 #
 # What it checks:
 #   * pnpm install (frozen lockfile) succeeds against the repo lockfile
+#   * `pnpm typecheck` succeeds — every workspace checked emit-free with
+#     `tsc --noEmit`. It runs before the build so a type error fails in
+#     seconds instead of after a cold vite build (AIS-122).
 #   * `pnpm -r build` succeeds — exercises shared, api, web, admin builds
 #   * `pnpm -r lint` succeeds (api enforces ESLint, root runs prettier)
 #   * `pnpm test` succeeds — the full unit matrix (shared, api-client, ui,
@@ -78,6 +81,17 @@ jobs:
       # that the api package sees the workspace dependency as compiled JS.
       - name: Build shared
         run: pnpm --filter @callback/shared build
+
+      # Emit-free type check of every workspace. Runs after "Build shared"
+      # because `@callback/shared` and `@callback/api-client` are consumed
+      # through `dist/*.d.ts` and `tsc --noEmit` produces none, so a fresh
+      # clone would fail on unresolved types. `apps/api` checks
+      # `tsconfig.build.json` — the same file `nest build` compiles with — so
+      # this step matches the production compile scope exactly; the spec and
+      # `test/` files it excludes are a known, tracked gap (UI-Architecture
+      # §9, AIS-122 follow-up).
+      - name: Typecheck all packages
+        run: pnpm typecheck
 
       - name: Build all packages
         run: pnpm -r build

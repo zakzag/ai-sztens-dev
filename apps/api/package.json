@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "build": "nest build",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node dist/migrate.js",
     "db:check": "drizzle-kit check",

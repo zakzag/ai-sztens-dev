@@ -3,7 +3,7 @@
 **Ticket:** [AIS-122](https://zakzag.atlassian.net/browse/AIS-122) — subtask of [AIS-105](https://zakzag.atlassian.net/browse/AIS-105) · High · `ci`, `quality`, `tooling`
 **Prerequisites:** AIS-118 (done — `apps/admin/src/app/` exists), AIS-120 (done — MSW harness + test matrix), AIS-121 (done — CI test matrix)
 **Touches:** root [`package.json`](../../package.json:1), [`ci.yml`](../../.github/workflows/ci.yml:1), new `.dependency-cruiser*.cjs`, new `knip.json`, new `scripts/quality/**`, [`apps/web/src`](../../apps/web/src/App.tsx:1), [`docs/Specs/UI-Architecture.md`](../Specs/UI-Architecture.md:1)
-**Status:** plan — nothing implemented yet
+**Status:** implemented on 2026-11-02 — closed out by [`2026-11-04--18-40-00-ais-122-quality-gates-close-out-plan.md`](2026-11-04--18-40-00-ais-122-quality-gates-close-out-plan.md:1)
 
 ---
 

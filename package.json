@@ -8,6 +8,7 @@
   },
   "scripts": {
     "predev": "pnpm --filter @callback/shared build",
+    "typecheck": "pnpm --filter @callback/shared build && pnpm -r typecheck",
     "quality:layers": "depcruise apps/admin/src --config .dependency-cruiser.cjs --output-type err",
     "quality:dead-code": "knip",
     "quality:tokens": "node scripts/quality/palette-gate.mjs",
@@ -21,7 +22,7 @@
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
-    "qa:all": "pnpm quality && pnpm test:quality && pnpm sonar:test && pnpm test:agents && pnpm build && pnpm lint && pnpm test",
+    "qa:all": "pnpm quality && pnpm test:quality && pnpm sonar:test && pnpm test:agents && pnpm typecheck && pnpm build && pnpm lint && pnpm test",
     "test": "pnpm --filter @callback/shared test && pnpm --filter @callback/api-client test && pnpm --filter @callback/ui test && pnpm --filter @callback/admin test && pnpm --filter @callback/api test",
     "test:e2e": "pnpm --filter @callback/api test:e2e",
     "test:agents": "node --test \"scripts/lib/agent-artifacts/*.test.mjs\"",

@@ -16,6 +16,13 @@ A `Input`/`Textarea` változatlan — nincs törés a `packages/ui`-ban.
 **AIS-116 (2026-11-03):** hét data-display primitív — `Skeleton`, `Spinner`, `EmptyState`,
 `DescriptionList`, `StatusBadge`, `Pagination`, `DataTable` (lásd §4) —, és a teljes `api-keys`
 oldal rájuk állítva: lap/lapméret/rendezés az URL-ben, működő lapozóval (§5).
+**AIS-117 (2026-11-04):** öt overlay primitív — `Dialog`, `ConfirmDialog`, `Drawer`, `Tooltip`,
+`DropdownMenu` (lásd §4) — **Radix viselkedéssel, saját vizuális réteggel**: a focus trap, az
+`Esc`, az `aria-modal`, a portál és a fókusz-visszaállítás a Radixé, a felület a token-alapú CVA
+recept; Radix CSS-import nélkül. A `Drawer` **nem** `Popover`, hanem `Dialog` + `side` variáns
+(modalitás: focus trap + `Esc` + scroll-lock kell egy űrlapos panelhez) — ezért három Radix csomag
+kell, nem négy. A `ConfirmDialog` csak a döntést adja vissza (`onConfirm`), nem navigál és nem
+zárja be magát. A `packages/ui/package.json` első runtime dependency-jei a Radix csomagok (§7).
 **Status:** living document — describes the _current_ state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -137,6 +144,11 @@ non-default outline, it must name a border/state token.
    (`grid-cols-[2fr_1fr]`) are allowed.
 4. New visual concepts are built once in `packages/ui` as a primitive or a CVA
    variant — never inline in a page.
+5. Overlays render into a **`document.body` portal** (Radix `Portal`) and stack with
+   the Tailwind scale utilities `z-40` (backdrop) / `z-50` (panel). There is **no
+   z-index token**: overlay depth is layout, not colour, and the palette gate does not
+   cover it (AIS-117 **D5**). The literals live in the primitives' `.const.ts` files,
+   never repeated in JSX.
 
 Definition-of-done check — the gate that enforces §3.3 (it also scans
 `packages/ui/src`, which the old `rg` one-liner did not):
@@ -190,6 +202,22 @@ a form composes `FormSection` → `FormField` → primitive, and `FormActions` f
 `Input`/`Textarea` are intentionally left untouched (they keep their own `label`/`hint`/`error`
 props), so nothing in `packages/ui` broke. The a11y gate for all of them is
 `packages/ui/test/form-a11y.test.tsx` (default / hint / error / disabled / open-listbox).
+
+### 4.0 Overlay primitives (AIS-117)
+
+| Primitive                        | Variants / props                                                                                    | Notes                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Dialog`                         | `open`, `onOpenChange`, `title`, `description?`, `footer?`, `size`: `sm` \| `md` \| `lg`, `closeLabel?` | Modal card over a dimmed backdrop. **Controlled only** (the page owns "is it open"). Radix supplies focus trap / `Esc` / outside dismiss / focus restoration; `aria-modal="true"` is set explicitly (Radix only hides siblings), `aria-labelledby` comes from the rendered `Title` — no id props. No `Dialog.Trigger` is required, so a dialog can be opened from a table row. |
+| `ConfirmDialog`                  | `open`, `onOpenChange`, `title`, `description?`, `confirmLabel`, `cancelLabel?`, `tone`: `danger` \| `primary`, `isPending?`, `onConfirm` | **Reports the decision only** (**D4**): confirm calls `onConfirm` and the dialog stays open — the caller closes it when the mutation succeeds, otherwise a failure would erase the question. `isPending` disables both buttons, marks confirm `aria-busy` and **blocks `Esc`/cancel dismissal**. `confirmLabel` is required; there is no generic "OK". |
+| `Drawer`                         | `open`, `onOpenChange`, `title`, `description?`, `side`: `right` \| `left`, `footer?`, `closeLabel?`  | Same modal shell as `Dialog` (**D3**) with a full-height edge-pinned panel; the body is the scroll container, so the footer stays reachable. Built on `react-dialog`, **not** `react-popover` — a form panel needs the modal contract.                                                                                                                                          |
+| `Tooltip`                        | `content`, `children` (trigger), `side?`, `delayMs?`, `disabled?`                                   | Ships **its own** `Tooltip.Provider` (**D6**) so a consumer cannot forget it. The content is `aria-describedby` only — **never** the accessible name (**D7**); the trigger must already be labelled. `disabled` renders the trigger alone.                                                                                                                                     |
+| `DropdownMenu`                   | `trigger`, `items: DropdownMenuItem[]`, `label?`, `align?`, `emptyLabel?`                            | **Data-driven** (**D8**): `{ id, label, onSelect, tone?, disabled? }`, `tone: 'default' \| 'danger'`. Selecting calls `onSelect(id)` and closes the menu. Empty `items` renders one disabled `DROPDOWN_MENU_EMPTY_LABEL` row instead of an empty box. Keyboard/roving focus is Radix's.                                                                                        |
+
+The a11y gate for all five is [`overlay-a11y.test.tsx`](../../packages/ui/test/overlay-a11y.test.tsx:1)
+(`vitest-axe`, WCAG A/AA rule sets, `color-contrast` off in jsdom). Behavioural coverage lives in
+`dialog` / `confirm-dialog` / `drawer` / `tooltip` / `dropdown-menu` test files; the jsdom shims
+(`ResizeObserver`, pointer capture, `scrollIntoView`) and the `pointerEventsCheck: 0` user-event
+instance are shared from `test/mocks/`.
 
 ### 4.1 Error surfaces (AIS-96)
 
@@ -452,6 +480,21 @@ existing `Table*` components instead of adopting `@tanstack/react-table`, becaus
 and the paging are **server-side** (`sort`/`order`/`page` are query fields) and the API caps a page
 at 100 rows — a client-side sorting engine and virtualisation would be dead code plus a second
 table implementation to migrate. `packages/ui/package.json` is unchanged.
+
+**AIS-117 added the first runtime dependencies of `packages/ui`** — behaviour-only Radix
+packages, all three in `dependencies` (`react`/`react-dom` remain `peerDependencies`):
+
+| Dependency                      | Where         | Why                                                                  | State       |
+| ------------------------------- | ------------- | -------------------------------------------------------------------- | ----------- |
+| `@radix-ui/react-dialog`        | `packages/ui` | focus trap, `Esc`, outside dismiss, portal, focus restoration        | installed   |
+| `@radix-ui/react-dropdown-menu` | `packages/ui` | roving focus, typeahead, `Esc`, menu roles for the row-action menu   | installed   |
+| `@radix-ui/react-tooltip`       | `packages/ui` | hover/focus timing, `aria-describedby` wiring, placement             | installed   |
+
+`@radix-ui/react-popover` is deliberately **absent** (**D3**): the `Drawer` is modal, so it is
+built on `@radix-ui/react-dialog` with a `side` variant. Measured effect on
+`apps/admin` at the time of writing: **0 bytes** — nothing imports the overlays yet, so Rollup
+tree-shakes them out of `dist/assets/index-*.js` (`grep radix` on the output: 0 hits). The real
+delta will be measured in **AIS-22**, the first consumer.
 
 ## 8. Verification commands
 

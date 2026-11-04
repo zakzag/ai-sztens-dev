@@ -188,3 +188,64 @@ export type {
   ComboboxOption,
 } from './components/combobox/combobox.interface.js';
 export type { ComboboxDirection } from './components/combobox/combobox.logic.js';
+
+export { Dialog } from './components/dialog/Dialog.js';
+export {
+  dialogOverlayVariants,
+  dialogVariants,
+} from './components/dialog/dialog.variants.js';
+export { DIALOG_CLOSE_LABEL } from './components/dialog/dialog.const.js';
+export type { DialogProps } from './components/dialog/dialog.interface.js';
+export type {
+  DialogSize,
+  DialogVariants,
+} from './components/dialog/dialog.variants.js';
+
+export { ConfirmDialog } from './components/confirm-dialog/ConfirmDialog.js';
+export {
+  CONFIRM_DIALOG_CANCEL_LABEL,
+  CONFIRM_DIALOG_DEFAULT_TONE,
+} from './components/confirm-dialog/confirm-dialog.const.js';
+export type {
+  ConfirmDialogProps,
+  ConfirmDialogTone,
+} from './components/confirm-dialog/confirm-dialog.interface.js';
+
+export { Drawer } from './components/drawer/Drawer.js';
+export { drawerVariants } from './components/drawer/drawer.variants.js';
+export {
+  DRAWER_BODY_CLASS,
+  DRAWER_DEFAULT_SIDE,
+} from './components/drawer/drawer.const.js';
+export type { DrawerProps } from './components/drawer/drawer.interface.js';
+export type {
+  DrawerSide,
+  DrawerVariants,
+} from './components/drawer/drawer.variants.js';
+
+export { Tooltip } from './components/tooltip/Tooltip.js';
+export { tooltipVariants } from './components/tooltip/tooltip.variants.js';
+export {
+  TOOLTIP_DEFAULT_DELAY_MS,
+  TOOLTIP_SIDE_OFFSET,
+} from './components/tooltip/tooltip.const.js';
+export type {
+  TooltipProps,
+  TooltipSide,
+} from './components/tooltip/tooltip.interface.js';
+
+export { DropdownMenu } from './components/dropdown-menu/DropdownMenu.js';
+export {
+  dropdownMenuContentVariants,
+  dropdownMenuItemVariants,
+} from './components/dropdown-menu/dropdown-menu.variants.js';
+export {
+  DROPDOWN_MENU_EMPTY_LABEL,
+  DROPDOWN_MENU_SIDE_OFFSET,
+} from './components/dropdown-menu/dropdown-menu.const.js';
+export type {
+  DropdownMenuAlign,
+  DropdownMenuItem,
+  DropdownMenuItemTone,
+  DropdownMenuProps,
+} from './components/dropdown-menu/dropdown-menu.interface.js';

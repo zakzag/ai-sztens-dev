@@ -28,6 +28,14 @@ export interface UseApiMutationOptions<TData, TVariables> {
   /** The service call that performs the write. */
   readonly mutationFn: (variables: TVariables) => Promise<TData>;
   /**
+   * Optional identity of the write, e.g. `['api-keys', 'create']`.
+   *
+   * It is not used for caching — it is what the global notification layer puts
+   * into the `detail` field of a failure (AIS-84), so the log says *which* write
+   * failed instead of only *that* one did.
+   */
+  readonly mutationKey?: QueryKey;
+  /**
    * Query-key prefixes to invalidate after a successful write.
    *
    * Prefixes, not exact keys: `['api-keys']` refreshes every `api-keys` query

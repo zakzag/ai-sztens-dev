@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@callback/api-client": "workspace:*",
+    "@callback/notifications": "workspace:*",
     "@callback/shared": "workspace:*",
     "@callback/ui": "workspace:*",
     "@hookform/resolvers": "^3.9.1",

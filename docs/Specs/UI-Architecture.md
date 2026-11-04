@@ -1,5 +1,14 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
+**AIS-84 (2026-11-05):** a globális notification capture az admin SPA-ban — minden lezárt HTTP
+kísérlet (`HttpEvent`), minden elutasított query/mutation és minden `meta.successMessage`-dzsel
+jelentkező írás **külön kód nélkül** kerül a logba. Egyetlen store-példány
+(`app/notifications/notification.store.ts`) osztozik a cache-callbackeken, az `onEvent` listeneren és a
+`<NotificationProvider>`-en; a `<NotificationHost />` az `AdminLayout`-ban mountol. A láthatóság
+továbbra is a `toErrorSurface` döntése: `silent` → nincs bejegyzés, `field`/`banner` → csak log,
+`page` → log **és** toast. A transport-esemény szándékosan **nem** toastol (D3: nincs benne hibakód,
+így nem tudná a helyes szöveget választani) — a mátrix a §4.1.3-ban.
+
 **AIS-82 (2026-11-04):** a log panel prezentációs primitívei — `LogDrawer` + `LogEntryRow`
 (lásd §4) —: összecsukott oldalszéli fül (`aria-expanded` + `aria-controls`), **nem modális**
 becsúszó panel (nincs overlay, nincs focus trap, `Escape` zár), hat szűrő chip (`Mind` / `Siker` /
@@ -28,7 +37,7 @@ degradáció hiba esetén. A store-hoz **nincs** bekötve: a bekötés az AIS-83
 továbbra sem importál Reactet: a `tsconfig.core.json` a `src/core`-t DOM nélkül fordítja, a
 `tsconfig.json` a React réteget DOM+JSX-szel. Részletek a §4 „React bindings and host" blokkban.
 
-**Utolsó frissítés:** 2026-11-04 (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
+**Utolsó frissítés:** 2026-11-05 (AIS-84: globális notification capture — `QueryCache`/`MutationCache` callbackek + HTTP `onEvent` + `<NotificationHost />` az `AdminLayout`-ban, lásd §4.1.3 és §5) (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **AIS-115 (2026-11-04):** a közös form-minta — `features/forms/use-app-form.ts`
 (`useAppForm`) egy helyen fogja össze a zod resolvert, a `toFieldErrors` mezőhiba-leképezést, az
 első hibás mező determinisztikus fókuszát, a `reset → notify → onSuccess` siker-konvenciót és az
@@ -339,7 +348,54 @@ React exists. An app mounts **one** pair:
 | Timestamps        | `formatTimestamp` is injected (default `toLocaleTimeString('hu-HU')`) and forwarded to `LogDrawer`, so `packages/ui` stays free of app date helpers                                |
 
 `logNavigation` from the base plan is **not** part of AIS-83: router logging needs the app's
-`react-router` callbacks, so it is added in AIS-84 where the router actually lives.
+`react-router` callbacks, so it is added in AIS-84 where the router actually lives. **AIS-84 shipped
+without it** (key decision 8 of the ticket): a navigation log is pure noise, so a follow-up ticket
+turns it on behind an explicit flag instead of shipping a permanently disabled logger.
+
+#### 4.1.3 Global capture in the admin app (AIS-84)
+
+Nothing in a page or a form has to call `notify` to report a failure. Three central emitters write
+into the one store the UI renders, and each of them maps through
+[`notification-events.logic.ts`](../../apps/admin/src/app/notifications/notification-events.logic.ts:1)
+(pure, one function per source):
+
+| Source | Condition | Level | `source` | Toast |
+| ------ | --------- | ----- | -------- | ----- |
+| `HttpEvent` | `outcome: 'success'` | `system` | `api` | no |
+| `HttpEvent` | `outcome: 'error'` (any status, incl. `status: null`) | `error` | `api` | no (**D3**) |
+| `QueryCache.onError` | `surface === 'silent'` (abort) | — | — | no entry |
+| `QueryCache.onError` | `field` / `banner` | `error` | `api` | no |
+| `QueryCache.onError` | `page` | `error` | `api` | **yes** |
+| `MutationCache.onError` | same three rules as a failed read | `error` | `api` | see above |
+| `MutationCache.onSuccess` | `meta.successMessage` non-empty | `success` | `form` | **yes** |
+| `MutationCache.onSuccess` | no meta / blank copy | — | — | no entry |
+| `window` `error` / `unhandledrejection` | always (AIS-83, unchanged) | `error` | `runtime` | yes |
+
+Why the transport event is log-only (**D3**, a deliberate deviation from the ticket's key decision 5):
+`HttpEvent` carries a status but **no code and no `issues[]`**, so it can neither pick the accurate
+Hungarian copy nor respect the classifier that decides where a failure is allowed to appear.
+Toasting there would put two cards on screen for every failed write — one with the status copy, one
+with the code copy. The transport therefore only *records* the attempt, which is what the log panel
+is for: the detail is `"{durationMs} ms"` and the message is `"{METHOD} {path} — {status|hálózati hiba}"`.
+
+Wiring, in the order `main.tsx` performs it:
+
+1. `app/notifications/notification.store.ts` creates the **single** store and its `sessionStorage`
+   mirror (an injected store is *not* seeded by the provider, so the restore happens before the store
+   exists — AIS-83 `D3`);
+2. `setHttpEventListener(createHttpEventEmitter(store))` — `services/http-events.ts` is the registry
+   the transport reads, because `services` may not import `app/` (`no-service-to-higher-layer`);
+3. `createAppQueryClient(store)` builds the one `QueryClient` with
+   `new QueryCache(createQueryCacheHandlers(store))` and the matching `MutationCache`; the retry and
+   refetch defaults are unchanged (`retry: 1`, no refetch on focus);
+4. `AppProviders` mounts `QueryClientProvider → NotificationProvider → SessionProvider`, and
+   `AdminLayout` renders `<NotificationHost />` as a **sibling of `<main>`** — so the stack and the
+   drawer survive navigation and exist on every protected page, while the public login route has no
+   host at all.
+
+`useApiMutation` accepts an optional `mutationKey`, which is what the failure entry puts into
+`detail` (`mutationKey=["api-keys","create"]`) — without it the log would say *that* a write failed
+but not *which* one.
 
 ### 4.0 Overlay primitives (AIS-117)
 
@@ -521,7 +577,11 @@ A page appears in this table even when **three of the four buckets are intention
 
 Adding a page means adding a row here in the same change (rule §0.10). If a page has **transient** UI
 state that is neither URL- nor server-owned (rule §6.1 step 3 answered yes), it gets a page-local
-store factory inside its own folder — never a global store; the only global store is the session store.
+store factory inside its own folder — never a global store. Exactly **two** global stores are
+allowed: the session store (`app/providers/session-provider.tsx`) and the notification/log store
+(`app/notifications/notification.store.ts`, AIS-84). Both are global because their consumer exists
+before any page does — the router reads the session, and the cache callbacks plus the HTTP listener
+write into the store before the first render. Any other global store is a defect.
 
 **Form state is always react-hook-form, and always through `useAppForm` (AIS-115, §4.4).**
 The page-level failure message a form shows is the hook's own `formError` state, so a form never
@@ -601,7 +661,7 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 | `zod` (direct dependency)                                                                               | `apps/admin`                             | form schema validation                                                                                          | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30). A second zod (4.x) exists only for `knip`; see the `packageExtensions` note below §7.                                             |
 | `@hookform/resolvers`                                                                                   | `apps/admin`                             | `zodResolver` for react-hook-form                                                                               | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3. It declares `zod` as a **peer only**, so `pnpm-workspace.yaml > packageExtensions` injects a real zod 3 dependency; without that, its `.d.ts` resolved knip's zod 4 and `apps/admin`'s `tsc` failed.    |
 | `zustand`                                                                                               | `apps/admin`                             | page-local stores, global session store                                                                         | **planned — added with the first page that needs UI state** (`/api-keys` has none, D9)                                                                                                                                                                                        |
-| `@callback/notifications`                                                                               | `packages/notifications`                 | notification + log store, framework-free (AIS-79) + React bindings on `./react` (AIS-83)                        | **core + React bindings installed** — `react`/`react-dom` are **peer** dependencies, `@callback/ui` is a dependency, `@testing-library/*` and `jsdom` are dev-only. The root export stays React-free; `build` runs `tsconfig.core.json` (no DOM) first, then `tsconfig.json` (DOM + JSX), so a DOM reference in `src/core` cannot compile |
+| `@callback/notifications`                                                                               | `packages/notifications`, `apps/admin`   | notification + log store, framework-free (AIS-79) + React bindings on `./react` (AIS-83), consumed by the admin capture (AIS-84) | **core + React bindings installed, consumed by `apps/admin`** — `react`/`react-dom` are **peer** dependencies, `@callback/ui` is a dependency, `@testing-library/*` and `jsdom` are dev-only. The root export stays React-free; `build` runs `tsconfig.core.json` (no DOM) first, then `tsconfig.json` (DOM + JSX), so a DOM reference in `src/core` cannot compile. The admin app imports both the core (`createNotificationStore`, `createNotificationStorage`) and `./react` (`NotificationProvider`, `NotificationHost`) |
 | `dependency-cruiser`                                                                                    | repo root                                | layer gate: `app → pages → features → entities → services → lib` (§9.1)                                         | installed (`^16`) — dev-only, never shipped                                                                                                                                                                                                                                   |
 | `knip`                                                                                                  | repo root                                | dead-code gate: unused files / exports / dependencies (§9.2)                                                    | installed (`^5`) — dev-only, `apps/api` deliberately out of scope (D8)                                                                                                                                                                                                        |
 

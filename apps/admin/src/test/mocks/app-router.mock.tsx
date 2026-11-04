@@ -11,14 +11,16 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { AuthProvider } from '../../auth/AuthContext.js';
 import { SessionContext } from '../../app/providers/session-provider.js';
 import type { SessionState } from '../../app/session/session.interface.js';
+import { createNotificationHarness } from './notification-provider.mock.js';
 
 /**
  * Render helpers for the `app/` layer tests.
  *
- * The `app/` components read four contexts: the router, the session, the query
- * client (the app-level banner reads the query cache) and the auth provider
- * (the login page needs it). These wrappers supply them, so a component test
- * can focus on the component instead of rebuilding the whole provider chain.
+ * The `app/` components read five contexts: the router, the session, the query
+ * client (the app-level banner reads the query cache), the auth provider (the
+ * login page needs it) and the notification provider (the layout renders
+ * `<NotificationHost />`, AIS-84). These wrappers supply them, so a component
+ * test can focus on the component instead of rebuilding the provider chain.
  */
 
 /** Props of {@link renderWithRouter}. */
@@ -51,17 +53,20 @@ export function renderWithRouter(
     ...renderOptions
   } = options;
   const queryClient = createTestQueryClient();
+  const NotificationWrapper = createNotificationHarness().Wrapper;
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={initialEntries}>
-          <AuthProvider>
-            <SessionContext.Provider value={session}>
-              {children}
-            </SessionContext.Provider>
-          </AuthProvider>
-        </MemoryRouter>
+        <NotificationWrapper>
+          <MemoryRouter initialEntries={initialEntries}>
+            <AuthProvider>
+              <SessionContext.Provider value={session}>
+                {children}
+              </SessionContext.Provider>
+            </AuthProvider>
+          </MemoryRouter>
+        </NotificationWrapper>
       </QueryClientProvider>
     );
   }

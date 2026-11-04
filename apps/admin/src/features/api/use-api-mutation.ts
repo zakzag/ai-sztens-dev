@@ -32,10 +32,11 @@ export function useApiMutation<TData, TVariables>(
   options: UseApiMutationOptions<TData, TVariables>,
 ): UseApiMutationResult<TData, TVariables> {
   const queryClient = useQueryClient();
-  const { mutationFn, invalidateKeys, meta, onSuccess } = options;
+  const { mutationFn, mutationKey, invalidateKeys, meta, onSuccess } = options;
 
   const mutation = useMutation<TData, unknown, TVariables>({
     mutationFn,
+    mutationKey,
     onSuccess: async (data: TData) => {
       if (invalidateKeys !== undefined && invalidateKeys.length > 0) {
         await Promise.all(

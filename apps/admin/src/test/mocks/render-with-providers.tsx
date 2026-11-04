@@ -3,12 +3,12 @@
  *
  * Mirrors [`app/providers/app-providers.tsx`](../../app/providers/app-providers.tsx)
  * but swaps the production entry points for their test counterparts:
- * an isolated query client (no retries, no cache between tests) and a
- * `MemoryRouter` so components that read the URL state render without a browser.
+ * an isolated query client (no retries, no cache between tests), a fresh
+ * notification provider with a memory-only mirror, and a `MemoryRouter` so
+ * components that read the URL state render without a browser.
  *
- * The notification provider is intentionally absent: AIS-84 has not landed yet;
- * add it here the moment it does, so every component test inherits it without a
- * per-test wrapper.
+ * The notification provider is the one AIS-84 mounted for real, so a component
+ * test inherits it without a per-test wrapper — the same order as production.
  */
 
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -16,6 +16,7 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { render, type RenderResult } from '@testing-library/react';
 import { SessionProvider } from '../../app/providers/session-provider.js';
+import { createNotificationHarness } from './notification-provider.mock.js';
 import { createTestQueryClient } from './query-client.mock.js';
 
 /** Options of {@link renderWithProviders}. */
@@ -42,6 +43,7 @@ export function renderWithProviders(
   options: RenderWithProvidersOptions = {},
 ): RenderWithProvidersResult {
   const client = createTestQueryClient();
+  const NotificationWrapper = createNotificationHarness().Wrapper;
 
   // `initialEntries` is a mutable `InitialEntry[]` on the react-router side, so
   // a `readonly string[]` has to be copied instead of passed through (AIS-122:
@@ -50,9 +52,11 @@ export function renderWithProviders(
 
   const utils = render(
     <QueryClientProvider client={client}>
-      <SessionProvider>
-        <MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>
-      </SessionProvider>
+      <NotificationWrapper>
+        <SessionProvider>
+          <MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>
+        </SessionProvider>
+      </NotificationWrapper>
     </QueryClientProvider>,
   );
 

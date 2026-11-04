@@ -1,3 +1,4 @@
+import { NotificationHost } from '@callback/notifications/react';
 import { Link } from 'react-router-dom';
 import { AppErrorBanner } from '../../components/error/AppErrorBanner.js';
 import { APP_BRAND_LABEL, APP_ROUTE_HOME_PATH } from '../app.const.js';
@@ -21,6 +22,13 @@ import type { AdminLayoutProps } from './admin-layout.interface.js';
  * The tier-3 banner lives here because it expresses a condition that outlives
  * the page — offline, expired session, maintenance — and must survive
  * navigation (plan `D11`).
+ *
+ * `<NotificationHost />` is mounted here for the same reason: the toast stack
+ * and the log drawer belong to the authenticated shell, so they survive
+ * navigation and appear on every protected page without a page ever rendering
+ * them (AIS-84). The public routes (the login page) deliberately have no host —
+ * there is nothing to report before a session exists, and a stray toast over the
+ * login form would be noise.
  *
  * @param props - see {@link AdminLayoutProps}.
  * @returns the application shell.
@@ -47,6 +55,8 @@ export function AdminLayout({ routes, children }: AdminLayoutProps) {
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         {children}
       </main>
+
+      <NotificationHost />
     </div>
   );
 }

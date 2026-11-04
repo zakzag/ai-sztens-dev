@@ -275,3 +275,40 @@ export type {
   ToastDepth,
   ToastVariants,
 } from './components/toast/toast.variants.js';
+
+export { LogDrawer } from './components/log-drawer/LogDrawer.js';
+export { LogEntryRow } from './components/log-drawer/LogEntryRow.js';
+export {
+  logDrawerFooterVariants,
+  logDrawerHeaderVariants,
+  logDrawerListVariants,
+  logDrawerPanelVariants,
+  logDrawerTabVariants,
+  logEntryRowVariants,
+  logFilterChipVariants,
+} from './components/log-drawer/log-drawer.variants.js';
+export { toLogDrawerTabLabel } from './components/log-drawer/log-drawer.logic.js';
+export {
+  LOG_DRAWER_CLEAR_LABEL,
+  LOG_DRAWER_CLOSE_LABEL,
+  LOG_DRAWER_EMPTY_LABEL,
+  LOG_DRAWER_FILTER_GROUP_LABEL,
+  LOG_DRAWER_LOAD_MORE_LABEL,
+  LOG_DRAWER_OPEN_LABEL,
+  LOG_DRAWER_PANEL_ID_SUFFIX,
+  LOG_DRAWER_TITLE,
+  LOG_DRAWER_Z_INDEX,
+  LOG_FILTERS,
+  LOG_FILTER_LABELS,
+  LOG_LEVEL_LABELS,
+} from './components/log-drawer/log-drawer.const.js';
+export type {
+  LogDrawerProps,
+  LogEntryItem,
+  LogEntryRowProps,
+  LogLevelFilter,
+} from './components/log-drawer/log-drawer.interface.js';
+export type {
+  LogEntryRowVariants,
+  LogFilterChipVariants,
+} from './components/log-drawer/log-drawer.variants.js';

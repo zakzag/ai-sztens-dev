@@ -1,5 +1,11 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
+**AIS-82 (2026-11-04):** a log panel prezentációs primitívei — `LogDrawer` + `LogEntryRow`
+(lásd §4) —: összecsukott oldalszéli fül (`aria-expanded` + `aria-controls`), **nem modális**
+becsúszó panel (nincs overlay, nincs focus trap, `Escape` zár), hat szűrő chip (`Mind` / `Siker` /
+`Hiba` / `Figyelmeztetés` / `Info` / `Rendszer`), injektált `formatTimestamp`, és lapozás **csak
+propon** (`hasMore` / `onLoadMore`). A store, a host és a 20/50-es lap-ablak továbbra is AIS-83.
+
 **AIS-131 (2026-11-04):** a referencia-szelet teljes CRUD — `pages/api-keys/ApiKeyDetailPage`
 (`/api-keys/:identifier`): detail olvasás `useApiDetail`-en, inline `PATCH` szerkesztés `useAppForm`-mal,
 törlés `ConfirmDialog`-gal, `409 STALE_WRITE` → oldalszintű újratöltés. A state-tábla új sora §5-ben, a
@@ -214,6 +220,8 @@ three rules above; see §9 for its negative fixture and its exemption list.
 | `Combobox` | `id`, `options[]`, `value`, `inputValue`, `onSelect`, `onInputValueChange`, `emptyMessage?`, `invalid?`, `describedBy?` | Fully controlled (**D5**): the caller owns value _and_ typed text. Filtering and index maths live in `combobox.logic.ts` (`filterOptions`, `nextActiveIndex`, `clampActiveIndex`, `normalizeQuery` — accent-insensitive). WAI-ARIA combobox pattern with `aria-activedescendant`. Local options only; async search / multi-select are out of scope. |
 | `Toast` (AIS-81) | `level`: `success` \| `error` \| `warning` \| `info` \| `system`, `message`, `detail?`, `repeatCount?`, `onDismiss`, `onPause?`, `onResume?`, `depth?` | One notification card. The accent is the `Alert`/`Banner` border recipe; `error` → `role="alert"`, every other level → `role="status"`. **Stateless by contract**: no timer, no store, no storage — it reports the dismiss intent and forwards `pointerenter`/`pointerleave`, so the auto-dismiss clock belongs to the host (AIS-83). The entry animation is pure CSS through Tailwind's `starting:` variant, and `onPause` is omitted from the DOM attributes so the media event cannot clash with the callback. `detail` renders clamped to two lines with a `title`. |
 | `ToastStack` (AIS-81) | `toasts` (**newest first**), `onDismiss`, `onPause?`, `onResume?` | Fixed bottom-right container and the live region itself (`role="region"`, `aria-live="polite"`, `aria-atomic="false"`, labelled). Renders at most `TOAST_MAX_VISIBLE` (`3`) cards, so the **newest** survive an overflow, and assigns each card its `depth` (`scale`/`opacity`) so older cards read as “behind”. `TOAST_STACK_Z_INDEX` is `z-60` — a toast must stay readable above the dialog/drawer surface (`z-50`). Pure rules in `toast.logic.ts` (`toToastDepth`). |
+| `LogDrawer` (AIS-82) | `entries` (**newest first**, already sliced), `isOpen`, `unseenCount`, `levelFilter`, `hasMore`, `onToggle`, `onClose`, `onFilterChange`, `onLoadMore`, `onClear`, `formatTimestamp` | Collapsed edge tab (`aria-expanded` + `aria-controls`, count badge only when `unseenCount > 0`) plus a **non-modal** sliding panel: no overlay, no focus trap, page stays scrollable, `Escape` closes. Six chips (`Mind` / `Siker` / `Hiba` / `Figyelmeztetés` / `Info` / `Rendszer`) as `aria-pressed` buttons — `Siker` exists because the store emits `success`. Panel is `role="log"` with `aria-live="off"` (the announcement noise stays on the toasts). `LOG_DRAWER_Z_INDEX` is `z-40`: below the modal overlay and below the toast stack. Paging is **props only**; the 20/50 window belongs to AIS-83. |
+| `LogEntryRow` (AIS-82) | `entry`, `formatTimestamp` | One row: level glyph chip **+** level text (severity is never colour-only), injected timestamp, `break-words` message, `detail` only when present. Reuses the `Toast` chip recipe and glyph map, so a toast and its log row cannot disagree about a level. |
 
 Exports are explicit from `packages/ui/src/index.ts` (no `export *`). `cn()` is
 exported too so pages can merge caller classes with the recipe classes.
@@ -238,6 +246,18 @@ first** — the store prepends — and that contract is the only reason the trim
 cards when the list overflows. The timers, the `notify` facade and the `NotificationHost` belong to
 AIS-83 and must never leak into these two primitives: they hold no `useState`, no `useEffect` and no
 storage access.
+
+The log panel arrived with **AIS-82** and completes the presentational half of the same subsystem.
+`LogEntryItem` is structurally typed, so the store's `NotificationEntry` is assignable with no mapper
+(the extra `source`/`read`/`toast`/`repeatCount` fields are simply ignored) and `packages/ui` stays
+free of `@callback/notifications` imports. The drawer is deliberately **non-modal** — it is a
+diagnostics side view, so `OverlayShell` (focus trap, overlay, scroll lock) must **not** be reused —
+and it owns no state: the filter, the unseen count, `hasMore` and the visible slice all come from the
+host. The panel element stays mounted and only its `translate-x` class changes, which animates both
+directions and keeps the tab's `aria-controls` from dangling, while the panel *content* renders only
+while open so nothing hidden is focusable. The single side effect in `packages/ui` lives here: a
+`document` `keydown` listener, registered only while open, that closes on `Escape`. Timestamps are
+injected (`formatTimestamp`) so the package stays independent of the app's date helpers.
 
 #### `packages/notifications` core (AIS-79)
 

@@ -21,6 +21,13 @@ címzi a badge-et, mert a „nincs lejárat" szöveg szándékosan kétszer szer
 degradáció hiba esetén. A store-hoz **nincs** bekötve: a bekötés az AIS-83 providere. Részletek a
 `packages/notifications` core §-ban lentebb.
 
+**AIS-83 (2026-11-04):** a `@callback/notifications` **React rétege** a `./react` al-exporton —
+`NotificationProvider` (store + `sessionStorage` tükör + `error`/`unhandledrejection` figyelők),
+`useToasts` / `useLogDrawer` / `useLogEntries` / `useToastTimers` hookok (`useSyncExternalStore`),
+`createNotifier` + `useNotifier`, és a `NotificationHost` (toast-időzítők, lapozási ablak). A core
+továbbra sem importál Reactet: a `tsconfig.core.json` a `src/core`-t DOM nélkül fordítja, a
+`tsconfig.json` a React réteget DOM+JSX-szel. Részletek a §4 „React bindings and host" blokkban.
+
 **Utolsó frissítés:** 2026-11-04 (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **AIS-115 (2026-11-04):** a közös form-minta — `features/forms/use-app-form.ts`
 (`useAppForm`) egy helyen fogja össze a zod resolvert, a `toFieldErrors` mezőhiba-leképezést, az
@@ -306,6 +313,34 @@ reported to the user — losing the mirror is acceptable, breaking the app is no
 | Failure modes    | `setItem` throws → memory-only, the payload is **not** marked written so the next save retries; `getItem` throws → empty list, no `removeItem`             |
 | `clear()`        | cancels the pending write **before** `removeItem`, otherwise a queued flush would resurrect the key                                                        |
 
+#### React bindings and host (AIS-83)
+
+`@callback/notifications/react` is the second export of the package and the only code that knows
+React exists. An app mounts **one** pair:
+
+```tsx
+<NotificationProvider includeDetails={import.meta.env.DEV}>
+  <App />
+  <NotificationHost />
+</NotificationProvider>
+```
+
+| Aspect            | Contract                                                                                                                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Restore           | store **and** mirror are built in `useState` lazy initialisers, so `storage.load()` runs once, synchronously, and the first paint already shows the restored log (no flash)          |
+| Subscriptions     | every hook is `useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot)`; derivation happens in `useMemo`, never inside `getSnapshot` (that would loop)     |
+| Toast lifetimes   | `success`/`info` 4 s, `warning` 6 s, `error` **sticky** (`system` sticky too); one timeout per toast id, owned by `NotificationHost` via `useToastTimers`                            |
+| Pause             | `pointerenter` clears the timer, `pointerleave` restarts a **full** TTL; `document.hidden` clears every timer and becoming visible restarts the countdown of what is still on screen |
+| Log window        | `20` rows on open, `+50` per „Korábbiak betöltése", `hasMore` derived from the filtered buffer; a filter change resets the window — state lives in `useLogDrawer` (`useState`)      |
+| Mark read         | opening the drawer calls `markAllRead()` in the toggle handler, not in an effect, so one click = one store write                                                                    |
+| Emitters          | `createNotifier(store)` works without React; `useNotifier()` binds the provider store. There is **no** module-level `notify` singleton                                                            |
+| Runtime capture   | the provider registers `window` `error` + `unhandledrejection` (`source: 'runtime'`, `level: 'error'`) and removes both on unmount; the stack is only recorded with `includeDetails`  |
+| Mirror writes     | the provider forwards every `entries` snapshot to `storage.save`, flushes on `pagehide` and once more on unmount; the default scheduler is one flush per animation frame              |
+| Timestamps        | `formatTimestamp` is injected (default `toLocaleTimeString('hu-HU')`) and forwarded to `LogDrawer`, so `packages/ui` stays free of app date helpers                                |
+
+`logNavigation` from the base plan is **not** part of AIS-83: router logging needs the app's
+`react-router` callbacks, so it is added in AIS-84 where the router actually lives.
+
 ### 4.0 Overlay primitives (AIS-117)
 
 | Primitive       | Variants / props                                                                                                                          | Notes                                                                                                                                                                                                                                                                                                                                                                          |
@@ -566,7 +601,7 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 | `zod` (direct dependency)                                                                               | `apps/admin`                             | form schema validation                                                                                          | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30). A second zod (4.x) exists only for `knip`; see the `packageExtensions` note below §7.                                             |
 | `@hookform/resolvers`                                                                                   | `apps/admin`                             | `zodResolver` for react-hook-form                                                                               | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3. It declares `zod` as a **peer only**, so `pnpm-workspace.yaml > packageExtensions` injects a real zod 3 dependency; without that, its `.d.ts` resolved knip's zod 4 and `apps/admin`'s `tsc` failed.    |
 | `zustand`                                                                                               | `apps/admin`                             | page-local stores, global session store                                                                         | **planned — added with the first page that needs UI state** (`/api-keys` has none, D9)                                                                                                                                                                                        |
-| `@callback/notifications`                                                                                | `packages/notifications`                 | notification + log store, framework-free (AIS-79)                                                               | **core installed** (`src/core`: no React, no DOM, no storage) — the React bindings and the host arrive with AIS-83                                                                                                                            |
+| `@callback/notifications`                                                                               | `packages/notifications`                 | notification + log store, framework-free (AIS-79) + React bindings on `./react` (AIS-83)                        | **core + React bindings installed** — `react`/`react-dom` are **peer** dependencies, `@callback/ui` is a dependency, `@testing-library/*` and `jsdom` are dev-only. The root export stays React-free; `build` runs `tsconfig.core.json` (no DOM) first, then `tsconfig.json` (DOM + JSX), so a DOM reference in `src/core` cannot compile |
 | `dependency-cruiser`                                                                                    | repo root                                | layer gate: `app → pages → features → entities → services → lib` (§9.1)                                         | installed (`^16`) — dev-only, never shipped                                                                                                                                                                                                                                   |
 | `knip`                                                                                                  | repo root                                | dead-code gate: unused files / exports / dependencies (§9.2)                                                    | installed (`^5`) — dev-only, `apps/api` deliberately out of scope (D8)                                                                                                                                                                                                        |
 

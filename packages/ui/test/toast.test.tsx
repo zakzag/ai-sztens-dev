@@ -6,6 +6,7 @@ import { Toast } from '../src/components/toast/Toast.js';
 import {
   TOAST_DISMISS_LABEL,
   TOAST_LEVEL_GLYPHS,
+  TOAST_MAX_VISIBLE,
 } from '../src/components/toast/toast.const.js';
 import type { ToastProps } from '../src/components/toast/toast.interface.js';
 import { AXE_JSDOM_OPTIONS } from './mocks/axe-options.mock.js';
@@ -34,6 +35,23 @@ function renderToast(overrides: Partial<ToastProps> = {}) {
 }
 
 describe('Toast', () => {
+  it('pins the five levels of the shared notification vocabulary', () => {
+    // `@callback/notifications` declares `NotificationLevel` with the same five
+    // literals (AIS-79 D1). Its `NOTIFICATION_LEVELS` is pinned in its own suite;
+    // this is the other half of the pair, so neither side can drift silently.
+    expect(Object.keys(TOAST_LEVEL_GLYPHS)).toEqual([
+      'success',
+      'error',
+      'warning',
+      'info',
+      'system',
+    ]);
+  });
+
+  it('mirrors the store toast cap of three visible cards', () => {
+    expect(TOAST_MAX_VISIBLE).toBe(3);
+  });
+
   it.each([
     ['success', 'border-success'],
     ['error', 'border-danger'],

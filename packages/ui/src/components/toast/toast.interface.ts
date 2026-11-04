@@ -4,10 +4,13 @@ import type { ToastVariants } from './toast.variants.js';
 /**
  * Severity vocabulary of a notification.
  *
- * Declared in `packages/ui` on purpose: AIS-81 is a self-contained UI story and
- * `@callback/notifications` does not exist yet. AIS-79 aliases this union
- * (`type NotificationLevel = ToastLevel`) instead of re-declaring it, so the two
- * packages cannot drift apart.
+ * Declared in `packages/ui` on purpose (AIS-81 D1). The notifications core
+ * (AIS-79 D1) declares its own `NotificationLevel` union with the same five
+ * literals instead of aliasing this type, because that package is
+ * framework-free and importing the UI kit would pull React types in. The two
+ * vocabularies are therefore kept in sync by **pinned tests on both sides**
+ * (`NOTIFICATION_LEVELS` and the `TOAST_LEVEL_GLYPHS` keys), so a change on one
+ * side fails a suite instead of drifting silently.
  */
 export type ToastLevel = 'success' | 'error' | 'warning' | 'info' | 'system';
 

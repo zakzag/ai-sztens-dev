@@ -25,7 +25,7 @@ Two presentational primitives, no store and no timer:
 
 | # | Decision | Why |
 | - | -------- | --- |
-| D1 | `ToastLevel` is declared in `packages/ui` | `packages/notifications` does not exist yet (AIS-79); that ticket aliases this union instead of re-declaring it |
+| D1 | `ToastLevel` is declared in `packages/ui` | `packages/notifications` did not exist yet (AIS-79). AIS-79 later chose the opposite of what this plan assumed: it declares its own `NotificationLevel` union and the two vocabularies are pinned by tests on both sides |
 | D2 | Entry animation = Tailwind `starting:` + `transition-[transform,opacity]` | A `data-mounted` flip would need `useState`, which the DoD forbids in the primitive |
 | D3 | `ToastStackProps.toasts` is newest-first | The store prepends; slicing the head is what keeps the **newest** cards when the list overflows |
 | D5 | Level accent follows the `Alert`/`Banner` border recipe | Contrast never depends on the accent colour alone |
@@ -49,3 +49,26 @@ pnpm quality:tokens                                               → 0 violatio
 
 The palette `rg` from the ticket returns nothing; the components contain no `useState`,
 `useEffect`, `setTimeout` or storage access.
+
+## Close-out (2026-11-04 22:55)
+
+The feature was already in the tree when AIS-81 was picked up again, but the ticket was still
+`To Do` and two drifts had appeared after AIS-79 landed:
+
+| Drift | Fix |
+| --- | --- |
+| `toast.interface.ts` claimed AIS-79 **aliases** `ToastLevel` (`type NotificationLevel = ToastLevel`) | JSDoc rewritten: the notifications core declares its own union (AIS-79 D1) and the two are kept in sync by pinned tests. The D1 row above corrected the same way |
+| Both `notification.interface.ts` and [`docs/Specs/UI-Architecture.md`](../Specs/UI-Architecture.md) promised the `TOAST_LEVEL_GLYPHS` keys were asserted in a test — no such test existed | `toast.test.tsx` now pins the five levels, and `TOAST_MAX_VISIBLE === 3` (mirror of `NOTIFICATION_MAX_VISIBLE_TOASTS`) |
+
+Verification on the close-out run:
+
+```text
+pnpm --filter @callback/ui test      → 315 passed (39 files), toast.test.tsx 19 tests
+pnpm --filter @callback/ui build     → tsc clean
+pnpm quality:tokens                  → 0 violations
+pnpm quality:dead-code               → knip clean
+```
+
+Plan: [`docs/plans/2026-11-04--22-46-00-ais-81-toast-primitives-closeout-plan.md`](../plans/2026-11-04--22-46-00-ais-81-toast-primitives-closeout-plan.md).
+No `format:check` gate exists in the repo yet, so only the touched lines were kept Prettier-shaped
+instead of reformatting the whole files.

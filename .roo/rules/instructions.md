@@ -13,6 +13,54 @@
   `docs/history/` holds only post-implementation change summaries; a plan
   never belongs there.
 
+# Git commit üzenetek
+
+- Every commit title produced by an AI agent (Zoo Code / Roo Code, and through
+  the generated artefacts GitHub Copilot, Cursor, Claude Code) MUST follow one
+  of the two formats below. The rule applies to every branch, and it applies to
+  PR titles and squash-merge commit titles as well — otherwise the ticket–commit
+  link is lost on `main`.
+
+```text
+<KEY>: <type>(<scope>): <summary>     # the work belongs to a Jira ticket
+<type>(<scope>): <summary>            # there is no related ticket
+```
+
+| Element         | Constraint                                                                                                                        |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `<KEY>`         | `PROJECT-NUMBER`, e.g. `AIS-123`. The real ticket key, in the **first** position, followed by the `: ` separator. Never invented. |
+| `<type>`        | required, closed list: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `build`, `ci`, `style`, `revert`               |
+| `(<scope>)`     | optional, lowercase, several scopes are allowed comma separated: `feat(api, infra)`. The ticket key is never used as a scope.     |
+| `<summary>`     | imperative mood, English, no trailing period, whole title at most 72 characters                                                   |
+| breaking change | `!` before the colon: `AIS-42: feat(api)!: drop legacy endpoint`                                                                  |
+
+- Key resolution is a deterministic chain, first match wins:
+  1. the Jira ticket handled in the current session (Jira MCP context, or the
+     key given by the user),
+  2. otherwise the key read from the branch name (pattern
+     `[A-Z][A-Z0-9]{1,9}-\d+`),
+  3. otherwise there is no key, so the title uses the type-only format.
+- Generating, guessing or "typing" a key is forbidden: an unverifiable key is
+  worse than no key. If the ticket is unknown, use the type-only format.
+
+Correct titles:
+
+```text
+AIS-41: feat(admin): implement API keys page
+fix(vite): prevent SPA routes from being swallowed by the /api proxy
+AIS-36: chore(db): add drizzle schema and the first migration
+```
+
+Forbidden titles:
+
+| Title                                         | Why                                                  |
+| --------------------------------------------- | ---------------------------------------------------- |
+| `deploy.yml fix`                              | neither a type nor a key, unreachable from `git log` |
+| `AIS-41`                                      | key only, no type and no summary                     |
+| `feature: stuff`                              | literal type outside the closed list                 |
+| `AIS-41 feat(admin): add API keys page`       | missing the `: ` separator after the key             |
+| `AIS-41: feat(admin): add the API keys page.` | trailing period in the summary                       |
+
 # Milestones
 
 - Whenever a chat produces a plan or implementation that meets ANY of the

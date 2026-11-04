@@ -27,6 +27,19 @@ minimumReleaseAgeExclude:
 overrides:
   light-my-request: 6.6.0
 
+# `@hookform/resolvers` declares `zod` only as a *peer* and imports it by bare
+# specifier. pnpm hoists `knip`'s zod 4 into `node_modules/.pnpm/node_modules`,
+# so the resolver's `.d.ts` (`T extends z.Schema<any, any>`) resolved to zod 4's
+# `$ZodType` while the app passes a zod 3 schema — `apps/admin`'s `tsc` failed
+# with "missing def, type, toJSONSchema, check" (AIS-113 build fix). Giving the
+# resolver a real zod 3 dependency makes it see the same instance as the app;
+# knip keeps its own zod 4. Do not "simplify" this into an `overrides` entry:
+# forcing one zod version breaks knip (`ERR_PACKAGE_PATH_NOT_EXPORTED`).
+packageExtensions:
+  '@hookform/resolvers':
+    dependencies:
+      zod: ^3.24.1
+
 # Explicit "known, deliberately not built" list. pnpm 12 treats an *unlisted*
 # dependency with an install script as an error (ERR_PNPM_IGNORED_BUILDS), so
 # every such package has to be named here. `msw` ships a setup helper the test

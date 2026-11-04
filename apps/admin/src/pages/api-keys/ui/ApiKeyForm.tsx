@@ -1,3 +1,4 @@
+import { VALIDATION_ERROR_MAP } from '@callback/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Card, Input, Textarea } from '@callback/ui';
 import { useState } from 'react';
@@ -52,7 +53,12 @@ export function ApiKeyForm() {
     setError,
     formState: { errors },
   } = useForm<ApiKeyFormValues>({
-    resolver: zodResolver(apiKeyFormSchema),
+    // The second argument is zod's `ParseParams`: with the map attached, the
+    // zod-generated issues (`too_small`, `invalid_string`, …) speak the locale
+    // that `main.tsx` configured — Hungarian in this bundle (AIS-112 `D2`).
+    resolver: zodResolver(apiKeyFormSchema, {
+      errorMap: VALIDATION_ERROR_MAP,
+    }),
     defaultValues: API_KEY_FORM_DEFAULTS,
   });
 

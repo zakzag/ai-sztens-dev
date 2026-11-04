@@ -111,15 +111,3 @@ export const API_KEY_FORM_DEFAULTS: ApiKeyFormValues = {
   expiresAt: '',
 };
 
-/** Validation messages, mapped to the fields by `apiKeyFormSchema`. */
-export const API_KEY_FORM_VALIDATION_MESSAGES = {
-  nameRequired: 'A név megadása kötelező.',
-  nameTooLong: 'A név legfeljebb 200 karakter lehet.',
-  identifierRequired: 'Az azonosító megadása kötelező.',
-  identifierInvalid:
-    'Az azonosító csak betűt, számot, pontot, kötőjelet és aláhúzást tartalmazhat (legfeljebb 200 karakter).',
-  descriptionTooLong: 'A leírás legfeljebb 2000 karakter lehet.',
-  apiKeyRequired: 'Az API kulcs értékének megadása kötelező.',
-  apiKeyTooLong: 'Az API kulcs értéke legfeljebb 4000 karakter lehet.',
-  expiresAtInvalid: 'Érvényes dátumot adj meg (éééé-hh-nn), vagy hagyd üresen.',
-} as const;

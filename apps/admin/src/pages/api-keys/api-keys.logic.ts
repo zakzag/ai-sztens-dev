@@ -3,9 +3,11 @@
  *
  * Four jobs, all testable with values alone:
  *
- * 1. `apiKeyFormSchema` — client-side validation that mirrors the backend
- *    limits. The numbers and the identifier pattern come from
- *    `@callback/shared`, so the form cannot drift away from the API contract.
+ * 1. `apiKeyFormSchema` — **derived** from the shared `createApiKeySchema`
+ *    (AIS-112 plan `D1`/`D2`), so the client cannot accept something the server
+ *    rejects. Only two fields are overridden: `description` may be empty in a
+ *    form (the mapper omits it) and `expiresAt` holds a calendar day instead of
+ *    an ISO instant.
  * 2. `toCreateApiKeyInput` — form values → request body. Empty optional fields
  *    are **omitted** (not `null`, not `''`), because the backend DTO declares
  *    them as optional strings and rejects anything else.
@@ -16,18 +18,17 @@
  *    be sorted, so the table cannot offer a sort the API would answer with a
  *    `400`.
  *
- * Why not reuse the shared `createApiKeySchema` for the form? Because it expects
- * an ISO instant in `expiresAt`, while the form holds a calendar day. The wire
- * schema still guards the request on the service side (plan decision D31).
+ * There is deliberately **no** copy in this module: every message comes from the
+ * shared catalogue, and the schema is derived rather than re-typed.
  */
 
 import {
   API_KEY_DEFAULT_SORT,
   API_KEY_DESCRIPTION_MAX_LENGTH,
-  API_KEY_IDENTIFIER_PATTERN,
-  API_KEY_NAME_MAX_LENGTH,
   API_KEY_SORT_FIELDS,
-  API_KEY_VALUE_MAX_LENGTH,
+  createApiKeySchema,
+  dateOnlySchema,
+  trimmedStringSchema,
   type ApiKeyListQuery,
   type ApiKeySortField,
   type CreateApiKeyInput,
@@ -35,68 +36,22 @@ import {
 import type { DataTableSort } from '@callback/ui';
 import { z } from 'zod';
 import { toExpiryIso } from '../../lib/date.js';
-import { API_KEY_FORM_VALIDATION_MESSAGES } from './api-keys.const.js';
 import type { ApiKeyFormValues } from './api-keys.interface.js';
-
-/**
- * @param value - date input value; may be empty.
- * @returns `true` when {@link toExpiryIso} would accept the value.
- */
-function isExpiryInputAccepted(value: string): boolean {
-  try {
-    toExpiryIso(value);
-
-    return true;
-  } catch {
-    // `toExpiryIso` signals “not a calendar date” by throwing `RangeError`. For
-    // a validation predicate that throw *is* the answer, so it is turned into
-    // `false` here and nowhere else — the real conversion stays untouched.
-    return false;
-  }
-}
 
 /**
  * Field rules of the create form.
  *
- * `z.string().trim()` is applied before the length checks, so a name of spaces
- * is rejected instead of being stored as `'   '`.
+ * Built with `omit` + `extend` on the request schema: the limits, the
+ * identifier pattern and every rejection message stay in the contract, and only
+ * the two genuinely form-specific shapes are replaced. An unknown key is still
+ * rejected, because `omit`/`extend` preserve the schema's `strict` policy.
  */
-export const apiKeyFormSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, API_KEY_FORM_VALIDATION_MESSAGES.nameRequired)
-    .max(API_KEY_NAME_MAX_LENGTH, API_KEY_FORM_VALIDATION_MESSAGES.nameTooLong),
-  identifier: z
-    .string()
-    .trim()
-    .min(1, API_KEY_FORM_VALIDATION_MESSAGES.identifierRequired)
-    .regex(
-      API_KEY_IDENTIFIER_PATTERN,
-      API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid,
-    ),
-  description: z
-    .string()
-    .trim()
-    .max(
-      API_KEY_DESCRIPTION_MAX_LENGTH,
-      API_KEY_FORM_VALIDATION_MESSAGES.descriptionTooLong,
-    ),
-  apiKey: z
-    .string()
-    .trim()
-    .min(1, API_KEY_FORM_VALIDATION_MESSAGES.apiKeyRequired)
-    .max(
-      API_KEY_VALUE_MAX_LENGTH,
-      API_KEY_FORM_VALIDATION_MESSAGES.apiKeyTooLong,
-    ),
-  expiresAt: z
-    .string()
-    .refine(
-      isExpiryInputAccepted,
-      API_KEY_FORM_VALIDATION_MESSAGES.expiresAtInvalid,
-    ),
-});
+export const apiKeyFormSchema = createApiKeySchema
+  .omit({ description: true, expiresAt: true })
+  .extend({
+    description: trimmedStringSchema({ max: API_KEY_DESCRIPTION_MAX_LENGTH }),
+    expiresAt: dateOnlySchema.or(z.literal('')),
+  });
 
 /**
  * Builds the request body of `POST /api/api-keys`.

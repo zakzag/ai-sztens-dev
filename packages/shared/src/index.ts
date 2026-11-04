@@ -152,7 +152,6 @@ export {
 } from './contract/api-keys/api-keys.fixture.js';
 
 export {
-  API_KEY_IDENTIFIER_MESSAGE,
   apiKeyIdentifierSchema,
   apiKeyListSchema,
   apiKeySchema,
@@ -169,3 +168,85 @@ export type {
   CreateApiKeyInput,
   UpdateApiKeyInput,
 } from './contract/api-keys/api-keys.interface.js';
+
+export {
+  ALLOWED_URL_PROTOCOLS,
+  DATE_ONLY_LENGTH,
+  DATE_ONLY_PATTERN,
+  EMAIL_MAX_LENGTH,
+  HU_POSTAL_CODE_LENGTH,
+  HU_POSTAL_CODE_PATTERN,
+  HU_TAX_NUMBER_AREA_CODE_MAX,
+  HU_TAX_NUMBER_AREA_CODE_MIN,
+  HU_TAX_NUMBER_CHECK_DIGIT_WEIGHTS,
+  HU_TAX_NUMBER_MAX_LENGTH,
+  HU_TAX_NUMBER_PATTERN,
+  HU_TAX_NUMBER_VAT_CODE_MAX,
+  HU_TAX_NUMBER_VAT_CODE_MIN,
+  IBAN_LETTER_OFFSET,
+  IBAN_MAX_LENGTH,
+  IBAN_MIN_LENGTH,
+  IBAN_MODULUS,
+  IBAN_PATTERN,
+  IBAN_VALID_REMAINDER,
+  LONG_TEXT_MAX_LENGTH,
+  PHONE_DEFAULT_COUNTRY,
+  PHONE_INPUT_MAX_LENGTH,
+  SHORT_TEXT_MAX_LENGTH,
+  URL_MAX_LENGTH,
+} from './contract/common/format.const.js';
+
+export type {
+  IdentifierSchemaOptions,
+  TextSchemaOptions,
+} from './contract/common/format-schema.interface.js';
+
+export type { DateOnlyParts } from './contract/common/date-only.interface.js';
+export type { HuTaxNumberParts } from './contract/common/hu-tax-number.interface.js';
+
+export { formatMessage, resolveMessage } from './contract/common/validation-message.helper.js';
+export {
+  configureValidationLocale,
+  getValidationLocale,
+  resetValidationLocale,
+} from './contract/common/validation-message.helper.js';
+export { VALIDATION_MESSAGE_CATALOGUE } from './contract/common/validation-message.const.js';
+export type {
+  ValidationLocale,
+  ValidationMessageCatalogue,
+  ValidationMessageKey,
+  ValidationMessageParams,
+} from './contract/common/validation-message.interface.js';
+export { VALIDATION_ERROR_MAP } from './contract/common/validation-error-map.const.js';
+
+export { isValidDateOnly, parseDateOnly } from './contract/common/date-only.helper.js';
+export { dateOnlySchema } from './contract/common/date-only.schema.js';
+export { emailSchema } from './contract/common/email.schema.js';
+export { huPostalCodeSchema } from './contract/common/hu-postal-code.schema.js';
+export {
+  computeHuTaxNumberCheckDigit,
+  hasValidHuTaxNumberCheckDigit,
+  isValidHuTaxNumber,
+  parseHuTaxNumber,
+} from './contract/common/hu-tax-number.helper.js';
+export { huTaxNumberSchema } from './contract/common/hu-tax-number.schema.js';
+export {
+  computeIbanRemainder,
+  isValidIban,
+  normalizeIban,
+  toIbanNumeric,
+} from './contract/common/iban.helper.js';
+export { ibanSchema } from './contract/common/iban.schema.js';
+export { isValidPhone, normalizePhone } from './contract/common/phone.helper.js';
+export { phoneSchema } from './contract/common/phone.schema.js';
+export {
+  identifierSchema,
+  nonEmptyTextSchema,
+  trimmedStringSchema,
+} from './contract/common/text.schema.js';
+export { urlSchema } from './contract/common/url.schema.js';
+
+export {
+  dateOnlyToLocalIsoInstant,
+  toLocalDateOnly,
+} from './lib/date-only.js';

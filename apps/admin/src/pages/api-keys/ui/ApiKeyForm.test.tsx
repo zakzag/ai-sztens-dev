@@ -11,6 +11,11 @@
  * and the pending state.
  */
 
+import {
+  API_KEY_NAME_MAX_LENGTH,
+  VALIDATION_MESSAGE_CATALOGUE,
+  formatMessage,
+} from '@callback/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -36,10 +41,12 @@ import {
   API_KEY_FORM_PENDING_LABEL,
   API_KEY_FORM_SUBMIT_LABEL,
   API_KEY_FORM_SUCCESS_MESSAGE,
-  API_KEY_FORM_VALIDATION_MESSAGES,
 } from '../api-keys.const.js';
 import { ApiKeyForm } from './ApiKeyForm.js';
 import { renderWithProviders } from '../../../test/mocks/render-with-providers.js';
+
+/** Hungarian validation copy, i.e. what this bundle renders (AIS-112 `D2`). */
+const HUNGARIAN_VALIDATION = VALIDATION_MESSAGE_CATALOGUE.hu;
 
 /** Renders the form inside the full provider chain. */
 function renderForm() {
@@ -82,22 +89,20 @@ describe('ApiKeyForm', () => {
     server.resetHandlers();
   });
 
-  it('blocks the submit and reports every missing required field', async () => {
+  it('blocks the submit and reports every missing required field in Hungarian', async () => {
     const recorder = createRequestRecorder();
 
     renderForm();
 
     await userEvent.click(getSubmitButton());
 
-    expect(
-      await screen.findByText(API_KEY_FORM_VALIDATION_MESSAGES.nameRequired),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(API_KEY_FORM_VALIDATION_MESSAGES.identifierRequired),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(API_KEY_FORM_VALIDATION_MESSAGES.apiKeyRequired),
-    ).toBeInTheDocument();
+    // The sentence comes from the shared catalogue (AIS-112): the form owns no
+    // validation copy of its own any more, so all three fields share it.
+    const requiredMessages = await screen.findAllByText(
+      HUNGARIAN_VALIDATION.REQUIRED,
+    );
+
+    expect(requiredMessages).toHaveLength(3);
     expect(recorder.requests).toHaveLength(0);
 
     recorder.stop();
@@ -112,8 +117,30 @@ describe('ApiKeyForm', () => {
     await userEvent.click(getSubmitButton());
 
     expect(
+      await screen.findByText(HUNGARIAN_VALIDATION.IDENTIFIER),
+    ).toBeInTheDocument();
+    expect(recorder.requests).toHaveLength(0);
+
+    recorder.stop();
+  });
+
+  it('renders the shared too-long copy for a name over the contract limit', async () => {
+    const recorder = createRequestRecorder();
+
+    renderForm();
+
+    await fillRequiredFields({
+      name: 'a'.repeat(API_KEY_NAME_MAX_LENGTH + 1),
+    });
+    await userEvent.click(getSubmitButton());
+
+    // This message is produced by the zod-generated `too_big` issue, i.e. by
+    // `VALIDATION_ERROR_MAP` — not by a hand-written string in the component.
+    expect(
       await screen.findByText(
-        API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid,
+        formatMessage(HUNGARIAN_VALIDATION.TOO_LONG_TEMPLATE, {
+          max: API_KEY_NAME_MAX_LENGTH,
+        }),
       ),
     ).toBeInTheDocument();
     expect(recorder.requests).toHaveLength(0);

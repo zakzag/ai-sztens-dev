@@ -13,11 +13,10 @@
  * Both functions are pure; the “now” clock is never read.
  */
 
+import { dateOnlyToLocalIsoInstant } from '@callback/shared';
 import {
-  DATE_INPUT_PATTERN,
   EXPIRY_FORMAT_OPTIONS,
   EXPIRY_LOCALE,
-  INVALID_DATE_INPUT_MESSAGE,
   INVALID_EXPIRY_LABEL,
   NO_EXPIRY_LABEL,
 } from './date.const.js';
@@ -31,9 +30,11 @@ const expiryFormatter = new Intl.DateTimeFormat(
 /**
  * Converts a `<input type="date">` value into the ISO instant the API expects.
  *
- * The day is interpreted in the **browser's** timezone (local midnight), which
- * is what the user sees in the date picker: choosing `2026-11-01` stores “the
- * moment 2026-11-01 starts where I am”, not UTC midnight.
+ * The conversion itself moved into `@callback/shared` (`lib/date-only.ts`,
+ * AIS-112 plan `D5`), because the same calendar-day ⇄ instant rule is needed by
+ * every form, not only by this one. The semantics are unchanged: the day is the
+ * **browser's** local day, so choosing `2026-11-01` stores “the moment
+ * 2026-11-01 starts where I am”, not UTC midnight.
  *
  * @param dateInput - value of the date input (`YYYY-MM-DD`); may be empty.
  * @returns `undefined` for an empty/blank input — meaning “no expiry”, which
@@ -43,35 +44,7 @@ const expiryFormatter = new Intl.DateTimeFormat(
  *   before submitting; throwing here means a caller bypassed that validation.
  */
 export function toExpiryIso(dateInput: string): string | undefined {
-  const trimmed = dateInput.trim();
-
-  if (trimmed.length === 0) {
-    return undefined;
-  }
-
-  const match = DATE_INPUT_PATTERN.exec(trimmed);
-
-  if (match === null) {
-    throw new RangeError(INVALID_DATE_INPUT_MESSAGE);
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const localMidnight = new Date(year, month - 1, day, 0, 0, 0, 0);
-
-  // A non-existent day (`2026-02-31`) rolls over silently in `Date`, so the
-  // components are compared back instead of trusting the constructor.
-  const isRealDate =
-    localMidnight.getFullYear() === year &&
-    localMidnight.getMonth() === month - 1 &&
-    localMidnight.getDate() === day;
-
-  if (!isRealDate) {
-    throw new RangeError(INVALID_DATE_INPUT_MESSAGE);
-  }
-
-  return localMidnight.toISOString();
+  return dateOnlyToLocalIsoInstant(dateInput);
 }
 
 /**

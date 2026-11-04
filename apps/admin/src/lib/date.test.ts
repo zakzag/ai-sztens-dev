@@ -8,11 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  INVALID_DATE_INPUT_MESSAGE,
-  INVALID_EXPIRY_LABEL,
-  NO_EXPIRY_LABEL,
-} from './date.const.js';
+import { INVALID_EXPIRY_LABEL, NO_EXPIRY_LABEL } from './date.const.js';
 import { formatExpiry, toExpiryIso } from './date.js';
 
 /**
@@ -66,19 +62,18 @@ describe('toExpiryIso', () => {
 
   it('throws for a non-ISO shaped input', () => {
     expect(() => toExpiryIso('2026.07.01')).toThrow(RangeError);
-    expect(() => toExpiryIso('2026.07.01')).toThrow(INVALID_DATE_INPUT_MESSAGE);
   });
 
   it('throws for a single-digit month or day', () => {
-    expect(() => toExpiryIso('2026-7-1')).toThrow(INVALID_DATE_INPUT_MESSAGE);
+    expect(() => toExpiryIso('2026-7-1')).toThrow(RangeError);
   });
 
   it('throws for a calendar day that does not exist', () => {
-    expect(() => toExpiryIso('2026-02-31')).toThrow(INVALID_DATE_INPUT_MESSAGE);
+    expect(() => toExpiryIso('2026-02-31')).toThrow(RangeError);
   });
 
   it('throws for a non-leap 29 February', () => {
-    expect(() => toExpiryIso('2027-02-29')).toThrow(INVALID_DATE_INPUT_MESSAGE);
+    expect(() => toExpiryIso('2027-02-29')).toThrow(RangeError);
   });
 });
 

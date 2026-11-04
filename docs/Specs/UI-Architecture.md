@@ -1,6 +1,6 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-11-03 (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
+**Utolsó frissítés:** 2026-11-04 (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **AIS-116 (2026-11-03):** hét data-display primitív — `Skeleton`, `Spinner`, `EmptyState`,
 `DescriptionList`, `StatusBadge`, `Pagination`, `DataTable` (lásd §4) —, és a teljes `api-keys`
 oldal rájuk állítva: lap/lapméret/rendezés az URL-ben, működő lapozóval (§5).
@@ -255,6 +255,37 @@ One entry in `app/router/route-registry.tsx`:
 - The registry test enforces the invariants: unique paths, a leading slash, and **no path may start
   with `/api/`** — the Vite dev proxy forwards `^/api/` to the API, so a colliding route would
   answer with JSON instead of the app shell (see §8.1).
+
+### 4.3 Form schemas and validation copy (AIS-112)
+
+A form schema is **derived** from the shared request schema, never re-typed:
+
+```ts
+// apps/admin/src/pages/api-keys/api-keys.logic.ts
+export const apiKeyFormSchema = createApiKeySchema
+  .omit({ description: true, expiresAt: true })
+  .extend({
+    description: trimmedStringSchema({ max: API_KEY_DESCRIPTION_MAX_LENGTH }),
+    expiresAt: dateOnlySchema.or(z.literal('')),
+  });
+```
+
+Two overrides, both about the *form* and not about the rule: an empty description is allowed
+(the mapper omits it) and `expiresAt` holds a calendar day instead of an ISO instant. Everything
+else — limits, patterns, rejection copy — comes from `@callback/shared`.
+
+**No validation sentence lives in the admin app.** The copy is one catalogue
+(`packages/shared/src/contract/common/validation-message.const.ts`, `en` + `hu`), and the language
+is decided in exactly two places:
+
+| Where | Call | Effect |
+| ----- | ---- | ------ |
+| [`apps/admin/src/main.tsx`](../../apps/admin/src/main.tsx:1) | `configureValidationLocale('hu')` | every schema message resolved after boot is Hungarian |
+| [`ApiKeyForm.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyForm.tsx:55) | `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` | the zod-generated issues (`too_small`, `invalid_string`, …) are translated too |
+
+Tests must do the same: [`apps/admin/src/test/setup.ts`](../../apps/admin/src/test/setup.ts:1) calls
+`configureValidationLocale('hu')`, so a missing translation fails a test instead of reaching a user.
+Schema tests that parse without the map are testing the **server** path, i.e. English.
 
 ## 5. State plan per page
 

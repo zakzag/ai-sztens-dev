@@ -1,7 +1,7 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-11-03
-**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109; client binding of every registered operation + registry ⇄ service coverage gate + resource template: AIS-110
+**Utolsó frissítés:** 2026-11-04 (AIS-112: közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3)
+**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109; client binding of every registered operation + registry ⇄ service coverage gate + resource template: AIS-110; közös formátum-sémák + kétnyelvű validációs üzenetek: AIS-112
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
 ---
@@ -22,8 +22,24 @@ Every request and response shape is defined **once**, in `packages/shared/src/co
 | `contract/no-payload.schema.ts`              | `noPayloadSchema` (`z.null()`) — the payload of a “nothing to return” call        |
 | `contract/<resource>/<resource>.contract.ts` | endpoint registry entries (`operationId`, method, path, `tag`, schemas, `errors`) |
 | `contract/endpoint.registry.ts`              | `API_ENDPOINTS` + `ENVELOPE_EXEMPTIONS`                                           |
+| `contract/common/<format>.schema.ts`         | közös formátum-sémák: `email`, `phone` (E.164), `huTaxNumber`, `huPostalCode`, `iban`, `dateOnly`, `url`, `trimmedString`/`nonEmptyText`/`identifier` |
+| `contract/common/validation-message.const.ts`| a validációs copy **egyetlen** katalógusa, `en` + `hu` nyelven                    |
+| `contract/common/validation-error-map.const.ts` | `VALIDATION_ERROR_MAP` — a zod generált issue-jait fordítja az aktív locale-re   |
 
 The same schema drives three artefacts: `z.infer` types, server validation (`ZodBodyPipe`), client parsing (`http-client`). There is no class-validator DTO and no hand-written interface in `apps/api/src/api-keys` any more — and since AIS-93 there is no `class-validator` / `class-transformer` dependency at all, nor a global `ValidationPipe` (see §7).
+
+### 1.0 Rejection copy — one catalogue, two languages
+
+Since AIS-112 a validation message is never a literal in a schema, a form or a component:
+
+| Besorolás | Nyelv | Hol jelenik meg |
+| --------- | ----- | --------------- |
+| **UI copy** | magyar | a böngésző bundle-e: `configureValidationLocale('hu')` a [`apps/admin/src/main.tsx`](../../apps/admin/src/main.tsx:1)-ben, és a `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` |
+| **Internal copy** | angol | a szerver `details[].message` mezője — a locale **default** értéke `en`, és a `apps/api` soha nem hívja a `configureValidationLocale`-t |
+
+Ezért a `message`/`details[].message` ugyanabból a katalógusból származik, de a szerver processzben angolul. A UI továbbra sem **rendereli** a szerver szövegét (§3): a mezőhibát a `code` + `path` alapján maga állítja elő.
+
+Egy szabály-alapú form-séma **származtatva** készül a kérés-sémából (`createApiKeySchema.omit().extend()`), nem újrafogalmazva — így a kliens nem fogadhat el olyat, amit a szerver elutasít.
 
 ### 1.1 Endpoint registry
 
@@ -80,7 +96,7 @@ One `ApiEndpointContract` per operation, typed so a missing or misspelled field 
 
 - `code` — stable, locale independent, **the decision key on the client**.
 - `status` — derived from the code catalogue; never passed in by a service.
-- `message` — English, for developers and logs. **Never rendered as user copy.**
+- `message` — English, for developers and logs. **Never rendered as user copy.** The sentence comes from the shared validation catalogue (`contract/common/validation-message.const.ts`); the server process keeps the default `en` locale, so this field never becomes Hungarian.
 - `details[]` — `{ path, message }` with dot paths (`name`, `lines.2.quantity`); `path: ''` means “whole payload”.
 - 5xx — `message` is the fixed `INTERNAL_ERROR_MESSAGE`; stack, SQL text and constraint names stay in the server log, correlated by `requestId`.
 

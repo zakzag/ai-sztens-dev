@@ -9,9 +9,16 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { ApiKeyListQuery } from '@callback/shared';
+import {
+  API_KEY_DESCRIPTION_MAX_LENGTH,
+  API_KEY_NAME_MAX_LENGTH,
+  API_KEY_VALUE_MAX_LENGTH,
+  VALIDATION_ERROR_MAP,
+  VALIDATION_MESSAGE_CATALOGUE,
+  formatMessage,
+  type ApiKeyListQuery,
+} from '@callback/shared';
 import type { DataTableSort } from '@callback/ui';
-import { API_KEY_FORM_VALIDATION_MESSAGES } from './api-keys.const.js';
 import type { ApiKeyFormValues } from './api-keys.interface.js';
 import {
   apiKeyFormSchema,
@@ -20,6 +27,9 @@ import {
   toSortParams,
   toTableSort,
 } from './api-keys.logic.js';
+
+/** Hungarian copy, i.e. what the admin renders (AIS-112 `D2`). */
+const HUNGARIAN = VALIDATION_MESSAGE_CATALOGUE.hu;
 
 /** Minimal, valid values; individual tests override one field at a time. */
 const VALID_VALUES: ApiKeyFormValues = {
@@ -46,7 +56,11 @@ function fieldError(
   values: ApiKeyFormValues,
   field: keyof ApiKeyFormValues,
 ): string | undefined {
-  const result = apiKeyFormSchema.safeParse(values);
+  // The map is what makes the zod-generated issues (`too_small`, …) speak the
+  // configured locale — the same object `ApiKeyForm` hands to `zodResolver`.
+  const result = apiKeyFormSchema.safeParse(values, {
+    errorMap: VALIDATION_ERROR_MAP,
+  });
 
   if (result.success) {
     return undefined;
@@ -68,46 +82,53 @@ describe('apiKeyFormSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects a missing name', () => {
+  it('rejects a missing name with the shared REQUIRED copy', () => {
     expect(fieldError(withValues({ name: '' }), 'name')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.nameRequired,
+      HUNGARIAN.REQUIRED,
     );
   });
 
-  it('rejects a whitespace-only name', () => {
+  it('rejects a whitespace-only name with the shared REQUIRED copy', () => {
     expect(fieldError(withValues({ name: '   ' }), 'name')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.nameRequired,
+      HUNGARIAN.REQUIRED,
     );
   });
 
-  it('rejects a name longer than 200 characters', () => {
-    expect(fieldError(withValues({ name: 'a'.repeat(201) }), 'name')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.nameTooLong,
-    );
-  });
-
-  it('accepts a name of exactly 200 characters', () => {
+  it('rejects a name longer than the shared limit', () => {
     expect(
-      apiKeyFormSchema.safeParse(withValues({ name: 'a'.repeat(200) })).success,
+      fieldError(
+        withValues({ name: 'a'.repeat(API_KEY_NAME_MAX_LENGTH + 1) }),
+        'name',
+      ),
+    ).toBe(formatMessage(HUNGARIAN.TOO_LONG_TEMPLATE, {
+      max: API_KEY_NAME_MAX_LENGTH,
+    }));
+  });
+
+  it('accepts a name of exactly the shared limit', () => {
+    expect(
+      apiKeyFormSchema.safeParse(
+        withValues({ name: 'a'.repeat(API_KEY_NAME_MAX_LENGTH) }),
+      ).success,
     ).toBe(true);
   });
 
   it('rejects a missing identifier', () => {
     expect(fieldError(withValues({ identifier: '' }), 'identifier')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.identifierRequired,
+      HUNGARIAN.REQUIRED,
     );
   });
 
   it('rejects an identifier with a space', () => {
     expect(
       fieldError(withValues({ identifier: 'vapi prod' }), 'identifier'),
-    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid);
+    ).toBe(HUNGARIAN.IDENTIFIER);
   });
 
   it('rejects an identifier with a slash', () => {
     expect(
       fieldError(withValues({ identifier: 'vapi/prod' }), 'identifier'),
-    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.identifierInvalid);
+    ).toBe(HUNGARIAN.IDENTIFIER);
   });
 
   it('accepts dots, dashes and underscores in the identifier', () => {
@@ -117,34 +138,63 @@ describe('apiKeyFormSchema', () => {
     ).toBe(true);
   });
 
-  it('rejects a description longer than 2000 characters', () => {
+  it('trims the identifier before returning it', () => {
+    const parsed = apiKeyFormSchema.parse(
+      withValues({ identifier: '  vapi-prod  ' }),
+    );
+
+    expect(parsed.identifier).toBe('vapi-prod');
+  });
+
+  it('rejects a description longer than the shared limit', () => {
     expect(
-      fieldError(withValues({ description: 'a'.repeat(2001) }), 'description'),
-    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.descriptionTooLong);
+      fieldError(
+        withValues({
+          description: 'a'.repeat(API_KEY_DESCRIPTION_MAX_LENGTH + 1),
+        }),
+        'description',
+      ),
+    ).toBe(formatMessage(HUNGARIAN.TOO_LONG_TEMPLATE, {
+      max: API_KEY_DESCRIPTION_MAX_LENGTH,
+    }));
   });
 
-  it('rejects a missing api key value', () => {
+  it('rejects a whitespace-only api key value', () => {
     expect(fieldError(withValues({ apiKey: '  ' }), 'apiKey')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.apiKeyRequired,
+      HUNGARIAN.REQUIRED,
     );
   });
 
-  it('rejects an api key value longer than 4000 characters', () => {
-    expect(fieldError(withValues({ apiKey: 'k'.repeat(4001) }), 'apiKey')).toBe(
-      API_KEY_FORM_VALIDATION_MESSAGES.apiKeyTooLong,
-    );
+  it('rejects an api key value longer than the shared limit', () => {
+    expect(
+      fieldError(
+        withValues({ apiKey: 'k'.repeat(API_KEY_VALUE_MAX_LENGTH + 1) }),
+        'apiKey',
+      ),
+    ).toBe(formatMessage(HUNGARIAN.TOO_LONG_TEMPLATE, {
+      max: API_KEY_VALUE_MAX_LENGTH,
+    }));
   });
 
   it('rejects a malformed expiry date', () => {
     expect(
       fieldError(withValues({ expiresAt: '2027.01.31' }), 'expiresAt'),
-    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.expiresAtInvalid);
+    ).toBe(HUNGARIAN.DATE_ONLY);
   });
 
   it('rejects a calendar day that does not exist', () => {
     expect(
       fieldError(withValues({ expiresAt: '2027-02-29' }), 'expiresAt'),
-    ).toBe(API_KEY_FORM_VALIDATION_MESSAGES.expiresAtInvalid);
+    ).toBe(HUNGARIAN.DATE_ONLY);
+  });
+
+  it('is derived from the request schema: an undeclared key is rejected', () => {
+    const result = apiKeyFormSchema.safeParse({
+      ...VALID_VALUES,
+      id: 'injected',
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 

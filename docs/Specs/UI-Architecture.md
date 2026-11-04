@@ -1,6 +1,12 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
 **Utolsó frissítés:** 2026-11-04 (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
+**AIS-115 (2026-11-04):** a közös form-minta — `features/forms/use-app-form.ts`
+(`useAppForm`) egy helyen fogja össze a zod resolvert, a `toFieldErrors` mezőhiba-leképezést, az
+első hibás mező determinisztikus fókuszát, a `reset → notify → onSuccess` siker-konvenciót és az
+opcionális notification portot (`FormNotifier`, AIS-84 előtt `null`); a tiszta döntés a
+`use-app-form.logic.ts`-ben, a részletek a [`Forms-and-Validation.md`](./Forms-and-Validation.md:1)
+specben (lásd §4.4). Az `ApiKeyForm` átállása **AIS-85**.
 **AIS-113 (2026-11-04):** tíz form primitív — `FormField`, `FormSection`, `FormActions`, `Select`,
 `NumberInput`, `DatePicker`, `Checkbox`, `Switch`, `RadioGroup`, `Combobox` (lásd §4) —, a
 `FormField` **render prop** alapú (`ariaProps` a nyers DOM-hoz, `id`/`invalid`/`describedBy` a
@@ -310,6 +316,27 @@ Tests must do the same: [`apps/admin/src/test/setup.ts`](../../apps/admin/src/te
 `configureValidationLocale('hu')`, so a missing translation fails a test instead of reaching a user.
 Schema tests that parse without the map are testing the **server** path, i.e. English.
 
+### 4.4 The form pattern (`useAppForm`, AIS-115)
+
+A page never wires `useForm` + `zodResolver` + `setError` itself any more. It declares the schema,
+the ordered field paths and the submit call, and
+[`useAppForm`](../../apps/admin/src/features/forms/use-app-form.ts:1) returns
+`{ register, handleSubmit, errors, formState, formError, reset, setServerError, clearFormError }`:
+
+| Concern             | Where it is decided                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| validation          | `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` inside the hook (§4.3)                        |
+| which input is wrong | `lib/field-errors.logic.ts` `toFieldErrors` (AIS-111), **not** the hook                                |
+| focus order         | `use-app-form.logic.ts` `toFormErrorPlan` + declared `fieldPaths`; only the **first** entry focuses     |
+| page-level message  | the hook's `formError` state, rendered as one `Alert` above the form                                    |
+| success feedback    | `reset(defaultValues)` → `notify.success(successMessage)` → `onSuccess` (port is optional, AIS-84)       |
+
+`handleSubmit` is the **ready** submit handler (goes straight onto `<form onSubmit={…}>`), not
+react-hook-form's curried function — a page therefore cannot bypass the validate → submit → reset →
+notify order. The hook holds no field name and no sentence, and never branches on `error.code`
+(the field-error gate, §9.3). Full contract and tests: [`Forms-and-Validation.md`](./Forms-and-Validation.md:1).
+`ApiKeyForm.tsx` still uses the hand-wired variant; it migrates in **AIS-85**.
+
 ## 5. State plan per page
 
 Three buckets only: server state → TanStack Query, page UI state → that page's
@@ -327,6 +354,10 @@ an omission (compare **D9**).
 Adding a page means adding a row here in the same change (rule §0.10). If a page needs
 page-wide UI state, it gets a page-local store factory inside its own folder — never a
 global store; the only global store is the session store.
+
+**Form state is always react-hook-form, and always through `useAppForm` (AIS-115, §4.4).**
+The page-level failure message a form shows is the hook's own `formError` state, so a form never
+copies server data into a store and never keeps a second `useState` for errors.
 
 **List state lives in the URL (AIS-119), not in a store.** A list's filter, sort and page are
 read from and written back to the URL through [`features/api/use-list-params.ts`](../../apps/admin/src/features/api/use-list-params.ts:1)
@@ -366,7 +397,9 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
    outside this package.
 3. Add `apps/admin/src/features/<use-case>/` — `use-<use-case>.ts` (query/mutation), pure rules in
    `<use-case>.logic.ts`, query keys in `<use-case>.const.ts`, narrow result interfaces in
-   `<use-case>.interface.ts`.
+   `<use-case>.interface.ts`. A form does **not** re-implement the plumbing: it calls
+   [`useAppForm`](../../apps/admin/src/features/forms/use-app-form.ts:1) with its schema, ordered
+   field paths and submit (§4.4, [`Forms-and-Validation.md`](./Forms-and-Validation.md:1)).
 4. Compose the page from `packages/ui` primitives and page-only parts under `pages/<page>/ui/`.
 5. Implement loading / empty / error / success explicitly — a bare `null` is a defect.
 6. Register the route in `app/router/route-registry.tsx` — one `RouteEntry` in

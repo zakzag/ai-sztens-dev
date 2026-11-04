@@ -1,5 +1,11 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
+**AIS-131 (2026-11-04):** a referencia-szelet teljes CRUD — `pages/api-keys/ApiKeyDetailPage`
+(`/api-keys/:identifier`): detail olvasás `useApiDetail`-en, inline `PATCH` szerkesztés `useAppForm`-mal,
+törlés `ConfirmDialog`-gal, `409 STALE_WRITE` → oldalszintű újratöltés. A state-tábla új sora §5-ben, a
+döntések (`updatedAt` minta-token, `key={updatedAt}` remount, `404` külön ág) a
+[`Admin-Data-Flow.md`](./Admin-Data-Flow.md) §3.7-ben.
+
 **Utolsó frissítés:** 2026-11-04 (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **AIS-115 (2026-11-04):** a közös form-minta — `features/forms/use-app-form.ts`
 (`useAppForm`) egy helyen fogja össze a zod resolvert, a `toFieldErrors` mezőhiba-leképezést, az
@@ -23,6 +29,13 @@ recept; Radix CSS-import nélkül. A `Drawer` **nem** `Popover`, hanem `Dialog` 
 (modalitás: focus trap + `Esc` + scroll-lock kell egy űrlapos panelhez) — ezért három Radix csomag
 kell, nem négy. A `ConfirmDialog` csak a döntést adja vissza (`onConfirm`), nem navigál és nem
 zárja be magát. A `packages/ui/package.json` első runtime dependency-jei a Radix csomagok (§7).
+**AIS-130 (2026-11-04):** a page-state szabály **le van zárva**, és a szabály nyer: a sorrend
+**URL → TanStack Query → page-local store → `useState`**
+([`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:139) §6.1). A `zustand`
+**nincs telepítve** — egyetlen oldalnak sincs tranziens UI-állapota, ezért a store-factory a
+szabályban csak **referencia-minta**; aki először használja, ugyanabban a change-ben telepíti,
+`installed`-ra váltja a §7 sort és megírja a store-tesztet. Ez a döntés szünteti meg a §6 és a §5
+eddigi ellentmondását: a §5 a §6-ot **idézi**, nem fordítja.
 **Status:** living document — describes the _current_ state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -367,21 +380,23 @@ notify order. The hook holds no field name and no sentence, and never branches o
 
 ## 5. State plan per page
 
-Three buckets only: server state → TanStack Query, page UI state → that page's
-Zustand store, form state → react-hook-form. Never mix them. A page appears in this table
-even when **two of the three buckets are intentionally empty** — "no store" is a decision, not
-an omission (compare **D9**).
+The bucket order is the one in [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:139) §6:
+**list/navigation state → the URL, server state → TanStack Query, transient page UI state → that
+page's Zustand store, local state → `useState`**, and form state → react-hook-form. Never mix them.
+A page appears in this table even when **three of the four buckets are intentionally empty** —
+"no store" is a decision, not an omission (compare **D9**).
 
 | Page                                                                 | Server state                                                                                                                                                                                                                                            | Page UI state                                                                                                                                                                                           | Form state                                                                                                                                         | Notes                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pages/api-keys` (AIS-41, `/api-keys` route)                         | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`). The query hook exposes the raw `error` (keeps `requestId`), `errorMessage` and `errorSurface` | **none** — no Zustand store, no filters/sort/tabs (D9); the only local state is the form's page-level error in `ApiKeyForm`. The app banner keeps only a dismissal flag (`useState`), never server data | react-hook-form + `zodResolver(apiKeyFormSchema)` (`pages/api-keys/api-keys.logic.ts`); `identifier` field carries the 409 via `setError` (D8/D36) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32). Failure routing: `errorSurface === 'page'` → `PageErrorState` + retry; `banner` → only `AppErrorBanner` speaks, the page renders nothing extra (AIS-96) |
+| `pages/api-keys/ApiKeyDetailPage` (AIS-131, `/api-keys/:identifier`)  | `useApiKeyDetailQuery` / `useUpdateApiKeyMutation` / `useDeleteApiKeyMutation` in `features/api-keys`; the identifier is the `useParams` value and part of `API_KEYS_QUERY_KEYS.detail(identifier)`. All three expose `error` / `errorMessage` / `errorSurface` | **none** — no store. Three `useState` flags only: dialog open, “last write was stale”, “last write succeeded”. None survives navigation and none copies server data (a remount is not needed for them)    | `useAppForm` + `apiKeyEditFormSchema`; `updatedAt` is a **prop**, never a field, and the form is remounted with `key={updatedAt}` after a save (the hook ends a submit with `reset(defaultValues)`) | `identifier` and `apiKey` are not editable (the PATCH contract is `.strict()`); `404` has its own branch instead of an empty `DescriptionList`; `409 STALE_WRITE` → page `Alert` + reload via `isStaleWriteFailure`, `422` → the blamed input; the delete runs through `ConfirmDialog` and closes only on success (AIS-131) |
 | `pages/LoginPage` (`/login` route)                                   | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | `AuthContext` + `auth/session-token.ts` over `sessionStorage`; no RHF yet                                                                          | The token storage key lives in one module only (D19). The `app/` layer reads the session through `useRequireSession()` only, so the cookie session (AIS-74) changes one file. API-side auth guard is out of scope                                                                                                                           |
 | `pages/PlaceholderPage` (`/` route)                                  | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | none                                                                                                                                               | Static shell for the authenticated landing route; replaced when a real dashboard lands                                                                                                                                                                                                                                                      |
 | `/calls` route (a registry entry in `app/router/route-registry.tsx`) | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | none                                                                                                                                               | Placeholder markup carried by the route registry; becomes a page folder when the calls feature starts                                                                                                                                                                                                                                       |
 
-Adding a page means adding a row here in the same change (rule §0.10). If a page needs
-page-wide UI state, it gets a page-local store factory inside its own folder — never a
-global store; the only global store is the session store.
+Adding a page means adding a row here in the same change (rule §0.10). If a page has **transient** UI
+state that is neither URL- nor server-owned (rule §6.1 step 3 answered yes), it gets a page-local
+store factory inside its own folder — never a global store; the only global store is the session store.
 
 **Form state is always react-hook-form, and always through `useAppForm` (AIS-115, §4.4).**
 The page-level failure message a form shows is the hook's own `formError` state, so a form never
@@ -392,8 +407,9 @@ read from and written back to the URL through [`features/api/use-list-params.ts`
 (`useListParams(schema)`), so they are **not** page UI state and never enter a Zustand store.
 The hook is generic and takes the resource's shared list-query schema as a parameter; the
 parsed `params` is what the generic `useApiList` (AIS-114) feeds into a TanStack Query key.
-`zustand` therefore stays **uninstalled** — add it to §7 only when a page genuinely needs
-transient UI state (open drawer, selected row, column filters).
+`zustand` therefore stays **uninstalled** — the decision was closed in **AIS-130** (§7): it is added
+together with the first page that genuinely needs transient UI state (open drawer, selected row,
+column filters), and that change flips the §7 row to `installed`.
 
 **AIS-116 closed the loop on `pages/api-keys`:** the page now _renders_ what the URL says and
 _writes_ back what the user asks for, so the row above still holds “no page store”:
@@ -417,8 +433,9 @@ The table still owns nothing: the failure stays `PageErrorState` (`D11`), and th
 The rule file's §12 in repo terms. Every step is a review checkpoint.
 
 1. Create `apps/admin/src/pages/<page>/` with `<Page>.tsx` (composition only),
-   `<page>.interface.ts`, `<page>.const.ts`; add `<page>.store.ts` **only** if the page owns UI
-   state (page-local `createStore` factory + provider/hook, never exported outside the folder).
+   `<page>.interface.ts`, `<page>.const.ts`; add `<page>.store.ts` **only** if the rule's §6.1
+   decision test ends at the store (page-local `createStore` factory + provider/hook, never exported
+   outside the folder).
 2. Add the server need to `packages/api-client`: interface + implementation + the Zod schema in
    `packages/shared/src/contract/<resource>/` (the envelope lives in
    `packages/shared/src/contract/envelope.schema.ts`), then parse at the HTTP boundary. No `fetch`
@@ -463,7 +480,9 @@ The rule file's §12 in repo terms. Every step is a review checkpoint.
 | `knip`                                                                                                  | repo root                                | dead-code gate: unused files / exports / dependencies (§9.2)                                                    | installed (`^5`) — dev-only, `apps/api` deliberately out of scope (D8)                                                                                                                                                                                                        |
 
 Adding a dependency requires updating this table in the same change. Rows marked
-_planned_ must not be read as available.
+_planned_ must not be read as available. The `zustand` row's decision was **closed in AIS-130**: it
+stays _planned_ because no page has transient UI state yet; the page that first needs one installs it,
+flips this row to `installed` and ships the store test in the same change (§5, rule §6.4).
 
 **Two zod instances, on purpose (AIS-113 build fix).** `@hookform/resolvers` declares `zod` as a
 _peer_ and imports it by bare specifier, while `knip` (dev-only, repo root) depends on zod **4**.

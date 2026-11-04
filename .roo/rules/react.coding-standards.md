@@ -1,7 +1,7 @@
 # React UI Coding Standards — AI Code-Generation Rules
 
 **Applies to:** [`apps/web`](../../apps/web/package.json:1), [`apps/admin`](../../apps/admin/package.json:1), `packages/ui`, `packages/api-client`.
-**Stack:** React 18, TypeScript strict, Vite, Tailwind CSS v4 (`@theme` tokens), TanStack Query v5, Zustand, react-hook-form + Zod, React Router 6.
+**Stack:** React 18, TypeScript strict, Vite, Tailwind CSS v4 (`@theme` tokens), TanStack Query v5, Zustand (transient page UI only, §6), react-hook-form + Zod, React Router 6.
 **Authority:** this file wins over generic advice, habit or personal preference. Architecture reference: [`docs/Specs/UI-Architecture.md`](../../docs/Specs/UI-Architecture.md:1) — it documents how this repo implements the rules below (layer map, tokens, primitives, per-page state plan, new-page recipe, dependency list).
 
 ---
@@ -10,8 +10,8 @@
 
 1. **Components render.** They do not fetch, validate business rules, map domain data or own page-wide state.
 2. **All backend access** goes through a service in `packages/api-client`, consumed only through TanStack Query hooks in `features/`.
-3. **Three state buckets only:** server data → TanStack Query; page UI state → that page's Zustand store; form state → react-hook-form. Never mix them.
-4. **One page = one folder.** Its store lives inside the folder and is never imported by another page.
+3. **State has a fixed decision order:** list/navigation state → the **URL**; server data → TanStack Query; transient page UI state → that page's Zustand store **only if** the first two cannot own it; form state → react-hook-form. Never mix them, and never copy one bucket into another (§6).
+4. **One page = one folder.** If the page has a store, it lives inside the folder and is never imported by another page.
 5. **No color literals, no Tailwind palette utilities, no arbitrary color values.** Only `packages/ui` tokens and primitives.
 6. **Imports flow downwards only:** `app → pages → features → entities → services → lib`. No page→page, no feature→feature imports.
 7. **SOLID / KISS / DRY:** one function = one responsibility; pure functions preferred; extract duplication instead of copying it.
@@ -28,7 +28,7 @@ apps/<app>/src/
   app/                    providers, router, layout shell, error boundary, session store
   pages/<page>/
     <Page>.tsx            route entry — composition only
-    <page>.store.ts       page-scoped Zustand factory (see §6)
+    <page>.store.ts       (optional) page-scoped Zustand factory — transient UI state only (§6)
     <page>.interface.ts   page-local types
     <page>.const.ts       query keys, defaults, labels
     ui/                   page-only presentational parts
@@ -87,7 +87,7 @@ Shared code between pages/features goes to `entities` or `lib` — never importe
 | Pure logic     | `<name>.logic.ts`              | `callback-form.logic.ts`                                 |
 | Types          | `<name>.interface.ts`          | `dashboard.interface.ts`                                 |
 | Constants      | `<name>.const.ts`              | `dashboard.const.ts`                                     |
-| Store          | `<page>.store.ts`              | `dashboard.store.ts`                                     |
+| Store (opt.)   | `<page>.store.ts`              | `dashboard.store.ts` — only when §6.1 step 3 is **yes**  |
 | Service        | `<domain>.service.ts`          | `callback-requests.service.ts`                           |
 | Variants       | `<primitive>.variants.ts`      | `button.variants.ts`                                     |
 
@@ -136,22 +136,62 @@ export function toStatusVariant(status: CallbackRequestStatus): BadgeVariant {
 
 ---
 
-## 6. State: three buckets
+## 6. State: URL first, then Query, then — maybe — a store
 
-| Bucket        | Owner                    | Examples                                       | Forbidden inside                 |
-| ------------- | ------------------------ | ---------------------------------------------- | -------------------------------- |
-| Server state  | TanStack Query           | request lists, call details, mutation results  | copy of server data in Zustand   |
-| Page UI state | page-local Zustand store | filters, sort, tabs, selected row, drawer open | server data, derived server data |
-| Form state    | react-hook-form          | field values, field errors, dirty/touched      | submitting to services directly  |
+Four buckets. The **order is the rule**: always try the earlier bucket first, and move down only when
+the previous one provably cannot hold the state.
 
-Rules:
+| # | Bucket                  | Owner                                                        | Examples                                                        | Never inside                          |
+| - | ----------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------- |
+| 1 | List / navigation state | the **URL** — `useSearchParams` behind one typed hook (§6.2) | filter, sort, page, page size, active tab, linkable selected id | secrets, server payloads, form values |
+| 2 | Server state            | TanStack Query cache                                         | request lists, call details, mutation results                   | a copy in a store or in `useState`    |
+| 3 | Transient page UI       | page-local store factory — Zustand (§6.3)                    | open drawer, selected row, column filters, bulk selection       | server data, derived server data      |
+| 4 | Local component state   | `useState` in the component that owns the interaction        | open menu of one dropdown, a search field's own text            | state a sibling or the page needs     |
 
-- Query keys are declared in `*.const.ts` and reused — never inline arrays in components.
-- Invalidate/refetch through the query client after mutations; do not hand-patch unrelated caches.
-- Store factory pattern (below) — one store instance per mounted page, so state resets on navigation.
-- `persist` is allowed only with an explicit whitelist (`partialize`) and documented in the state plan.
-- Components subscribe with selectors: `useDashboardStore((s) => s.filters)`.
+**Form state is a separate bucket and always react-hook-form** (§0.3): the form component owns it,
+never a store and never the URL.
+
+### 6.1 The decision test
+
+Ask in this order and stop at the first **yes**:
+
+1. Must the state survive a reload, a copied link, or the back button? → **the URL**.
+2. Does the value originate on the server? → **TanStack Query** (never copy it out).
+3. Do two or more parts of the page share it, and may it be lost on navigation? → **page-local store**.
+
+If all three are **no**, the state is local: `useState` in the component that owns the interaction.
+Most pages therefore end up with **no store at all** — "no store" is a decision, not an omission, and
+it is recorded in the state plan of [`docs/Specs/UI-Architecture.md`](../../docs/Specs/UI-Architecture.md:368) §5.
+
+### 6.2 The URL bucket
+
+- List state is parsed and written by **one** hook
+  ([`features/api/use-list-params.ts`](../../apps/admin/src/features/api/use-list-params.ts:1)) using
+  the resource's shared list-query schema. A component never reads `searchParams` itself, and list
+  state never enters a store.
+- One user interaction = **one** URL write (`setParams(patch)`). Two writes rebuild the URL from the
+  same pre-render value, so the first change is lost and two history entries appear.
+- Schema defaults are omitted from the URL; an invalid parameter falls back to the default instead of
+  throwing.
+
+### 6.3 The store bucket
+
+- Store factory pattern (below), **one instance per mounted page**, so navigation resets it.
+- The page folder owns `<Page>StoreProvider` + `use<Page>Store<T>(selector)`; no store export leaves
+  that folder and no page imports another page's store.
+- Components subscribe with selectors: `useDashboardStore((s) => s.filters)` — never the whole store.
+- `persist` is allowed only with an explicit whitelist (`partialize`), documented in the state plan.
 - The only global store is `useSessionStore` (token, role) in `app/`.
+- A store that mirrors URL state or Query state is a defect, not a convenience (§6.1, steps 1–2).
+
+### 6.4 `zustand` is not installed yet (AIS-130)
+
+The factory below is the **reference pattern**, not a required file. `zustand` is in **no**
+`package.json` today, because no page has genuine transient UI state yet. The page that first needs
+one adds the dependency in the **same** change, switches the `zustand` row of
+[`docs/Specs/UI-Architecture.md`](../../docs/Specs/UI-Architecture.md:442) §7 to `installed`, and
+ships the store tests (init → patch → selector). Until then **no** `<page>.store.ts` is created — an
+unused store would also fail the dead-code gate (`pnpm quality:dead-code`).
 
 ```ts
 import { createStore } from 'zustand/vanilla';
@@ -173,7 +213,31 @@ export function createDashboardStore(init?: Partial<DashboardState>) {
 }
 ```
 
-The page folder owns `<Page>StoreProvider` + `use<Page>Store<T>(selector)`; no store export leaves that folder.
+The provider and the selector hook stay in the page folder, so the instance is created once per mount:
+
+```ts
+// pages/dashboard/dashboard-store.provider.tsx — the only place an instance is created
+export function DashboardStoreProvider({ children }: PropsWithChildren) {
+  const [store] = useState(() => createDashboardStore());
+  return (
+    <DashboardStoreContext.Provider value={store}>
+      {children}
+    </DashboardStoreContext.Provider>
+  );
+}
+
+export function useDashboardStore<T>(selector: (state: DashboardStore) => T): T {
+  const store = useContext(DashboardStoreContext);
+  if (store === null) throw new MissingStoreProviderError('DashboardStore');
+  return useStore(store, selector);
+}
+```
+
+### 6.5 The server-state bucket
+
+- Query keys are declared in `*.const.ts` and reused — never inline arrays in components.
+- Invalidate/refetch through the query client after mutations; do not hand-patch unrelated caches.
+- Server data is read from the cache; it is never copied into `useState` or into a store.
 
 ---
 
@@ -288,11 +352,11 @@ export const buttonVariants = cva(
 1. Create `pages/<page>/` with `<Page>.tsx`, `<page>.interface.ts`, `<page>.const.ts`.
 2. Add the server needs to `packages/api-client` (interface + implementation + Zod schema).
 3. Add `features/<use-case>/use-*.ts` (query/mutation) and move decisions into `*.logic.ts`.
-4. If the page has UI state, add `<page>.store.ts` + provider/hook; otherwise add no store.
+4. Only if §6.1 step 3 answered **yes**, add `<page>.store.ts` + provider/hook; otherwise add no store.
 5. Compose the page from `packages/ui` primitives and page-only parts in `ui/`.
 6. Implement loading/empty/error/success explicitly.
 7. Register the route in `app/router`.
-8. Add tests (logic, store, hook) and mocks in `src/test/mocks`.
+8. Add tests (logic, hook and — if the page has one — store) and mocks in `src/test/mocks`.
 9. Add a row to the state plan in `docs/Specs/UI-Architecture.md`.
 10. Run `pnpm lint`, `pnpm test`, `pnpm build` for the app.
 
@@ -302,7 +366,7 @@ export const buttonVariants = cva(
 
 - [ ] No `fetch` outside `packages/api-client`.
 - [ ] No business rule inside JSX; logic extracted to `*.logic.ts`.
-- [ ] Server state in TanStack Query, page state in the page store, forms in RHF — no mixing.
+- [ ] List state in the URL, server state in TanStack Query, transient page state in the page store (if any), forms in RHF — no mixing.
 - [ ] No color literal, palette class or arbitrary color: `rg "#[0-9a-fA-F]{3,8}|(bg|text|border|ring|from|to|via)-(slate|gray|zinc|neutral|stone|indigo|red|amber|green|emerald|blue)-\d{2,3}" apps/web/src apps/admin/src` returns nothing.
 - [ ] Only `packages/ui` primitives used for buttons, inputs, cards, badges, alerts, tables.
 - [ ] Loading / empty / error / success states present.

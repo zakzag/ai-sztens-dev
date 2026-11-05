@@ -4,16 +4,19 @@ import { Badge } from '../badge/Badge.js';
 import { Button } from '../button/Button.js';
 import {
   LOG_DRAWER_CLEAR_LABEL,
-  LOG_DRAWER_CLOSE_LABEL,
   LOG_DRAWER_EMPTY_LABEL,
   LOG_DRAWER_FILTER_GROUP_LABEL,
+  LOG_DRAWER_HANDLE_CAPTION,
+  LOG_DRAWER_HANDLE_COLLAPSED_GLYPH,
+  LOG_DRAWER_HANDLE_OPEN_GLYPH,
+  LOG_DRAWER_HEADER_CLOSE_LABEL,
   LOG_DRAWER_LOAD_MORE_LABEL,
   LOG_DRAWER_PANEL_ID_SUFFIX,
   LOG_DRAWER_TITLE,
   LOG_FILTERS,
   LOG_FILTER_LABELS,
 } from './log-drawer.const.js';
-import { toLogDrawerTabLabel } from './log-drawer.logic.js';
+import { toLogDrawerHandleLabel } from './log-drawer.logic.js';
 import { LogEntryRow } from './LogEntryRow.js';
 import {
   logDrawerFooterVariants,
@@ -26,18 +29,31 @@ import {
 import type { LogDrawerProps } from './log-drawer.interface.js';
 
 /**
- * Side log panel: a narrow edge tab while collapsed, a sliding panel while open.
+ * Side log panel with **one** always-visible arrow handle (AIS-82, AIS-136).
  *
  * Presentational only — it owns no data, no filter state and no page window; the
  * host passes the already-sliced rows and receives every intent as a callback
  * (AIS-82 decisions D1, D7).
  *
+ * The handle is a single `<button>` that exists in **both** states (AIS-136
+ * `D4`): it opens the panel while collapsed and closes it while open, flips its
+ * glyph and its accessible name with `isOpen`, and always exposes
+ * `aria-expanded` + `aria-controls`. It is a **sibling after** the panel rather
+ * than a child, because the panel is `pointer-events-none` while collapsed — a
+ * handle inside it would be unreachable in exactly the state that needs it.
+ * Being the later sibling also paints it above the panel at the same `z-index`,
+ * so the handle rides the panel edge without covering it: the open panel
+ * reserves a matching right gutter.
+ *
  * The panel is **not** modal (D3): no overlay, no focus trap, the page behind
  * stays scrollable. The one side effect in the component is a `document`
  * `keydown` listener that closes the panel on `Escape` (D6) — it is registered
- * only while the panel is open. The panel element stays mounted so the tab's
+ * only while the panel is open. The panel element stays mounted so the handle's
  * `aria-controls` never dangles and the slide animates in both directions; its
  * content is rendered only while open, so nothing hidden is focusable.
+ *
+ * `✕` and `Escape` remain as secondary close paths; the handle is the primary
+ * toggle in both directions.
  *
  * @param props - see {@link LogDrawerProps}.
  */
@@ -74,23 +90,6 @@ export function LogDrawer({
 
   return (
     <>
-      {isOpen ? null : (
-        <button
-          type="button"
-          className={logDrawerTabVariants()}
-          aria-expanded={false}
-          aria-controls={panelId}
-          aria-label={toLogDrawerTabLabel(unseenCount)}
-          onClick={onToggle}
-        >
-          <span aria-hidden="true">‹</span>
-          {unseenCount > 0 ? <Badge variant="info">{unseenCount}</Badge> : null}
-          <span className="text-xs font-medium" aria-hidden="true">
-            Log
-          </span>
-        </button>
-      )}
-
       <aside
         id={panelId}
         role="log"
@@ -121,7 +120,7 @@ export function LogDrawer({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    aria-label={LOG_DRAWER_CLOSE_LABEL}
+                    aria-label={LOG_DRAWER_HEADER_CLOSE_LABEL}
                     onClick={onClose}
                   >
                     <span aria-hidden="true">✕</span>
@@ -184,6 +183,23 @@ export function LogDrawer({
           </>
         ) : null}
       </aside>
+
+      <button
+        type="button"
+        className={logDrawerTabVariants({ isOpen })}
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        aria-label={toLogDrawerHandleLabel(unseenCount, isOpen)}
+        onClick={onToggle}
+      >
+        <span aria-hidden="true">
+          {isOpen ? LOG_DRAWER_HANDLE_OPEN_GLYPH : LOG_DRAWER_HANDLE_COLLAPSED_GLYPH}
+        </span>
+        {unseenCount > 0 ? <Badge variant="info">{unseenCount}</Badge> : null}
+        <span className="text-xs font-medium" aria-hidden="true">
+          {LOG_DRAWER_HANDLE_CAPTION}
+        </span>
+      </button>
     </>
   );
 }

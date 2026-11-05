@@ -1,6 +1,6 @@
 # Forms and validation — the admin form pattern
 
-**Utolsó frissítés:** 2026-11-05 (AIS-85: az `ApiKeyForm` átállt a mintára és a `notify` portra; a `formError` csak a `field`-szintű hiba maradéka — ki beszél a hibáról: §3.1) (AIS-115: megjelent a közös form-minta, `features/forms/use-app-form.ts` — validáció, mezőhiba-leképezés, submit/toast konvenció egy helyen)
+**Utolsó frissítés:** 2026-11-05 (AIS-136: `banner` hiba is toastol — a `field` marad az egyetlen toast nélküli szint (§3.1); az `ApiKeyEditForm` megkapta a `notify` portot, a lap sikeres `Alert`-je mellett (§5–§6)) (AIS-85: az `ApiKeyForm` átállt a mintára és a `notify` portra; a `formError` csak a `field`-szintű hiba maradéka — ki beszél a hibáról: §3.1) (AIS-115: megjelent a közös form-minta, `features/forms/use-app-form.ts` — validáció, mezőhiba-leképezés, submit/toast konvenció egy helyen)
 **Status:** living document — describes the _current_ state of form handling in `apps/admin`.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) §5 (business logic),
 §6 (three state buckets), §9 (error handling) and [`UI-Architecture.md`](./UI-Architecture.md:1) §4.3.
@@ -95,15 +95,20 @@ Two rules that are easy to get wrong and are enforced by the hook:
 `toFormErrorPlan` takes the failure's `toErrorSurface` classification, so the form and the
 notification system can never render the same sentence twice:
 
-| Surface  | Field messages | Form `Alert` (`formError`) | Toast (capture)   | Log entry |
-| -------- | -------------- | -------------------------- | ----------------- | --------- |
-| `field`  | yes            | only the unowned residue   | no                | yes       |
-| `page`   | no             | **no**                     | yes               | yes       |
-| `banner` | no             | **no**                     | no (banner speak) | yes       |
-| `silent` | no             | no                         | no                | no        |
+| Surface  | Field messages | Form `Alert` (`formError`) | Toast (capture)      | Log entry |
+| -------- | -------------- | -------------------------- | -------------------- | --------- |
+| `field`  | yes            | only the unowned residue   | no                   | yes       |
+| `page`   | no             | **no**                     | yes                  | yes       |
+| `banner` | no             | **no**                     | **yes** (AIS-136)    | yes       |
+| `silent` | no             | no                         | no                   | no        |
 
-Consequence for a form inside the admin shell: a `409` stays on its input with focus and **no**
-toast, a `5xx` shows exactly **one** error toast, and a form never needs a second error state.
+Consequence for a form inside the admin shell: a field-addressable failure stays on its input with
+focus and **no** toast, a `5xx` shows exactly **one** error toast, and a form never needs a second
+error state. A `banner` failure (offline, `401`, `503`) is now toasted **in addition to**
+`AppErrorBanner`: the banner shows the persistent condition, the toast marks the moment. Note that
+`409 STALE_WRITE` has **no** `fieldMessage` in the catalogue, so the classifier files it under
+`page`: the detail page shows its reload `Alert` **and** the capture toasts once — an addressable
+input is the only failure that stays silent on the toast channel.
 
 ---
 
@@ -138,12 +143,17 @@ tickets could not block each other.
   satisfies `FormNotifier` structurally, so a page passes it straight in. The port stays
   one-method: the hook **never** calls `notify.error`, because error toasting belongs to the
   global capture (§3.1).
-- **Success has exactly one owner.** The form announces through the port; the api-keys
-  mutations carry **no** `meta.successMessage`, so the mutation-cache callback stays silent.
+- **The api-keys writes have exactly one announcement.** The form announces through the port; the
+  api-keys mutations carry **no** `meta.successMessage`, so the mutation-cache callback stays silent.
   (`useApiMutation` does not even forward `meta` to `useMutation`, so the two paths cannot
   double-fire by accident.)
 - A page that has no notifier yet simply omits `notify` plus `successMessage`, and
   renders its own success affordance if it needs one.
+- **`ApiKeyDetailPage` keeps its success `Alert` next to the toast (AIS-136 `AIS136-D1`).** The port
+  was added in AIS-136, so the row is now announced twice **on purpose**: the toast marks the moment
+  of the save, the `Alert` marks the state of the row that was just saved and survives a dismissed
+  toast. Both read the same `API_KEY_EDIT_FORM_SUCCESS_MESSAGE` constant, so the copy cannot drift.
+  `ApiKeyForm` stays single-surface: it has no `Alert` at all.
 
 ---
 
@@ -154,6 +164,7 @@ tickets could not block each other.
 | [`use-app-form.logic.test.ts`](../../apps/admin/src/features/forms/use-app-form.logic.test.ts:1) | ordering by `fieldPaths`, dropping unowned paths, residue message for `field`, suppression for `page`/`banner`/`silent`                   |
 | [`use-app-form.test.tsx`](../../apps/admin/src/features/forms/use-app-form.test.tsx:1)           | valid submit, reset, notification, invalid block, pending, page failure without a duplicate `Alert`, unmapped path, focus order, retry     |
 | [`ApiKeyForm.test.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyForm.test.tsx:1)            | the reference slice end to end: one toast **and** one log entry per submit, `409` field-only, `5xx` toast-only, residue `Alert`, invalidation |
+| [`ApiKeyEditForm.test.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyEditForm.test.tsx:1)    | the same contract on the edit form (AIS-136): one success toast + one log entry, and **no** toast for a field-addressable failure          |
 
 The consumer harness ([`test/mocks/app-form-harness.mock.tsx`](../../apps/admin/src/test/mocks/app-form-harness.mock.tsx:1))
 builds the form out of the real primitives, so the suite asserts what a page renders.
@@ -167,5 +178,5 @@ No test hits the network: the write is always a mock.
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `pages/LoginPage`                 | not react-hook-form based yet; unaffected                                                                    |
 | `pages/api-keys/ui/ApiKeyForm`    | **migrated in AIS-85** — `useAppForm` + `useNotifier()`, no `pageError` state, no success `Alert`, `FormActions` |
-| `pages/api-keys/ui/ApiKeyEditForm` | `useAppForm` since AIS-131; it inherits the AIS-85 surface rule but has no notification port yet             |
+| `pages/api-keys/ui/ApiKeyEditForm` | `useAppForm` since AIS-131; **notify port since AIS-136** (`useNotifier()`), with the page's success `Alert` deliberately kept (`AIS136-D1`) |
 | Every new form                    | must use `useAppForm` (§1) — a hand-wired resolver + `setError` loop is a review finding                     |

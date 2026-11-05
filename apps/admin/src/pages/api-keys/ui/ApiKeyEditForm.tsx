@@ -1,3 +1,4 @@
+import { useNotifier } from '@callback/notifications/react';
 import { Alert, Card, FormActions, Input, Textarea } from '@callback/ui';
 import { API_KEY_EDIT_FIELD_PATHS } from '../../../features/api-keys/api-keys.const.js';
 import { useAppForm } from '../../../features/forms/use-app-form.js';
@@ -8,6 +9,7 @@ import {
   API_KEY_EDIT_FORM_LABELS,
   API_KEY_EDIT_FORM_PENDING_LABEL,
   API_KEY_EDIT_FORM_SUBMIT_LABEL,
+  API_KEY_EDIT_FORM_SUCCESS_MESSAGE,
   API_KEY_EDIT_FORM_TITLE,
 } from '../api-keys.const.js';
 import type {
@@ -17,7 +19,7 @@ import type {
 import { apiKeyEditFormSchema } from '../api-keys.logic.js';
 
 /**
- * Edit form of one API key (AIS-131).
+ * Edit form of one API key (AIS-131, notify port since AIS-136).
  *
  * Built on {@link useAppForm}, so the five decisions of the shared form pattern
  * (resolver with the Hungarian error map, `toFieldErrors` mapping, first-error
@@ -31,6 +33,13 @@ import { apiKeyEditFormSchema } from '../api-keys.logic.js';
  * only reports the values. A rejection is re-thrown by `submit`, so `useAppForm`
  * still maps it onto the fields.
  *
+ * Since AIS-136 the form owns the notification port as well (`useNotifier()`),
+ * exactly like `ApiKeyForm` (AIS-85): a successful `PATCH` produces one toast and
+ * one log entry. The mutation carries **no** `meta.successMessage`, so the
+ * cache-level callback stays silent and cannot duplicate the announcement.
+ * The page's own success `Alert` stays (`AIS136-D1`): the toast marks the moment,
+ * the `Alert` marks the state of the row that was just saved.
+ *
  * The form is remounted by the page (`key={updatedAt}`) after every successful
  * save, because `useAppForm` closes a submit with `reset(defaultValues)`: with a
  * static `defaultValues` that reset would restore the **pre-edit** values.
@@ -38,12 +47,16 @@ import { apiKeyEditFormSchema } from '../api-keys.logic.js';
  * @param props - see {@link ApiKeyEditFormProps}.
  */
 export function ApiKeyEditForm({ values, submit, onSaved }: ApiKeyEditFormProps) {
+  const notify = useNotifier();
+
   const { register, handleSubmit, errors, formState, formError } =
     useAppForm<ApiKeyEditFormValues>({
       schema: apiKeyEditFormSchema,
       defaultValues: values,
       fieldPaths: API_KEY_EDIT_FIELD_PATHS,
       submit,
+      notify,
+      successMessage: API_KEY_EDIT_FORM_SUCCESS_MESSAGE,
       onSuccess: onSaved,
     });
 

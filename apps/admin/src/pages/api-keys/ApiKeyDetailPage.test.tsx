@@ -150,9 +150,14 @@ describe('ApiKeyDetailPage', () => {
       screen.getByRole('button', { name: API_KEY_EDIT_FORM_SUBMIT_LABEL }),
     );
 
-    expect(
-      await screen.findByText(API_KEY_EDIT_FORM_SUCCESS_MESSAGE),
-    ).toBeInTheDocument();
+    // AIS-136 `AIS136-D1` (owner decision): the page keeps its success `Alert`
+    // **and** the form's notify port adds a toast, so the same sentence appears
+    // twice on purpose — the `Alert` marks the saved state, the toast the moment.
+    const successSurfaces = await screen.findAllByText(
+      API_KEY_EDIT_FORM_SUCCESS_MESSAGE,
+    );
+
+    expect(successSurfaces).toHaveLength(2);
 
     await waitFor(() => {
       expect(requestsByMethod(recorder, 'PATCH')).toHaveLength(1);

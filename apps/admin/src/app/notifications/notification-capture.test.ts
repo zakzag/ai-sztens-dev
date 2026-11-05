@@ -126,16 +126,17 @@ describe('createAppQueryClient — failure capture', () => {
     expect(store.emitted[0]?.detail).toContain('queryKey=["api-keys","list"]');
   });
 
-  it('captures a banner-level failure without asking for a toast', async () => {
+  it('captures a banner-level failure and asks for a toast too (AIS-136)', async () => {
     const store = createNotificationStoreSpy();
 
     await runFailingQuery(createAppQueryClient(store), createNetworkError(), [
       'api-keys',
     ]);
 
+    // The banner expresses the condition, the toast the moment: both speak.
     expect(store.emitted[0]).toMatchObject({
       message: toErrorMessage(createNetworkError()),
-      toast: false,
+      toast: true,
     });
   });
 

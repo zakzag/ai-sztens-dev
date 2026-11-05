@@ -5,6 +5,7 @@ import {
 } from '@callback/notifications';
 import { toErrorMessage } from '../../lib/error-message.js';
 import { toApiError, toErrorSurface } from '../../lib/error-surface.logic.js';
+import type { ErrorSurface } from '../../lib/error-surface.interface.js';
 import {
   HTTP_EVENT_SEPARATOR,
   HTTP_EVENT_SOURCE,
@@ -34,10 +35,22 @@ import type {
  * lives here, so the capture wiring stays a three-line adapter and the whole
  * policy is testable with plain values.
  *
- * The visibility rule reuses the existing classifier
- * ({@link toErrorSurface}): `silent` → nothing, `field`/`banner` → log only (the
- * form or the banner is already speaking), `page` → log **and** toast. One
- * failure therefore produces exactly one visible surface.
+ * The visibility rule reuses the existing classifier ({@link toErrorSurface})
+ * and is **total** over its four surfaces (AIS-136 `D1`):
+ *
+ * | surface  | log entry | toast | who else speaks                       |
+ * | -------- | --------- | ----- | ------------------------------------- |
+ * | `silent` | no        | no    | — (a cancellation is not a failure)   |
+ * | `field`  | yes       | **no**| the input + the form residue `Alert`  |
+ * | `banner` | yes       | yes   | `AppErrorBanner` (the condition)      |
+ * | `page`   | yes       | yes   | the page's own error region           |
+ *
+ * A field error deliberately stays off the toast: it must not steal the
+ * announcement from the input that keeps focus and shows the message, while
+ * every other tier is announced even when the user is looking elsewhere.
+ * A `banner` failure is toasted even though the banner also shows it, because
+ * the banner expresses the persistent **condition** and the toast marks the
+ * **moment** of the failure (D2).
  */
 
 /**
@@ -249,13 +262,37 @@ export function readSuccessMessage(meta: unknown): string | null {
 }
 
 /**
+ * The toast half of the failure matrix (AIS-136 `D1`).
+ *
+ * Exhaustive on purpose: a new {@link ErrorSurface} member fails to compile
+ * until somebody decides whether it is announced, instead of silently
+ * inheriting one of the two answers.
+ *
+ * `silent` never reaches this function — {@link toFailureEntry} returns early —
+ * but it is listed so the switch stays total.
+ *
+ * @param surface - the tier the classifier picked for the failure.
+ * @returns `true` when the failure must also appear as a toast.
+ */
+export function toFailureToast(surface: ErrorSurface): boolean {
+  switch (surface) {
+    case 'silent':
+    case 'field':
+      return false;
+    case 'banner':
+    case 'page':
+      return true;
+  }
+}
+
+/**
  * Shared failure mapping of the query and the mutation cache.
  *
  * @param error - anything that was thrown.
  * @param kind - catalogued event kind the entry is filed under.
  * @param keyLabel - detail label of the resource key.
  * @param key - query or mutation key, when declared.
- * @returns the entry, or `null` for a cancellation or an already-surfaced failure.
+ * @returns the entry, or `null` for a cancellation (the only invisible failure).
  */
 function toFailureEntry(
   error: unknown,
@@ -276,6 +313,6 @@ function toFailureEntry(
     source: defaults.source,
     message: toErrorMessage(error),
     detail: toErrorDetail(error, keyLabel, key) ?? undefined,
-    toast: surface === 'page',
+    toast: toFailureToast(surface),
   };
 }

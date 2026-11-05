@@ -52,7 +52,7 @@ degradáció hiba esetén. A store-hoz **nincs** bekötve: a bekötés az AIS-83
 továbbra sem importál Reactet: a `tsconfig.core.json` a `src/core`-t DOM nélkül fordítja, a
 `tsconfig.json` a React réteget DOM+JSX-szel. Részletek a §4 „React bindings and host" blokkban.
 
-**Utolsó frissítés:** 2026-11-05 (AIS-84: globális notification capture — `QueryCache`/`MutationCache` callbackek + HTTP `onEvent` + `<NotificationHost />` az `AdminLayout`-ban, lásd §4.1.3 és §5) (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
+**Utolsó frissítés:** 2026-11-05 (AIS-136: a notification alrendszer app-shell lezárása — egy **mindig látható** log-drawer fogantyú (`aria-expanded`/`aria-controls` mindkét állapotban, váltakozó glyph és accessible name, badge mindkét állapotban), a **toast-mátrix** teljessé tétele (`field` → csak log, `banner`/`page` → log **és** toast), a render-crash bekötése `AppErrorBoundary` injektált `onError` portján át, valamint az `ApiKeyEditForm` `notify` portja — lásd §4.1.3, §4 és §5) (AIS-84: globális notification capture — `QueryCache`/`MutationCache` callbackek + HTTP `onEvent` + `<NotificationHost />` az `AdminLayout`-ban, lásd §4.1.3 és §5) (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **AIS-115 (2026-11-04):** a közös form-minta — `features/forms/use-app-form.ts`
 (`useAppForm`) egy helyen fogja össze a zod resolvert, a `toFieldErrors` mezőhiba-leképezést, az
 első hibás mező determinisztikus fókuszát, a `reset → notify → onSuccess` siker-konvenciót és az
@@ -260,6 +260,18 @@ The seven data-display primitives above arrived with **AIS-116**; the accessible
 pager uses (`PAGINATION_NEXT_LABEL`, …) are exported as well, so a page test asserts against
 the same constant the component renders.
 
+**`LogDrawer` has one persistent arrow handle (AIS-136).** One always-mounted `<button>` toggles the
+panel in **both** directions — it used to render only while collapsed. It exposes `aria-expanded`
+and `aria-controls` in both states, flips its glyph (`‹` collapsed → `›` open) and its accessible
+name (`LOG_DRAWER_OPEN_LABEL` / `LOG_DRAWER_CLOSE_LABEL`), keeps the unseen badge in both states and
+reports the single intent through `onToggle`; `✕` (`LOG_DRAWER_HEADER_CLOSE_LABEL`, a **different**
+name so two controls are never indistinguishable) and `Escape` stay as secondary close paths. The
+element is a sibling **after** the panel, because the collapsed panel is `pointer-events-none` — a
+handle inside it would be unreachable exactly when it is needed. Its position never changes
+(`right-0`): the open panel reserves a right gutter (`LOG_DRAWER_HANDLE_GUTTER`) instead, so there is
+no viewport-dependent offset and no layout shift. The panel stays **non-modal**: no overlay, no focus
+trap, page still scrollable.
+
 The ten form primitives arrived with **AIS-113** and are the mandatory route for new forms:
 a form composes `FormSection` → `FormField` → primitive, and `FormActions` for the buttons.
 `Input`/`Textarea` are intentionally left untouched (they keep their own `label`/`hint`/`error`
@@ -379,12 +391,29 @@ into the one store the UI renders, and each of them maps through
 | `HttpEvent` | `outcome: 'success'` | `system` | `api` | no |
 | `HttpEvent` | `outcome: 'error'` (any status, incl. `status: null`) | `error` | `api` | no (**D3**) |
 | `QueryCache.onError` | `surface === 'silent'` (abort) | — | — | no entry |
-| `QueryCache.onError` | `field` / `banner` | `error` | `api` | no |
+| `QueryCache.onError` | `field` (addressable input) | `error` | `api` | no (**AIS-136 D1**) |
+| `QueryCache.onError` | `banner` (`401`, `503`, `status === null`) | `error` | `api` | **yes** (AIS-136) |
 | `QueryCache.onError` | `page` | `error` | `api` | **yes** |
-| `MutationCache.onError` | same three rules as a failed read | `error` | `api` | see above |
+| `MutationCache.onError` | same four rules as a failed read | `error` | `api` | see above |
 | `MutationCache.onSuccess` | `meta.successMessage` non-empty | `success` | `form` | **yes** |
 | `MutationCache.onSuccess` | no meta / blank copy | — | — | no entry |
+| `AppErrorBoundary` (AIS-136) | a component threw while rendering | `error` | `runtime` | **yes** |
 | `window` `error` / `unhandledrejection` | always (AIS-83, unchanged) | `error` | `runtime` | yes |
+
+**The toast matrix is a total function of the surface** (AIS-136 `D1`): `silent` → no entry,
+`field` → log only, `banner` and `page` → log **and** toast. `toFailureToast(surface)` in the same
+logic module is an exhaustive `switch`, so a new `ErrorSurface` member cannot silently inherit one of
+the two answers. A `banner` failure is toasted **in addition to** `AppErrorBanner`, deliberately
+(`D2`): the banner expresses the persistent **condition** (offline / expired session / 503) and
+survives a dismissed toast, while the toast marks the **moment** the failure happened. A field
+failure stays off the toast, because the input keeps focus and shows the message.
+
+A render crash reaches the user through the same store: `AppErrorBoundary` takes an **injected**
+`onError` port (it is a class component, so no hook — `D3`), and
+[`runtime-error.ts`](../../apps/admin/src/app/notifications/runtime-error.ts:1) turns the report into
+the catalogued `runtime.error` entry (`RUNTIME_ERROR_MESSAGE` + `toRuntimeDetail`, stack only when
+`import.meta.env.DEV`). `App.tsx` builds that emitter once from the single store, so the boundary
+depends on a port rather than on a singleton.
 
 Why the transport event is log-only (**D3**, a deliberate deviation from the ticket's key decision 5):
 `HttpEvent` carries a status but **no code and no `issues[]`**, so it can neither pick the accurate

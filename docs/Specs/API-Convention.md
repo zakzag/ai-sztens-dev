@@ -1,6 +1,6 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-11-04 (AIS-112: közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3)
+**Utolsó frissítés:** 2026-11-05 (AIS-136: a 3. tier — app-szintű banner — a megjelenítés **mellett** toastol is; a `field` tier az egyetlen, amely toast nélkül marad, lásd §10) (AIS-112: közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3)
 **Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109; client binding of every registered operation + registry ⇄ service coverage gate + resource template: AIS-110; közös formátum-sémák + kétnyelvű validációs üzenetek: AIS-112
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
@@ -330,12 +330,18 @@ The resolved id appears as `meta.requestId` / `error.requestId` **and** as the `
 
 ## 10. Where an error becomes visible (four tiers)
 
-| Tier          | Component                                             | Applies to                                         |
-| ------------- | ----------------------------------------------------- | -------------------------------------------------- |
-| 1. Field      | RHF `setError(path)` from `details[]`                 | `400`/`422`, `409` with a field detail             |
-| 2. Page       | `Alert` in the page content region + retry            | `403`, `404`, `409`, `5xx` on the page's main data |
-| 3. App        | dismissible top banner (session + notification store) | `401`, offline (`status === null`), `503`          |
-| 4. Log drawer | system entries with `code`, `status`, `requestId`     | all `5xx`, schema-drift payloads                   |
+| Tier          | Component                                             | Applies to                                         | Toast (AIS-136) |
+| ------------- | ----------------------------------------------------- | -------------------------------------------------- | --------------- |
+| 1. Field      | RHF `setError(path)` from `details[]`                 | `400`/`422`, `409` with a field detail             | **no**          |
+| 2. Page       | `Alert` in the page content region + retry            | `403`, `404`, `409`, `5xx` on the page's main data | yes             |
+| 3. App        | dismissible top banner (session + notification store) | `401`, offline (`status === null`), `503`          | **yes**         |
+| 4. Log drawer | system entries with `code`, `status`, `requestId`     | all `5xx`, schema-drift payloads                   | n/a             |
+
+Tier 3 is the only tier that speaks **twice** on purpose: the banner expresses the persistent
+condition (offline / expired session / 503) and survives a dismissed toast, while the toast marks the
+moment the failure happened. Tier 1 stays off the toast channel, because the input keeps focus and
+shows the message; everything else is announced even when the user is looking at another part of the
+screen. The matrix is decided once, in `toFailureToast` (`apps/admin/src/app/notifications/notification-events.logic.ts`).
 
 `toErrorMessage(error)` maps **code first** (`ERROR_CODE_MESSAGE` in `apps/admin/src/lib/error-message.const.ts`), then falls back to the status copy. The server's `message`/`details` are never used as user copy. Its signature (`unknown → string`) is frozen — the notification capture builds on it.
 

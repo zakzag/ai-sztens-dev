@@ -5,7 +5,8 @@
  * the test can mount it with the stub registry and a plain child.
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -75,7 +76,7 @@ describe('AdminLayout', () => {
   });
 
   it('mounts the notification host inside the shell', () => {
-    // The host's collapsed log tab is the always-rendered half of the pair (the
+    // The host's log drawer handle is the always-rendered half of the pair (the
     // toast region only exists while a card is on screen), so its absence would
     // mean no protected page ever shows a notification (AIS-84).
     renderWithRouter(
@@ -85,6 +86,27 @@ describe('AdminLayout', () => {
     );
 
     expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument();
+  });
+
+  it('gives every protected page a working log drawer handle', async () => {
+    // AIS-136: the handle must both open and close the panel, without a page
+    // wiring anything.
+    renderWithRouter(
+      <AdminLayout routes={MOCK_ROUTE_ENTRIES}>
+        <p>page content</p>
+      </AdminLayout>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { expanded: false }));
+
+    expect(await screen.findByRole('button', { expanded: true })).toBeInTheDocument();
+    expect(screen.getByRole('log')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { expanded: true }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument();
+    });
   });
 
   it('fails loudly when no notification provider is above it', () => {

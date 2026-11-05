@@ -7,12 +7,16 @@ import {
   LOG_DRAWER_CLOSE_LABEL,
   LOG_DRAWER_EMPTY_LABEL,
   LOG_DRAWER_FILTER_GROUP_LABEL,
+  LOG_DRAWER_HANDLE_COLLAPSED_GLYPH,
+  LOG_DRAWER_HANDLE_OPEN_GLYPH,
+  LOG_DRAWER_HEADER_CLOSE_LABEL,
   LOG_DRAWER_LOAD_MORE_LABEL,
+  LOG_DRAWER_OPEN_LABEL,
   LOG_DRAWER_TITLE,
   LOG_FILTERS,
   LOG_FILTER_LABELS,
 } from '../src/components/log-drawer/log-drawer.const.js';
-import { toLogDrawerTabLabel } from '../src/components/log-drawer/log-drawer.logic.js';
+import { toLogDrawerHandleLabel } from '../src/components/log-drawer/log-drawer.logic.js';
 import type { LogDrawerProps } from '../src/components/log-drawer/log-drawer.interface.js';
 import {
   LOG_ENTRY_BASE_TIMESTAMP,
@@ -45,57 +49,171 @@ function renderOpen(overrides: Partial<LogDrawerProps> = {}) {
   return props;
 }
 
-describe('LogDrawer', () => {
-  it('renders only the tab while closed', () => {
+/**
+ * @param isOpen - state the handle is queried in.
+ * @param unseenCount - unseen count the name is built from.
+ * @returns the single toggle handle of the component.
+ */
+function getHandle(isOpen: boolean, unseenCount = 0): HTMLElement {
+  return screen.getByRole('button', {
+    name: toLogDrawerHandleLabel(unseenCount, isOpen),
+  });
+}
+
+describe('toLogDrawerHandleLabel', () => {
+  it('names the open action while the panel is collapsed', () => {
+    expect(toLogDrawerHandleLabel(0, false)).toBe(LOG_DRAWER_OPEN_LABEL);
+  });
+
+  it('names the close action while the panel is open', () => {
+    expect(toLogDrawerHandleLabel(0, true)).toBe(LOG_DRAWER_CLOSE_LABEL);
+  });
+
+  it('appends the unseen count in both states', () => {
+    expect(toLogDrawerHandleLabel(3, false)).toBe(
+      `${LOG_DRAWER_OPEN_LABEL} (3 új)`,
+    );
+    expect(toLogDrawerHandleLabel(3, true)).toBe(
+      `${LOG_DRAWER_CLOSE_LABEL} (3 új)`,
+    );
+  });
+
+  it('ignores a negative count', () => {
+    expect(toLogDrawerHandleLabel(-1, false)).toBe(LOG_DRAWER_OPEN_LABEL);
+  });
+});
+
+describe('LogDrawer — the persistent handle', () => {
+  it('renders the toggle handle while the panel is collapsed', () => {
     render(<LogDrawer {...buildProps()} />);
 
-    const tab = screen.getByRole('button', { name: toLogDrawerTabLabel(0) });
-
-    expect(tab).toHaveAttribute('aria-expanded', 'false');
+    expect(getHandle(false)).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('log')).not.toBeInTheDocument();
     expect(screen.queryByText('Bejegyzés 1')).not.toBeInTheDocument();
   });
 
-  it('points the closed tab at an existing panel element', () => {
-    render(<LogDrawer {...buildProps()} />);
+  it('renders the toggle handle while the panel is open', () => {
+    renderOpen();
 
-    const tab = screen.getByRole('button', { name: toLogDrawerTabLabel(0) });
-    const panelId = tab.getAttribute('aria-controls');
-
-    expect(panelId).not.toBeNull();
-    expect(document.getElementById(String(panelId))).not.toBeNull();
+    expect(getHandle(true)).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('shows the unseen count in the label and as a badge', () => {
-    render(<LogDrawer {...buildProps({ unseenCount: 3 })} />);
+  it('flips the chevron and the accessible name with the state', () => {
+    const collapsed = buildProps();
 
-    const tab = screen.getByRole('button', { name: toLogDrawerTabLabel(3) });
+    const { unmount } = render(<LogDrawer {...collapsed} />);
+    const closedHandle = getHandle(false);
 
-    expect(tab).toHaveTextContent('3');
-    expect(toLogDrawerTabLabel(3)).toBe(
-      `${toLogDrawerTabLabel(0)} (3 új)`,
-    );
+    expect(closedHandle).toHaveTextContent(LOG_DRAWER_HANDLE_COLLAPSED_GLYPH);
+    expect(closedHandle).not.toHaveTextContent(LOG_DRAWER_HANDLE_OPEN_GLYPH);
+    unmount();
+
+    renderOpen();
+    const openHandle = getHandle(true);
+
+    expect(openHandle).toHaveTextContent(LOG_DRAWER_HANDLE_OPEN_GLYPH);
+    expect(openHandle).not.toHaveTextContent(LOG_DRAWER_HANDLE_COLLAPSED_GLYPH);
   });
 
-  it('hides the badge when there is no unseen entry', () => {
-    render(<LogDrawer {...buildProps({ unseenCount: 0 })} />);
+  it('exposes aria-expanded and aria-controls on the handle in both states', () => {
+    const collapsed = buildProps();
 
-    const tab = screen.getByRole('button', { name: toLogDrawerTabLabel(0) });
+    const { unmount } = render(<LogDrawer {...collapsed} />);
+    const closedHandle = getHandle(false);
+    const closedPanelId = closedHandle.getAttribute('aria-controls');
 
-    expect(tab).not.toHaveTextContent('0');
+    expect(closedPanelId).not.toBeNull();
+    expect(document.getElementById(String(closedPanelId))).not.toBeNull();
+    unmount();
+
+    renderOpen();
+    const openHandle = getHandle(true);
+    const openPanelId = openHandle.getAttribute('aria-controls');
+
+    expect(openPanelId).not.toBeNull();
+    expect(document.getElementById(String(openPanelId))).not.toBeNull();
   });
 
-  it('reports the toggle intent from the tab', async () => {
+  it('calls onToggle when the handle is activated while collapsed', async () => {
     const props = buildProps();
 
     render(<LogDrawer {...props} />);
-    await userEvent.click(
-      screen.getByRole('button', { name: toLogDrawerTabLabel(0) }),
-    );
+    await userEvent.click(getHandle(false));
 
     expect(props.onToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('calls onToggle when the handle is activated while open', async () => {
+    const props = renderOpen();
+
+    await userEvent.click(getHandle(true));
+
+    expect(props.onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the unseen badge in both states and hides it at zero', () => {
+    const collapsed = buildProps({ unseenCount: 3 });
+
+    const { unmount } = render(<LogDrawer {...collapsed} />);
+
+    expect(getHandle(false, 3)).toHaveTextContent('3');
+    unmount();
+
+    renderOpen({ unseenCount: 3 });
+
+    expect(getHandle(true, 3)).toHaveTextContent('3');
+  });
+
+  it('hides the badge and the count suffix when nothing is unseen', () => {
+    const props = buildProps({ unseenCount: 0 });
+
+    render(<LogDrawer {...props} />);
+
+    const handle = getHandle(false, 0);
+
+    expect(handle).not.toHaveTextContent('0');
+    expect(handle).toHaveAccessibleName(LOG_DRAWER_OPEN_LABEL);
+  });
+
+  it('keeps the header close button and Escape as close paths', async () => {
+    const props = renderOpen();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: LOG_DRAWER_HEADER_CLOSE_LABEL }),
+    );
+
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(props.onToggle).not.toHaveBeenCalled();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(props.onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores Escape while closed', async () => {
+    const props = buildProps();
+
+    render(<LogDrawer {...props} />);
+    await userEvent.keyboard('{Escape}');
+
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps the panel non-modal and aria-hidden while collapsed', () => {
+    render(<LogDrawer {...buildProps()} />);
+
+    const panel = document.getElementById(
+      String(getHandle(false).getAttribute('aria-controls')),
+    );
+
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveAttribute('aria-hidden', 'true');
+    expect(panel?.className).toContain('pointer-events-none');
+    expect(panel?.className).toContain('translate-x-full');
+  });
+});
+
+describe('LogDrawer — content', () => {
   it('renders the entries newest first and the total count', () => {
     renderOpen();
 
@@ -175,23 +293,6 @@ describe('LogDrawer', () => {
     ).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('closes on Escape while open', async () => {
-    const props = renderOpen();
-
-    await userEvent.keyboard('{Escape}');
-
-    expect(props.onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('ignores Escape while closed', async () => {
-    const props = buildProps();
-
-    render(<LogDrawer {...props} />);
-    await userEvent.keyboard('{Escape}');
-
-    expect(props.onClose).not.toHaveBeenCalled();
-  });
-
   it('reports the clear intent from the header', async () => {
     const props = renderOpen();
 
@@ -200,16 +301,6 @@ describe('LogDrawer', () => {
     );
 
     expect(props.onClear).toHaveBeenCalledTimes(1);
-  });
-
-  it('reports the close intent from the header control', async () => {
-    const props = renderOpen();
-
-    await userEvent.click(
-      screen.getByRole('button', { name: LOG_DRAWER_CLOSE_LABEL }),
-    );
-
-    expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
   it('is a named log region with live announcements switched off', () => {

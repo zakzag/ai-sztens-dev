@@ -2,14 +2,30 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { LOG_DRAWER_Z_INDEX } from './log-drawer.const.js';
 
 /**
- * Collapsed state: a narrow strip on the right edge, vertically centred.
+ * The single drawer handle: a narrow strip on the right edge, vertically
+ * centred, present in **both** states (AIS-136 `D4`).
  *
  * A real `<button>`, so it is focusable and announced as one; the chevron and
  * the "Log" caption are decorative and rendered `aria-hidden`, the accessible
- * name comes from `aria-label`.
+ * name comes from `aria-label` and flips with `isOpen`.
+ *
+ * The **position never changes** (`right-0`): only the surface flips to the
+ * pressed shadow, and the panel reserves a matching right gutter
+ * ({@link LOG_DRAWER_HANDLE_GUTTER}) while it is open. Moving the handle next to
+ * an open panel would need a viewport-width dependent offset and could push it
+ * off-screen on a narrow viewport.
  */
 export const logDrawerTabVariants = cva(
-  `fixed top-1/2 right-0 ${LOG_DRAWER_Z_INDEX} flex w-10 -translate-y-1/2 flex-col items-center gap-2 rounded-l-card border border-r-0 border-hairline bg-surface-overlay py-3 text-text-secondary shadow-neu-raised transition-shadow duration-fast hover:text-text-primary focus-visible:border-border-focus focus-visible:shadow-focus-ring focus-visible:outline-none`,
+  `fixed top-1/2 right-0 ${LOG_DRAWER_Z_INDEX} flex w-10 -translate-y-1/2 flex-col items-center gap-2 rounded-l-card border border-r-0 border-hairline bg-surface-overlay py-3 transition-shadow duration-fast focus-visible:border-border-focus focus-visible:shadow-focus-ring focus-visible:outline-none`,
+  {
+    variants: {
+      isOpen: {
+        true: 'text-text-primary shadow-neu-pressed',
+        false: 'text-text-secondary shadow-neu-raised hover:text-text-primary',
+      },
+    },
+    defaultVariants: { isOpen: false },
+  },
 );
 
 /**
@@ -25,16 +41,27 @@ export const logDrawerPanelVariants = cva(
   `fixed inset-y-0 right-0 ${LOG_DRAWER_Z_INDEX} flex w-full max-w-[26rem] flex-col border-l border-hairline bg-surface-overlay text-sm text-text-primary shadow-neu-raised transition-transform duration-base ease-neu`,
 );
 
+/**
+ * Right gutter the open panel reserves for the handle, so the handle may ride
+ * the panel edge without ever covering the header actions, the rows or the
+ * footer button.
+ */
+export const LOG_DRAWER_HANDLE_GUTTER = 'pr-12';
+
 /** Header row: title, total count, actions, then the filter chips. */
 export const logDrawerHeaderVariants = cva(
-  'flex flex-col gap-2 border-b border-hairline px-4 py-3',
+  `flex flex-col gap-2 border-b border-hairline py-3 pl-4 ${LOG_DRAWER_HANDLE_GUTTER}`,
 );
 
 /** The only scroll container of the panel, so the footer stays reachable. */
-export const logDrawerListVariants = cva('flex-1 overflow-y-auto px-2 py-2');
+export const logDrawerListVariants = cva(
+  `flex-1 overflow-y-auto py-2 pl-2 ${LOG_DRAWER_HANDLE_GUTTER}`,
+);
 
 /** Footer holding the load-more control. */
-export const logDrawerFooterVariants = cva('border-t border-hairline px-4 py-3');
+export const logDrawerFooterVariants = cva(
+  `border-t border-hairline py-3 pl-4 ${LOG_DRAWER_HANDLE_GUTTER}`,
+);
 
 /**
  * One filter chip.

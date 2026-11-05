@@ -279,6 +279,7 @@ export type {
 export { LogDrawer } from './components/log-drawer/LogDrawer.js';
 export { LogEntryRow } from './components/log-drawer/LogEntryRow.js';
 export {
+  LOG_DRAWER_HANDLE_GUTTER,
   logDrawerFooterVariants,
   logDrawerHeaderVariants,
   logDrawerListVariants,
@@ -287,12 +288,16 @@ export {
   logEntryRowVariants,
   logFilterChipVariants,
 } from './components/log-drawer/log-drawer.variants.js';
-export { toLogDrawerTabLabel } from './components/log-drawer/log-drawer.logic.js';
+export { toLogDrawerHandleLabel } from './components/log-drawer/log-drawer.logic.js';
 export {
   LOG_DRAWER_CLEAR_LABEL,
   LOG_DRAWER_CLOSE_LABEL,
   LOG_DRAWER_EMPTY_LABEL,
   LOG_DRAWER_FILTER_GROUP_LABEL,
+  LOG_DRAWER_HANDLE_CAPTION,
+  LOG_DRAWER_HANDLE_COLLAPSED_GLYPH,
+  LOG_DRAWER_HANDLE_OPEN_GLYPH,
+  LOG_DRAWER_HEADER_CLOSE_LABEL,
   LOG_DRAWER_LOAD_MORE_LABEL,
   LOG_DRAWER_OPEN_LABEL,
   LOG_DRAWER_PANEL_ID_SUFFIX,

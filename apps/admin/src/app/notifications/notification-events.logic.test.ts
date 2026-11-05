@@ -26,6 +26,7 @@ import {
 import {
   readSuccessMessage,
   toErrorDetail,
+  toFailureToast,
   toHttpEntry,
   toMutationErrorEntry,
   toMutationSuccessEntry,
@@ -80,6 +81,18 @@ describe('toHttpEntry', () => {
   });
 });
 
+describe('toFailureToast', () => {
+  it('never toasts a cancellation or a field failure', () => {
+    expect(toFailureToast('silent')).toBe(false);
+    expect(toFailureToast('field')).toBe(false);
+  });
+
+  it('toasts the banner and page tiers', () => {
+    expect(toFailureToast('banner')).toBe(true);
+    expect(toFailureToast('page')).toBe(true);
+  });
+});
+
 describe('toQueryErrorEntry', () => {
   it('stays silent on a cancellation', () => {
     expect(
@@ -87,14 +100,28 @@ describe('toQueryErrorEntry', () => {
     ).toBeNull();
   });
 
-  it('logs without a toast when the banner already speaks (network failure)', () => {
+  it('toasts an offline failure even though the banner also speaks', () => {
     const entry = toQueryErrorEntry(createNetworkError(), {
       queryKey: ['api-keys'],
     });
 
-    expect(entry?.toast).toBe(false);
+    expect(entry?.toast).toBe(true);
     expect(entry?.level).toBe('error');
     expect(entry?.message).toBe(toErrorMessage(createNetworkError()));
+  });
+
+  it('toasts a banner-classified 401 failure', () => {
+    expect(
+      toQueryErrorEntry(createStatusError(401), { queryKey: ['api-keys'] })
+        ?.toast,
+    ).toBe(true);
+  });
+
+  it('toasts a banner-classified 503 failure', () => {
+    expect(
+      toQueryErrorEntry(createStatusError(503), { queryKey: ['api-keys'] })
+        ?.toast,
+    ).toBe(true);
   });
 
   it('logs without a toast when a form field is blamed', () => {
@@ -103,6 +130,7 @@ describe('toQueryErrorEntry', () => {
     });
 
     expect(entry?.toast).toBe(false);
+    expect(entry).not.toBeNull();
   });
 
   it('toasts a page-level failure and carries the resource key', () => {
@@ -112,6 +140,13 @@ describe('toQueryErrorEntry', () => {
 
     expect(entry?.toast).toBe(true);
     expect(entry?.detail).toContain('queryKey=["api-keys","list"]');
+  });
+
+  it('toasts a thrown non-ApiError, which the classifier files under page', () => {
+    expect(
+      toQueryErrorEntry(new TypeError('boom'), { queryKey: ['api-keys'] })
+        ?.toast,
+    ).toBe(true);
   });
 
   it('includes status, code and requestId in the detail', () => {

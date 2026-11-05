@@ -1,29 +1,40 @@
 /**
- * Tests of the edit form (AIS-131).
+ * Tests of the edit form (AIS-131, notify port since AIS-136).
  *
  * The write is injected (`submit`), so this suite needs no MSW: it asserts the
  * **contract of the component** — what it prefills, what it submits, and how it
- * distributes a rejection. The end-to-end path (real mutation + transport +
- * handler) is covered by `ApiKeyDetailPage.test.tsx`.
+ * distributes a rejection and a success. The end-to-end path (real mutation +
+ * transport + handler) is covered by `ApiKeyDetailPage.test.tsx`.
  *
- * Covered branches: prefill, successful submit, field-addressable rejection with
- * focus, a page-level rejection left to the capture toast (AIS-85 `D2`), pending
- * state, and the client-side block of an invalid name.
+ * Since AIS-136 the form calls `useNotifier()`, so every render goes through
+ * `renderWithProviders` (a missing provider would throw). That also gives the
+ * assertions something to check: one success toast **and** one log entry per
+ * save, and **no** toast for a field-addressable failure.
+ *
+ * Covered branches: prefill, successful submit with notification, field-addressable
+ * rejection with focus and without a toast, a page-level rejection left to the
+ * capture toast (AIS-85 `D2`), pending state, and the client-side block of an
+ * invalid name.
  */
 
 import { HTTP_STATUS } from '@callback/api-client';
 import { VALIDATION_MESSAGE_CATALOGUE } from '@callback/shared';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { FIELD_INVALID_MESSAGE } from '../../../lib/error-message.const.js';
 import { createCodedError } from '../../../test/mocks/api-error.mock.js';
 import { createDeferred } from '../../../test/mocks/deferred.mock.js';
 import {
+  renderWithProviders,
+  type RenderWithProvidersResult,
+} from '../../../test/mocks/render-with-providers.js';
+import {
   API_KEY_EDIT_FORM_ERROR_TITLE,
   API_KEY_EDIT_FORM_LABELS,
   API_KEY_EDIT_FORM_PENDING_LABEL,
   API_KEY_EDIT_FORM_SUBMIT_LABEL,
+  API_KEY_EDIT_FORM_SUCCESS_MESSAGE,
 } from '../api-keys.const.js';
 import type {
   ApiKeyEditFormProps,
@@ -43,10 +54,12 @@ const VALUES: ApiKeyEditFormValues = {
 
 /**
  * @param overrides - props that differ from the defaults.
- * @returns the render result.
+ * @returns the render result plus the notification harness of the tree.
  */
-function renderForm(overrides: Partial<ApiKeyEditFormProps> = {}) {
-  return render(
+function renderForm(
+  overrides: Partial<ApiKeyEditFormProps> = {},
+): RenderWithProvidersResult {
+  return renderWithProviders(
     <ApiKeyEditForm
       values={VALUES}
       submit={vi.fn().mockResolvedValue(undefined)}
@@ -163,5 +176,45 @@ describe('ApiKeyEditForm', () => {
     ).toBeDisabled();
 
     deferred.resolve(undefined);
+  });
+
+  it('emits one success toast and one log entry on save', async () => {
+    const rendered = renderForm();
+
+    await userEvent.click(getSubmitButton());
+
+    // The toast is the visible surface; the log entry is the same announcement.
+    expect(
+      await screen.findByText(API_KEY_EDIT_FORM_SUCCESS_MESSAGE),
+    ).toBeInTheDocument();
+
+    const state = rendered.notifications.store.getSnapshot();
+
+    expect(state.entries).toHaveLength(1);
+    expect(state.entries[0]?.level).toBe('success');
+    expect(state.entries[0]?.message).toBe(API_KEY_EDIT_FORM_SUCCESS_MESSAGE);
+    // `manual`, i.e. the notifier port — not the `form.success` cache callback,
+    // which stays silent because no `meta.successMessage` is set.
+    expect(state.entries[0]?.source).toBe('manual');
+    expect(state.toasts).toHaveLength(1);
+  });
+
+  it('shows a field message and no toast for a blamed input', async () => {
+    const rendered = renderForm({
+      submit: vi.fn().mockRejectedValue(
+        createCodedError({
+          status: HTTP_STATUS.UNPROCESSABLE_ENTITY,
+          code: 'SEMANTIC_VALIDATION_FAILED',
+          issues: [{ path: 'name', message: 'Already taken' }],
+        }),
+      ),
+    });
+
+    await userEvent.click(getSubmitButton());
+
+    expect(await screen.findByText(FIELD_INVALID_MESSAGE)).toBeInTheDocument();
+    expect(
+      rendered.notifications.store.getSnapshot().toasts,
+    ).toHaveLength(0);
   });
 });

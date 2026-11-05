@@ -4,11 +4,43 @@ import type { LogLevelFilter } from './log-drawer.interface.js';
 /** Panel heading and accessible name of the panel. */
 export const LOG_DRAWER_TITLE = 'Rendszernapló';
 
-/** Accessible name of the collapsed tab; the unseen count is appended by logic. */
+/**
+ * Accessible name of the handle while the panel is collapsed.
+ *
+ * The unseen count is appended by {@link toLogDrawerHandleLabel}, so the label
+ * always describes the action the handle offers in its **current** state.
+ */
 export const LOG_DRAWER_OPEN_LABEL = 'Rendszernapló megnyitása';
 
-/** Accessible name of the header close control (its glyph is `aria-hidden`). */
+/**
+ * Accessible name of the handle while the panel is open (its glyph is
+ * `aria-hidden`).
+ *
+ * Deliberately different from {@link LOG_DRAWER_HEADER_CLOSE_LABEL}: the handle
+ * and the header `✕` are two separate controls, and two buttons with the same
+ * accessible name are indistinguishable to a screen reader user.
+ */
 export const LOG_DRAWER_CLOSE_LABEL = 'Rendszernapló bezárása';
+
+/**
+ * Accessible name of the `✕` in the panel header — the secondary close path
+ * next to the handle (its glyph is `aria-hidden`).
+ */
+export const LOG_DRAWER_HEADER_CLOSE_LABEL = 'Naplópanel bezárása';
+
+/** Handle glyph while collapsed: points at the panel it would open. */
+export const LOG_DRAWER_HANDLE_COLLAPSED_GLYPH = '‹';
+
+/** Handle glyph while open: points away from the panel it would close. */
+export const LOG_DRAWER_HANDLE_OPEN_GLYPH = '›';
+
+/**
+ * Visible caption of the handle.
+ *
+ * Decorative (`aria-hidden`), because the accessible name of the button comes
+ * from `aria-label` — a screen reader must hear the action, not the word “Log”.
+ */
+export const LOG_DRAWER_HANDLE_CAPTION = 'Log';
 
 /** Shown inside the list when the caller passed no rows. */
 export const LOG_DRAWER_EMPTY_LABEL = 'Még nincs bejegyzés.';

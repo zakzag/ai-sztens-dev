@@ -64,14 +64,23 @@ export interface LogDrawerProps {
   /** Rows to render, **newest first** (index `0` is the newest entry). */
   readonly entries: readonly LogEntryItem[];
   readonly isOpen: boolean;
-  /** Unseen entries; drives the badge on the collapsed tab. `0` hides it. */
+  /**
+   * Unseen entries; drives the badge on the handle in **both** states and is
+   * part of its accessible name. `0` hides the badge and the suffix.
+   */
   readonly unseenCount: number;
   readonly levelFilter: LogLevelFilter;
   /** `true` while older rows remain in the store's ring buffer. */
   readonly hasMore: boolean;
-  /** The collapsed tab was activated: open or close. */
+  /**
+   * The handle was activated — the single toggle intent of the component.
+   *
+   * The handle is always mounted (AIS-136), so this fires in both directions:
+   * `isOpen === false` means “open the panel”, `isOpen === true` means “close
+   * it”. The host derives that from its own state; the component never guesses.
+   */
   readonly onToggle: () => void;
-  /** Close control or `Escape`. */
+  /** Header close control or `Escape` — secondary close paths beside `onToggle`. */
   readonly onClose: () => void;
   readonly onFilterChange: (filter: LogLevelFilter) => void;
   /** "Korábbiak betöltése" — called exactly once per activation. */

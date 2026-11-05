@@ -1,6 +1,6 @@
 # New admin page — the single checklist
 
-**Utolsó frissítés:** 2026-11-05
+**Utolsó frissítés:** 2026-11-05 (AIS-136: a notification alrendszer **automatikus** — egy page soha nem mountol hostot, nem hoz létre store-t; lásd §2 „no work" bekezdés és §3)
 **Status:** living document — the current process, not a snapshot
 **Owner:** AIS-133 (parent story: AIS-129)
 **Reference slice:** `api-keys` — `apps/admin/src/pages/api-keys/`, routes `/api-keys` and `/api-keys/:identifier`
@@ -55,6 +55,15 @@ Column and layer order is not negotiable: `contract → api-client → api → f
 → route → nav → mocks → state-plan row`. The layer gate (`pnpm quality:layers`) may only pass in that
 order, so working out of order means rewriting.
 
+**Notifications need no step at all (AIS-136).** The toast stack and the log drawer are mounted once,
+by `<NotificationHost />` in `app/layout/AdminLayout.tsx`, and the capture adapters are bound to the
+single store in `main.tsx`. A page therefore never mounts `NotificationProvider` / `NotificationHost`,
+never creates a notification store and never sets `meta.successMessage` on its mutations: the global
+capture already toasts every `banner`/`page` failure and logs every `field` one. The only two things a
+page may do are (a) pass `useNotifier()` + a `successMessage` into `useAppForm` for a successful write,
+and (b) render its own error region for the tier it owns. The public `/login` route deliberately has
+no host.
+
 ---
 
 ## 3. Do not
@@ -70,6 +79,8 @@ order, so working out of order means rewriting.
 | Import `app/` from `pages/`                                                    | keep the route path in the page const or `app/app.const.ts` |
 | Add a second navigation list                                                   | the `route-registry.tsx` entry is the only list             |
 | Duplicate validation copy                                                      | the shared catalogue in `packages/shared`                   |
+| Mount `NotificationProvider` / `NotificationHost` on a page                    | the host already lives in `AdminLayout`, once                |
+| Create a notification store, or set `meta.successMessage` on a write           | one store in `app/notifications`, the form's `notify` port   |
 
 ---
 

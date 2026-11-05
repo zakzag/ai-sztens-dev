@@ -1,5 +1,7 @@
 # Docker Debug Playbook — AIsztens
 
+**Utolsó frissítés:** 2026-11-05 (AIS-133: a header pótolva a `quality:docs` kapuhoz; a tartalom változatlan)
+
 A scenario-driven, copy-paste-ready playbook for debugging the AIsztens
 production stack ([`infra/docker-compose.yml`](../../infra/docker-compose.yml):
 `api`, `web`, `admin`, `postgres`, `caddy`, `monitor`) and the droplet that

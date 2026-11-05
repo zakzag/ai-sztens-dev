@@ -8,7 +8,12 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { APP_API_PATH_PREFIX, APP_ROUTE_LOGIN_PATH } from '../app.const.js';
+import { API_KEYS_LIST_ROUTE_PATH } from '../../pages/api-keys/api-keys.const.js';
+import {
+  APP_API_PATH_PREFIX,
+  APP_ROUTE_API_KEYS_PATH,
+  APP_ROUTE_LOGIN_PATH,
+} from '../app.const.js';
 import {
   ALL_ROUTE_ENTRIES,
   NOT_FOUND_ROUTE_ENTRY,
@@ -57,12 +62,28 @@ describe('route registry', () => {
     expect(login?.navLabel).toBeNull();
   });
 
-  it('gives every protected entry a label', () => {
-    // A route without a label is not linkable at all, so it would be
-    // unreachable from the navigation — the registry must not contain one.
+  it('keeps an unlinked protected entry addressable only through a URL parameter', () => {
+    // A detail page has no place in the navigation (see `RouteEntry.navLabel`),
+    // so `null` is legal — but only for a route a user can address by URL
+    // parameter. A plain page without a label would be unreachable: no nav link
+    // and nothing to type into the address bar.
     for (const route of PROTECTED_ROUTE_ENTRIES) {
-      expect(route.navLabel).not.toBeNull();
+      if (route.navLabel === null) {
+        expect(route.path).toContain(':');
+      }
     }
+  });
+
+  it('declares the api-key detail route under the identifier parameter', () => {
+    // The page reads the value with `useParams` and sends it straight to
+    // `GET /api/api-keys/:identifier`, so the parameter name is part of the
+    // contract between the route and the service.
+    const detail = PROTECTED_ROUTE_ENTRIES.find((route) =>
+      route.path.includes(':identifier'),
+    );
+
+    expect(detail).toBeDefined();
+    expect(detail?.navLabel).toBeNull();
   });
 
   it('never links a hidden route', () => {
@@ -76,5 +97,11 @@ describe('route registry', () => {
   it('keeps the not-found entry unlinked and catch-all', () => {
     expect(NOT_FOUND_ROUTE_ENTRY.path).toBe('*');
     expect(NOT_FOUND_ROUTE_ENTRY.navLabel).toBeNull();
+  });
+
+  it('keeps the detail page return path in sync with the list route', () => {
+    // `pages` must not import `app`, so the detail page carries its own copy of
+    // the list path; this assertion is what keeps the copy honest.
+    expect(API_KEYS_LIST_ROUTE_PATH).toBe(APP_ROUTE_API_KEYS_PATH);
   });
 });

@@ -1,26 +1,38 @@
-import { QueryClient } from '@tanstack/react-query';
+import { configureValidationLocale } from '@callback/shared';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App.js';
+import { createAppQueryClient } from './app/notifications/app-query-client.js';
+import { createHttpEventEmitter } from './app/notifications/notification-capture.js';
+import { notificationStore } from './app/notifications/notification.store.js';
+import { setHttpEventListener } from './services/http-events.js';
 import './index.css';
 
 /**
  * The entry point of the admin SPA.
  *
- * It creates the query client — the server-state bucket — and mounts the app
- * inside the router. The client is handed to the app as a prop instead of
- * being instantiated inside the provider chain, because the notification
- * store (AIS-84) has to bind its cache callbacks to this very instance.
+ * The boot sequence is a fixed order of four steps, and the order is the
+ * contract (AIS-84):
  *
- * The `BrowserRouter` stays here: it is the navigation context, and the `app/`
- * layer consumes it rather than owning it.
+ * 1. `configureValidationLocale('hu')` — the **only** place that decides the
+ *    language of validation copy (AIS-112 plan `D8`): the shared schemas keep a
+ *    single rule set, and this one call makes them speak Hungarian in the
+ *    browser while the API keeps the default English
+ *    ([`docs/Specs/API-Convention.md`](../../../docs/Specs/API-Convention.md:83)).
+ * 2. the HTTP listener is registered, so every request sent **after** this line
+ *    reaches the log — no request is ever sent before React Mounts.
+ * 3. the query client is built **with** the notification cache callbacks, which
+ *    is why it is created here and handed to `<App>` as a prop instead of being
+ *    instantiated inside the provider chain.
+ * 4. the app is mounted inside the router. `BrowserRouter` stays here: it is the
+ *    navigation context, and the `app/` layer consumes it rather than owning it.
  */
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false },
-  },
-});
+configureValidationLocale('hu');
+
+setHttpEventListener(createHttpEventEmitter(notificationStore));
+
+const queryClient = createAppQueryClient(notificationStore);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

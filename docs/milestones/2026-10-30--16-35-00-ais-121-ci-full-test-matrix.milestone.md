@@ -93,14 +93,30 @@ pnpm test                              # mind az 5 suite, zöldnek kell lennie
 kimenetében mind az 5 suite látszik (`@callback/shared`, `@callback/api-client`, `@callback/ui`,
 `@callback/admin`, `@callback/api`).
 
-**A negatív bizonyíték (a DoD szigorú része):** egy eldobható branchen szándékosan el kell
-rontani egy admin-tesztet (pl. [`apps/admin/src/lib/date.test.ts`](../../apps/admin/src/lib/date.test.ts:1)
-egy `expect` értékét). Ekkor:
+### A negatív bizonyíték — elvégezve, valódi CI-futásokkal
 
-- a `build-test` job **piros** lesz, és a bukó teszt neve látszik a logban;
-- a `shared` és `api-client` suite **zöld** marad (ők korábban futnak a láncban), és a lánc az
-  `admin` suite-nél áll meg — ez bizonyítja, hogy az admin-tesztek **valóban a CI-ban futnak**;
-- a teszt visszaállítása után a CI **zöld**.
+A DoD szigorú része volt: _„szándékosan elrontott admin-teszttel a CI **piros** (a teszt
+visszaállítása után zöld)"_. Ez egy körút, és mindkét irányban **valódi GitHub Actions futással**
+igazolt:
+
+| Fázis       | Commit                       | CI run                  | Eredmény                                                                                                   |
+| ----------- | ---------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Pozitív** | `50f3f0b` (`main`)           | `41134685651`           | `Unit tests (full matrix)` = ✅ **success** · `build-test` 84 s · `api-e2e` ✅                             |
+| **Negatív** | `8e0b18d` (eldobható branch) | `41135219763`           | `Unit tests (full matrix)` = ❌ **failure** · a 8. lépésig (checkout, setup, install, build, lint) mind ✅ |
+| **Pozitív** | `dc40361` (a revert)         | PR #8 merge → `674cae5` | **4 checks passed**                                                                                        |
+
+A törés egyetlen assertion volt az
+[`apps/admin/src/lib/date.test.ts`](../../apps/admin/src/lib/date.test.ts:46)-ben
+(`getDate()` `1` → `2`). Lokálisan ez **1 failed / 172 passed** az admin suite-ben, tehát a
+`pnpm test` lánc az `@callback/admin` lépésnél áll meg — **a `shared` és `api-client` már
+zöld volt**, ami bizonyítja, hogy a lánc sorrendje és a bukás pontosan a admin suite-nél van.
+
+A piros futás `build-test` jobja **47 másodperc** alatt állt meg (22:01:16 → 22:02:03) — gyorsan
+failelt, nem timeouttal.
+
+Az eldobható branch (`chore/ais-121-negative-proof`) és a PR #8 a bizonyíték után **törölve /
+lezárva**; a `main` a merge commiton (`674cae5`) van, ahol a törés nincs és a teljes mátrix zöld
+(800 teszt / 77 fájl / 0 bukás).
 
 ## 6. Follow-ups
 

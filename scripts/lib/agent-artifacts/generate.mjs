@@ -19,7 +19,7 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { DEFAULT_EMIT, loadOverrides } from './overrides.mjs';
+import { EMITTABLE, loadOverrides } from './overrides.mjs';
 import { renderClaudeSubagent } from './render-claude.mjs';
 import { renderCopilotChatMode } from './render-copilot.mjs';
 import { renderCursorCommand, renderCursorRule } from './render-cursor.mjs';
@@ -139,7 +139,9 @@ async function buildModeArtifacts(options) {
   const artifacts = [];
   for (const mode of modes) {
     const override = overrides[mode.slug] ?? {};
-    const emit = override.emit ?? DEFAULT_EMIT;
+    // No explicit `emit` list → the mode emits everything it can (AIS-122: the
+    // former `DEFAULT_EMIT` alias of `EMITTABLE` was a duplicate export).
+    const emit = override.emit ?? EMITTABLE;
     console.log(
       `[i] Mode: ${mode.slug} (${mode.groups.join(', ')}) -> ${emit.join(', ')}`,
     );

@@ -28,10 +28,22 @@ const COLUMN_MAPPING = [
   ['expires_at', 'PgTimestamp', 'date', false],
   ['created_at', 'PgTimestamp', 'date', true],
   ['updated_at', 'PgTimestamp', 'date', true],
+  // AIS-108: the soft-delete marker. Nullable on purpose — `NULL` means "live".
+  ['deleted_at', 'PgTimestamp', 'date', false],
 ] as const;
 
 const MIGRATION_FILE = fileURLToPath(
   new URL('../../drizzle/0002_minor_domino.sql', import.meta.url),
+);
+
+/** Migration that added `deleted_at` and its index (AIS-108). */
+const SOFT_DELETE_MIGRATION_FILE = fileURLToPath(
+  new URL('../../drizzle/0003_organic_firedrake.sql', import.meta.url),
+);
+
+/** Migration that narrowed every timestamp to millisecond precision (AIS-108). */
+const TIMESTAMP_PRECISION_MIGRATION_FILE = fileURLToPath(
+  new URL('../../drizzle/0004_numerous_gunslinger.sql', import.meta.url),
 );
 
 describe('apiKeys table identity', () => {
@@ -43,7 +55,7 @@ describe('apiKeys table identity', () => {
 });
 
 describe('apiKeys column mapping', () => {
-  it('declares the eight ticket columns in order', () => {
+  it('declares the nine columns in order', () => {
     expect(config.columns.map((column) => column.name)).toEqual(
       COLUMN_MAPPING.map(([name]) => name),
     );
@@ -66,6 +78,14 @@ describe('apiKeys column mapping', () => {
     expect(apiKeys.expiresAt.name).toBe('expires_at');
     expect(apiKeys.createdAt.name).toBe('created_at');
     expect(apiKeys.updatedAt.name).toBe('updated_at');
+    expect(apiKeys.deletedAt.name).toBe('deleted_at');
+  });
+
+  it('leaves the soft-delete marker nullable and without a default', () => {
+    // `NULL` = live; a timestamp = deleted. A default would mark every new row
+    // as deleted, and `NOT NULL` would make "live" inexpressible.
+    expect(apiKeys.deletedAt.notNull).toBe(false);
+    expect(apiKeys.deletedAt.hasDefault).toBe(false);
   });
 });
 
@@ -113,8 +133,21 @@ describe('apiKeys unique constraint', () => {
     ).toEqual([['identifier']]);
   });
 
-  it('declares no extra indexes, checks or foreign keys', () => {
-    expect(config.indexes).toEqual([]);
+  it('declares exactly one index, the soft-delete one (AIS-108)', () => {
+    expect(config.indexes.map((entry) => entry.config.name)).toEqual([
+      'api_keys_deleted_at_idx',
+    ]);
+    // Drizzle types `index.config.columns` as `any`, so the shape is asserted
+    // through a narrow local view instead of leaking `any[]` through `.map()`.
+    const indexedColumns = (config.indexes[0]?.config.columns ??
+      []) as readonly {
+      readonly name: string;
+    }[];
+
+    expect(indexedColumns.map((column) => column.name)).toEqual(['deleted_at']);
+  });
+
+  it('declares no checks or foreign keys', () => {
     expect(config.checks).toEqual([]);
     expect(config.foreignKeys).toEqual([]);
   });
@@ -145,5 +178,56 @@ describe('generated migration 0002', () => {
       migration.match(/"\w+" timestamp with time zone/g) ?? [];
 
     expect(timestampColumns).toHaveLength(3);
+  });
+});
+
+describe('generated migration 0003', () => {
+  const migration = readFileSync(SOFT_DELETE_MIGRATION_FILE, 'utf8');
+
+  it('adds the nullable deleted_at column', () => {
+    expect(migration).toContain(
+      'ALTER TABLE "platform"."api_keys" ADD COLUMN "deleted_at" timestamp with time zone',
+    );
+  });
+
+  it('creates the soft-delete index every read can use', () => {
+    expect(migration).toContain(
+      'CREATE INDEX "api_keys_deleted_at_idx" ON "platform"."api_keys"',
+    );
+  });
+
+  it('does not make the existing rows look deleted', () => {
+    // No `NOT NULL` and no default: every current row is live by definition.
+    expect(migration).not.toContain(
+      'deleted_at" timestamp with time zone NOT NULL',
+    );
+    expect(migration).not.toContain('DEFAULT now()');
+  });
+});
+
+describe('apiKeys timestamp precision (AIS-108)', () => {
+  it('stores every timestamp with millisecond precision', () => {
+    // The wire contract is `toISOString()` (milliseconds). A microsecond column
+    // could hold a value the client cannot echo back, which would make every
+    // `WHERE updated_at = $expected` a spurious `409 STALE_WRITE`.
+    expect(apiKeys.createdAt.precision).toBe(3);
+    expect(apiKeys.updatedAt.precision).toBe(3);
+    expect(apiKeys.expiresAt.precision).toBe(3);
+    expect(apiKeys.deletedAt.precision).toBe(3);
+  });
+
+  it('narrows the existing columns in migration 0004', () => {
+    const migration = readFileSync(TIMESTAMP_PRECISION_MIGRATION_FILE, 'utf8');
+
+    for (const column of [
+      'created_at',
+      'updated_at',
+      'expires_at',
+      'deleted_at',
+    ]) {
+      expect(migration).toContain(
+        `ALTER COLUMN "${column}" SET DATA TYPE timestamp (3) with time zone`,
+      );
+    }
   });
 });

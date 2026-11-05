@@ -39,6 +39,7 @@ import {
   openApiErrorResponses,
   pathParameters,
   payloadComponentName,
+  queryParametersOf,
   registerEnvelopeComponents,
   registerPayloadComponents,
   schemaRef,
@@ -57,6 +58,18 @@ const VERB_BY_METHOD: Readonly<
 };
 
 /**
+ * Builds the meta of one example body.
+ *
+ * @param entry - registry entry.
+ * @returns the fixed `meta`, plus `pagination` when the entry is a paged list.
+ */
+function exampleMetaOf(entry: ApiEndpointContract): Record<string, unknown> {
+  return entry.examplePagination === undefined
+    ? { ...EXAMPLE_META }
+    : { ...EXAMPLE_META, pagination: entry.examplePagination };
+}
+
+/**
  * Builds the response body example of one endpoint.
  *
  * The published example is the **whole body**, not just the payload, so a reader
@@ -72,7 +85,7 @@ function exampleOf(entry: ApiEndpointContract): unknown {
   }
 
   return entry.envelope
-    ? { data: entry.example, meta: EXAMPLE_META }
+    ? { data: entry.example, meta: exampleMetaOf(entry) }
     : entry.example;
 }
 
@@ -102,7 +115,7 @@ function registerEntry(
     summary: entry.summary,
     operationId: entry.operationId,
     tags: [entry.tag],
-    parameters: pathParameters(entry.path),
+    parameters: [...pathParameters(entry.path), ...queryParametersOf(entry)],
     request:
       entry.requestSchema === undefined
         ? undefined

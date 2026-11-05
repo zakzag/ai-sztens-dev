@@ -3,29 +3,45 @@
   "version": "0.0.1",
   "private": true,
   "description": "AIsztens monorepo: NestJS+Fastify API, React public site, React admin SPA",
+  "engines": {
+    "node": ">=24.9.0"
+  },
   "scripts": {
     "predev": "pnpm --filter @callback/shared build",
+    "typecheck": "pnpm --filter @callback/shared build && pnpm -r typecheck",
+    "quality:layers": "depcruise apps/admin/src --config .dependency-cruiser.cjs --output-type err",
+    "quality:dead-code": "knip",
+    "quality:tokens": "node scripts/quality/palette-gate.mjs",
+    "quality:field-errors": "node scripts/quality/field-error-gate.mjs",
+    "quality:docs": "node scripts/quality/docs-gate.mjs",
+    "quality": "pnpm quality:layers && pnpm quality:dead-code && pnpm quality:tokens && pnpm quality:field-errors && pnpm quality:docs",
+    "test:quality": "node --test \"scripts/quality/*.test.mjs\" \"scripts/lib/vite-build.logic.test.mjs\"",
     "dev": "concurrently -k -n shared,api,web,admin -c yellow,blue,green,magenta \"pnpm --filter @callback/shared dev\" \"pnpm --filter @callback/api start:dev\" \"pnpm --filter @callback/web dev\" \"pnpm --filter @callback/admin dev\"",
+    "dev:local": "run_local_dev.ps1",
     "db:up": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml up -d",
     "db:down": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml down",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
-    "test": "pnpm --filter @callback/shared test && pnpm --filter @callback/api-client test && pnpm --filter @callback/ui test && pnpm --filter @callback/admin test && pnpm --filter @callback/api test",
+    "qa:all": "pnpm quality && pnpm test:quality && pnpm sonar:test && pnpm test:agents && pnpm typecheck && pnpm build && pnpm lint && pnpm test",
+    "test": "pnpm --filter @callback/shared test && pnpm --filter @callback/api-client test && pnpm --filter @callback/notifications test && pnpm --filter @callback/ui test && pnpm --filter @callback/admin test && pnpm --filter @callback/api test",
     "test:e2e": "pnpm --filter @callback/api test:e2e",
-    "test:agents": "node --test scripts/lib/agent-artifacts/",
+    "test:agents": "node --test \"scripts/lib/agent-artifacts/*.test.mjs\"",
     "test:stack": "bash scripts/test/stack-smoke.sh",
     "test:stack:up": "bash scripts/test/stack-up.sh",
     "test:stack:down": "bash scripts/test/stack-down.sh",
     "sonar": "pnpm sonar:coverage && pnpm sonar:scan",
     "sonar:scan": "node scripts/sonar/scan.mjs",
-    "sonar:coverage": "pnpm --filter @callback/shared test:cov && pnpm --filter @callback/api-client test:cov && pnpm --filter @callback/ui test:cov && pnpm --filter @callback/admin test:cov && pnpm --filter @callback/api test:cov && node scripts/sonar/lcov-merge.mjs",
+    "sonar:coverage": "pnpm --filter @callback/shared test:cov && pnpm --filter @callback/api-client test:cov && pnpm --filter @callback/notifications test:cov && pnpm --filter @callback/ui test:cov && pnpm --filter @callback/admin test:cov && pnpm --filter @callback/api test:cov && node scripts/sonar/lcov-merge.mjs",
     "sonar:test": "node --test scripts/sonar/lcov-merge.test.mjs scripts/sonar/scan-config.test.mjs scripts/sonar/scan.test.mjs"
   },
   "devDependencies": {
     "@sonar/scan": "^4.4.0",
     "concurrently": "^9.2.4",
+    "dependency-cruiser": "^16",
+    "knip": "^5",
     "prettier": "^3.9.9"
-  }
+  },
+  "packageManager": "pnpm@12.16.1+sha512.091d1dee7927575661b25dab3c2ae31cafc1c54d6b71ed6a6600cf0c1cb10434a447eae14015f1b23e2e6bedeed79df94a932e2164d2832280dce3fb32f656d1"
 }

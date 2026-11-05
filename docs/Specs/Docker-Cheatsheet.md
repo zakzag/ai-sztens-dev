@@ -1,5 +1,7 @@
 # Docker Debugging Cheatsheet
 
+**Utolsó frissítés:** 2026-11-05 (AIS-133: a header pótolva a `quality:docs` kapuhoz; a tartalom változatlan)
+
 A swiss-army-knife reference for debugging Docker containers, with a focus on the
 **AIsztens** stack ([`infra/docker-compose.yml`](../../infra/docker-compose.yml)):
 `api` (NestJS + Fastify), `web` (nginx serving the public SPA), `admin`

@@ -74,28 +74,34 @@ export const RATE_LIMITED_MESSAGE =
 export const SERVICE_UNAVAILABLE_MESSAGE =
   'A szolgáltatás átmenetileg nem elérhető. Próbáld újra később.';
 
+/**
+ * `STALE_WRITE` — the payload was written against a version that no longer
+ * exists, so applying it would overwrite somebody else's change (AIS-108).
+ *
+ * Deliberately not a field error: the server blames `updatedAt`, a hidden
+ * concurrency token the user cannot edit, so the only useful action is a reload.
+ */
+export const STALE_WRITE_MESSAGE =
+  'Az adatot közben valaki más módosította. Töltsd újra az oldalt, majd próbáld újra.';
+
+/**
+ * `SEMANTIC_VALIDATION_FAILED` — the shape is valid, the content is not
+ * (AIS-108), e.g. an `expiresAt` in the past. Rendered on the offending field
+ * when the envelope names one, page-level otherwise.
+ */
+export const SEMANTIC_VALIDATION_FAILED_MESSAGE =
+  'A megadott érték tartalmilag nem megfelelő. Ellenőrizd az adatokat.';
+
 /** `UNEXPECTED_PAYLOAD` — the client could not parse a contract-conform body. */
 export const UNEXPECTED_PAYLOAD_USER_MESSAGE =
   'A szerver váratlan választ adott. Próbáld újra később.';
 
 /**
- * `code` → Hungarian user copy.
+ * The `code` → copy table itself lives in
+ * [`api-error-code.const.ts`](./api-error-code.const.ts:1) as
+ * `ERROR_CODE_MESSAGE`, derived from `ERROR_CODE_CATALOGUE`.
  *
- * The keys are the values of `API_ERROR_CODE` from `@callback/shared` plus the
- * client-side `UNEXPECTED_PAYLOAD`; the type stays `string` on purpose, because
- * a code from a newer server must degrade to the status fallback instead of
- * failing to compile.
+ * This file stays the **only** home of Hungarian literals: the catalogue only
+ * wires codes to these symbols, so a new server code cannot introduce copy that
+ * nobody reviewed.
  */
-export const ERROR_CODE_MESSAGE: Readonly<Record<string, string>> = {
-  VALIDATION_FAILED: VALIDATION_MESSAGE,
-  UNAUTHENTICATED: SESSION_EXPIRED_MESSAGE,
-  FORBIDDEN: FORBIDDEN_MESSAGE,
-  NOT_FOUND: NOT_FOUND_MESSAGE,
-  CONFLICT: CONFLICT_MESSAGE,
-  PAYLOAD_TOO_LARGE: PAYLOAD_TOO_LARGE_MESSAGE,
-  RATE_LIMITED: RATE_LIMITED_MESSAGE,
-  INTERNAL_ERROR: SERVER_ERROR_MESSAGE,
-  SERVICE_UNAVAILABLE: SERVICE_UNAVAILABLE_MESSAGE,
-  API_KEY_IDENTIFIER_CONFLICT: IDENTIFIER_CONFLICT_MESSAGE,
-  UNEXPECTED_PAYLOAD: UNEXPECTED_PAYLOAD_USER_MESSAGE,
-};

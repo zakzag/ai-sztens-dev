@@ -139,9 +139,31 @@ describe('component registration', () => {
       'ApiKey',
       'ApiKeyList',
       'CreateApiKey',
+      'NoPayload',
       'PaginationMeta',
       'ResponseMeta',
+      'UpdateApiKey',
     ]);
+  });
+
+  it('names the request schema of the update endpoint', () => {
+    const updateApiKey = JSON.stringify(
+      components.components?.schemas?.UpdateApiKey,
+    );
+
+    // The schema is `.strict()`, so the component carries both the required
+    // concurrency token and `additionalProperties: false`.
+    expect(updateApiKey).toContain('"updatedAt"');
+    expect(updateApiKey).toContain('"additionalProperties":false');
+    expect(updateApiKey).not.toContain('"identifier"');
+  });
+
+  it('describes the delete payload as a nullable NoPayload component', () => {
+    // `z.null()` renders as `{ "type": "null" }`; without it `envelopeOf()`
+    // could not describe a `DELETE` response at all.
+    expect(components.components?.schemas?.NoPayload).toEqual({
+      type: 'null',
+    });
   });
 
   it('keeps data and meta required in the envelope component', () => {

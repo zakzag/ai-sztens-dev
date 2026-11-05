@@ -10,10 +10,20 @@
 import { API_KEYS_ENDPOINTS } from './api-keys/api-keys.contract.js';
 import type { ApiEndpointContract } from './endpoint.interface.js';
 
-/** Every enveloped endpoint the contract knows. */
-export const API_ENDPOINTS: readonly ApiEndpointContract[] = [
+/**
+ * Every enveloped endpoint the contract knows.
+ *
+ * `as const satisfies` keeps the literal types of the resource arrays alive
+ * (AIS-109). A plain `readonly ApiEndpointContract[]` annotation here would be a
+ * second widening point: the entries would lose their concrete `requestSchema`
+ * type even if the resource array kept it, and `RequestBodyOf<'apiKeys.update'>`
+ * would collapse to `never`. `satisfies` still proves the whole list is a valid
+ * endpoint registry, so consumers (`apps/api` OpenAPI generation, the contract
+ * audit tests) need no change.
+ */
+export const API_ENDPOINTS = [
   ...API_KEYS_ENDPOINTS,
-];
+] as const satisfies readonly ApiEndpointContract[];
 
 /**
  * One route that deliberately does **not** use the envelope.

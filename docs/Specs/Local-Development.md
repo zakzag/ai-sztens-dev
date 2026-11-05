@@ -1,7 +1,10 @@
 # Local Development — AIsztens
 
+**Utolsó frissítés:** 2026-11-05 (AIS-133: a header egységesítve a `quality:docs` kapuhoz; a tartalom változatlan)
 **Status:** living spec
-**Last updated:** 2026-10-21 — AIS-42: új **§6 end-to-end how-to** (séma módosítás → `db:generate` → `db:migrate` → API + admin indítás → API-kulcs felvétele az oldalon), lépésenként lefuttatott parancsokkal és a tényleges kimenetekkel.
+**Last updated:** 2026-11-05 — §5 "Common pitfalls" now separates the two `pnpm install` `os error 32` shapes (a _transient_ collision on a first-time virtual-store folder vs a real lock), documents the `WARN Ignoring broken lockfile` trap, which makes pnpm silently drop pinning and re-resolve the whole graph, and documents the `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` prompt: pnpm appends the exemptions itself, but the run that appended them still fails — the retry is the fix.
+**Previous update:** 2026-11-02 — **Node 24.9+ is a hard requirement**: §2.1 documents the `>=24.9.0` `engines` field and the `.node-version` pin (fnm/nvm), because the `apps/api` e2e suites that boot `AppModule` **silently self-skip** on older runtimes instead of failing.
+**Previous update:** 2026-10-21 — AIS-42: új **§6 end-to-end how-to** (séma módosítás → `db:generate` → `db:migrate` → API + admin indítás → API-kulcs felvétele az oldalon), lépésenként lefuttatott parancsokkal és a tényleges kimenetekkel.
 **Previous update:** 2026-10-21 — host-run API boot: `pnpm dev` leaves `APP_ENV` unset, so NestJS falls back to `dev`, reads `apps/api/.env.dev` **first**, and therefore needs (a) `DATABASE_URL` in `apps/api/.env.local` and (b) an explicit `APP_ENV=local` to serve the localhost CORS list — otherwise the admin SPA on `http://localhost:5174` is rejected by CORS. §3 and §5 document the trap and the verification commands.
 **Previous update:** 2026-10-21 — Windows install recovery: an IDE language service (or any other process) holding a handle inside `node_modules` makes `pnpm install` abort with `Failed to create symlink … os error 32`; §5 documents the diagnosis, the kill-then-rerun recovery and why `--force` makes it worse.
 **Previous update:** 2026-10-19 — per-context Postgres schemas: the init directory now ships two idempotent scripts ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh) for roles and schema grants, [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) for the `platform` / `callback` / `email` schemas), and both run only on a fresh `pgdata` volume (AIS-35). §2b now carries the mandatory env keys, the verification queries, the stop/wipe semantics and the 5432 port collision; the DB topic has its own spec, [`Database-Local.md`](Database-Local.md).
@@ -38,6 +41,32 @@ and `infra/.env.{local,dev,prod}` paths in addition to the existing `.env`.
 ---
 
 ## 2. Starting the local stack
+
+### 2.1 Node.js version (≥ 24.9)
+
+The repo pins **Node 24** two ways, and both matter:
+
+| Artefact                                                                   | Purpose                                                                                                      |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [`package.json`](../../package.json) → `"engines": { "node": ">=24.9.0" }` | documents the requirement; `pnpm` warns (`ERR_PNPM_UNSUPPORTED_ENGINE`) when the shell runs an older runtime |
+| [`.node-version`](../../.node-version) (`24.22.2`)                         | what `fnm` / `nvm` switch to; `fnm use` and `fnm install` read it                                            |
+
+Why it is not cosmetic: Jest runs these apps in **native ESM**, and only Node ≥ 24.9 can
+`require()` the CommonJS-only `@nestjs/config`. Below that, every e2e suite that boots
+`AppModule` prints `[app-module-gate] skipped: …` and **passes without asserting anything** —
+a green run that proves nothing. The same trap exists for Postgres: without a reachable DB the
+persistence suites print `[database-gate] skipped: …`.
+
+```bash
+fnm install          # reads .node-version
+fnm use              # switches this shell to 24.22.2
+node --version       # v24.22.2
+pnpm db:up           # Postgres for the persistence e2e suites
+pnpm --filter @callback/api test:e2e
+```
+
+A run is only meaningful when the summary says `Tests: N passed` with **no** `skipped` line in
+the console output.
 
 The local stack is started with one command. Its subcommands, pre-flight checks
 and exact compose invocation are documented in
@@ -381,6 +410,55 @@ process`). pnpm's `node_modules/.pnpm` layout is a tree of symlinks, so any
   Do not reach for `pnpm install --force` first: it deletes and recreates the
   whole `node_modules` tree, which maximises the window in which a locked file
   can abort the run.
+
+  **Two failure shapes — decide which one you have before fixing anything.**
+  If the failing path sits inside a virtual folder that pnpm was creating **in
+  that same run** (typically a dependency freshly added to a `package.json`,
+  e.g. `@radix-ui+react-dropdown-me_<hash>` → `@radix-ui/react-menu`) and the
+  command was a _plain_ install, then nothing is being deleted and no process
+  holds that entry: it is a **transient collision** between pnpm's parallel link
+  workers on the shared parent directory (`node_modules/@radix-ui`), sometimes
+  aggravated by a real-time scanner or the Windows indexer. Kill the IDE
+  helpers, retry once, and the run finishes. If the abort repeats at the **same**
+  path, it is a real lock — find the holder with the commands above.
+
+  **`WARN Ignoring broken lockfile … expected a single document in the stream,
+but found more` is a second bug, never noise.** It means `pnpm-lock.yaml`
+  contains more than one YAML document (a hand-written or tool-prepended block),
+  so pnpm discards the whole file and **re-resolves the dependency graph**:
+  pinning is lost, the run relinks every package (maximising the collision
+  window above), and the rewritten file bumps packages inside their semver
+  ranges. Recovery and proof:
+
+  ```powershell
+  # after the install finished, drop the re-resolved file and re-pin the tree
+  git restore --staged --worktree --source=HEAD pnpm-lock.yaml
+  pnpm install        # expect: "Lockfile is up to date, resolution step is skipped"
+  git status --porcelain -- pnpm-lock.yaml   # expect: empty
+  ```
+
+  `Lockfile is up to date, resolution step is skipped` proves the lockfile is
+  honoured; a run that instead prints `resolved N … added M` on a clean checkout
+  is re-resolving and will leave unreviewed version bumps. Never edit
+  `pnpm-lock.yaml` into a second document, and never accept those bumps as part
+  of a tooling fix.
+
+  **`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` after answering `yes` to the
+  prompt is expected — rerun the command.** pnpm 12 shows
+  `? Add to minimumReleaseAgeExclude in pnpm-workspace.yaml and proceed with the
+install?` and on `yes` it does append the `name@exact-version` entries, but the
+  install it then runs still verifies against the policy **loaded at startup**,
+  so it aborts with the same 12 entries it just wrote. Nothing is broken:
+
+  ```powershell
+  pnpm install        # run 1: writes the exemptions, fails on the stale policy
+  pnpm install        # run 2: "✓ Lockfile passes supply-chain policies"
+  ```
+
+  Do not "fix" it by downgrading packages, by raising `minimumReleaseAge`, or by
+  `pnpm clean --lockfile` (that re-resolves and bumps unrelated packages). Keep
+  pnpm's `name@version` format — a bare package name would exempt **every future
+  release** of that package, not just the one that reached the lockfile.
 
 ---
 

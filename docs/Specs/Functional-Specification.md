@@ -1,8 +1,10 @@
 # Funkcionális Specifikáció
 
+**Utolsó frissítés:** 2026-11-05 (AIS-133: a header pótolva a `quality:docs` kapuhoz; a tartalom változatlan)
+
 **Dátum:** [Dátum]
 **Státusz:** [Vázlat / Elfogadva]
-**Kapcsolódik:** [`01-Brainstorming.md`](01-Brainstorming.md)
+**Kapcsolódik:** [`01-Brainstorming.md`](outdated/01-aisztens.md)
 
 > Ez a dokumentum a rendszer funkcióinak **egyetlen forrása**. Minden funkcióhoz add meg, hogy
 > része-e az MVP-nek (a **MVP?** oszlopban), így az MVP-scope a funkciólistából egyenesen
@@ -44,5 +46,5 @@
 
 ## 6. Hivatkozások
 
-- [`01-Brainstorming.md`](01-Brainstorming.md)
+- [`01-Brainstorming.md`](outdated/01-aisztens.md)
 - Műszaki tervek: [`../01-aisztens.md`](outdated/01-aisztens.md), [`../02-flowchart.md`](outdated/02-flowchart.md), [`../03-implementation-general.md`](outdated/03-implementation-general.md)

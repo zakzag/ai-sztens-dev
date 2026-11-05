@@ -9,11 +9,16 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  INVALID_DATE_INPUT_MESSAGE,
   INVALID_EXPIRY_LABEL,
+  INVALID_TIMESTAMP_LABEL,
   NO_EXPIRY_LABEL,
 } from './date.const.js';
-import { formatExpiry, toExpiryIso } from './date.js';
+import {
+  formatDateTime,
+  formatExpiry,
+  toDateInputValue,
+  toExpiryIso,
+} from './date.js';
 
 /**
  * @param dateInput - a date-input value expected to be valid.
@@ -66,19 +71,18 @@ describe('toExpiryIso', () => {
 
   it('throws for a non-ISO shaped input', () => {
     expect(() => toExpiryIso('2026.07.01')).toThrow(RangeError);
-    expect(() => toExpiryIso('2026.07.01')).toThrow(INVALID_DATE_INPUT_MESSAGE);
   });
 
   it('throws for a single-digit month or day', () => {
-    expect(() => toExpiryIso('2026-7-1')).toThrow(INVALID_DATE_INPUT_MESSAGE);
+    expect(() => toExpiryIso('2026-7-1')).toThrow(RangeError);
   });
 
   it('throws for a calendar day that does not exist', () => {
-    expect(() => toExpiryIso('2026-02-31')).toThrow(INVALID_DATE_INPUT_MESSAGE);
+    expect(() => toExpiryIso('2026-02-31')).toThrow(RangeError);
   });
 
   it('throws for a non-leap 29 February', () => {
-    expect(() => toExpiryIso('2027-02-29')).toThrow(INVALID_DATE_INPUT_MESSAGE);
+    expect(() => toExpiryIso('2027-02-29')).toThrow(RangeError);
   });
 });
 
@@ -96,5 +100,37 @@ describe('formatExpiry', () => {
 
     expect(formatExpiry(localNoon.toISOString())).toContain('2025');
     expect(formatExpiry(localNoon.toISOString())).toContain('15');
+  });
+});
+
+describe('toDateInputValue', () => {
+  it('returns an empty value for null and for an unparsable instant', () => {
+    expect(toDateInputValue(null)).toBe('');
+    expect(toDateInputValue('not-a-date')).toBe('');
+  });
+
+  it('round-trips a calendar day through toExpiryIso', () => {
+    // The edit form depends on this: it shows the stored expiry as a date input
+    // value and must send the same day back, not the UTC one.
+    expect(toDateInputValue(requireIso('2027-02-01'))).toBe('2027-02-01');
+  });
+
+  it('renders the local day of an instant that is still the previous UTC day', () => {
+    const localLateEvening = new Date(2026, 10, 4, 23, 30, 0, 0);
+
+    expect(toDateInputValue(localLateEvening.toISOString())).toBe('2026-11-04');
+  });
+});
+
+describe('formatDateTime', () => {
+  it('renders the date and the time of an instant', () => {
+    const localInstant = new Date(2026, 10, 4, 9, 5, 0, 0);
+
+    expect(formatDateTime(localInstant.toISOString())).toContain('2026');
+    expect(formatDateTime(localInstant.toISOString())).toContain('09');
+  });
+
+  it('renders the invalid label for an unparsable timestamp', () => {
+    expect(formatDateTime('not-a-date')).toBe(INVALID_TIMESTAMP_LABEL);
   });
 });

@@ -69,13 +69,28 @@ describe('unwrapEnvelope — success', () => {
       envelope({ id: '1', name: 'first' }),
     );
 
-    expect(result).toEqual({ ok: true, data: { id: '1', name: 'first' } });
+    expect(result).toEqual({
+      ok: true,
+      data: { id: '1', name: 'first' },
+      meta: TEST_META,
+    });
+  });
+
+  it('returns the validated `meta` next to the payload', () => {
+    const result = unwrapEnvelope(
+      itemSchema,
+      envelope({ id: '1', name: 'first' }),
+    );
+
+    expect(result.ok && result.meta.requestId).toBe(TEST_META.requestId);
+    expect(result.ok && result.meta.timestamp).toBe(TEST_META.timestamp);
   });
 
   it('accepts a null `data` when the caller schema allows it', () => {
     expect(unwrapEnvelope(z.null(), envelope(null))).toEqual({
       ok: true,
       data: null,
+      meta: TEST_META,
     });
   });
 
@@ -89,15 +104,14 @@ describe('unwrapEnvelope — success', () => {
   });
 
   it('passes a paginated `meta` through untouched', () => {
+    const pagination = { page: 1, limit: 10, total: 1, totalPages: 1 };
     const result = unwrapEnvelope(z.array(itemSchema), {
       data: [{ id: '1', name: 'first' }],
-      meta: {
-        ...TEST_META,
-        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
-      },
+      meta: { ...TEST_META, pagination },
     });
 
-    expect(result).toEqual({ ok: true, data: [{ id: '1', name: 'first' }] });
+    expect(result.ok && result.data).toEqual([{ id: '1', name: 'first' }]);
+    expect(result.ok && result.meta.pagination).toEqual(pagination);
   });
 });
 

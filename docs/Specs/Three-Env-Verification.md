@@ -1,5 +1,6 @@
 # Three-Environment Verification — AIsztens
 
+**Utolsó frissítés:** 2026-11-05 (AIS-133: a header egységesítve a `quality:docs` kapuhoz; a tartalom változatlan)
 **Status:** living spec
 **Database note (2026-10-21, AIS-64):** the call-back feature was removed
 entirely — API module, admin page, public web form, `callback.callback_requests`,

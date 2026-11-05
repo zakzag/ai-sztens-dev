@@ -23,16 +23,42 @@
  * - `updated_at` is maintained by Drizzle's `$onUpdate` and therefore only on
  *   writes that go through the Drizzle handle — there is no DB trigger yet.
  *
+ * AIS-108 (2026-11-02) added `deleted_at`: the delete endpoint is a **soft**
+ * delete, so the row survives (audit trail, an undelete stays possible) and
+ * every read has to filter on it. That filter lives in
+ * `api-keys/api-keys.filter.ts` (`apiKeyNotDeletedFilter()`), not here — the
+ * schema only declares the column and its index.
+ *
  * Workflow (AIS-36): edit this file, run
  * `pnpm --filter @callback/api db:generate`, review the generated SQL under
  * `apps/api/drizzle/`, then `db:migrate`. The generated migration and its
  * `meta/` snapshot are both committed.
  */
 
-import { pgSchema, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  index,
+  pgSchema,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 /** The operations context: migration bookkeeping and cross-cutting records. */
 export const platformSchema = pgSchema('platform');
+
+/**
+ * Every timestamp is stored with **millisecond** precision (AIS-108).
+ *
+ * The wire contract is `Date.prototype.toISOString()` (millisecond resolution),
+ * so a column with Postgres' default microsecond precision holds values the
+ * client can never express: the `updated_at` optimistic-concurrency token is
+ * echoed back by the client as milliseconds, and `WHERE updated_at = $expected`
+ * would then never match the stored `…123456Z` row — every update would be a
+ * spurious `409 STALE_WRITE`. Storing what the contract can represent keeps the
+ * comparison exact.
+ */
+const TIMESTAMP_PRECISION = 3;
 
 /**
  * Stored credentials for external AI providers and internal integrations.
@@ -48,16 +74,41 @@ export const apiKeys = platformSchema.table(
     identifier: text('identifier').notNull(),
     description: text('description'),
     apiKey: text('api_key').notNull(),
-    expiresAt: timestamp('expires_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true })
+    expiresAt: timestamp('expires_at', {
+      withTimezone: true,
+      precision: TIMESTAMP_PRECISION,
+    }),
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      precision: TIMESTAMP_PRECISION,
+    })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+      precision: TIMESTAMP_PRECISION,
+    })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
+    /**
+     * Soft-delete marker (AIS-108): `NULL` = live, a timestamp = deleted.
+     *
+     * Deliberately **not** a boolean plus a separate column, and deliberately
+     * not a hard `DELETE`: the moment of deletion is the piece an audit trail
+     * needs, and hiding a row is a read-side decision that stays reversible.
+     */
+    deletedAt: timestamp('deleted_at', {
+      withTimezone: true,
+      precision: TIMESTAMP_PRECISION,
+    }),
   },
-  (table) => [unique('api_keys_identifier_key').on(table.identifier)],
+  (table) => [
+    unique('api_keys_identifier_key').on(table.identifier),
+    // Every read filters `deleted_at IS NULL`; the index keeps that cheap and
+    // also serves a future "undelete / purge" job that scans the opposite.
+    index('api_keys_deleted_at_idx').on(table.deletedAt),
+  ],
 );
 
 /** Shape of a row read from `platform.api_keys`. */

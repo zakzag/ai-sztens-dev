@@ -1,14 +1,22 @@
 /**
- * Tests of the create form.
+ * Tests of the create form — the reference wiring of the shared form pattern
+ * (AIS-115) into the notification system (AIS-85).
  *
  * The mock point is the **network**, not the service (MSW harness, decision
  * `D1`): the form runs the real mutation hook + transport, and only the wire is
  * replaced by the handlers in `test/mocks/handlers`. A request recorder captures
  * the intercepted payload where the old service double used to assert the call.
  *
- * Covered: client-side validation (nothing is submitted), the exact payload of
- * a successful submit, the form reset, the field-level 409, a page-level 5xx
- * and the pending state.
+ * Because `renderWithProviders` now mounts the provider **and** the host with the
+ * real capture adapters bound to its store, every assertion below is about the
+ * single-visible-surface rule of AIS-85:
+ *
+ * | outcome                | field | page `Alert` | toast | log entry |
+ * | ---------------------- | ----- | ------------ | ----- | --------- |
+ * | success                | —     | —            | yes   | yes       |
+ * | `409`/`400` addressed  | yes   | —            | —     | yes       |
+ * | `400` with residue     | yes   | yes          | —     | yes       |
+ * | `5xx` / network        | —     | —            | yes   | yes       |
  */
 
 import {
@@ -18,10 +26,14 @@ import {
 } from '@callback/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { API_KEY_IDENTIFIER_CONFLICT_MESSAGE } from '../../../features/api-keys/api-keys.const.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  API_KEYS_QUERY_KEYS,
+  API_KEY_IDENTIFIER_CONFLICT_MESSAGE,
+} from '../../../features/api-keys/api-keys.const.js';
 import {
   FIELD_INVALID_MESSAGE,
+  IDENTIFIER_CONFLICT_MESSAGE,
   SERVER_ERROR_MESSAGE,
   VALIDATION_MESSAGE,
 } from '../../../lib/error-message.const.js';
@@ -34,6 +46,10 @@ import {
   apiKeysCreateServerError,
 } from '../../../test/mocks/handlers/api-keys.handlers.js';
 import { createRequestRecorder } from '../../../test/mocks/request-recorder.js';
+import {
+  renderWithProviders,
+  type RenderWithProvidersResult,
+} from '../../../test/mocks/render-with-providers.js';
 import { server } from '../../../test/mocks/server.js';
 import {
   API_KEY_FORM_ERROR_TITLE,
@@ -43,13 +59,15 @@ import {
   API_KEY_FORM_SUCCESS_MESSAGE,
 } from '../api-keys.const.js';
 import { ApiKeyForm } from './ApiKeyForm.js';
-import { renderWithProviders } from '../../../test/mocks/render-with-providers.js';
 
 /** Hungarian validation copy, i.e. what this bundle renders (AIS-112 `D2`). */
 const HUNGARIAN_VALIDATION = VALIDATION_MESSAGE_CATALOGUE.hu;
 
-/** Renders the form inside the full provider chain. */
-function renderForm() {
+/** The seed key the invalidation assertions watch. */
+const SEEDED_LIST_KEY = API_KEYS_QUERY_KEYS.all;
+
+/** Renders the form inside the full provider chain (provider + host). */
+function renderForm(): RenderWithProvidersResult {
   return renderWithProviders(<ApiKeyForm />);
 }
 
@@ -91,8 +109,7 @@ describe('ApiKeyForm', () => {
 
   it('blocks the submit and reports every missing required field in Hungarian', async () => {
     const recorder = createRequestRecorder();
-
-    renderForm();
+    const rendered = renderForm();
 
     await userEvent.click(getSubmitButton());
 
@@ -104,6 +121,8 @@ describe('ApiKeyForm', () => {
 
     expect(requiredMessages).toHaveLength(3);
     expect(recorder.requests).toHaveLength(0);
+    // A client-side rejection is not an event: nothing is announced or logged.
+    expect(rendered.notifications.store.getSnapshot().entries).toHaveLength(0);
 
     recorder.stop();
   });
@@ -148,14 +167,18 @@ describe('ApiKeyForm', () => {
     recorder.stop();
   });
 
-  it('submits the mapped payload, shows the success alert and resets the fields', async () => {
+  it('submits the mapped payload, toasts once, logs once and resets the fields', async () => {
     const recorder = createRequestRecorder();
-
-    renderForm();
+    const rendered = renderForm();
+    // The invalidation of the list prefix is what refreshes the table, so the
+    // real client method is watched instead of a seeded cache entry (the test
+    // client has `gcTime: 0`, so an unobserved query would be collected).
+    const invalidate = vi.spyOn(rendered.client, 'invalidateQueries');
 
     await fillRequiredFields();
     await userEvent.click(getSubmitButton());
 
+    // One visible surface: the success text is the toast body.
     expect(
       await screen.findByText(API_KEY_FORM_SUCCESS_MESSAGE),
     ).toBeInTheDocument();
@@ -177,6 +200,18 @@ describe('ApiKeyForm', () => {
       '',
     );
     expect(screen.getByLabelText(API_KEY_FORM_LABELS.apiKey)).toHaveValue('');
+
+    // Exactly one toast and exactly one log entry for one submit.
+    const state = rendered.notifications.store.getSnapshot();
+
+    expect(state.toasts).toHaveLength(1);
+    expect(state.entries).toHaveLength(1);
+    expect(state.entries[0]?.level).toBe('success');
+    expect(state.entries[0]?.message).toBe(API_KEY_FORM_SUCCESS_MESSAGE);
+    expect(state.entries[0]?.source).toBe('manual');
+
+    // The list prefix was invalidated, so the table cannot show a stale page.
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: SEEDED_LIST_KEY });
 
     recorder.stop();
   });
@@ -218,10 +253,10 @@ describe('ApiKeyForm', () => {
     recorder.stop();
   });
 
-  it('maps a 409 onto the identifier field instead of the page', async () => {
+  it('puts a 409 on the identifier field, focuses it and announces nothing', async () => {
     server.use(apiKeysCreateConflict);
 
-    renderForm();
+    const rendered = renderForm();
 
     await fillRequiredFields();
     await userEvent.click(getSubmitButton());
@@ -235,26 +270,43 @@ describe('ApiKeyForm', () => {
     expect(
       screen.getByLabelText(API_KEY_FORM_LABELS.identifier),
     ).toHaveAttribute('aria-invalid', 'true');
+    expect(document.activeElement).toBe(
+      screen.getByLabelText(API_KEY_FORM_LABELS.identifier),
+    );
+
+    // The failure is addressable, so it is a log entry only — no toast.
+    const state = rendered.notifications.store.getSnapshot();
+
+    expect(state.toasts).toHaveLength(0);
+    expect(state.entries).toHaveLength(1);
+    expect(state.entries[0]?.toast).toBe(false);
+    expect(state.entries[0]?.message).toBe(IDENTIFIER_CONFLICT_MESSAGE);
   });
 
-  it('shows a page-level error for a non-conflict failure', async () => {
+  it('toasts a non-conflict failure and renders no page alert for the same reason', async () => {
     server.use(apiKeysCreateServerError);
 
-    renderForm();
+    const rendered = renderForm();
 
     await fillRequiredFields();
     await userEvent.click(getSubmitButton());
 
+    // AIS-85 `D2`: the capture toast is the only surface for a `page` failure.
+    expect(await screen.findByText(SERVER_ERROR_MESSAGE)).toBeInTheDocument();
     expect(
-      await screen.findByText(API_KEY_FORM_ERROR_TITLE),
-    ).toBeInTheDocument();
-    expect(screen.getByText(SERVER_ERROR_MESSAGE)).toBeInTheDocument();
+      screen.queryByText(API_KEY_FORM_ERROR_TITLE),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByText(API_KEY_IDENTIFIER_CONFLICT_MESSAGE),
     ).not.toBeInTheDocument();
     expect(
       screen.getByLabelText(API_KEY_FORM_LABELS.identifier),
     ).not.toHaveAttribute('aria-invalid');
+
+    const state = rendered.notifications.store.getSnapshot();
+
+    expect(state.toasts).toHaveLength(1);
+    expect(state.entries[0]?.level).toBe('error');
   });
 
   it('keeps a legacy 409 without details on the identifier field', async () => {
@@ -276,10 +328,10 @@ describe('ApiKeyForm', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('puts every addressable field of a 400 on its own input', async () => {
+  it('puts every addressable field of a 400 on its own input and keeps the residue in one alert', async () => {
     server.use(apiKeysCreateMultiFieldValidation);
 
-    renderForm();
+    const rendered = renderForm();
 
     await fillRequiredFields();
     await userEvent.click(getSubmitButton());
@@ -299,6 +351,8 @@ describe('ApiKeyForm', () => {
     // The path no input owns is the only thing the page alert carries.
     expect(screen.getByText(API_KEY_FORM_ERROR_TITLE)).toBeInTheDocument();
     expect(screen.getByText(VALIDATION_MESSAGE)).toBeInTheDocument();
+    // A field-surface failure is log-only: the alert speaks, the toast does not.
+    expect(rendered.notifications.store.getSnapshot().toasts).toHaveLength(0);
   });
 
   it('shows no page alert when the server blamed a field only', async () => {

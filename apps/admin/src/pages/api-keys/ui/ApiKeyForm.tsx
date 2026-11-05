@@ -1,14 +1,11 @@
-import { VALIDATION_ERROR_MAP } from '@callback/shared';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, Card, Input, Textarea } from '@callback/ui';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useNotifier } from '@callback/notifications/react';
+import { Alert, Card, FormActions, Input, Textarea } from '@callback/ui';
 import {
   API_KEY_FIELD_PATHS,
   DEFAULT_FIELD_PATH_BY_CODE,
 } from '../../../features/api-keys/api-keys.const.js';
 import { useCreateApiKeyMutation } from '../../../features/api-keys/use-api-keys.js';
-import { toFieldErrors } from '../../../lib/field-errors.logic.js';
+import { useAppForm } from '../../../features/forms/use-app-form.js';
 import {
   API_KEY_FORM_DEFAULTS,
   API_KEY_FORM_ERROR_TITLE,
@@ -24,86 +21,49 @@ import type { ApiKeyFormValues } from '../api-keys.interface.js';
 import { apiKeyFormSchema, toCreateApiKeyInput } from '../api-keys.logic.js';
 
 /**
- * Create form of the API key page.
+ * Create form of the API key page — the reference implementation of the shared
+ * form pattern (AIS-115) wired into the notification system (AIS-85).
  *
- * The form owns exactly one bucket — react-hook-form state — plus one piece of
- * page-level feedback (`pageError`). The server state stays in the query cache:
- * the mutation hook invalidates the list and only then runs `onCreated`, which
- * is where the fields are cleared.
+ * The component owns **no** validation, no field-error loop and no error state:
+ * it declares the schema, the ordered field paths, the submit call and one
+ * notification port, and {@link useAppForm} does the rest (resolver with the
+ * Hungarian error map, `toFieldErrors` mapping, first-error focus, the
+ * reset → notify order).
  *
- * Error routing (plan decisions D1, D11 tier 1, D13):
- * - the shared `toFieldErrors` (`lib/field-errors.logic.ts`) decides: allowed
- *   `code` + addressable `issues[].path` → `setError(path)`, one message per
- *   input;
- * - whatever the mapping could not address (or a code outside the allow-list) →
- *   the page-level `Alert`, text mapped by `toErrorMessage`.
+ * Who speaks after a submit (AIS-85 `D1`/`D2`):
  *
- * The component only applies the result: it never inspects `status`, `code` or
- * the server's `message`, so a new server code cannot smuggle text into the UI.
+ * - **success** → `notify.success` from the hook, i.e. one toast plus one log
+ *   entry. No `meta.successMessage` is set on the mutation, so the cache-level
+ *   callback stays silent and there is exactly one announcement.
+ * - **field-addressable failure** (`400` issues, `409` duplicate identifier) →
+ *   `setError` on the input, first invalid one focused, **no toast**: the global
+ *   capture is log-only for a `field` surface.
+ * - **page failure** (`5xx`, network) → the capture toasts it; the hook leaves
+ *   `formError` empty, so the same sentence is never rendered twice.
+ * - **the residue** of a `field` failure whose issue names no rendered input →
+ *   the one `Alert` below, because nothing else owns that message.
+ *
+ * `Input`/`Textarea` carry their own label, hint and error wiring (AIS-113), so
+ * the fields are not wrapped in `FormField`: that primitive is for controls that
+ * do not bundle a label, and wrapping would render two labels and drop the
+ * `aria-describedby` the primitive already sets.
  *
  * @returns the form card.
  */
 export function ApiKeyForm() {
-  const [pageError, setPageError] = useState<string | null>(null);
+  const notify = useNotifier();
+  const { createApiKey } = useCreateApiKeyMutation();
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setError,
-    formState: { errors },
-  } = useForm<ApiKeyFormValues>({
-    // The second argument is zod's `ParseParams`: with the map attached, the
-    // zod-generated issues (`too_small`, `invalid_string`, …) speak the locale
-    // that `main.tsx` configured — Hungarian in this bundle (AIS-112 `D2`).
-    resolver: zodResolver(apiKeyFormSchema, {
-      errorMap: VALIDATION_ERROR_MAP,
-    }),
-    defaultValues: API_KEY_FORM_DEFAULTS,
-  });
-
-  const {
-    createApiKey,
-    isPending,
-    isSuccess,
-    reset: resetMutation,
-  } = useCreateApiKeyMutation({
-    onCreated: () => {
-      reset(API_KEY_FORM_DEFAULTS);
-      setPageError(null);
-    },
-  });
-
-  /**
-   * Submits the validated values.
-   *
-   * @param values - form values already accepted by the schema.
-   */
-  async function onSubmit(values: ApiKeyFormValues): Promise<void> {
-    setPageError(null);
-    resetMutation();
-
-    try {
-      await createApiKey(toCreateApiKeyInput(values));
-    } catch (error) {
-      const { fields, form } = toFieldErrors(error, {
-        fieldPaths: API_KEY_FIELD_PATHS,
-        defaultPathByCode: DEFAULT_FIELD_PATH_BY_CODE,
-      });
-
-      // Iterating the declared field order makes the focus deterministic: the
-      // first invalid input in visual order is the one that gets it.
-      for (const field of API_KEY_FIELD_PATHS) {
-        const message = fields[field];
-
-        if (message !== undefined) {
-          setError(field, { type: 'server', message }, { shouldFocus: true });
-        }
-      }
-
-      setPageError(form);
-    }
-  }
+  const { register, handleSubmit, errors, formState, formError } =
+    useAppForm<ApiKeyFormValues>({
+      schema: apiKeyFormSchema,
+      defaultValues: API_KEY_FORM_DEFAULTS,
+      fieldPaths: API_KEY_FIELD_PATHS,
+      defaultPathByCode: DEFAULT_FIELD_PATH_BY_CODE,
+      submit: (values) => createApiKey(toCreateApiKeyInput(values)),
+      notify,
+      successMessage: API_KEY_FORM_SUCCESS_MESSAGE,
+    });
 
   return (
     <Card className="space-y-4">
@@ -111,17 +71,13 @@ export function ApiKeyForm() {
         {API_KEY_FORM_TITLE}
       </h2>
 
-      {isSuccess ? (
-        <Alert variant="success">{API_KEY_FORM_SUCCESS_MESSAGE}</Alert>
-      ) : null}
-
-      {pageError !== null ? (
+      {formError !== null ? (
         <Alert variant="danger" title={API_KEY_FORM_ERROR_TITLE}>
-          {pageError}
+          {formError}
         </Alert>
       ) : null}
 
-      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <Input
           {...register('name')}
           id={API_KEY_FORM_FIELD_IDS.name}
@@ -168,9 +124,14 @@ export function ApiKeyForm() {
           type="date"
         />
 
-        <Button type="submit" disabled={isPending}>
-          {isPending ? API_KEY_FORM_PENDING_LABEL : API_KEY_FORM_SUBMIT_LABEL}
-        </Button>
+        <FormActions
+          submitLabel={
+            formState.isSubmitting
+              ? API_KEY_FORM_PENDING_LABEL
+              : API_KEY_FORM_SUBMIT_LABEL
+          }
+          isSubmitting={formState.isSubmitting}
+        />
       </form>
     </Card>
   );

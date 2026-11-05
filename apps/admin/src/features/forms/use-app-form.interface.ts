@@ -154,6 +154,13 @@ export interface FormErrorEntry<F extends string> {
 export interface FormErrorPlan<F extends string> {
   /** Field messages in `fieldPaths` order; the first one takes focus. */
   readonly entries: readonly FormErrorEntry<F>[];
-  /** The page-level message, or `null` when every issue landed on a field. */
+  /**
+   * The page-level message, or `null` when another surface owns the failure.
+   *
+   * Non-`null` only for a `field`-surface failure whose issue the mapping could
+   * not address: a `page` failure is toasted by the capture (AIS-84), a `banner`
+   * failure by `AppErrorBanner` (AIS-96), and a `silent` one is not reported at
+   * all. Anything else would say the same sentence twice (AIS-85 `D2`).
+   */
   readonly formMessage: string | null;
 }

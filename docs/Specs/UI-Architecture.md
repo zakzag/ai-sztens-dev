@@ -1,5 +1,14 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
+**Utolsó frissítés: 2026-11-05 — AIS-85 (a notification story lezárása).** Az `ApiKeyForm` a
+referencia-implementáció: `useAppForm` + `useNotifier()`, `pageError` state és success `Alert` nélkül,
+`FormActions` pending-gombbal. A form csak a **látható** részt dönti el: siker → `notify.success`
+(egy toast + egy log bejegyzés), `field` hiba → mező + fókusz, toast nélkül, `page` hiba → a capture
+toastja (a form `formError`-ja `null` marad), és csak a `field` hiba **gazdátlan** maradéka kerül a
+form `Alert`-jébe — a `toFormErrorPlan` most a `toErrorSurface` besorolást is megkapja (lásd §4.4).
+A `renderWithProviders` teszt-harness a `NotificationHost`-ot is mountolja, és a valódi capture
+adaptereket köti a store-hoz, így a `ApiKeyForm.test.tsx` a teljes láncot méri (§8).
+
 **AIS-84 (2026-11-05):** a globális notification capture az admin SPA-ban — minden lezárt HTTP
 kísérlet (`HttpEvent`), minden elutasított query/mutation és minden `meta.successMessage`-dzsel
 jelentkező írás **külön kód nélkül** kerül a logba. Egyetlen store-példány
@@ -43,7 +52,7 @@ továbbra sem importál Reactet: a `tsconfig.core.json` a `src/core`-t DOM nélk
 első hibás mező determinisztikus fókuszát, a `reset → notify → onSuccess` siker-konvenciót és az
 opcionális notification portot (`FormNotifier`, AIS-84 előtt `null`); a tiszta döntés a
 `use-app-form.logic.ts`-ben, a részletek a [`Forms-and-Validation.md`](./Forms-and-Validation.md:1)
-specben (lásd §4.4). Az `ApiKeyForm` átállása **AIS-85**.
+specben (lásd §4.4). Az `ApiKeyForm` átállása **AIS-85**-ben megtörtént.
 **AIS-113 (2026-11-04):** tíz form primitív — `FormField`, `FormSection`, `FormActions`, `Select`,
 `NumberInput`, `DatePicker`, `Checkbox`, `Switch`, `RadioGroup`, `Combobox` (lásd §4) —, a
 `FormField` **render prop** alapú (`ariaProps` a nyers DOM-hoz, `id`/`invalid`/`describedBy` a
@@ -545,19 +554,22 @@ the ordered field paths and the submit call, and
 [`useAppForm`](../../apps/admin/src/features/forms/use-app-form.ts:1) returns
 `{ register, handleSubmit, errors, formState, formError, reset, setServerError, clearFormError }`:
 
-| Concern              | Where it is decided                                                                                 |
-| -------------------- | --------------------------------------------------------------------------------------------------- |
-| validation           | `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` inside the hook (§4.3)                    |
-| which input is wrong | `lib/field-errors.logic.ts` `toFieldErrors` (AIS-111), **not** the hook                             |
-| focus order          | `use-app-form.logic.ts` `toFormErrorPlan` + declared `fieldPaths`; only the **first** entry focuses |
-| page-level message   | the hook's `formError` state, rendered as one `Alert` above the form                                |
-| success feedback     | `reset(defaultValues)` → `notify.success(successMessage)` → `onSuccess` (port is optional, AIS-84)  |
+| Concern              | Where it is decided                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| validation           | `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` inside the hook (§4.3)                                             |
+| which input is wrong | `lib/field-errors.logic.ts` `toFieldErrors` (AIS-111), **not** the hook                                                      |
+| focus order          | `use-app-form.logic.ts` `toFormErrorPlan` + declared `fieldPaths`; only the **first** entry focuses                          |
+| page-level message   | the hook's `formError`, rendered as one `Alert` — **only** when the failure was `field`-surface and the mapping left a residue; `page`/`banner`/`silent` failures keep it `null` (AIS-85 `D2`, who-speaks table in [`Forms-and-Validation.md`](./Forms-and-Validation.md:1) §3.1) |
+| success feedback     | `reset(defaultValues)` → `notify.success(successMessage)` → `onSuccess`; the port is `useNotifier()` from `@callback/notifications/react` (structurally a `FormNotifier`), and the mutation carries **no** `meta.successMessage`, so exactly one toast appears (AIS-85 `D1`) |
 
 `handleSubmit` is the **ready** submit handler (goes straight onto `<form onSubmit={…}>`), not
 react-hook-form's curried function — a page therefore cannot bypass the validate → submit → reset →
 notify order. The hook holds no field name and no sentence, and never branches on `error.code`
 (the field-error gate, §9.3). Full contract and tests: [`Forms-and-Validation.md`](./Forms-and-Validation.md:1).
-`ApiKeyForm.tsx` still uses the hand-wired variant; it migrates in **AIS-85**.
+`ApiKeyForm.tsx` is the reference implementation since **AIS-85**: `Input`/`Textarea` carry their own
+`label`/`hint`/`error`/`aria` wiring, so they are **not** wrapped in `FormField` (that would render two
+labels and the primitive overrides `aria-describedby` after `...rest`); `FormField` is for controls that
+bring no label of their own.
 
 ## 5. State plan per page
 
@@ -569,7 +581,7 @@ A page appears in this table even when **three of the four buckets are intention
 
 | Page                                                                 | Server state                                                                                                                                                                                                                                            | Page UI state                                                                                                                                                                                           | Form state                                                                                                                                         | Notes                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pages/api-keys` (AIS-41, `/api-keys` route)                         | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`). The query hook exposes the raw `error` (keeps `requestId`), `errorMessage` and `errorSurface` | **none** — no Zustand store, no filters/sort/tabs (D9); the only local state is the form's page-level error in `ApiKeyForm`. The app banner keeps only a dismissal flag (`useState`), never server data | react-hook-form + `zodResolver(apiKeyFormSchema)` (`pages/api-keys/api-keys.logic.ts`); `identifier` field carries the 409 via `setError` (D8/D36) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32). Failure routing: `errorSurface === 'page'` → `PageErrorState` + retry; `banner` → only `AppErrorBanner` speaks, the page renders nothing extra (AIS-96) |
+| `pages/api-keys` (AIS-41, `/api-keys` route)                         | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`). The query hook exposes the raw `error` (keeps `requestId`), `errorMessage` and `errorSurface` | **none** — no Zustand store, no filters/sort/tabs (D9), and since AIS-85 no form-level error state either (the hook owns `formError` as residue only). The app banner keeps only a dismissal flag (`useState`), never server data | `useAppForm` + `apiKeyFormSchema` (`pages/api-keys/api-keys.logic.ts`) with `API_KEY_FIELD_PATHS` and `DEFAULT_FIELD_PATH_BY_CODE`; success → `useNotifier()`, `409` → `identifier` field with focus and no toast (D8/D36, AIS-85 `D1`/`D2`) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32). Failure routing: `errorSurface === 'page'` → `PageErrorState` + retry **and** the capture toast for the write; `banner` → only `AppErrorBanner` speaks, the page renders nothing extra (AIS-96); `field` → the input, plus the residue `Alert` only when a path has no input (AIS-85) |
 | `pages/api-keys/ApiKeyDetailPage` (AIS-131, `/api-keys/:identifier`)  | `useApiKeyDetailQuery` / `useUpdateApiKeyMutation` / `useDeleteApiKeyMutation` in `features/api-keys`; the identifier is the `useParams` value and part of `API_KEYS_QUERY_KEYS.detail(identifier)`. All three expose `error` / `errorMessage` / `errorSurface` | **none** — no store. Three `useState` flags only: dialog open, “last write was stale”, “last write succeeded”. None survives navigation and none copies server data (a remount is not needed for them)    | `useAppForm` + `apiKeyEditFormSchema`; `updatedAt` is a **prop**, never a field, and the form is remounted with `key={updatedAt}` after a save (the hook ends a submit with `reset(defaultValues)`) | `identifier` and `apiKey` are not editable (the PATCH contract is `.strict()`); `404` has its own branch instead of an empty `DescriptionList`; `409 STALE_WRITE` → page `Alert` + reload via `isStaleWriteFailure`, `422` → the blamed input; the delete runs through `ConfirmDialog` and closes only on success (AIS-131) |
 | `pages/LoginPage` (`/login` route)                                   | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | `AuthContext` + `auth/session-token.ts` over `sessionStorage`; no RHF yet                                                                          | The token storage key lives in one module only (D19). The `app/` layer reads the session through `useRequireSession()` only, so the cookie session (AIS-74) changes one file. API-side auth guard is out of scope                                                                                                                           |
 | `pages/PlaceholderPage` (`/` route)                                  | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | none                                                                                                                                               | Static shell for the authenticated landing route; replaced when a real dashboard lands                                                                                                                                                                                                                                                      |

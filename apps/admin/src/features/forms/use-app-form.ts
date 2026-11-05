@@ -22,6 +22,12 @@
  * what the caller declared. That is also why it never branches on `error.status`
  * or `error.code` — the decision lives in `lib/field-errors.logic.ts`, which is
  * what the `quality:field-errors` gate requires.
+ *
+ * Since AIS-85 the page-level `formError` is not "whatever the mapping could not
+ * address" but "the residue of a **field** failure": `toErrorSurface` classifies
+ * the failure once, and a `page` failure (the capture toast), a `banner` failure
+ * (`AppErrorBanner`) or a `silent` one already has an owner. That is what keeps a
+ * `500` from rendering the same sentence twice.
  */
 
 import { VALIDATION_ERROR_MAP } from '@callback/shared';
@@ -29,6 +35,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { FieldValues } from 'react-hook-form';
+import { toErrorSurface } from '../../lib/error-surface.logic.js';
 import { toFieldErrors } from '../../lib/field-errors.logic.js';
 import { APP_FORM_FIELD_ERROR_TYPE } from './use-app-form.const.js';
 import { toFormErrorPlan } from './use-app-form.logic.js';
@@ -80,6 +87,7 @@ export function useAppForm<FV extends FieldValues>(
     const plan = toFormErrorPlan(
       toFieldErrors(error, { fieldPaths, defaultPathByCode }),
       fieldPaths,
+      toErrorSurface(error),
     );
 
     plan.entries.forEach((entry, index) => {

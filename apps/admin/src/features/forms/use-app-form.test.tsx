@@ -5,8 +5,10 @@
  * assertion is about what a page renders or receives:
  *
  * 1. the submit convention — validate → submit → reset → notify → `onSuccess`;
- * 2. the failure routing — an addressable issue lands on its input, everything
- *    else becomes one page-level message and **nothing** is announced;
+ * 2. the failure routing — an addressable issue lands on its input, the residue
+ *    of a `field` failure becomes one page-level message, and a `page`/`banner`
+ *    failure is left to its own surface (AIS-85 `D2`), so nothing is announced
+ *    twice and **nothing** is announced by the hook either;
  * 3. the pending state — `isSubmitting` disables the trigger while the write is
  *    in flight;
  * 4. the deterministic focus of `D3` — the declared order wins over the server's
@@ -225,7 +227,7 @@ describe('useAppForm — failure routing', () => {
     expect(screen.queryByText(FIELD_INVALID_MESSAGE)).toBeNull();
   });
 
-  it('falls back to the page-level copy for a backend failure', async () => {
+  it('leaves a page failure to the capture toast instead of repeating it in an Alert', async () => {
     const submit = vi.fn(async () => {
       throw createServerError();
     });
@@ -236,8 +238,14 @@ describe('useAppForm — failure routing', () => {
 
     await userEvent.click(getSubmitButton());
 
-    expect(await screen.findByText(SERVER_ERROR_MESSAGE)).toBeInTheDocument();
-    expect(submit).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+
+    // AIS-85 `D2`: the capture toasts a `page` failure (AIS-84) and `AppErrorBanner`
+    // speaks for a `banner` one, so the form must not render the same sentence too.
+    expect(screen.queryByText(SERVER_ERROR_MESSAGE)).toBeNull();
+    expect(screen.queryByText(FIELD_INVALID_MESSAGE)).toBeNull();
   });
 
   it('blames the declared path when the envelope named none', async () => {
@@ -285,9 +293,12 @@ describe('useAppForm — failure routing', () => {
   });
 
   it('clears the page-level message when the user retries', async () => {
+    // A `field` failure whose issue names no rendered input is the only case that
+    // still produces a page-level message (AIS-85 `D2`), so the residue copy is
+    // what a retry has to clear.
     const submit = vi
       .fn<(values: AppFormValues) => Promise<unknown>>()
-      .mockRejectedValueOnce(createServerError())
+      .mockRejectedValueOnce(createConflictError())
       .mockResolvedValueOnce(undefined);
 
     render(
@@ -295,14 +306,16 @@ describe('useAppForm — failure routing', () => {
     );
 
     await userEvent.click(getSubmitButton());
-    expect(await screen.findByText(SERVER_ERROR_MESSAGE)).toBeInTheDocument();
+    expect(
+      await screen.findByText(IDENTIFIER_CONFLICT_MESSAGE),
+    ).toBeInTheDocument();
 
     await userEvent.click(getSubmitButton());
 
     await waitFor(() => {
       expect(submit).toHaveBeenCalledTimes(2);
     });
-    expect(screen.queryByText(SERVER_ERROR_MESSAGE)).toBeNull();
+    expect(screen.queryByText(IDENTIFIER_CONFLICT_MESSAGE)).toBeNull();
   });
 
   it('applies an out-of-band failure through the same mapping', async () => {

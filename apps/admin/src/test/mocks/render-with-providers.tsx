@@ -9,14 +9,23 @@
  *
  * The notification provider is the one AIS-84 mounted for real, so a component
  * test inherits it without a per-test wrapper — the same order as production.
+ *
+ * Since AIS-85 `<NotificationHost />` is mounted too (exactly where
+ * `AdminLayout` mounts it), and the harness is returned: a test can therefore
+ * assert both the **rendered** toast and the **stored** log entry of one submit,
+ * which is the acceptance criterion of the notification story.
  */
 
+import { NotificationHost } from '@callback/notifications/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { render, type RenderResult } from '@testing-library/react';
 import { SessionProvider } from '../../app/providers/session-provider.js';
-import { createNotificationHarness } from './notification-provider.mock.js';
+import {
+  createNotificationHarness,
+  type NotificationHarness,
+} from './notification-provider.mock.js';
 import { createTestQueryClient } from './query-client.mock.js';
 
 /** Options of {@link renderWithProviders}. */
@@ -25,25 +34,30 @@ export interface RenderWithProvidersOptions {
   readonly initialEntries?: readonly string[];
 }
 
-/** Result of {@link renderWithProviders}: the render result plus the client. */
+/** Result of {@link renderWithProviders}: the render result, client and store. */
 export interface RenderWithProvidersResult extends RenderResult {
   /** The isolated query client the tree is wrapped in. */
   readonly client: ReturnType<typeof createTestQueryClient>;
+  /** Store, mirror and wrapper of the notification provider in this tree. */
+  readonly notifications: NotificationHarness;
 }
 
 /**
- * Renders `ui` inside the query + session + router providers.
+ * Renders `ui` inside the query + notification + session + router providers.
  *
  * @param ui - the component under test.
  * @param options - optional initial router entries.
- * @returns the testing-library result plus the query client.
+ * @returns the testing-library result plus the query client and notification harness.
  */
 export function renderWithProviders(
   ui: ReactNode,
   options: RenderWithProvidersOptions = {},
 ): RenderWithProvidersResult {
-  const client = createTestQueryClient();
-  const NotificationWrapper = createNotificationHarness().Wrapper;
+  const notifications = createNotificationHarness();
+  const NotificationWrapper = notifications.Wrapper;
+  // The capture adapters are bound to this tree's store, so a failed or
+  // successful write reaches the very store the rendered host reads from.
+  const client = createTestQueryClient(notifications.store);
 
   // `initialEntries` is a mutable `InitialEntry[]` on the react-router side, so
   // a `readonly string[]` has to be copied instead of passed through (AIS-122:
@@ -54,11 +68,14 @@ export function renderWithProviders(
     <QueryClientProvider client={client}>
       <NotificationWrapper>
         <SessionProvider>
-          <MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter>
+          <MemoryRouter initialEntries={initialEntries}>
+            {ui}
+            <NotificationHost />
+          </MemoryRouter>
         </SessionProvider>
       </NotificationWrapper>
     </QueryClientProvider>,
   );
 
-  return { ...utils, client };
+  return { ...utils, client, notifications };
 }

@@ -7,8 +7,8 @@
  * handler) is covered by `ApiKeyDetailPage.test.tsx`.
  *
  * Covered branches: prefill, successful submit, field-addressable rejection with
- * focus, unaddressable rejection as the page-level alert, pending state, and the
- * client-side block of an invalid name.
+ * focus, a page-level rejection left to the capture toast (AIS-85 `D2`), pending
+ * state, and the client-side block of an invalid name.
  */
 
 import { HTTP_STATUS } from '@callback/api-client';
@@ -128,7 +128,7 @@ describe('ApiKeyEditForm', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders an unaddressable failure as the page-level alert', async () => {
+  it('leaves a page failure to the capture toast instead of an inline alert', async () => {
     const submit = vi
       .fn()
       .mockRejectedValue(
@@ -141,9 +141,15 @@ describe('ApiKeyEditForm', () => {
     renderForm({ submit });
     await userEvent.click(getSubmitButton());
 
+    await waitFor(() => {
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+
+    // AIS-85 `D2`: `toFormErrorPlan` drops the page-level copy when the global
+    // capture owns the surface, so the sentence is not rendered twice.
     expect(
-      await screen.findByText(API_KEY_EDIT_FORM_ERROR_TITLE),
-    ).toBeInTheDocument();
+      screen.queryByText(API_KEY_EDIT_FORM_ERROR_TITLE),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the submit busy while the write is in flight', async () => {

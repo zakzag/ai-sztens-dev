@@ -349,16 +349,15 @@ export const buttonVariants = cva(
 
 ## 12. New page recipe
 
-1. Create `pages/<page>/` with `<Page>.tsx`, `<page>.interface.ts`, `<page>.const.ts`.
-2. Add the server needs to `packages/api-client` (interface + implementation + Zod schema).
-3. Add `features/<use-case>/use-*.ts` (query/mutation) and move decisions into `*.logic.ts`.
-4. Only if §6.1 step 3 answered **yes**, add `<page>.store.ts` + provider/hook; otherwise add no store.
-5. Compose the page from `packages/ui` primitives and page-only parts in `ui/`.
-6. Implement loading/empty/error/success explicitly.
-7. Register the route in `app/router`.
-8. Add tests (logic, hook and — if the page has one — store) and mocks in `src/test/mocks`.
-9. Add a row to the state plan in `docs/Specs/UI-Architecture.md`.
-10. Run `pnpm lint`, `pnpm test`, `pnpm build` for the app.
+The single, file-name-level, layer-ordered checklist is
+[`docs/Specs/New-Admin-Page.md`](../../docs/Specs/New-Admin-Page.md) (owner AIS-133). It is the only
+place that lists the steps; this section does not repeat them. Four rules are non-negotiable whatever
+the checklist says:
+
+1. **Components render.** No `fetch`, no business rule, no page-wide state inside a component.
+2. **All backend access** goes through `packages/api-client`; forms go through `useAppForm`.
+3. **State order is fixed:** URL → TanStack Query → page store (only per §6.1) → `useState`.
+4. **New code ships with tests**, and `pnpm quality` (including `quality:docs`) must stay green.
 
 ---
 

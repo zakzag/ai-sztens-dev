@@ -1,6 +1,12 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-05 — AIS-85 (a notification story lezárása).** Az `ApiKeyForm` a
+**Utolsó frissítés: 2026-11-05 — AIS-133 (az „új admin oldal” checklist egységesítése).** A recept
+egyetlen, fájlnév-szintű igazságforrása a [`New-Admin-Page.md`](./New-Admin-Page.md): ez a doksi a §6
+helyett **mindig** azt linkeli, a §5 state-plan marad a state-buckets tábla egyetlen helye, és az új
+`pnpm quality:docs` kapu (§9) pirosra fordítja, ha egy pointer-forrás elveszti a linket vagy egy `§N`
+hivatkozás nem létező szekcióra mutat.
+
+**AIS-85 (2026-11-05):** Az `ApiKeyForm` a
 referencia-implementáció: `useAppForm` + `useNotifier()`, `pageError` state és success `Alert` nélkül,
 `FormActions` pending-gombbal. A form csak a **látható** részt dönti el: siker → `notify.success`
 (egy toast + egy log bejegyzés), `field` hiba → mező + fókusz, toast nélkül, `page` hiba → a capture
@@ -627,31 +633,20 @@ The table still owns nothing: the failure stays `PageErrorState` (`D11`), and th
 
 ## 6. New page recipe
 
-The rule file's §12 in repo terms. Every step is a review checkpoint.
+The step-by-step, file-name-level, layer-ordered checklist is
+[`New-Admin-Page.md`](./New-Admin-Page.md) (owner AIS-133). It is the **only** place that lists the
+steps — this section and `.roo/rules/react.coding-standards.md` §12 only point at it.
 
-1. Create `apps/admin/src/pages/<page>/` with `<Page>.tsx` (composition only),
-   `<page>.interface.ts`, `<page>.const.ts`; add `<page>.store.ts` **only** if the rule's §6.1
-   decision test ends at the store (page-local `createStore` factory + provider/hook, never exported
-   outside the folder).
-2. Add the server need to `packages/api-client`: interface + implementation + the Zod schema in
-   `packages/shared/src/contract/<resource>/` (the envelope lives in
-   `packages/shared/src/contract/envelope.schema.ts`), then parse at the HTTP boundary. No `fetch`
-   outside this package.
-3. Add `apps/admin/src/features/<use-case>/` — `use-<use-case>.ts` (query/mutation), pure rules in
-   `<use-case>.logic.ts`, query keys in `<use-case>.const.ts`, narrow result interfaces in
-   `<use-case>.interface.ts`. A form does **not** re-implement the plumbing: it calls
-   [`useAppForm`](../../apps/admin/src/features/forms/use-app-form.ts:1) with its schema, ordered
-   field paths and submit (§4.4, [`Forms-and-Validation.md`](./Forms-and-Validation.md:1)).
-4. Compose the page from `packages/ui` primitives and page-only parts under `pages/<page>/ui/`.
-5. Implement loading / empty / error / success explicitly — a bare `null` is a defect.
-6. Register the route in `app/router/route-registry.tsx` — one `RouteEntry` in
-   `PROTECTED_ROUTE_ENTRIES` with a `navLabel` (or `null` for a route that must not be linked) and
-   a `hidden` flag for the index route. The `<Routes>` markup **and** the navigation are both derived
-   from the registry, so there is no second list to update; keep the markup on token classes.
-7. Add tests: `*.logic.ts` (all branches), the store (if any), the hook (success + error +
-   loading), and the page parts. Doubles and fixtures go to `src/test/mocks/**`, never inline.
-8. Add the page row to §5 of this document.
-9. Run the per-app checks from §8, then the palette check from §3.3.
+What stays in this document, because it is a decision rather than a step:
+
+- **§5 is the state plan** — a new page adds **one row** there, even when three of the four buckets
+  are intentionally empty ("no store" is a decision, not an omission);
+- **§4.4 is the form pattern** — every form goes through `useAppForm`, and the plumbing is never
+  re-implemented in a page;
+- **§3.3 and §4 are the styling and primitive vocabulary** the checklist refers to.
+
+Route registration is derived: one `RouteEntry` in `app/router/route-registry.tsx` produces both the
+`<Routes>` markup and the navigation, so `AdminNav.tsx` needs **no** edit for a new page.
 
 ## 7. Dependency list (UI side)
 
@@ -765,13 +760,13 @@ The palette check in §3.3 is part of the definition of done as well.
 
 ## 9. CI quality gates (AIS-122)
 
-The rules in `.roo/rules/react.coding-standards.md` are **machine-enforced**. Four static gates
+The rules in `.roo/rules/react.coding-standards.md` are **machine-enforced**. Five static gates
 run in the `quality-gates` CI job (`.github/workflows/ci.yml`), one step per gate, so the red step
-names the failing rule. A fifth machine check, `pnpm typecheck`, guards the types themselves and
-runs in `build-test` (§9.5). Locally the four gates are one command:
+names the failing rule. A sixth machine check, `pnpm typecheck`, guards the types themselves and
+runs in `build-test` (§9.5). Locally the five gates are one command:
 
 ```bash
-pnpm quality          # layers → dead code → tokens → field errors
+pnpm quality          # layers → dead code → tokens → field errors → docs
 pnpm test:quality     # the gates' own tests (negative + positive fixtures)
 ```
 
@@ -794,6 +789,7 @@ It is the command to run before pushing a branch; it is deliberately _not_ wired
 | `pnpm quality:dead-code`    | no unused file, export, exported type or dependency                                                                       | `apps/{admin,web}` + `packages/{ui,api-client,shared}` |
 | `pnpm quality:tokens`       | no colour literal, no Tailwind palette utility, no arbitrary colour value                                                 | `apps/*/src` **and** `packages/ui/src`                 |
 | `pnpm quality:field-errors` | no `error.status ===` / `error.code ===` / `instanceof ApiError` outside a pure decision function                         | `apps/*/src`                                           |
+| `pnpm quality:docs`         | every relative link resolves, every `§N` reference exists, every `docs/Specs` doc carries a valid `**Utolsó frissítés:**`, and every pointer source links [`New-Admin-Page.md`](./New-Admin-Page.md) | `docs/Specs` (minus `outdated/`) + the pointer sources |
 
 ### 9.1 Layer gate (`dependency-cruiser`)
 

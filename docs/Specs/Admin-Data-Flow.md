@@ -1,6 +1,6 @@
 # Admin Data Flow — contract → transport → service → hook → UI
 
-**Utolsó frissítés:** 2026-11-04 (AIS-131: a referencia-szelet teljes CRUD — detail olvasás, `PATCH` `updatedAt` tokennel, `ConfirmDialog`-os törlés; AIS-116: a lista-recept — `useListParams → useApiList → DataTable`/`Pagination`; AIS-110: „New resource template” szekció + registry ⇄ service lefedettségi kapu)
+**Utolsó frissítés:** 2026-11-05 (AIS-133: a fájlszintű „új erőforrás” recept egyetlen helyre, a [`New-Admin-Page.md`](New-Admin-Page.md)-ba került — ez a doksi a **folyamokat** tartja meg: a 3.6 alatti lista-adatfolyamot és a 3.7 alatti CRUD-adatfolyamot, a lépéssort nem; a korábbi, elavult szekcióhivatkozások javítva; AIS-131: a referencia-szelet teljes CRUD; AIS-116: a lista-recept; AIS-110: registry ⇄ service lefedettségi kapu)
 **Story:** AIS-102 (data flow), AIS-110 (client operation coverage + resource template)
 **Status:** living document — a jelenlegi állapotot írja le, nem pillanatképet.
 
@@ -22,7 +22,8 @@ Két szabály, amit ez a doksi **nem** ismétel meg, mert máshol él:
 | Téma                                                                                                    | Hol van leírva                                       |
 | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | A HTTP szerződés (envelope, hibakódok, lista query, `PATCH`/`DELETE` konvenció, `operationId` registry) | [`API-Convention.md`](API-Convention.md) §1–§8, §4.2 |
-| Az admin rétegek, tokenek, primitívek, state-bucketek, „új oldal” recept                                | [`UI-Architecture.md`](UI-Architecture.md) §2, §12   |
+| Az admin rétegek, tokenek, primitívek, state-bucketek, primitív-vokabulár                               | [`UI-Architecture.md`](UI-Architecture.md) §3.3, §4, §6 |
+| Az „új admin oldal” lépéssor (fájlnév-szintű, réteg-sorrendű) — **az egyetlen igazságforrás**          | [`New-Admin-Page.md`](New-Admin-Page.md)             |
 
 Ez a doksi a **kettő közötti** részt fedi le: hogyan lesz egy végpontból működő admin adatfolyam, és
 hogyan lehet ezt egy új erőforrásra másolni.
@@ -44,77 +45,25 @@ hogyan lehet ezt egy új erőforrásra másolni.
 
 ## 3. New resource template
 
-Egy új erőforrás **öt helyen** jelenik meg, mindig ugyanabban a sorrendben. Az `api-keys` a referenci-
-implementáció: a fájlnevek azért szerepelnek itt, hogy „másold az `api-keys` mappát” végrehajtható
-utasítás legyen.
+A fájlnév-szintű, réteg-sorrendű recept **egyetlen** helye a [`New-Admin-Page.md`](New-Admin-Page.md)
+(owner AIS-133). Az ottani §2 tábla sorolja fel a létrehozandó fájlokat abban a sorrendben, ahogy a
+réteg-kapu megköveteli — contract → `endpoint.registry` → shared tesztek → api-client →
+`service.registry` → api → drizzle → api tesztek → features → entities → pages → opcionális store →
+route-registry → (nav: nincs teendő) → MSW handler → `UI-Architecture.md` §5 state-plan sor —, és
+mindegyiknél a kötelező tartalmat is.
 
-### 3.1 `packages/shared/src/contract/<resource>/`
+Ez a doksi azt tartja meg, amit a checklist nem tud kifejezni:
 
-| Fájl                                              | Tartalom                                                                                                                         |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `<resource>.schema.ts`                            | request séma **`.strict()`**, response séma toleráns (ismeretlen kulcsot eldob)                                                  |
-| `<resource>.list-query.ts`                        | a lista query séma + a rendezhető oszlopok + a query paraméter-leírások (ha van lista)                                           |
-| `<resource>.update.ts`                            | a `PATCH` partial séma, kötelező `updatedAt`-tel (ha az erőforrás módosítható)                                                   |
-| `<resource>.contract.ts`                          | a registry bejegyzések (`<resource>.<action>`, method, path, `tag`, `successStatus`, `dataSchema`, `requestSchema?`, `errors[]`) |
-| `<resource>.fixture.ts`                           | egy érvényes példa — ugyanaz a fixture megy a sémába a tesztben és az OpenAPI `example`-be                                       |
-| `<resource>.const.ts` / `<resource>.interface.ts` | limitek, path konstans; a típusok `z.infer`-rel a sémákból                                                                       |
+| Marad itt | Miért |
+| --- | --- |
+| §2 réteg-felelősségek | táblázat arról, mi **tilos** egy rétegben — nem lépés, hanem szabály |
+| §3.6 a lista adatfolyama | egy vonal, a `useListParams → useApiList → DataTable` sorrend |
+| §3.7 a detail/edit/delete adatfolyama | a teljes CRUD-szelet öt szabálya |
 
-A registry bejegyzés hozzáadása után a `packages/shared/test/endpoint-registry.test.ts` és a
-`packages/api/test/envelope-contract.e2e-spec.ts` route-audit automatikusan elkapja az eltérést.
-
-### 3.2 `packages/api-client/src/<resource>/`
-
-| Fájl                      | Tartalom                                                                                                               |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `<resource>.service.ts`   | `create<Resource>Service(client: HttpClient)` — a path `clientPathOf('<resource>.<action>')`-ból, **soha** nem literál |
-| `<resource>.interface.ts` | a service interfésze (ezt injektálják a hookok); minden metódus fogad `options?: RequestOptions`-t                     |
-| `<resource>.const.ts`     | a path konstansok + a lista query default-jai                                                                          |
-| `<resource>.path.ts`      | csak akkor, ha `:identifier` helyettesítés kell — egyetlen hely, ami tudja, hogyan néz ki a placeholder                |
-
-**Kötelező utolsó lépés:** egy sor a `packages/api-client/src/service.registry.ts`-ben
-
-```ts
-export function createServiceFactories(): ServiceFactories {
-  return {
-    apiKeys: createApiKeysService,
-    // <resource>: create<Resource>Service,
-  };
-}
-```
-
-A kulcs **meg kell egyezzen** a registry namespace-szel, mert a lefedettségi kapu ebből vezeti le az
-elvárást. A `packages/api-client/test/service-coverage.test.ts` piros lesz, ha egy `operationId`-hez
-nincs service-metódus (`missing`), vagy ha egy service-metódusra nincs registry bejegyzés (`orphan`).
-Ezért egy új erőforrás nem igényel új tesztet: csak a registry bejegyzést és a fenti egy sort.
-
-### 3.3 `apps/api/src/<resource>/`
-
-| Fájl                                                 | Tartalom                                                                                                                              |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `<resource>.controller.ts`                           | `@Body(new ZodBodyPipe(schema))`, `@ReqCtx()`, `this.responses.ok(await service…, ctx)`; a `DELETE` `200` + `data: null` (soha `204`) |
-| `<resource>.service.ts`                              | üzleti döntés, plain adat vissza; hiba → `AppError` leszármazott                                                                      |
-| `<resource>.repository.ts`                           | Drizzle; a `update`/`softDelete` **atomikus** és verzió-ellenőrzött                                                                   |
-| `<resource>.mapper.ts` / `<resource>.logic.ts`       | row → dto; tiszta szabályok (pl. „múltbeli dátum”)                                                                                    |
-| `<resource>.errors.ts` / `<resource>.error-guard.ts` | domain hibák és a hozzájuk tartozó HTTP-kód leképezés                                                                                 |
-
-A `PATCH`/`DELETE` szemantikája (verzió-ütközés → `409 STALE_WRITE`, lehetetlen érték → `422
-SEMANTIC_VALIDATION_FAILED`, soft delete → `404`) a [`API-Convention.md`](API-Convention.md) §4.2-ben
-él; itt nem duplikáljuk.
-
-### 3.4 `apps/admin/src/features/<use-case>/`
-
-| Fájl                      | Tartalom                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------- |
-| `use-<use-case>.ts`       | TanStack Query hook; a service-t injektálva kapja, cache-invalidálást itt végez |
-| `<use-case>.logic.ts`     | tiszta szabályok (mapper, szűrő, döntés) — React és I/O nélkül                  |
-| `<use-case>.interface.ts` | szűk hook-visszatérési típusok (`isLoading`, `errorMessage`, `errorSurface`, …) |
-| `<use-case>.const.ts`     | query key-ek (**kötelező** itt deklarálni, nem a komponensben)                  |
-
-### 3.5 `apps/admin/src/entities/<entity>/` és `pages/<page>/`
-
-A mapper és a display-komponensek az `entities`-ben, a kompozíció a `pages`-ben. Az „új oldal” recept
-lépésről lépésre a [`UI-Architecture.md`](UI-Architecture.md) §12-ben van — ott a state-tábla sorát is
-fel kell venni.
+Az HTTP-oldali szerződés (envelope, lista query, `PATCH`/`DELETE` szemantika, `operationId` registry)
+továbbra is a [`API-Convention.md`](API-Convention.md) §1.1 és §4.2-ben él; a registry ⇄ service
+lefedettségi kapu (`packages/api-client/test/service-coverage.test.ts`) automatikusan elkapja az
+eltérést, ezért egy új erőforrás nem igényel külön tesztet ehhez.
 
 ### 3.6 Egy lista adatfolyama (AIS-116)
 

@@ -343,7 +343,7 @@ The resolved id appears as `meta.requestId` / `error.requestId` **and** as the `
 
 Implemented by `toFieldErrors(error): { fields, form }` in
 `apps/admin/src/features/<use-case>/<use-case>.logic.ts` (API keys:
-[`api-keys.logic.ts`](../../apps/admin/src/features/api-keys/api-keys.logic.ts:1)). Pure, no React, no I/O.
+[`api-keys.logic.ts`](../../apps/admin/src/pages/api-keys/api-keys.logic.ts:1)). Pure, no React, no I/O.
 
 | Rule                   | Detail                                                                                                                                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

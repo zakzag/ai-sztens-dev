@@ -200,6 +200,10 @@ jobs:
   #                            no arbitrary colour in apps/*/src + packages/ui/src
   #   * quality:field-errors — no `error.status ===` / `error.code ===` /
   #                            `instanceof ApiError` outside `*.logic.ts`
+  #   * quality:docs         — every relative link in docs/Specs resolves, every
+  #                            `§N` reference names an existing section, every
+  #                            Specs doc carries `**Utolsó frissítés:**`, and the
+  #                            pointer docs link docs/Specs/New-Admin-Page.md
   #
   # `pnpm test:quality` runs the gates' own negative/positive fixtures first: if
   # a rule stops firing, this job goes red even when the repo happens to be clean.
@@ -247,3 +251,6 @@ jobs:
 
       - name: Field-error gate
         run: pnpm quality:field-errors
+
+      - name: Docs gate
+        run: pnpm quality:docs

@@ -10,17 +10,38 @@ packages:
 
 # pnpm 12 turns the supply-chain `minimumReleaseAge` guard on by default (24h).
 # Declaring it explicitly keeps the intent visible and stable if the default
-# changes. The four entries below are trusted direct/transitive dependencies
-# that were refreshed to patch/minor releases published inside that 24h window;
-# exempting them is deliberate (downgrading them again would be churn with no
-# security gain for packages we already review). Re-check this list when the
-# versions have aged past the cutoff.
+# changes.
+#
+# The list below holds two kinds of exemptions:
+#   * bare package names (`strtok3`) — the package is trusted for *any* version;
+#   * `name@exact-version` pins (`@babel/core@7.29.13`) — a single release that
+#     reached `pnpm-lock.yaml` before the 24h window elapsed. pnpm 12 wrote the
+#     `name@version` batch below automatically at the confirmation prompt; keep
+#     the format, a bare name would widen the exemption to future releases.
+#
+# Downgrading these again would be churn with no security gain for packages we
+# already review. DELETE the versioned entries once the pinned releases have
+# aged past the cutoff — they only exist to keep the lockfile installable today.
+# Leaving them in place silently disables the guard for those versions forever.
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - '@tanstack/react-query'
   - '@tanstack/query-core'
   - strtok3
   - token-types
+  # Flagged on 2026-11-05 (published 2026-11-04 16:33Z, i.e. inside the window).
+  - '@babel/core@7.29.13'
+  - '@babel/generator@7.29.13'
+  - '@babel/helper-compilation-targets@7.29.13'
+  - '@babel/helper-module-transforms@7.29.13'
+  - '@babel/helper-string-parser@7.29.13'
+  - '@babel/helpers@7.29.13'
+  - '@babel/parser@7.29.13'
+  - '@babel/runtime@7.29.13'
+  - '@babel/traverse@7.29.13'
+  - bare-url@2.5.6
+  - electron-to-chromium@1.5.477
+  - graphql@16.15.0
 
 # `light-my-request` ships a broken/floating range through Fastify; pinning it
 # keeps the API's inject-based tests deterministic across installs.

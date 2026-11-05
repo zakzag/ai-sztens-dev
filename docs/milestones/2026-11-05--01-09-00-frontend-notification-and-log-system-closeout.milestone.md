@@ -71,9 +71,10 @@ Browser checklist on a running stack (`pnpm dev` + `/api-keys`):
 7. reload the page → the log is restored (≤200) without toasts;
 8. inspect one `api` log row from the failed request → status, URL, duration; no headers, no body.
 
-> Note: `vite build` fails with `Access is denied` while deleting an `esbuild` temp file when `%TEMP%`
-> points at the Windows profile. Pointing `TEMP`/`TMP` at a repo-local `.tmp` directory makes it green —
-> environment issue, not a code defect.
+> The Windows `esbuild` `Access is denied` temp-file failure that used to break `pnpm build` is fixed
+> in the repository by [`scripts/lib/vite-build.mjs`](../../scripts/lib/vite-build.mjs:1): the apps call
+> it instead of `vite` directly, so the bundler always gets a project-local temp directory. See the
+> troubleshooting section of [`scripts/README.md`](../../scripts/README.md:1).
 
 ## 6. Follow-ups
 

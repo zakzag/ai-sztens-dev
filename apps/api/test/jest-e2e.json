@@ -2,6 +2,7 @@
   "preset": "ts-jest/presets/default-esm",
   "moduleFileExtensions": ["js", "json", "ts"],
   "moduleNameMapper": {
+    "^(\\.{1,2}/.*\\.json\\.js)$": "$1",
     "^(\\.{1,2}/.*)\\.js$": "$1"
   },
   "rootDir": ".",

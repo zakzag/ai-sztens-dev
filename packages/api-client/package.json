@@ -38,6 +38,7 @@
     ],
     "moduleNameMapper": {
       "^@callback/shared$": "<rootDir>/../shared/src/index.ts",
+      "^(\\.{1,2}/.*\\.json\\.js)$": "$1",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "rootDir": ".",

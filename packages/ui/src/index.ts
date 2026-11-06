@@ -250,6 +250,21 @@ export type {
   DropdownMenuProps,
 } from './components/dropdown-menu/dropdown-menu.interface.js';
 
+export { SelectMenu } from './components/select-menu/SelectMenu.js';
+export {
+  SELECT_MENU_CHEVRON_CLASS,
+  SELECT_MENU_ITEM_CLASS,
+  SELECT_MENU_TRIGGER_CLASS,
+} from './components/select-menu/select-menu.const.js';
+export {
+  toSelectedOption,
+  toTriggerLabel,
+} from './components/select-menu/select-menu.logic.js';
+export type {
+  SelectMenuOption,
+  SelectMenuProps,
+} from './components/select-menu/select-menu.interface.js';
+
 export { Toast } from './components/toast/Toast.js';
 export { ToastStack } from './components/toast/ToastStack.js';
 export {
@@ -319,6 +334,7 @@ export type {
 } from './components/log-drawer/log-drawer.variants.js';
 
 export {
+  ChevronDownIcon,
   ChevronRightIcon,
   MoonIcon,
   SettingsIcon,

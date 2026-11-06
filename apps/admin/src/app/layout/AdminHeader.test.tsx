@@ -12,6 +12,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../../test/mocks/app-router.mock.js';
+import { createOverlayUser } from '../../test/mocks/overlay-environment.mock.js';
 import {
   MOCK_DETAIL_LABEL,
   MOCK_ROUTE_ENTRIES,
@@ -24,6 +25,7 @@ import {
   ADMIN_HEADER_TOP_ROW_HEIGHT,
   ADMIN_HEADER_Z_INDEX,
   APP_USER_SETTINGS_ARIA_LABEL,
+  THEME_OPTION_DARK_LABEL,
   THEME_OPTION_LIGHT,
   THEME_OPTION_LIGHT_LABEL,
   THEME_SELECTOR_LABEL,
@@ -93,7 +95,9 @@ describe('AdminHeader', () => {
     const [topBand] = getBands();
 
     expect(
-      within(topBand).getByRole('combobox', { name: THEME_SELECTOR_LABEL }),
+      within(topBand).getByRole('button', {
+        name: `${THEME_SELECTOR_LABEL}: ${THEME_OPTION_DARK_LABEL}`,
+      }),
     ).toBeInTheDocument();
     expect(
       within(topBand).getByRole('button', {
@@ -150,13 +154,17 @@ describe('AdminHeader', () => {
   });
 
   it('forwards the picked appearance through the port', async () => {
+    const user = createOverlayUser();
     const { onThemeChange } = renderHeader();
 
-    await userEvent.click(
-      screen.getByRole('combobox', { name: THEME_SELECTOR_LABEL }),
+    await user.click(
+      screen.getByRole('button', {
+        name: `${THEME_SELECTOR_LABEL}: ${THEME_OPTION_DARK_LABEL}`,
+      }),
     );
-    await userEvent.click(
-      screen.getByRole('option', { name: THEME_OPTION_LIGHT_LABEL }),
+    await screen.findByRole('menu');
+    await user.click(
+      screen.getByRole('menuitemradio', { name: THEME_OPTION_LIGHT_LABEL }),
     );
 
     expect(onThemeChange).toHaveBeenCalledWith(THEME_OPTION_LIGHT);

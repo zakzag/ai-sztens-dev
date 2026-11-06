@@ -8,10 +8,6 @@ export interface ComboboxHarnessProps {
   readonly options: readonly ComboboxOption[];
   /** Optional spy forwarded to the real `onSelect`. */
   readonly onSelect?: (value: string) => void;
-  /** Optional spy forwarded to the real `onOpen`. */
-  readonly onOpen?: () => void;
-  /** Optional spy forwarded to the real `onClose`. */
-  readonly onClose?: () => void;
   /** Renders the input disabled. */
   readonly disabled?: boolean;
 }
@@ -28,8 +24,6 @@ export interface ComboboxHarnessProps {
 export function ComboboxHarness({
   options,
   onSelect,
-  onOpen,
-  onClose,
   disabled = false,
 }: ComboboxHarnessProps) {
   const [value, setValue] = useState<string | null>(null);
@@ -44,8 +38,6 @@ export function ComboboxHarness({
         inputValue={inputValue}
         disabled={disabled}
         onInputValueChange={setInputValue}
-        onOpen={onOpen}
-        onClose={onClose}
         onSelect={(nextValue) => {
           setValue(nextValue);
           onSelect?.(nextValue);

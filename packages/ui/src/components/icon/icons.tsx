@@ -124,3 +124,20 @@ export function ChevronRightIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/**
+ * Chevron-down icon — the "opens below" affordance of the select trigger.
+ *
+ * Geometry copied from Lucide `chevron-down`
+ * (https://lucide.dev/icons/chevron-down),
+ * ISC licence — Copyright (c) Lucide Contributors.
+ *
+ * @param props - see {@link IconProps}.
+ */
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <svg {...ICON_BASE_PROPS} className={cn(ICON_BASE_CLASS, className)}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}

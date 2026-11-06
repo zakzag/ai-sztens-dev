@@ -40,8 +40,6 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(
       inputValue,
       onSelect,
       onInputValueChange,
-      onOpen,
-      onClose,
       placeholder,
       emptyMessage = COMBOBOX_DEFAULT_EMPTY_MESSAGE,
       invalid = false,
@@ -62,36 +60,9 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(
     const active = clampActiveIndex(activeIndex, filtered.length);
     const activeOption = active >= 0 ? filtered[active] : undefined;
 
-    /**
-     * Expands the listbox and reports the transition **once**.
-     *
-     * `onOpen` fires only when the listbox was actually closed, so the caller
-     * clears its filter text once, not on every keystroke that re-expands it.
-     */
-    function open(): void {
-      if (isOpen) {
-        return;
-      }
-
-      setIsOpen(true);
-      onOpen?.();
-    }
-
-    /**
-     * Collapses the listbox and reports the transition **once**.
-     *
-     * `onClose` fires only when the listbox was actually open, so a blur of an
-     * already-closed field cannot reset the caller's text a second time.
-     */
     function close(): void {
-      setActiveIndex(-1);
-
-      if (!isOpen) {
-        return;
-      }
-
       setIsOpen(false);
-      onClose?.();
+      setActiveIndex(-1);
     }
 
     function select(option: ComboboxOption): void {
@@ -109,7 +80,7 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(
 
       if (direction) {
         event.preventDefault();
-        open();
+        setIsOpen(true);
         setActiveIndex(
           nextActiveIndex(activeIndex, direction, filtered.length),
         );
@@ -153,11 +124,11 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(
           className={cn(inputVariants({ invalid }))}
           onChange={(event) => {
             onInputValueChange(event.target.value);
-            open();
+            setIsOpen(true);
             setActiveIndex(-1);
           }}
-          onFocus={open}
-          onClick={open}
+          onFocus={() => setIsOpen(true)}
+          onClick={() => setIsOpen(true)}
           onBlur={close}
           onKeyDown={handleKeyDown}
         />

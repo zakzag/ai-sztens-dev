@@ -9,6 +9,9 @@
  *   between the component and its specification.
  */
 
+import { MoonIcon, SunIcon, SunsetIcon } from '@callback/ui';
+import type { IconProps } from '@callback/ui';
+import type { ComponentType } from 'react';
 import type {
   ThemeOption,
   ThemeOptionEntry,
@@ -38,30 +41,6 @@ export const APP_USER_SETTINGS_ARIA_LABEL = 'Felhasználói beállítások';
 
 /** Accessible label of the appearance combobox (`<label>` text). */
 export const THEME_SELECTOR_LABEL = 'Megjelenés';
-
-/**
- * Id of the appearance combobox input.
- *
- * The listbox and every option id derive from it, so the id is a contract with
- * the `Combobox` primitive rather than a local detail (AIS-148).
- */
-export const THEME_SELECTOR_ID = 'app-theme';
-
-/**
- * Width of the combobox inside the fixed-height header row.
- *
- * A layout-only utility: the surface, border and depth come from the primitive,
- * so the header never restates the token recipe.
- */
-export const THEME_SELECTOR_WIDTH_CLASS = 'w-40';
-
-/**
- * Placeholder shown while the listbox is open and the filter text is empty.
- *
- * The input is deliberately emptied on open (AIS-148): a pre-filled selection
- * would filter the list down to that single appearance.
- */
-export const THEME_SELECTOR_PLACEHOLDER = 'Keresés…';
 
 /** Value of the light appearance. */
 export const THEME_OPTION_LIGHT: ThemeOption = 'light';
@@ -93,3 +72,19 @@ export const THEME_SELECTOR_OPTIONS: readonly ThemeOptionEntry[] = [
   { value: DEFAULT_THEME_OPTION, label: THEME_OPTION_DARK_LABEL },
   { value: THEME_OPTION_AMBIENT, label: THEME_OPTION_AMBIENT_LABEL },
 ];
+
+/**
+ * Icon of each appearance.
+ *
+ * The map holds the **component**, not an element, so the selector can render it
+ * with its own props and this module stays free of JSX (a `.const.ts` file). The
+ * select box shows the icon both on the trigger and in the option list
+ * (AIS-149).
+ */
+export const THEME_OPTION_ICONS: Readonly<
+  Record<ThemeOption, ComponentType<IconProps>>
+> = {
+  [THEME_OPTION_LIGHT]: SunIcon,
+  [DEFAULT_THEME_OPTION]: MoonIcon,
+  [THEME_OPTION_AMBIENT]: SunsetIcon,
+};

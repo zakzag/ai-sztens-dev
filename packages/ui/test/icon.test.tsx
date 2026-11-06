@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
+  ChevronDownIcon,
   ChevronRightIcon,
   MoonIcon,
   SettingsIcon,
@@ -11,14 +12,17 @@ import { ICON_BASE_CLASS } from '../src/components/icon/icon.const.js';
 import type { IconProps } from '../src/components/icon/icon.interface.js';
 
 /** Every icon of the set, so a new icon cannot skip the shared contract. */
-const ICONS: readonly { readonly name: string; readonly Icon: (props: IconProps) => JSX.Element }[] =
-  [
-    { name: 'SunIcon', Icon: SunIcon },
-    { name: 'MoonIcon', Icon: MoonIcon },
-    { name: 'SunsetIcon', Icon: SunsetIcon },
-    { name: 'SettingsIcon', Icon: SettingsIcon },
-    { name: 'ChevronRightIcon', Icon: ChevronRightIcon },
-  ];
+const ICONS: readonly {
+  readonly name: string;
+  readonly Icon: (props: IconProps) => JSX.Element;
+}[] = [
+  { name: 'SunIcon', Icon: SunIcon },
+  { name: 'MoonIcon', Icon: MoonIcon },
+  { name: 'SunsetIcon', Icon: SunsetIcon },
+  { name: 'SettingsIcon', Icon: SettingsIcon },
+  { name: 'ChevronRightIcon', Icon: ChevronRightIcon },
+  { name: 'ChevronDownIcon', Icon: ChevronDownIcon },
+];
 
 describe('icon set', () => {
   for (const { name, Icon } of ICONS) {
@@ -39,7 +43,9 @@ describe('icon set', () => {
       it('carries the default size class', () => {
         const { container } = render(<Icon />);
 
-        expect(container.querySelector('svg')).toHaveClass(...ICON_BASE_CLASS.split(' '));
+        expect(container.querySelector('svg')).toHaveClass(
+          ...ICON_BASE_CLASS.split(' '),
+        );
       });
     });
   }

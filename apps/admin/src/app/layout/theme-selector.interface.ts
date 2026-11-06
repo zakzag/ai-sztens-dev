@@ -1,5 +1,5 @@
 /**
- * Types of the appearance selector of the admin header (AIS-147, AIS-148).
+ * Types of the appearance selector of the admin header (AIS-147, AIS-149).
  *
  * The selector is **UI only**: the theme is not applied anywhere yet, so the
  * value type describes a choice, not a feature (AIS-140 `D3`).
@@ -11,29 +11,15 @@ export type ThemeOption = 'light' | 'dark' | 'ambient';
 /**
  * One entry of the appearance list.
  *
- * It deliberately carries **no** icon: the selector is a combobox, and an
- * `<option>` inside a listbox is text-only (AIS-148).
+ * It deliberately carries **no** icon: a `.const.ts` module cannot hold JSX, so
+ * the icon component is looked up by {@link ThemeOption} in
+ * `layout.const.ts` and rendered by the selector.
  */
 export interface ThemeOptionEntry {
-  /** Submitted value of the combobox option. */
+  /** Submitted value of the select option. */
   readonly value: ThemeOption;
-  /** Visible label of the combobox option. */
+  /** Visible label of the select option. */
   readonly label: string;
-}
-
-/**
- * The single state object of {@link ThemeSelector}.
- *
- * `selected` and `query` live together, because the combobox is fully
- * controlled (AIS-113 **D5**): the typed text is an intermediate filter, not a
- * second source of truth. Keeping them in one object means "reset the text to
- * the selection" is one atomic update instead of two that can disagree.
- */
-export interface ThemeSelectorState {
-  /** The appearance the user actually chose. */
-  readonly selected: ThemeOption;
-  /** Text currently in the combobox input (the filter query). */
-  readonly query: string;
 }
 
 /** Props of {@link ThemeSelector}. */

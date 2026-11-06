@@ -1,17 +1,17 @@
 /**
  * Tests of the appearance selector.
  *
- * The component is a controlled-by-nobody **combobox** (AIS-148): it owns its
+ * The component is a controlled-by-nobody **select box** (AIS-149): it owns its
  * selection locally and reports every change through the `onThemeChange` port.
  * The suite covers the compact contract — closed it shows **only** the chosen
- * appearance, open it lists all three — the filter-text reset, and the negative
+ * appearance with its icon, open it lists all three — and the negative
  * contract: selecting an appearance changes **nothing** outside the component
  * (AIS-140 `D3`).
  */
 
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { createOverlayUser } from '../../../test/mocks/overlay-environment.mock.js';
 import {
   THEME_OPTION_AMBIENT_LABEL,
   THEME_OPTION_DARK_LABEL,
@@ -33,112 +33,110 @@ function renderSelector() {
   return { ...result, onThemeChange };
 }
 
+/**
+ * Builds the accessible name the trigger reports.
+ *
+ * @param chosenLabel - label of the appearance the trigger shows.
+ * @returns `"Megjelenés: <chosen label>"`.
+ */
+function toTriggerName(chosenLabel: string): string {
+  return `${THEME_SELECTOR_LABEL}: ${chosenLabel}`;
+}
+
 describe('ThemeSelector', () => {
-  it('closes into a single, labelled combobox that shows only the selection', () => {
+  it('closes into a select box that shows only the chosen appearance', () => {
     const { container } = renderSelector();
 
-    const input = screen.getByRole('combobox', { name: THEME_SELECTOR_LABEL });
-
-    expect(input).toHaveAttribute('aria-expanded', 'false');
-    expect(input).toHaveValue(THEME_OPTION_DARK_LABEL);
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    expect(screen.queryAllByRole('option')).toHaveLength(0);
-    expect(container.querySelectorAll('svg')).toHaveLength(0);
+    expect(
+      screen.getByRole('button', {
+        name: toTriggerName(THEME_OPTION_DARK_LABEL),
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    // The chosen appearance's icon plus the trigger chevron — nothing else.
+    expect(container.querySelectorAll('svg')).toHaveLength(2);
+    expect(
+      screen.queryByText(THEME_OPTION_LIGHT_LABEL),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(THEME_OPTION_AMBIENT_LABEL),
+    ).not.toBeInTheDocument();
   });
 
-  it('opens the three appearances on focus and marks the selected one', async () => {
+  it('offers no search field, unlike a combobox', () => {
     renderSelector();
 
-    const input = screen.getByRole('combobox', { name: THEME_SELECTOR_LABEL });
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
 
-    await userEvent.click(input);
+  it('lists the three appearances with an icon each and marks the current one', async () => {
+    const user = createOverlayUser();
 
-    expect(input).toHaveAttribute('aria-expanded', 'true');
-    expect(
-      screen.getAllByRole('option').map((option) => option.textContent),
-    ).toEqual([
+    renderSelector();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: toTriggerName(THEME_OPTION_DARK_LABEL),
+      }),
+    );
+
+    const menu = await screen.findByRole('menu');
+
+    expect(menu).toHaveAttribute('aria-label', THEME_SELECTOR_LABEL);
+
+    const options = screen.getAllByRole('menuitemradio');
+
+    expect(options.map((option) => option.textContent)).toEqual([
       THEME_OPTION_LIGHT_LABEL,
       THEME_OPTION_DARK_LABEL,
       THEME_OPTION_AMBIENT_LABEL,
     ]);
     expect(
-      screen.getByRole('option', { name: THEME_OPTION_DARK_LABEL }),
-    ).toHaveAttribute('aria-selected', 'true');
+      options.every((option) => option.querySelector('svg') !== null),
+    ).toBe(true);
+    expect(options[1]).toHaveAttribute('aria-checked', 'true');
   });
 
-  it('commits a new appearance, closes, and shows it as the only value', async () => {
+  it('moves the selection, closes, and shows the new appearance', async () => {
+    const user = createOverlayUser();
     const { onThemeChange } = renderSelector();
 
-    const input = screen.getByRole('combobox', { name: THEME_SELECTOR_LABEL });
-
-    await userEvent.click(input);
-    await userEvent.click(
-      screen.getByRole('option', { name: THEME_OPTION_LIGHT_LABEL }),
+    await user.click(
+      screen.getByRole('button', {
+        name: toTriggerName(THEME_OPTION_DARK_LABEL),
+      }),
+    );
+    await screen.findByRole('menu');
+    await user.click(
+      screen.getByRole('menuitemradio', { name: THEME_OPTION_LIGHT_LABEL }),
     );
 
-    expect(input).toHaveValue(THEME_OPTION_LIGHT_LABEL);
-    expect(input).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(onThemeChange).toHaveBeenCalledTimes(1);
     expect(onThemeChange).toHaveBeenCalledWith(THEME_OPTION_LIGHT);
-  });
-
-  it('filters the list without accents', async () => {
-    renderSelector();
-
-    const input = screen.getByRole('combobox', { name: THEME_SELECTOR_LABEL });
-
-    await userEvent.click(input);
-    await userEvent.clear(input);
-    await userEvent.type(input, 'vilag');
-
-    expect(screen.getAllByRole('option')).toHaveLength(1);
-    expect(screen.getByRole('option')).toHaveTextContent(
-      THEME_OPTION_LIGHT_LABEL,
-    );
-  });
-
-  it('drops the typed filter text when the listbox closes', async () => {
-    renderSelector();
-
-    const input = screen.getByRole('combobox', { name: THEME_SELECTOR_LABEL });
-
-    await userEvent.click(input);
-    await userEvent.clear(input);
-    await userEvent.type(input, 'zzz');
-
-    expect(screen.queryAllByRole('option')).toHaveLength(0);
-
-    await userEvent.keyboard('{Escape}');
-
-    expect(input).toHaveValue(THEME_OPTION_DARK_LABEL);
-  });
-
-  it('keeps the committed appearance when the filter matched nothing', async () => {
-    const { onThemeChange } = renderSelector();
-
-    const input = screen.getByRole('combobox', { name: THEME_SELECTOR_LABEL });
-
-    await userEvent.click(input);
-    await userEvent.clear(input);
-    await userEvent.type(input, 'zzz');
-    await userEvent.keyboard('{Escape}');
-    await userEvent.click(input);
-
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
     expect(
-      screen.getByRole('option', { name: THEME_OPTION_DARK_LABEL }),
-    ).toHaveAttribute('aria-selected', 'true');
-    expect(onThemeChange).not.toHaveBeenCalled();
+      screen.getByRole('button', {
+        name: toTriggerName(THEME_OPTION_LIGHT_LABEL),
+      }),
+    ).toBeInTheDocument();
   });
 
   it('touches neither the document nor the storage', async () => {
+    const user = createOverlayUser();
+
     renderSelector();
 
-    const input = screen.getByRole('combobox', { name: THEME_SELECTOR_LABEL });
-
-    await userEvent.click(input);
-    await userEvent.click(
-      screen.getByRole('option', { name: THEME_OPTION_AMBIENT_LABEL }),
+    await user.click(
+      screen.getByRole('button', {
+        name: toTriggerName(THEME_OPTION_DARK_LABEL),
+      }),
+    );
+    await screen.findByRole('menu');
+    await user.click(
+      screen.getByRole('menuitemradio', { name: THEME_OPTION_AMBIENT_LABEL }),
     );
 
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);

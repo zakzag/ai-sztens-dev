@@ -31,6 +31,24 @@ export interface ComboboxProps {
   readonly onSelect: (value: string) => void;
   /** Called with every typed character; the caller mirrors it into `inputValue`. */
   readonly onInputValueChange: (inputValue: string) => void;
+  /**
+   * Called exactly once when a closed listbox opens — focus, a pointer press or
+   * the first arrow key — and never while it is already open.
+   *
+   * It is the caller's chance to drop a pre-filled value before filtering: an
+   * input that still held the current selection would filter the list down to
+   * that single entry (AIS-148).
+   */
+  readonly onOpen?: () => void;
+  /**
+   * Called exactly once whenever an open listbox closes — select, `Escape` or
+   * blur — and never while it is already closed.
+   *
+   * It is the caller's chance to restore the committed value after the
+   * intermediate filter text is gone: a closed combobox that still showed the
+   * query would claim a value the user never picked (AIS-148).
+   */
+  readonly onClose?: () => void;
   /** Placeholder of the input. */
   readonly placeholder?: string;
   /** Text shown when the filter matches nothing, defaults to the Hungarian label. */

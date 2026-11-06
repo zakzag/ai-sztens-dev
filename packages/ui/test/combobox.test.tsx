@@ -88,6 +88,21 @@ describe('Combobox', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
+  it('reopens on a click after the listbox was dismissed', async () => {
+    render(<ComboboxHarness options={FORM_COMBOBOX_OPTIONS} />);
+
+    const input = screen.getByRole('combobox');
+
+    input.focus();
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+    await userEvent.click(input);
+
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
   it('does not select a disabled option', async () => {
     const onSelect = vi.fn();
 
@@ -106,5 +121,62 @@ describe('Combobox', () => {
     render(<ComboboxHarness options={FORM_COMBOBOX_OPTIONS} disabled />);
 
     expect(screen.getByRole('combobox')).toBeDisabled();
+  });
+
+  it('reports the opening of a closed listbox exactly once', async () => {
+    const onOpen = vi.fn();
+
+    render(<ComboboxHarness options={FORM_COMBOBOX_OPTIONS} onOpen={onOpen} />);
+
+    const input = screen.getByRole('combobox');
+
+    input.focus();
+    await userEvent.type(input, 'a');
+
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports the close of an open listbox exactly once', async () => {
+    const onClose = vi.fn();
+
+    render(
+      <ComboboxHarness options={FORM_COMBOBOX_OPTIONS} onClose={onClose} />,
+    );
+
+    const input = screen.getByRole('combobox');
+
+    input.focus();
+    await userEvent.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays silent when the already closed listbox is dismissed again', async () => {
+    const onClose = vi.fn();
+
+    render(
+      <ComboboxHarness options={FORM_COMBOBOX_OPTIONS} onClose={onClose} />,
+    );
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('reports the close that follows a selection', async () => {
+    const onClose = vi.fn();
+
+    render(
+      <ComboboxHarness options={FORM_COMBOBOX_OPTIONS} onClose={onClose} />,
+    );
+
+    const input = screen.getByRole('combobox');
+
+    input.focus();
+    await userEvent.keyboard('{ArrowDown}');
+    await userEvent.keyboard('{Enter}');
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 });

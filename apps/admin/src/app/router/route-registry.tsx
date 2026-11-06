@@ -4,6 +4,8 @@ import { ApiKeysPage } from '../../pages/api-keys/ApiKeysPage.js';
 import { LoginPage } from '../../pages/LoginPage.js';
 import { PlaceholderPage } from '../../pages/PlaceholderPage.js';
 import {
+  APP_API_KEYS_LABEL,
+  APP_CALLS_LABEL,
   APP_NAV_HOME_LABEL,
   APP_NOT_FOUND_MESSAGE,
   APP_ROUTE_API_KEYS_PATH,
@@ -37,6 +39,9 @@ export const PUBLIC_ROUTE_ENTRIES: readonly RouteEntry[] = [
     navLabel: null,
     element: <LoginPage />,
     protected: false,
+    // The login page renders outside the authenticated shell, so it has no
+    // trail either — see `RouteEntry.breadcrumbLabel`.
+    breadcrumbLabel: null,
   },
 ];
 
@@ -53,12 +58,16 @@ export const PROTECTED_ROUTE_ENTRIES: readonly RouteEntry[] = [
     element: <PlaceholderPage />,
     protected: true,
     hidden: true,
+    // The root of every trail: it has a crumb but no parent.
+    breadcrumbLabel: APP_NAV_HOME_LABEL,
   },
   {
     path: APP_ROUTE_API_KEYS_PATH,
-    navLabel: 'API kulcsok',
+    navLabel: APP_API_KEYS_LABEL,
     element: <ApiKeysPage />,
     protected: true,
+    breadcrumbLabel: APP_API_KEYS_LABEL,
+    breadcrumbParentPath: APP_ROUTE_HOME_PATH,
   },
   {
     // The detail page is reached from the list, never from the navigation, so it
@@ -67,16 +76,25 @@ export const PROTECTED_ROUTE_ENTRIES: readonly RouteEntry[] = [
     //
     // The path template comes from the page folder: the table links to it too,
     // and a page may not import `app`, so the page owns the one literal.
+    //
+    // Breadcrumb: the segment is a URL parameter, so the text has to come from a
+    // resolver (AIS-140 `D5`). The raw identifier is shown on purpose — a display
+    // name is a separate decision (AIS-140 `D6`).
     path: API_KEY_DETAIL_ROUTE_PATH,
     navLabel: null,
     element: <ApiKeyDetailPage />,
     protected: true,
+    breadcrumbLabel: null,
+    breadcrumbParentPath: APP_ROUTE_API_KEYS_PATH,
+    resolveBreadcrumbLabel: (params) => params.identifier,
   },
   {
     path: APP_ROUTE_CALLS_PATH,
-    navLabel: 'Hívások',
+    navLabel: APP_CALLS_LABEL,
     element: <p className="text-text-secondary">Hívások — hamarosan</p>,
     protected: true,
+    breadcrumbLabel: APP_CALLS_LABEL,
+    breadcrumbParentPath: APP_ROUTE_HOME_PATH,
   },
 ];
 
@@ -90,6 +108,9 @@ export const NOT_FOUND_ROUTE_ENTRY: RouteEntry = {
   navLabel: null,
   element: <p className="text-text-secondary">{APP_NOT_FOUND_MESSAGE}</p>,
   protected: true,
+  // The catch-all is a page, not a position in the hierarchy: an unknown URL has
+  // no trail at all (`toBreadcrumbItems` returns `[]`).
+  breadcrumbLabel: null,
 };
 
 /** Every route of the application, public and protected alike. */

@@ -24,8 +24,19 @@ export const APP_ERROR_BOUNDARY_MESSAGE =
 /** Label of the error boundary's reload button. */
 export const APP_ERROR_BOUNDARY_RELOAD_LABEL = 'Oldal újratöltése';
 
-/** Label of the navigation entry pointing to the landing page. */
+/**
+ * Label of the landing page.
+ *
+ * Shared by the navigation entry and the breadcrumb root (AIS-146): the same
+ * route must read the same way in both places, so the wording lives here once.
+ */
 export const APP_NAV_HOME_LABEL = 'Kezdőlap';
+
+/** Label of the API-key manager, used by the nav and the breadcrumb (AIS-146). */
+export const APP_API_KEYS_LABEL = 'API kulcsok';
+
+/** Label of the (placeholder) calls page, used by the nav and the breadcrumb (AIS-146). */
+export const APP_CALLS_LABEL = 'Hívások';
 
 /** Path of the landing page. */
 export const APP_ROUTE_HOME_PATH = '/';

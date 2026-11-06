@@ -17,6 +17,7 @@ import {
   MOCK_ROUTE_ENTRIES,
   MOCK_VISIBLE_ROUTE,
 } from '../../test/mocks/route-registry.mock.js';
+import { APP_NAV_LABEL } from '../app.const.js';
 import type { RouteEntry } from './route-entry.interface.js';
 import { AppRouter } from './AppRouter.js';
 
@@ -26,6 +27,7 @@ const MOCK_PUBLIC_ROUTE: RouteEntry = {
   navLabel: null,
   element: <p>mock login</p>,
   protected: false,
+  breadcrumbLabel: null,
 };
 
 /** The catch-all entry used by the tests. */
@@ -34,6 +36,7 @@ const MOCK_NOT_FOUND_ROUTE: RouteEntry = {
   navLabel: null,
   element: <p>mock not found</p>,
   protected: true,
+  breadcrumbLabel: null,
 };
 
 describe('AppRouter', () => {
@@ -62,7 +65,11 @@ describe('AppRouter', () => {
     );
 
     expect(screen.getByText('mock home')).toBeInTheDocument();
-    expect(screen.getByRole('navigation')).toBeInTheDocument();
+    // Named query: the shell also renders the breadcrumb landmark, so the bare
+    // role would match two elements.
+    expect(
+      screen.getByRole('navigation', { name: APP_NAV_LABEL }),
+    ).toBeInTheDocument();
   });
 
   it('renders the not-found entry for an unknown URL', () => {
@@ -94,6 +101,6 @@ describe('AppRouter', () => {
     expect(
       screen.getByRole('heading', { name: 'Bejelentkezés' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('navigation')).toHaveLength(0);
   });
 });

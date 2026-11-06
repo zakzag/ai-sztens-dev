@@ -11,7 +11,10 @@ import { describe, expect, it } from 'vitest';
 import { API_KEYS_LIST_ROUTE_PATH } from '../../pages/api-keys/api-keys.const.js';
 import {
   APP_API_PATH_PREFIX,
+  APP_NAV_HOME_LABEL,
   APP_ROUTE_API_KEYS_PATH,
+  APP_ROUTE_CALLS_PATH,
+  APP_ROUTE_HOME_PATH,
   APP_ROUTE_LOGIN_PATH,
 } from '../app.const.js';
 import {
@@ -103,5 +106,97 @@ describe('route registry', () => {
     // `pages` must not import `app`, so the detail page carries its own copy of
     // the list path; this assertion is what keeps the copy honest.
     expect(API_KEYS_LIST_ROUTE_PATH).toBe(APP_ROUTE_API_KEYS_PATH);
+  });
+});
+
+describe('route registry breadcrumb metadata (AIS-146)', () => {
+  /** Every path the registry declares, catch-all included. */
+  const knownPaths = new Set(ALL_ROUTE_ENTRIES.map((route) => route.path));
+
+  it('points every breadcrumb parent at an existing entry', () => {
+    // The trail is built by walking this pointer, so a typo would silently cut
+    // the chain instead of failing a render.
+    for (const route of ALL_ROUTE_ENTRIES) {
+      if (route.breadcrumbParentPath !== undefined) {
+        expect(knownPaths.has(route.breadcrumbParentPath)).toBe(true);
+      }
+    }
+  });
+
+  it('gives every dynamic route a label resolver', () => {
+    for (const route of ALL_ROUTE_ENTRIES) {
+      if (route.path.includes(':')) {
+        expect(route.resolveBreadcrumbLabel).toBeDefined();
+      }
+    }
+  });
+
+  it('leaves only public and catch-all entries without a crumb', () => {
+    // An entry is in a trail when it has a static label or a resolver. Anything
+    // else that is reachable by URL would be a page nobody can locate.
+    for (const route of ALL_ROUTE_ENTRIES) {
+      const hasNoCrumb =
+        route.breadcrumbLabel === null &&
+        route.resolveBreadcrumbLabel === undefined;
+
+      if (hasNoCrumb) {
+        expect(route.protected === false || route.path === '*').toBe(true);
+      }
+    }
+
+    expect(NOT_FOUND_ROUTE_ENTRY.breadcrumbLabel).toBeNull();
+  });
+
+  it('builds a finite trail for every entry', () => {
+    for (const route of ALL_ROUTE_ENTRIES) {
+      let current = route;
+      let hops = 0;
+
+      while (current.breadcrumbParentPath !== undefined) {
+        const parent = ALL_ROUTE_ENTRIES.find(
+          (candidate) => candidate.path === current.breadcrumbParentPath,
+        );
+
+        expect(parent).toBeDefined();
+
+        if (parent === undefined) {
+          break;
+        }
+
+        current = parent;
+        hops += 1;
+        expect(hops).toBeLessThanOrEqual(knownPaths.size);
+      }
+    }
+  });
+
+  it('shares the wording of the nav and the breadcrumb', () => {
+    // Both labels of a route come from `app.const.ts`, so the two can never
+    // drift into two names for the same page (AIS-146 `D10`).
+    const home = PROTECTED_ROUTE_ENTRIES.find(
+      (route) => route.path === APP_ROUTE_HOME_PATH,
+    );
+    const apiKeys = PROTECTED_ROUTE_ENTRIES.find(
+      (route) => route.path === APP_ROUTE_API_KEYS_PATH,
+    );
+    const calls = PROTECTED_ROUTE_ENTRIES.find(
+      (route) => route.path === APP_ROUTE_CALLS_PATH,
+    );
+
+    expect(home?.breadcrumbLabel).toBe(APP_NAV_HOME_LABEL);
+    for (const route of [home, apiKeys, calls]) {
+      expect(route?.breadcrumbLabel).toBe(route?.navLabel);
+    }
+  });
+
+  it('mounts the detail page under the list section', () => {
+    const detail = PROTECTED_ROUTE_ENTRIES.find((route) =>
+      route.path.includes(':identifier'),
+    );
+
+    expect(detail?.breadcrumbParentPath).toBe(APP_ROUTE_API_KEYS_PATH);
+    expect(detail?.resolveBreadcrumbLabel?.({ identifier: 'abc123' })).toBe(
+      'abc123',
+    );
   });
 });

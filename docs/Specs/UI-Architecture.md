@@ -1,7 +1,12 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-05 — AIS-133 (az „új admin oldal” checklist egységesítése).** A recept
-egyetlen, fájlnév-szintű igazságforrása a [`New-Admin-Page.md`](./New-Admin-Page.md): ez a doksi a §6
+**Utolsó frissítés: 2026-11-06 — AIS-144 (ikon-vagyon és `RadioOption.icon`).** Öt kézzel beágyazott
+Lucide SVG (`SunIcon`, `MoonIcon`, `SunsetIcon`, `SettingsIcon`, `ChevronRightIcon`) alkotja az
+ikon-vagyont, **új dependency nélkül**; a `RadioGroup` opciója opcionális, kizárólag dekoratív ikont
+kap, ezért az accessible name továbbra is a `label` szövege (lásd §4 és §7).
+
+**AIS-133 (2026-11-05):** az „új admin oldal” checklist egységesítése. A recept egyetlen,
+fájlnév-szintű igazságforrása a [`New-Admin-Page.md`](./New-Admin-Page.md): ez a doksi a §6
 helyett **mindig** azt linkeli, a §5 state-plan marad a state-buckets tábla egyetlen helye, és az új
 `pnpm quality:docs` kapu (§9) pirosra fordítja, ha egy pointer-forrás elveszti a linket vagy egy `§N`
 hivatkozás nem létező szekcióra mutat.
@@ -247,7 +252,7 @@ three rules above; see §9 for its negative fixture and its exemption list.
 | `DatePicker` | `id`, `value`, `onChange`, `min?`, `max?`, `invalid?`, `describedBy?` | Controlled native `input[type="date"]` with a `yyyy-mm-dd` **string** contract — no date library, no conversion helper and no `@callback/shared` import in `packages/ui` (**D6**); the caller owns the domain format. |
 | `Checkbox` | `id`, `label`, `description?`, `invalid?`, `describedBy?` | Native checkbox and its `<label>` in one component. `accent-primary` is the only portable way to colour it; `description` sits inside the label, so no second id is needed. |
 | `Switch` | same contract as `Checkbox` | Native checkbox with `role="switch"`: keyboard, form serialisation and react-hook-form keep working with no JS state (**D4**). The visible track is a `peer-*`-styled sibling, the thumb is its `::after`. `aria-checked` follows the controlled `checked`. |
-| `RadioGroup` | `name`, `legend`, `options[]`, `value`, `onChange`, `orientation?`, `invalid?`, `describedBy?`, `disabled?` | Controlled `<fieldset>` group. Arrow keys delegate to the pure `nextOptionValue` (wraps at both ends, skips disabled options); the platform still moves focus, so the two never fight. Tests target `role="group"` + the legend. |
+| `RadioGroup` | `name`, `legend`, `options[]` (`value`, `label`, `description?`, `disabled?`, `icon?`), `value`, `onChange`, `orientation?`, `invalid?`, `describedBy?`, `disabled?` | Controlled `<fieldset>` group. Arrow keys delegate to the pure `nextOptionValue` (wraps at both ends, skips disabled options); the platform still moves focus, so the two never fight. Tests target `role="group"` + the legend. `RadioOption.icon` (AIS-144) renders a **decorative** icon before the label text: the icon wrapper is `aria-hidden`, so the accessible name stays the `label` text and nothing is announced twice, and `description` keeps its own block line under the label. |
 | `Combobox` | `id`, `options[]`, `value`, `inputValue`, `onSelect`, `onInputValueChange`, `emptyMessage?`, `invalid?`, `describedBy?` | Fully controlled (**D5**): the caller owns value _and_ typed text. Filtering and index maths live in `combobox.logic.ts` (`filterOptions`, `nextActiveIndex`, `clampActiveIndex`, `normalizeQuery` — accent-insensitive). WAI-ARIA combobox pattern with `aria-activedescendant`. Local options only; async search / multi-select are out of scope. |
 | `Toast` (AIS-81) | `level`: `success` \| `error` \| `warning` \| `info` \| `system`, `message`, `detail?`, `repeatCount?`, `onDismiss`, `onPause?`, `onResume?`, `depth?` | One notification card. The accent is the `Alert`/`Banner` border recipe; `error` → `role="alert"`, every other level → `role="status"`. **Stateless by contract**: no timer, no store, no storage — it reports the dismiss intent and forwards `pointerenter`/`pointerleave`, so the auto-dismiss clock belongs to the host (AIS-83). The entry animation is pure CSS through Tailwind's `starting:` variant, and `onPause` is omitted from the DOM attributes so the media event cannot clash with the callback. `detail` renders clamped to two lines with a `title`. |
 | `ToastStack` (AIS-81) | `toasts` (**newest first**), `onDismiss`, `onPause?`, `onResume?` | Fixed bottom-right container and the live region itself (`role="region"`, `aria-live="polite"`, `aria-atomic="false"`, labelled). Renders at most `TOAST_MAX_VISIBLE` (`3`) cards, so the **newest** survive an overflow, and assigns each card its `depth` (`scale`/`opacity`) so older cards read as “behind”. `TOAST_STACK_Z_INDEX` is `z-60` — a toast must stay readable above the dialog/drawer surface (`z-50`). Pure rules in `toast.logic.ts` (`toToastDepth`). |
@@ -276,7 +281,18 @@ The ten form primitives arrived with **AIS-113** and are the mandatory route for
 a form composes `FormSection` → `FormField` → primitive, and `FormActions` for the buttons.
 `Input`/`Textarea` are intentionally left untouched (they keep their own `label`/`hint`/`error`
 props), so nothing in `packages/ui` broke. The a11y gate for all of them is
-`packages/ui/test/form-a11y.test.tsx` (default / hint / error / disabled / open-listbox).
+`packages/ui/test/form-a11y.test.tsx` (default / hint / error / disabled / open-listbox / icons).
+
+**The icon set (AIS-144) is hand-embedded, not a dependency.** `packages/ui/src/components/icon/`
+holds five inline SVGs on the Lucide 24×24 stroke grid — `SunIcon`, `MoonIcon`, `SunsetIcon`,
+`SettingsIcon`, `ChevronRightIcon` — copied from the upstream source, with the ISC licence and the
+source URL in each component's JSDoc. Every icon is `fill="none"`, `stroke="currentColor"`,
+`strokeWidth={2}`, `aria-hidden="true"` and `focusable="false"`, so it inherits the surrounding text
+token and never enters the accessibility tree. `IconProps` carries **only** `className`: the shared
+attributes live in one place (`ICON_BASE_PROPS` in `icons.tsx`, constants in `icon.const.ts`) and the
+`h-4 w-4 shrink-0` base class is the default size, because an SVG with only a `viewBox` would stretch
+to the width of its container. A caller overrides the size with a normal utility (`h-6 w-6`) — there
+is no `size` and no `color` prop. The icons are exported explicitly from `packages/ui/src/index.ts`.
 
 The toast layer arrived with **AIS-81** and is only the *presentation* of the notification
 subsystem. `ToastLevel` is declared in `packages/ui`; the store (`@callback/notifications`, AIS-79)
@@ -721,6 +737,11 @@ existing `Table*` components instead of adopting `@tanstack/react-table`, becaus
 and the paging are **server-side** (`sort`/`order`/`page` are query fields) and the API caps a page
 at 100 rows — a client-side sorting engine and virtualisation would be dead code plus a second
 table implementation to migrate. `packages/ui/package.json` is unchanged.
+
+**AIS-144 added no dependency either.** The icon vocabulary is five inline Lucide SVGs on one shared
+24×24 stroke grid; an icon package would have been bigger than that payload and would have brought
+its own `size`/`color` axes next to the design tokens. No row was added to the table above and
+`packages/ui/package.json` stays unchanged.
 
 **AIS-117 added the first runtime dependencies of `packages/ui`** — behaviour-only Radix
 packages, all three in `dependencies` (`react`/`react-dom` remain `peerDependencies`):

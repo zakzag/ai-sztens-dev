@@ -78,7 +78,16 @@ export function RadioGroup({
                 className={cn(radioVariants({ invalid }))}
               />
               <label htmlFor={optionId} className="text-sm text-text-secondary">
-                {option.label}
+                {option.icon ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span aria-hidden="true" className="shrink-0">
+                      {option.icon}
+                    </span>
+                    <span>{option.label}</span>
+                  </span>
+                ) : (
+                  option.label
+                )}
                 {option.description ? (
                   <span className="block text-xs text-text-muted">
                     {option.description}

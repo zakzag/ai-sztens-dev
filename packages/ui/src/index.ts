@@ -317,3 +317,12 @@ export type {
   LogEntryRowVariants,
   LogFilterChipVariants,
 } from './components/log-drawer/log-drawer.variants.js';
+
+export {
+  ChevronRightIcon,
+  MoonIcon,
+  SettingsIcon,
+  SunIcon,
+  SunsetIcon,
+} from './components/icon/icons.js';
+export type { IconProps } from './components/icon/icon.interface.js';

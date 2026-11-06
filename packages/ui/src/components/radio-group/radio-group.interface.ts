@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 /** One selectable radio entry. */
 export interface RadioOption {
   /** Submitted value. */
@@ -8,6 +10,16 @@ export interface RadioOption {
   readonly description?: string;
   /** Renders the radio disabled (visible, not selectable). */
   readonly disabled?: boolean;
+  /**
+   * Optional leading icon, rendered **before** the label text.
+   *
+   * Purely visual decoration: the accessible name of the option comes from
+   * `label` only, so the wrapper around the icon is `aria-hidden` and the icon
+   * is never announced. Pass an already decorative SVG (the `@callback/ui` icon
+   * set is built exactly that way) — a control with its own accessible name
+   * would be announced twice.
+   */
+  readonly icon?: ReactNode;
 }
 
 /** Layout of the option list. */

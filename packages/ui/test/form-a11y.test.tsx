@@ -17,6 +17,7 @@ import {
   FORM_OPTIONS,
   FORM_RADIO_OPTIONS,
 } from './mocks/form-options.mock.js';
+import { ICON_RADIO_OPTIONS } from './mocks/icon-options.mock.js';
 import { AXE_JSDOM_OPTIONS } from './mocks/axe-options.mock.js';
 
 /**
@@ -188,6 +189,24 @@ describe('form primitives a11y', () => {
     );
 
     await userEvent.click(screen.getByRole('combobox'));
+
+    await expectNoViolations(container);
+  });
+
+  it('passes axe with option icons', async () => {
+    const { container } = render(
+      <form>
+        <FormSection legend="Megjelenés">
+          <RadioGroup
+            name="theme"
+            legend="Téma"
+            options={ICON_RADIO_OPTIONS}
+            value="light"
+            onChange={vi.fn()}
+          />
+        </FormSection>
+      </form>,
+    );
 
     await expectNoViolations(container);
   });

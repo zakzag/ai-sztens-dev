@@ -48,7 +48,7 @@ Verified prerequisites in the tree today:
 | File | Change |
 | ---- | ------ |
 | `packages/ui/src/components/breadcrumb/breadcrumb.interface.ts` | **new.** `BreadcrumbItem`, `BreadcrumbLinkRendererProps`, `BreadcrumbLinkRenderer`, `BreadcrumbProps` — all `readonly`, JSDoc on each. |
-| `packages/ui/src/components/breadcrumb/breadcrumb.const.ts` | **new.** `BREADCRUMB_DEFAULT_ARIA_LABEL = 'Útvonal'` plus the class recipes: `BREADCRUMB_LIST_CLASSES`, `BREADCRUMB_LINK_CLASSES`, `BREADCRUMB_CURRENT_CLASSES`, `BREADCRUMB_SEPARATOR_CLASSES`. Token classes only — no palette, no hex; no DOM-id constants (the component needs none). |
+| `packages/ui/src/components/breadcrumb/breadcrumb.const.ts` | **new.** `BREADCRUMB_DEFAULT_ARIA_LABEL = 'Útvonal'` plus the class recipes: `BREADCRUMB_LIST_CLASSES`, `BREADCRUMB_LINK_CLASSES`, `BREADCRUMB_STATIC_CLASSES` (D3 text crumb), `BREADCRUMB_CURRENT_CLASSES`, `BREADCRUMB_SEPARATOR_CLASSES`. Token classes only — no palette, no hex; no DOM-id constants (the component needs none). |
 | `packages/ui/src/components/breadcrumb/Breadcrumb.tsx` | **new.** The component described in §4. |
 | [`packages/ui/src/index.ts`](../../packages/ui/src/index.ts:321) | Explicit exports: `Breadcrumb`, `BREADCRUMB_DEFAULT_ARIA_LABEL`, and the four types. Added after the icon block, before the trailing section. |
 | `packages/ui/test/breadcrumb.test.tsx` | **new.** Full matrix of §5. |

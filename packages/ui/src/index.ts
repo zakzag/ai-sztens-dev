@@ -326,3 +326,12 @@ export {
   SunsetIcon,
 } from './components/icon/icons.js';
 export type { IconProps } from './components/icon/icon.interface.js';
+
+export { Breadcrumb } from './components/breadcrumb/Breadcrumb.js';
+export { BREADCRUMB_DEFAULT_ARIA_LABEL } from './components/breadcrumb/breadcrumb.const.js';
+export type {
+  BreadcrumbItem,
+  BreadcrumbLinkRenderer,
+  BreadcrumbLinkRendererProps,
+  BreadcrumbProps,
+} from './components/breadcrumb/breadcrumb.interface.js';

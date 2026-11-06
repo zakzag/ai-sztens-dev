@@ -1,6 +1,12 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-06 — AIS-144 (ikon-vagyon és `RadioOption.icon`).** Öt kézzel beágyazott
+**Utolsó frissítés: 2026-11-06 — AIS-145 (router-független `Breadcrumb` primitíva).** A
+`packages/ui` **nem függhet react-router-től**, ezért a link renderelését a hívó **injektálja**
+(`renderLink`); az utolsó crumb mindig `<span aria-current="page">`, a `to` nélküli crumb szövegként
+jelenik meg, az `n` crumb `n-1` dekoratív elválasztót kap, üres `items` esetén pedig **nincs** `<nav>`
+landmark (lásd §4).
+
+**AIS-144 (2026-11-06):** Öt kézzel beágyazott
 Lucide SVG (`SunIcon`, `MoonIcon`, `SunsetIcon`, `SettingsIcon`, `ChevronRightIcon`) alkotja az
 ikon-vagyont, **új dependency nélkül**; a `RadioGroup` opciója opcionális, kizárólag dekoratív ikont
 kap, ezért az accessible name továbbra is a `label` szövege (lásd §4 és §7).
@@ -258,6 +264,7 @@ three rules above; see §9 for its negative fixture and its exemption list.
 | `ToastStack` (AIS-81) | `toasts` (**newest first**), `onDismiss`, `onPause?`, `onResume?` | Fixed bottom-right container and the live region itself (`role="region"`, `aria-live="polite"`, `aria-atomic="false"`, labelled). Renders at most `TOAST_MAX_VISIBLE` (`3`) cards, so the **newest** survive an overflow, and assigns each card its `depth` (`scale`/`opacity`) so older cards read as “behind”. `TOAST_STACK_Z_INDEX` is `z-60` — a toast must stay readable above the dialog/drawer surface (`z-50`). Pure rules in `toast.logic.ts` (`toToastDepth`). |
 | `LogDrawer` (AIS-82) | `entries` (**newest first**, already sliced), `isOpen`, `unseenCount`, `levelFilter`, `hasMore`, `onToggle`, `onClose`, `onFilterChange`, `onLoadMore`, `onClear`, `formatTimestamp` | Collapsed edge tab (`aria-expanded` + `aria-controls`, count badge only when `unseenCount > 0`) plus a **non-modal** sliding panel: no overlay, no focus trap, page stays scrollable, `Escape` closes. Six chips (`Mind` / `Siker` / `Hiba` / `Figyelmeztetés` / `Info` / `Rendszer`) as `aria-pressed` buttons — `Siker` exists because the store emits `success`. Panel is `role="log"` with `aria-live="off"` (the announcement noise stays on the toasts). `LOG_DRAWER_Z_INDEX` is `z-40`: below the modal overlay and below the toast stack. Paging is **props only**; the 20/50 window belongs to AIS-83. |
 | `LogEntryRow` (AIS-82) | `entry`, `formatTimestamp` | One row: level glyph chip **+** level text (severity is never colour-only), injected timestamp, `break-words` message, `detail` only when present. Reuses the `Toast` chip recipe and glyph map, so a toast and its log row cannot disagree about a level. |
+| `Breadcrumb` (AIS-145) | `items: { label, to? }[]`, `ariaLabel?`, `renderLink?` | Router-független: a link elemet a hívó **injektálja** (`renderLink` — az adminban react-router `Link`, alapból `<a href>` fallback), így a `packages/ui` sosem importál routert. Az utolsó crumb `<span aria-current="page">`, **nem** link, akkor sem, ha van `to`-ja; a `to` nélküli nem-utolsó crumb szövegként jelenik meg (nincs halott link); `n` crumb → `n-1` elválasztó `<li aria-hidden="true">`-ban; üres `items` → **nincs** `<nav>` landmark. |
 
 Exports are explicit from `packages/ui/src/index.ts` (no `export *`). `cn()` is
 exported too so pages can merge caller classes with the recipe classes.

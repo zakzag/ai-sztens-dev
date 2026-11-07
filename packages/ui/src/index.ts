@@ -296,6 +296,8 @@ export { LogEntryRow } from './components/log-drawer/LogEntryRow.js';
 export {
   LOG_DRAWER_HANDLE_GUTTER,
   logDetailFieldVariants,
+  logDetailJsonPreVariants,
+  logDetailJsonToggleVariants,
   logDrawerFooterVariants,
   logDrawerHeaderVariants,
   logDrawerListVariants,
@@ -340,6 +342,9 @@ export {
   LOG_DRAWER_WIDTH_STEP,
   LOG_DRAWER_WIDTH_STEP_LARGE,
   LOG_DRAWER_Z_INDEX,
+  LOG_DETAIL_JSON_REGION_ID_SUFFIX,
+  LOG_DETAIL_JSON_TOGGLE_LABEL_CLOSE,
+  LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN,
   LOG_ENTRY_COPY_DONE_LABEL,
   LOG_ENTRY_COPY_ENTRY_LABEL,
   LOG_ENTRY_COPY_FEEDBACK_MS,
@@ -370,6 +375,8 @@ export type {
 } from './components/log-drawer/log-drawer.interface.js';
 export type {
   LogDetailFieldVariants,
+  LogDetailJsonPreVariants,
+  LogDetailJsonToggleVariants,
   LogEntryChevronVariants,
   LogEntryRowVariants,
   LogEntryToggleVariants,
@@ -377,6 +384,8 @@ export type {
 } from './components/log-drawer/log-drawer.variants.js';
 
 export { copyText } from './lib/copy-text.js';
+export { JSON_PRETTY_INDENT, NO_EXPANDED_JSON } from './lib/json.const.js';
+export { isJsonDetailValue, toPrettyJson } from './lib/json.logic.js';
 
 export {
   ChevronDownIcon,

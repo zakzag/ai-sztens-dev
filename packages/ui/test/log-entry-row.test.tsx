@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LogEntryRow } from '../src/components/log-drawer/LogEntryRow.js';
 import {
+  LOG_DETAIL_JSON_TOGGLE_LABEL_CLOSE,
+  LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN,
   LOG_ENTRY_COPY_DONE_LABEL,
   LOG_ENTRY_COPY_ENTRY_LABEL,
   LOG_ENTRY_COPY_FEEDBACK_MS,
@@ -170,9 +172,9 @@ describe('LogEntryRow — expandable details', () => {
     const terms = Array.from(container.querySelectorAll('dt')).map(
       (term) => term.textContent,
     );
-    const values = Array.from(container.querySelectorAll('dd')).map(
-      (value) => value.textContent,
-    );
+    const values = Array.from(
+      container.querySelectorAll('[data-log-detail-value]'),
+    ).map((value) => value.textContent);
 
     expect(terms).toEqual(buildLogDetails().map((field) => field.label));
     expect(values).toEqual(buildLogDetails().map((field) => field.value));
@@ -411,5 +413,155 @@ describe('LogEntryRow — copy controls', () => {
     ).not.toBeInTheDocument();
 
     restore();
+  });
+});
+
+describe('LogEntryRow — JSON detail values', () => {
+  /**
+   * Opens a row whose second and third values are JSON, the first is plain text.
+   *
+   * @returns the render result.
+   */
+  async function openJsonRow() {
+    const result = renderRow({
+      details: [
+        buildLogDetailField({ label: 'url', value: 'POST /api/v1/keys' }),
+        buildLogDetailField({
+          label: 'queryKey',
+          value: '["api-keys","update"]',
+          mono: true,
+        }),
+        buildLogDetailField({
+          label: 'body',
+          value: '{"name":"first"}',
+          mono: true,
+        }),
+      ],
+    });
+
+    await openRow(3);
+
+    return result;
+  }
+
+  /**
+   * @returns every pretty-JSON block of the row, open or collapsed.
+   */
+  function getJsonBlocks(): readonly HTMLPreElement[] {
+    return Array.from(document.querySelectorAll<HTMLPreElement>('pre'));
+  }
+
+  it('offers an expand control only for JSON values', async () => {
+    await openJsonRow();
+
+    expect(
+      screen.getAllByRole('button', {
+        name: LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN,
+      }),
+    ).toHaveLength(2);
+    expect(getJsonBlocks()).toHaveLength(2);
+  });
+
+  it('keeps the plain value text unchanged', async () => {
+    const { container } = await openJsonRow();
+
+    const values = Array.from(
+      container.querySelectorAll('[data-log-detail-value]'),
+    ).map((value) => value.textContent);
+
+    expect(values).toEqual([
+      'POST /api/v1/keys',
+      '["api-keys","update"]',
+      '{"name":"first"}',
+    ]);
+  });
+
+  it('expands the value to indented JSON', async () => {
+    await openJsonRow();
+
+    const [queryKeyBlock] = getJsonBlocks();
+
+    expect(queryKeyBlock).toHaveAttribute('hidden');
+
+    fireEvent.click(
+      screen.getAllByRole('button', {
+        name: LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN,
+      })[0],
+    );
+
+    expect(queryKeyBlock).not.toHaveAttribute('hidden');
+    expect(queryKeyBlock?.textContent).toBe('[\n  "api-keys",\n  "update"\n]');
+  });
+
+  it('names the control by the current state', async () => {
+    await openJsonRow();
+
+    fireEvent.click(
+      screen.getAllByRole('button', {
+        name: LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN,
+      })[0],
+    );
+
+    expect(
+      screen.getByRole('button', { name: LOG_DETAIL_JSON_TOGGLE_LABEL_CLOSE }),
+    ).toBeInTheDocument();
+  });
+
+  it('collapses again on a second click', async () => {
+    await openJsonRow();
+
+    const [queryKeyBlock] = getJsonBlocks();
+    const openFirst = () =>
+      fireEvent.click(
+        screen.getAllByRole('button', {
+          name: LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN,
+        })[0],
+      );
+
+    openFirst();
+    fireEvent.click(
+      screen.getByRole('button', { name: LOG_DETAIL_JSON_TOGGLE_LABEL_CLOSE }),
+    );
+
+    expect(queryKeyBlock).toHaveAttribute('hidden');
+  });
+
+  it('keeps two JSON values independent', async () => {
+    await openJsonRow();
+
+    screen
+      .getAllByRole('button', { name: LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN })
+      .forEach((toggle) => fireEvent.click(toggle));
+
+    expect(
+      getJsonBlocks().every((block) => !block.hasAttribute('hidden')),
+    ).toBe(true);
+
+    fireEvent.click(
+      screen.getAllByRole('button', {
+        name: LOG_DETAIL_JSON_TOGGLE_LABEL_CLOSE,
+      })[0],
+    );
+
+    const [queryKeyBlock, bodyBlock] = getJsonBlocks();
+
+    expect(queryKeyBlock).toHaveAttribute('hidden');
+    expect(bodyBlock).not.toHaveAttribute('hidden');
+  });
+
+  it('resets the expansions when the row is closed and reopened', async () => {
+    await openJsonRow();
+
+    fireEvent.click(
+      screen.getAllByRole('button', {
+        name: LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN,
+      })[0],
+    );
+    fireEvent.click(getToggle(true, 3));
+    fireEvent.click(getToggle(false, 3));
+
+    expect(getJsonBlocks().every((block) => block.hasAttribute('hidden'))).toBe(
+      true,
+    );
   });
 });

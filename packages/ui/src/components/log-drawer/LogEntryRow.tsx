@@ -1,11 +1,16 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '../../lib/cn.js';
 import { copyText } from '../../lib/copy-text.js';
+import { NO_EXPANDED_JSON } from '../../lib/json.const.js';
+import { toPrettyJson } from '../../lib/json.logic.js';
 import { Button } from '../button/Button.js';
 import { ChevronDownIcon } from '../icon/icons.js';
 import { TOAST_LEVEL_GLYPHS } from '../toast/toast.const.js';
 import { toastLevelChipVariants } from '../toast/toast.variants.js';
 import {
+  LOG_DETAIL_JSON_REGION_ID_SUFFIX,
+  LOG_DETAIL_JSON_TOGGLE_LABEL_CLOSE,
+  LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN,
   LOG_ENTRY_COPY_DONE_LABEL,
   LOG_ENTRY_COPY_ENTRY_LABEL,
   LOG_ENTRY_COPY_FEEDBACK_MS,
@@ -24,6 +29,8 @@ import {
 } from './log-drawer.logic.js';
 import {
   logDetailFieldVariants,
+  logDetailJsonPreVariants,
+  logDetailJsonToggleVariants,
   logEntryChevronVariants,
   logEntryDetailsVariants,
   logEntryRowVariants,
@@ -72,6 +79,17 @@ export function LogEntryRow({ entry, formatTimestamp }: LogEntryRowProps) {
   const [copied, setCopied] = useState<LogEntryCopyFlags>(LOG_ENTRY_COPY_IDLE);
 
   /**
+   * Which detail values are expanded to pretty-printed JSON (AIS-163).
+   *
+   * A `Set` of stable field keys, so any number of values can be open at once
+   * and each one toggles independently. Local for the same reason the row's own
+   * open state is local: it is the fourth tier of the state decision order, it
+   * is not server data and nothing else on the page needs it.
+   */
+  const [expandedJson, setExpandedJson] =
+    useState<ReadonlySet<string>>(NO_EXPANDED_JSON);
+
+  /**
    * One pending reset timer per copy control (AIS-153 decision A0).
    *
    * A `useRef` map rather than state: the handles are not rendered, and a
@@ -99,6 +117,43 @@ export function LogEntryRow({ entry, formatTimestamp }: LogEntryRowProps) {
       timers.clear();
     };
   }, []);
+
+  /**
+   * Expands or collapses one detail value's pretty-printed JSON (AIS-163).
+   *
+   * Writing a **new** set (never mutating the shared empty one) is what makes
+   * the two JSON values of a row independent: closing one never touches the
+   * other.
+   *
+   * @param fieldKey - stable key of the field inside this row.
+   */
+  function toggleJsonField(fieldKey: string): void {
+    setExpandedJson((current) => {
+      const next = new Set(current);
+
+      if (next.has(fieldKey)) {
+        next.delete(fieldKey);
+      } else {
+        next.add(fieldKey);
+      }
+
+      return next;
+    });
+  }
+
+  /**
+   * Opens or closes the row, dropping the JSON expansions when it closes.
+   *
+   * The expansions belong to the region, so keeping them across a close would
+   * greet the user with a half-expanded row on the next open.
+   */
+  function handleToggleRow(): void {
+    if (isOpen) {
+      setExpandedJson(NO_EXPANDED_JSON);
+    }
+
+    setIsOpen(!isOpen);
+  }
 
   /**
    * Copies one piece of the entry and confirms it **on that control only**.
@@ -144,7 +199,7 @@ export function LogEntryRow({ entry, formatTimestamp }: LogEntryRowProps) {
         aria-controls={regionId}
         aria-label={toEntryToggleLabel(isOpen, details.length)}
         className={cn(logEntryToggleVariants({ isOpen }))}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={handleToggleRow}
       >
         <span
           className={toastLevelChipVariants({ level: entry.level })}
@@ -179,23 +234,54 @@ export function LogEntryRow({ entry, formatTimestamp }: LogEntryRowProps) {
       >
         {hasDetails ? (
           <dl className="flex flex-col gap-2">
-            {details.map((field, index) => (
-              <div key={`${field.label}-${index}`} className="flex flex-col">
-                <dt className={cn(logDetailFieldVariants({ slot: 'label' }))}>
-                  {field.label}
-                </dt>
-                <dd
-                  className={cn(
-                    logDetailFieldVariants({
-                      slot: 'value',
-                      mono: field.mono === true,
-                    }),
-                  )}
-                >
-                  {field.value}
-                </dd>
-              </div>
-            ))}
+            {details.map((field, index) => {
+              const fieldKey = `${field.label}-${index}`;
+              const prettyJson = toPrettyJson(field.value);
+              const isJsonExpanded = expandedJson.has(fieldKey);
+              const jsonRegionId = `${instanceId}${LOG_DETAIL_JSON_REGION_ID_SUFFIX}-${index}`;
+
+              return (
+                <div key={fieldKey} className="flex flex-col">
+                  <dt className={cn(logDetailFieldVariants({ slot: 'label' }))}>
+                    {field.label}
+                  </dt>
+                  <dd
+                    className={cn(
+                      logDetailFieldVariants({
+                        slot: 'value',
+                        mono: field.mono === true,
+                      }),
+                    )}
+                  >
+                    <span data-log-detail-value className="block break-words">
+                      {field.value}
+                    </span>
+                    {prettyJson === null ? null : (
+                      <>
+                        <button
+                          type="button"
+                          aria-expanded={isJsonExpanded}
+                          aria-controls={jsonRegionId}
+                          className={cn(logDetailJsonToggleVariants())}
+                          onClick={() => toggleJsonField(fieldKey)}
+                        >
+                          {isJsonExpanded
+                            ? LOG_DETAIL_JSON_TOGGLE_LABEL_CLOSE
+                            : LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN}
+                        </button>
+                        <pre
+                          id={jsonRegionId}
+                          hidden={!isJsonExpanded}
+                          className={cn(logDetailJsonPreVariants())}
+                        >
+                          {prettyJson}
+                        </pre>
+                      </>
+                    )}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
         ) : (
           <p id={emptyId} className="text-xs text-text-muted">

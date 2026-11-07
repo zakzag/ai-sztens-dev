@@ -222,6 +222,28 @@ export const logDetailFieldVariants = cva('', {
   defaultVariants: { mono: false },
 });
 
+/**
+ * The "expand JSON" control beside a detail value (AIS-163).
+ *
+ * Deliberately small and quiet — it sits inside a `dd`, next to the value it
+ * expands, so it must not compete with the copy controls of the row. It is a
+ * real `<button>`, so `Enter`/`Space` work and `aria-expanded` is announced.
+ */
+export const logDetailJsonToggleVariants = cva(
+  'inline-flex items-center gap-1 rounded-control border border-hairline border-transparent bg-transparent px-1 text-xs text-text-muted transition-colors duration-fast hover:text-text-primary focus-visible:border-border-focus focus-visible:shadow-focus-ring focus-visible:outline-none',
+);
+
+/**
+ * The pretty-printed JSON block of one detail value.
+ *
+ * Bounded (`max-h-48` + `overflow-auto`) and `whitespace-pre`, so a deep query
+ * key or a long body scrolls inside the region instead of stretching the panel;
+ * monospaced, because indentation is meaningless in a proportional font.
+ */
+export const logDetailJsonPreVariants = cva(
+  'mt-1 w-full max-h-48 overflow-auto rounded-control bg-surface-sunken p-2 font-mono text-xs whitespace-pre',
+);
+
 export type LogEntryRowVariants = VariantProps<typeof logEntryRowVariants>;
 export type LogFilterChipVariants = VariantProps<typeof logFilterChipVariants>;
 export type LogEntryToggleVariants = VariantProps<
@@ -232,4 +254,10 @@ export type LogEntryChevronVariants = VariantProps<
 >;
 export type LogDetailFieldVariants = VariantProps<
   typeof logDetailFieldVariants
+>;
+export type LogDetailJsonToggleVariants = VariantProps<
+  typeof logDetailJsonToggleVariants
+>;
+export type LogDetailJsonPreVariants = VariantProps<
+  typeof logDetailJsonPreVariants
 >;

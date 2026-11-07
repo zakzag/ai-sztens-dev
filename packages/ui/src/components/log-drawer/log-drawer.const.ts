@@ -246,3 +246,24 @@ export const LOG_ENTRY_COPY_IDLE: LogEntryCopyFlags = {
  * `requestID`.
  */
 export const LOG_ENTRY_REQUEST_ID_FIELD_LABEL = 'requestId';
+
+/**
+ * Verb of the accessible name of a collapsed JSON value (AIS-163).
+ *
+ * A JSON value (`queryKey`, `body`, `responseMeta`) stays the single-line
+ * string the store stored; this control reveals the indented form beside it.
+ * The label names the format as well as the action, because "expand" alone
+ * would not tell a screen reader user **what** is being expanded.
+ */
+export const LOG_DETAIL_JSON_TOGGLE_LABEL_OPEN = 'JSON kibontása';
+
+/** Verb of the accessible name of an expanded JSON value. */
+export const LOG_DETAIL_JSON_TOGGLE_LABEL_CLOSE = 'JSON összecsukása';
+
+/**
+ * Suffix of the pretty-JSON region id.
+ *
+ * The row's `useId()` is the prefix and the field index the tail, so every
+ * `aria-controls` in a row full of JSON values points at exactly one element.
+ */
+export const LOG_DETAIL_JSON_REGION_ID_SUFFIX = '-log-detail-json';

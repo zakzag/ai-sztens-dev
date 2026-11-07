@@ -10,8 +10,12 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createOverlayUser } from '../../../test/mocks/overlay-environment.mock.js';
+import {
+  installRecordingStorages,
+  type WebStorageHarness,
+} from '../../../test/mocks/web-storage.mock.js';
 import {
   THEME_OPTION_AMBIENT_LABEL,
   THEME_OPTION_DARK_LABEL,
@@ -44,6 +48,24 @@ function toTriggerName(chosenLabel: string): string {
 }
 
 describe('ThemeSelector', () => {
+  /**
+   * Recording doubles of both web storages, reinstalled per test.
+   *
+   * The negative contract ("no storage write") is asserted on these counters
+   * instead of on `window.localStorage.length`: jsdom does not always provide a
+   * storage object, and reading `.length` of a missing one crashes the test
+   * instead of failing it.
+   */
+  let storage: WebStorageHarness;
+
+  beforeEach(() => {
+    storage = installRecordingStorages();
+  });
+
+  afterEach(() => {
+    storage.restore();
+  });
+
   it('closes into a select box that shows only the chosen appearance', () => {
     const { container } = renderSelector();
 
@@ -142,7 +164,9 @@ describe('ThemeSelector', () => {
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
     expect(document.documentElement.getAttribute('style')).toBeNull();
     expect(document.body.hasAttribute('data-theme')).toBe(false);
-    expect(window.localStorage.length).toBe(0);
-    expect(window.sessionStorage.length).toBe(0);
+    expect(storage.local.writtenKeys()).toEqual([]);
+    expect(storage.local.isUntouched()).toBe(true);
+    expect(storage.session.writtenKeys()).toEqual([]);
+    expect(storage.session.isUntouched()).toBe(true);
   });
 });

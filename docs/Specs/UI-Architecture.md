@@ -1,6 +1,16 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-07 — AIS-152 (`HttpEvent` bővítés és a `details` mapping bekötése).**
+**Utolsó frissítés: 2026-11-07 — AIS-155 (route-alapú `EntityDialog` szabvány + api-keys lista-első oldal).**
+Minden entitás-létrehozó/-módosító felület **route-mountolt overlay** (`EntityDialog`, `size="fit"`,
+opcionális footer submit `form` attribútummal, read-only mód `submit: null`-lal), a lista pedig
+mountolva marad mögötte: a `RouteEntry` új `children` mezőt kapott, az `AppRouter` rekurzívan renderel,
+a flat fogyasztók (breadcrumb-matcher, registry-invariánsok) a `flattenRouteEntries()`-en keresztül
+látják a fát, a bezárás pedig egy helyen dől el (`features/entity-dialog` `useEntityDialog` →
+`navigate(listPath, { replace: true })`). Az `api-keys` oldal alapból csak a listát mutatja („Új API
+kulcs” akció a fejlécben, `PlusIcon`), a `/api-keys/new` create és a `/api-keys/:identifier/view`
+read-only overlay külön URL (lásd §4.0, §4.2, §5, §6).
+
+**AIS-152 (2026-11-07) — `HttpEvent` bővítés és a `details` mapping bekötése.**
 A transport eseménye négy új, `readonly` mezőt hordoz (`requestId`, `query`, `bodyPreview`,
 `responseMeta`), a body csak **maszkolt, csonkolt prefix**, a token/`Authorization` soha; a capture
 mindhárom csatornája (HTTP, query/mutation hiba, runtime crash) kitölti a strukturált `details`
@@ -580,11 +590,12 @@ Wiring, in the order `main.tsx` performs it:
 `detail` (`mutationKey=["api-keys","create"]`) — without it the log would say *that* a write failed
 but not *which* one.
 
-### 4.0 Overlay primitives (AIS-117)
+### 4.0 Overlay primitives (AIS-117, `EntityDialog` since AIS-155)
 
 | Primitive       | Variants / props                                                                                                                          | Notes                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Dialog`        | `open`, `onOpenChange`, `title`, `description?`, `footer?`, `size`: `sm` \| `md` \| `lg`, `closeLabel?`                                   | Modal card over a dimmed backdrop. **Controlled only** (the page owns "is it open"). Radix supplies focus trap / `Esc` / outside dismiss / focus restoration; `aria-modal="true"` is set explicitly (Radix only hides siblings), `aria-labelledby` comes from the rendered `Title` — no id props. No `Dialog.Trigger` is required, so a dialog can be opened from a table row. |
+| `EntityDialog`  | `title`, `description?`, `onClose`, `submit?`: `{ label, formId, pendingLabel?, isSubmitting? }` \| `null`, `cancelLabel?`, `headerStart?`, `headerEnd?`, `footerExtras?`, `closeLabel?`, `className?` | **The standard window of every create/edit surface** (AIS-155). Presentation only: no router, no entity, every text and handler is a prop. It has **no `open` prop** — the route decides that by mounting it — and `Esc` / backdrop / the header `X` / the dismiss button all call `onClose`. `submit` renders a footer `type="submit" form={formId}` button, so the body's `<form>` (owned by `useAppForm`) stays the only submit path; `submit: null` makes the window read-only. Panel is `size="fit"`, the body scrolls, header and footer stay fixed. |
+| `Dialog`        | `open`, `onOpenChange`, `title`, `description?`, `footer?`, `size`: `sm` \| `md` \| `lg` \| `fit`, `closeLabel?`                          | Modal card over a dimmed backdrop. **Controlled only** (the page owns "is it open"). Radix supplies focus trap / `Esc` / outside dismiss / focus restoration; `aria-modal="true"` is set explicitly (Radix only hides siblings), `aria-labelledby` comes from the rendered `Title` — no id props. No `Dialog.Trigger` is required, so a dialog can be opened from a table row. `size="fit"` is `w-auto max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)]`, i.e. content-sized and never taller than the viewport. |
 | `ConfirmDialog` | `open`, `onOpenChange`, `title`, `description?`, `confirmLabel`, `cancelLabel?`, `tone`: `danger` \| `primary`, `isPending?`, `onConfirm` | **Reports the decision only** (**D4**): confirm calls `onConfirm` and the dialog stays open — the caller closes it when the mutation succeeds, otherwise a failure would erase the question. `isPending` disables both buttons, marks confirm `aria-busy` and **blocks `Esc`/cancel dismissal**. `confirmLabel` is required; there is no generic "OK".                         |
 | `Drawer`        | `open`, `onOpenChange`, `title`, `description?`, `side`: `right` \| `left`, `footer?`, `closeLabel?`                                      | Same modal shell as `Dialog` (**D3**) with a full-height edge-pinned panel; the body is the scroll container, so the footer stays reachable. Built on `react-dialog`, **not** `react-popover` — a form panel needs the modal contract.                                                                                                                                         |
 | `Tooltip`       | `content`, `children` (trigger), `side?`, `delayMs?`, `disabled?`                                                                         | Ships **its own** `Tooltip.Provider` (**D6**) so a consumer cannot forget it. The content is `aria-describedby` only — **never** the accessible name (**D7**); the trigger must already be labelled. `disabled` renders the trigger alone.                                                                                                                                     |
@@ -594,7 +605,13 @@ The a11y gate for all five is [`overlay-a11y.test.tsx`](../../packages/ui/test/o
 (`vitest-axe`, WCAG A/AA rule sets, `color-contrast` off in jsdom). Behavioural coverage lives in
 `dialog` / `confirm-dialog` / `drawer` / `tooltip` / `dropdown-menu` test files; the jsdom shims
 (`ResizeObserver`, pointer capture, `scrollIntoView`) and the `pointerEventsCheck: 0` user-event
-instance are shared from `test/mocks/`.
+instance are shared from `test/mocks/`. The entity window has its own suite,
+[`entity-dialog.test.tsx`](../../packages/ui/test/entity-dialog.test.tsx:1): submit/no-submit, the
+header slots and the three close paths.
+
+Two small vocabulary additions came with AIS-155: `PlusIcon` + `CloseIcon` in the icon set, and the
+`Button` `icon` slot, which renders a decorative icon before the label (the spinner replaces it while
+`isLoading`). The overlay header's close control is `CloseIcon`, not the old `✕` text glyph.
 
 ### 4.1 Error surfaces (AIS-96)
 
@@ -688,6 +705,12 @@ One entry in `app/router/route-registry.tsx`:
 
 - `navLabel: null` → the route exists but is not linked in the navigation.
 - `hidden: true` → the route has a label but stays out of the navigation (the index route).
+- `children` → the route is a **layout**: its element renders an `<Outlet/>`, and each child path is
+  absolute (it begins with the parent path). This is how an overlay such as `/api-keys/new` paints a
+  dialog above the still-mounted list (AIS-155 `D2`). A child is reached from its parent's own action,
+  so it may carry `navLabel: null` **without** a `:param` segment. Flat consumers (the breadcrumb
+  matcher, the registry invariants) receive `flattenRouteEntries(routes)` — `ALL_ROUTE_ENTRIES` is
+  already flattened.
 - `breadcrumbLabel: null` → the route has no crumb of its own. It is legal **only** on a public route
   or on the `*` catch-all; every other entry is in a trail when it has a static label **or** a resolver.
 - `breadcrumbParentPath` → the registry path of the parent route; the trail is built by walking this
@@ -725,10 +748,10 @@ else — limits, patterns, rejection copy — comes from `@callback/shared`.
 (`packages/shared/src/contract/common/validation-message.const.ts`, `en` + `hu`), and the language
 is decided in exactly two places:
 
-| Where                                                                        | Call                                                      | Effect                                                                         |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [`apps/admin/src/main.tsx`](../../apps/admin/src/main.tsx:1)                 | `configureValidationLocale('hu')`                         | every schema message resolved after boot is Hungarian                          |
-| [`ApiKeyForm.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyForm.tsx:55) | `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` | the zod-generated issues (`too_small`, `invalid_string`, …) are translated too |
+| Where                                                                            | Call                                                      | Effect                                                                         |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`apps/admin/src/main.tsx`](../../apps/admin/src/main.tsx:1)                     | `configureValidationLocale('hu')`                         | every schema message resolved after boot is Hungarian                          |
+| [`features/forms/use-app-form.ts`](../../apps/admin/src/features/forms/use-app-form.ts:1) | `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` | the zod-generated issues (`too_small`, `invalid_string`, …) are translated too |
 
 Tests must do the same: [`apps/admin/src/test/setup.ts`](../../apps/admin/src/test/setup.ts:1) calls
 `configureValidationLocale('hu')`, so a missing translation fails a test instead of reaching a user.
@@ -753,10 +776,14 @@ the ordered field paths and the submit call, and
 react-hook-form's curried function — a page therefore cannot bypass the validate → submit → reset →
 notify order. The hook holds no field name and no sentence, and never branches on `error.code`
 (the field-error gate, §9.3). Full contract and tests: [`Forms-and-Validation.md`](./Forms-and-Validation.md:1).
-`ApiKeyForm.tsx` is the reference implementation since **AIS-85**: `Input`/`Textarea` carry their own
-`label`/`hint`/`error`/`aria` wiring, so they are **not** wrapped in `FormField` (that would render two
-labels and the primitive overrides `aria-describedby` after `...rest`); `FormField` is for controls that
-bring no label of their own.
+
+Since **AIS-155** the reference implementation is split in two, because the submit button moved into the
+overlay footer: [`ApiKeyCreateDialog.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyCreateDialog.tsx:1)
+owns `useAppForm` (schema, field paths, submit, `onSuccess: closeDialog`) and the `<form id>` around
+[`ApiKeyFormFields.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyFormFields.tsx:1), which is the
+presentational field list. `Input`/`Textarea` carry their own `label`/`hint`/`error`/`aria` wiring, so
+they are **not** wrapped in `FormField` (that would render two labels and the primitive overrides
+`aria-describedby` after `...rest`); `FormField` is for controls that bring no label of their own.
 
 ## 5. State plan per page
 
@@ -813,6 +840,20 @@ candidate's own values — otherwise `sort`, `order` and `limit` were silently d
 The table still owns nothing: the failure stays `PageErrorState` (`D11`), and the sorted column is
 `toTableSort(params)` computed from the URL on every render.
 
+**AIS-155 turned the create/edit surface into a URL as well.** `/api-keys/new` and
+`/api-keys/:identifier/view` are nested registry children rendered into the list page's `<Outlet/>`, so:
+
+| Interaction                   | URL write                                                     | UI                                        |
+| ----------------------------- | ------------------------------------------------------------- | ----------------------------------------- |
+| “Új API kulcs” in the header  | `<Link to="/api-keys/new">` (a real navigation, linkable)     | `EntityDialog` above the list             |
+| row name                          | `<Link to="/api-keys/:identifier/view">`                      | read-only `EntityDialog` (`submit: null`) |
+| close (`X`, `Esc`, backdrop, dismiss) | `navigate('/api-keys', { replace: true })` via `useEntityDialog` | the list, still mounted, unchanged        |
+
+The overlay's open/closed state is therefore **URL state (bucket 1)**, not page UI state: the page gets
+no store, no `useState` for "is the dialog open", and a reload or a copied link re-opens the same
+window. The list is not remounted while the overlay is open, so there is no second fetch and no lost
+scroll position.
+
 ## 6. New page recipe
 
 The step-by-step, file-name-level, layer-ordered checklist is
@@ -825,6 +866,9 @@ What stays in this document, because it is a decision rather than a step:
   are intentionally empty ("no store" is a decision, not an omission);
 - **§4.4 is the form pattern** — every form goes through `useAppForm`, and the plumbing is never
   re-implemented in a page;
+- **§4.0 `EntityDialog` is the overlay standard** — a create or edit surface is a **nested route**
+  (`children` + `<Outlet/>`) rendered by `EntityDialog`, never an inline form under the list; the form
+  state stays in the overlay that owns `useAppForm`, and the footer submit submits it by `formId`;
 - **§3.3 and §4 are the styling and primitive vocabulary** the checklist refers to.
 
 Route registration is derived: one `RouteEntry` in `app/router/route-registry.tsx` produces both the

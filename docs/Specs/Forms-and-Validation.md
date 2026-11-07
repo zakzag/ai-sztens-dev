@@ -1,6 +1,6 @@
 # Forms and validation — the admin form pattern
 
-**Utolsó frissítés:** 2026-11-05 (AIS-136: `banner` hiba is toastol — a `field` marad az egyetlen toast nélküli szint (§3.1); az `ApiKeyEditForm` megkapta a `notify` portot, a lap sikeres `Alert`-je mellett (§5–§6)) (AIS-85: az `ApiKeyForm` átállt a mintára és a `notify` portra; a `formError` csak a `field`-szintű hiba maradéka — ki beszél a hibáról: §3.1) (AIS-115: megjelent a közös form-minta, `features/forms/use-app-form.ts` — validáció, mezőhiba-leképezés, submit/toast konvenció egy helyen)
+**Utolsó frissítés:** 2026-11-07 (AIS-155: a létrehozó űrlap **overlay-be** került — `ApiKeyCreateDialog` birtokolja a `useAppForm`-ot, a mezők `ApiKeyFormFields`-ben, a submit gomb az `EntityDialog` footerében `form={formId}`-vel; a minta többi része változatlan) (AIS-136: `banner` hiba is toastol — a `field` marad az egyetlen toast nélküli szint (§3.1); az `ApiKeyEditForm` megkapta a `notify` portot, a lap sikeres `Alert`-je mellett (§5–§6)) (AIS-85: az `ApiKeyForm` átállt a mintára és a `notify` portra; a `formError` csak a `field`-szintű hiba maradéka — ki beszél a hibáról: §3.1) (AIS-115: megjelent a közös form-minta, `features/forms/use-app-form.ts` — validáció, mezőhiba-leképezés, submit/toast konvenció egy helyen)
 **Status:** living document — describes the _current_ state of form handling in `apps/admin`.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) §5 (business logic),
 §6 (three state buckets), §9 (error handling) and [`UI-Architecture.md`](./UI-Architecture.md:1) §4.3.
@@ -153,7 +153,8 @@ tickets could not block each other.
   was added in AIS-136, so the row is now announced twice **on purpose**: the toast marks the moment
   of the save, the `Alert` marks the state of the row that was just saved and survives a dismissed
   toast. Both read the same `API_KEY_EDIT_FORM_SUCCESS_MESSAGE` constant, so the copy cannot drift.
-  `ApiKeyForm` stays single-surface: it has no `Alert` at all.
+  `ApiKeyForm` stayed single-surface: it had no success `Alert` at all. Since AIS-155 that component is
+  the create overlay (`ApiKeyCreateDialog` + `ApiKeyFormFields`), which keeps the same rule.
 
 ---
 
@@ -163,7 +164,7 @@ tickets could not block each other.
 | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | [`use-app-form.logic.test.ts`](../../apps/admin/src/features/forms/use-app-form.logic.test.ts:1) | ordering by `fieldPaths`, dropping unowned paths, residue message for `field`, suppression for `page`/`banner`/`silent`                   |
 | [`use-app-form.test.tsx`](../../apps/admin/src/features/forms/use-app-form.test.tsx:1)           | valid submit, reset, notification, invalid block, pending, page failure without a duplicate `Alert`, unmapped path, focus order, retry     |
-| [`ApiKeyForm.test.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyForm.test.tsx:1)            | the reference slice end to end: one toast **and** one log entry per submit, `409` field-only, `5xx` toast-only, residue `Alert`, invalidation |
+| [`ApiKeyCreateDialog.test.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyCreateDialog.test.tsx:1) | the reference slice end to end: one toast **and** one log entry per submit, `409` field-only, `5xx` toast-only, residue `Alert`, invalidation, and the close navigation of the overlay (AIS-155) |
 | [`ApiKeyEditForm.test.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyEditForm.test.tsx:1)    | the same contract on the edit form (AIS-136): one success toast + one log entry, and **no** toast for a field-addressable failure          |
 
 The consumer harness ([`test/mocks/app-form-harness.mock.tsx`](../../apps/admin/src/test/mocks/app-form-harness.mock.tsx:1))
@@ -177,6 +178,6 @@ No test hits the network: the write is always a mock.
 | Form                              | State                                                                                                        |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `pages/LoginPage`                 | not react-hook-form based yet; unaffected                                                                    |
-| `pages/api-keys/ui/ApiKeyForm`    | **migrated in AIS-85** — `useAppForm` + `useNotifier()`, no `pageError` state, no success `Alert`, `FormActions` |
+| `pages/api-keys/ui/ApiKeyCreateDialog` | **migrated in AIS-85** as `ApiKeyForm`; since **AIS-155** it is the `/api-keys/new` overlay: `useAppForm` + `useNotifier()` live in the overlay, the fields moved to `ApiKeyFormFields`, the submit button to the `EntityDialog` footer (`form={formId}`), and `onSuccess` closes the window |
 | `pages/api-keys/ui/ApiKeyEditForm` | `useAppForm` since AIS-131; **notify port since AIS-136** (`useNotifier()`), with the page's success `Alert` deliberately kept (`AIS136-D1`) |
 | Every new form                    | must use `useAppForm` (§1) — a hand-wired resolver + `setError` loop is a review finding                     |

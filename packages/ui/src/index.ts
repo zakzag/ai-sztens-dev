@@ -414,3 +414,6 @@ export type {
   BreadcrumbLinkRendererProps,
   BreadcrumbProps,
 } from './components/breadcrumb/breadcrumb.interface.js';
+
+export { DEFAULT_THEME_NAME, THEME_NAMES } from './theme/theme.const.js';
+export type { ThemeName } from './theme/theme.interface.js';

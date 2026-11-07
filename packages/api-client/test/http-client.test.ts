@@ -26,6 +26,7 @@ import {
   paginatedResponse,
   successResponse,
   textResponse,
+  withHeader,
 } from './mocks/fetch.mock.js';
 
 /**
@@ -804,7 +805,7 @@ describe('createHttpClient — getList', () => {
 });
 
 describe('createHttpClient — onEvent', () => {
-  it('reports a successful attempt without leaking the request', async () => {
+  it('reports a successful attempt without leaking the request headers', async () => {
     const events: HttpEvent[] = [];
     const fetchMock = createSequenceFetchMock([
       successResponse({ id: '1', name: 'first' }),
@@ -827,15 +828,20 @@ describe('createHttpClient — onEvent', () => {
     });
     expect(Number.isFinite(events[0]?.durationMs)).toBe(true);
     expect(events[0]?.durationMs).toBeGreaterThanOrEqual(0);
-    // The event carries exactly these keys: there is no header, token or body
-    // field on the type, so a listener cannot leak the request.
+    // The event carries exactly these keys: no header value exists on the type,
+    // and the body travels only as a masked prefix (AIS-152).
     expect(Object.keys(events[0] ?? {}).sort()).toEqual([
+      'bodyPreview',
       'durationMs',
       'method',
       'outcome',
       'path',
+      'query',
+      'requestId',
+      'responseMeta',
       'status',
     ]);
+    expect(JSON.stringify(events[0])).not.toContain('session-token');
   });
 
   it('reports a failed status as an error with the status kept', async () => {
@@ -901,6 +907,207 @@ describe('createHttpClient — onEvent', () => {
     });
 
     expect(events[0]?.path).toBe('/items');
+  });
+
+  it('reports the generated list query next to the bare path', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([paginatedResponse([])]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.getList('/items', z.array(itemSchema), {
+      query: { page: 3, limit: 20, order: 'desc' },
+    });
+
+    const sentUrl = new URL(fetchMock.calls[0]?.url ?? 'http://api.test');
+    expect(events[0]?.query).toBe(sentUrl.search.replace(/^\?/, ''));
+    expect(events[0]?.query).toContain('page=3');
+  });
+
+  it('reports the request id from the response header first', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      withHeader(successResponse(null), 'x-request-id', 'header-id'),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.delete('/items/1', z.null());
+
+    expect(events[0]?.requestId).toBe('header-id');
+  });
+
+  it('falls back to the envelope request id when the header is missing', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'first' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema);
+
+    expect(events[0]?.requestId).toBe(TEST_META.requestId);
+  });
+
+  it('falls back to the error request id on a failed status', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'gone',
+        requestId: 'error-id',
+      }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema).catch(() => undefined);
+
+    expect(events[0]?.requestId).toBe('error-id');
+  });
+
+  it('prefers the header over the error envelope id', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      withHeader(
+        errorResponse({ code: 'NOT_FOUND', status: 404, message: 'gone' }),
+        'x-request-id',
+        'header-id',
+      ),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema).catch(() => undefined);
+
+    expect(events[0]?.requestId).toBe('header-id');
+  });
+
+  it('reports a null request id for a dead network', async () => {
+    const events: HttpEvent[] = [];
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: createRejectingFetchMock().fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema).catch(() => undefined);
+
+    expect(events[0]?.requestId).toBeNull();
+    expect(events[0]?.responseMeta).toBeNull();
+  });
+
+  it('reports the body prefix of a write and nothing for a read', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'first' }),
+      successResponse({ id: '1', name: 'first' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.post('/items', { name: 'first' }, itemSchema);
+    await client.get('/items', itemSchema);
+
+    expect(events[0]?.bodyPreview).toBe('{"name":"first"}');
+    expect(events[1]?.bodyPreview).toBeNull();
+  });
+
+  it('never puts the token into the body prefix', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'first' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      getToken: () => 'session-token',
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.post(
+      '/items',
+      { name: 'first', token: 'body-token' },
+      itemSchema,
+    );
+
+    expect(events[0]?.bodyPreview).not.toContain('body-token');
+    expect(events[0]?.bodyPreview).not.toContain('session-token');
+  });
+
+  it('reports the response meta of a paginated list', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([paginatedResponse([])]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.getList('/items', z.array(itemSchema), {
+      query: { page: 1, limit: 20, order: 'desc' },
+    });
+
+    expect(events[0]?.responseMeta).toEqual({
+      requestId: TEST_META.requestId,
+      timestamp: TEST_META.timestamp,
+      totalItems: 1,
+    });
+  });
+
+  it('reports a null total for an endpoint that does not paginate', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      successResponse({ id: '1', name: 'first' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema);
+
+    expect(events[0]?.responseMeta?.totalItems).toBeNull();
+  });
+
+  it('reports no response meta for a contract drift and a failed status', async () => {
+    const events: HttpEvent[] = [];
+    const fetchMock = createSequenceFetchMock([
+      jsonResponse({ id: '1', name: 'first' }),
+      errorResponse({ code: 'NOT_FOUND', status: 404, message: 'gone' }),
+    ]);
+    const client = createHttpClient({
+      baseUrl: BASE_URL,
+      fetchImpl: fetchMock.fetchImpl,
+      onEvent: (event) => events.push(event),
+    });
+
+    await client.get('/items', itemSchema).catch(() => undefined);
+    await client.get('/items', itemSchema).catch(() => undefined);
+
+    expect(events[0]?.responseMeta).toBeNull();
+    expect(events[1]?.responseMeta).toBeNull();
   });
 
   it('does not fail the request when the listener throws', async () => {

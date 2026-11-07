@@ -34,11 +34,16 @@ import {
 } from './api-error.js';
 import { assertNoUnresolvedPathParameter } from './endpoint-path.js';
 import { unwrapEnvelope } from './envelope.logic.js';
+import { REQUEST_ID_HEADER } from './http-event.const.js';
+import { toBodyPreview, toEventQuery, toResponseMeta } from './http-event.logic.js';
 import { unwrapPaginatedEnvelope } from './paginated-envelope.logic.js';
 import type {
+  AttemptOutcome,
+  AttemptRequest,
   HttpClient,
   HttpClientConfig,
   HttpEvent,
+  HttpEventResponseMeta,
   ListRequest,
   RequestOptions,
 } from './http-client.interface.js';
@@ -138,11 +143,13 @@ function toPayloadError(
 }
 
 /**
- * Parses a 2xx body as the success envelope and returns its `data`.
+ * Parses a 2xx body as the success envelope and returns its `data` plus the
+ * traceable `meta` the telemetry event reports (AIS-152).
  *
  * All decoding happens in {@link unwrapEnvelope}; this function only owns the
- * transport concerns: reading the body and turning a failed unwrap into the
- * contract-drift {@link ApiError}.
+ * transport concerns: reading the body, turning a failed unwrap into the
+ * contract-drift {@link ApiError}, and deriving the event's meta from the **same**
+ * body (never a second read).
  *
  * @throws {ApiError} with code `UNEXPECTED_PAYLOAD` when the unwrap fails.
  */
@@ -150,18 +157,20 @@ async function parsePayload<T>(
   response: Response,
   schema: z.ZodType<T>,
   url: string,
-): Promise<T> {
-  const result = unwrapEnvelope(schema, await readBody(response));
+): Promise<AttemptOutcome<T>> {
+  const body = await readBody(response);
+  const result = unwrapEnvelope(schema, body);
 
   if (!result.ok) {
     throw toPayloadError(response, url, result.issues, result.cause);
   }
 
-  return result.data;
+  return { data: result.data, responseMeta: toResponseMeta(body) };
 }
 
 /**
- * Parses a 2xx body as a paginated list and returns rows plus pager metadata.
+ * Parses a 2xx body as a paginated list and returns rows, pager metadata and the
+ * traceable `meta` of the attempt.
  *
  * @throws {ApiError} with code `UNEXPECTED_PAYLOAD` when the unwrap fails,
  *   including a missing `meta.pagination` (issue path `meta.pagination`).
@@ -170,14 +179,18 @@ async function parseListPayload<TRows>(
   response: Response,
   rowsSchema: z.ZodType<TRows, z.ZodTypeDef, TRows>,
   url: string,
-): Promise<ApiResult<TRows>> {
-  const result = unwrapPaginatedEnvelope(rowsSchema, await readBody(response));
+): Promise<AttemptOutcome<ApiResult<TRows>>> {
+  const body = await readBody(response);
+  const result = unwrapPaginatedEnvelope(rowsSchema, body);
 
   if (!result.ok) {
     throw toPayloadError(response, url, result.issues, result.cause);
   }
 
-  return { data: result.data, meta: result.meta };
+  return {
+    data: { data: result.data, meta: result.meta },
+    responseMeta: toResponseMeta(body),
+  };
 }
 
 /**
@@ -207,6 +220,53 @@ async function toFailure(response: Response, url: string): Promise<never> {
 function toEventPath(path: string): string {
   const queryIndex = path.indexOf('?');
   return queryIndex === -1 ? path : path.slice(0, queryIndex);
+}
+
+/**
+ * Reads the correlation id out of the response headers.
+ *
+ * @param response - the received response.
+ * @returns the header value, or `null` when the server sent none.
+ */
+function toHeaderRequestId(response: Response): string | null {
+  const value = response.headers.get(REQUEST_ID_HEADER);
+
+  return value === null || value.length === 0 ? null : value;
+}
+
+/**
+ * Resolves the correlation id of a **failed** attempt (AIS-152 decision `D-A`).
+ *
+ * The header wins because the server sets it on error responses too; when it is
+ * missing, the thrown `ApiError` already carries the envelope's `error.requestId`,
+ * so no second body read is needed.
+ *
+ * @param response - the response that carried the failure.
+ * @param error - whatever the failure path threw.
+ * @returns the correlation id, or `null` when nothing identified the request.
+ */
+function toFailureRequestId(response: Response, error: unknown): string | null {
+  const headerRequestId = toHeaderRequestId(response);
+
+  if (headerRequestId !== null) {
+    return headerRequestId;
+  }
+
+  return error instanceof ApiError ? error.requestId : null;
+}
+
+/**
+ * Resolves the correlation id of a **successful** attempt.
+ *
+ * @param response - the 2xx response.
+ * @param responseMeta - the validated `meta` of the body, when it had one.
+ * @returns the header value first, then `meta.requestId`, otherwise `null`.
+ */
+function toSuccessRequestId(
+  response: Response,
+  responseMeta: HttpEventResponseMeta | null,
+): string | null {
+  return toHeaderRequestId(response) ?? responseMeta?.requestId ?? null;
 }
 
 /**
@@ -247,18 +307,20 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
    * dead network becomes the network `ApiError` and an unexpected error from the
    * parser is never misreported as a network failure. The second one observes the
    * parse result for telemetry and rethrows unchanged.
+   *
+   * The three values a listener may see (`eventPath`, `eventQuery`, `bodyPreview`)
+   * are derived **once** here, so the three emit paths cannot disagree about what
+   * the attempt looked like (AIS-152).
    */
-  async function attempt<T>(
-    method: ApiHttpMethod,
-    path: string,
-    init: RequestInit,
-    parse: (response: Response, url: string) => Promise<T>,
-    options?: RequestOptions,
-  ): Promise<T> {
+  async function attempt<T>(request: AttemptRequest<T>): Promise<T> {
+    const { method, path, init, body, parse, options } = request;
+
     assertNoUnresolvedPathParameter(path);
 
     const url = joinUrl(config.baseUrl, path);
     const eventPath = toEventPath(path);
+    const eventQuery = toEventQuery(path);
+    const bodyPreview = toBodyPreview(body);
     const startedAt = Date.now();
 
     let response: Response;
@@ -275,6 +337,10 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
         status: null,
         durationMs: Date.now() - startedAt,
         outcome: 'error',
+        requestId: null,
+        query: eventQuery,
+        bodyPreview,
+        responseMeta: null,
       });
 
       throw new ApiError({
@@ -286,7 +352,7 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
     }
 
     try {
-      const result = response.ok
+      const outcome = response.ok
         ? await parse(response, url)
         : await toFailure(response, url);
 
@@ -296,9 +362,13 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
         status: response.status,
         durationMs: Date.now() - startedAt,
         outcome: 'success',
+        requestId: toSuccessRequestId(response, outcome.responseMeta),
+        query: eventQuery,
+        bodyPreview,
+        responseMeta: outcome.responseMeta,
       });
 
-      return result;
+      return outcome.data;
     } catch (error) {
       emitEvent(config, {
         method,
@@ -306,6 +376,10 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
         status: response.status,
         durationMs: Date.now() - startedAt,
         outcome: 'error',
+        requestId: toFailureRequestId(response, error),
+        query: eventQuery,
+        bodyPreview,
+        responseMeta: null,
       });
 
       throw error;
@@ -314,13 +388,14 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
 
   return {
     get: <T>(path: string, schema: z.ZodType<T>, options?: RequestOptions) =>
-      attempt(
-        'GET',
+      attempt({
+        method: 'GET',
         path,
-        { method: 'GET' },
-        (response, url) => parsePayload(response, schema, url),
+        init: { method: 'GET' },
+        body: undefined,
+        parse: (response, url) => parsePayload(response, schema, url),
         options,
-      ),
+      }),
 
     post: <TBody, TRes>(
       path: string,
@@ -328,13 +403,14 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
       schema: z.ZodType<TRes>,
       options?: RequestOptions,
     ) =>
-      attempt(
-        'POST',
+      attempt({
+        method: 'POST',
         path,
-        { method: 'POST', body: JSON.stringify(body) },
-        (response, url) => parsePayload(response, schema, url),
+        init: { method: 'POST', body: JSON.stringify(body) },
+        body,
+        parse: (response, url) => parsePayload(response, schema, url),
         options,
-      ),
+      }),
 
     put: <TBody, TRes>(
       path: string,
@@ -342,13 +418,14 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
       schema: z.ZodType<TRes>,
       options?: RequestOptions,
     ) =>
-      attempt(
-        'PUT',
+      attempt({
+        method: 'PUT',
         path,
-        { method: 'PUT', body: JSON.stringify(body) },
-        (response, url) => parsePayload(response, schema, url),
+        init: { method: 'PUT', body: JSON.stringify(body) },
+        body,
+        parse: (response, url) => parsePayload(response, schema, url),
         options,
-      ),
+      }),
 
     patch: <TBody, TRes>(
       path: string,
@@ -356,26 +433,28 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
       schema: z.ZodType<TRes>,
       options?: RequestOptions,
     ) =>
-      attempt(
-        'PATCH',
+      attempt({
+        method: 'PATCH',
         path,
-        { method: 'PATCH', body: JSON.stringify(body) },
-        (response, url) => parsePayload(response, schema, url),
+        init: { method: 'PATCH', body: JSON.stringify(body) },
+        body,
+        parse: (response, url) => parsePayload(response, schema, url),
         options,
-      ),
+      }),
 
     delete: <TRes>(
       path: string,
       schema: z.ZodType<TRes>,
       options?: RequestOptions,
     ) =>
-      attempt(
-        'DELETE',
+      attempt({
+        method: 'DELETE',
         path,
-        { method: 'DELETE' },
-        (response, url) => parsePayload(response, schema, url),
+        init: { method: 'DELETE' },
+        body: undefined,
+        parse: (response, url) => parsePayload(response, schema, url),
         options,
-      ),
+      }),
 
     getList: <TRows>(
       path: string,
@@ -389,13 +468,14 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
       ).toString();
       const requestPath = search.length === 0 ? path : `${path}?${search}`;
 
-      return attempt(
-        'GET',
-        requestPath,
-        { method: 'GET' },
-        (response, url) => parseListPayload(response, rowsSchema, url),
+      return attempt({
+        method: 'GET',
+        path: requestPath,
+        init: { method: 'GET' },
+        body: undefined,
+        parse: (response, url) => parseListPayload(response, rowsSchema, url),
         options,
-      );
+      });
     },
   };
 }

@@ -54,9 +54,12 @@ export {
 } from './endpoint-path.js';
 
 export type {
+  AttemptOutcome,
+  AttemptRequest,
   HttpClient,
   HttpClientConfig,
   HttpEvent,
+  HttpEventResponseMeta,
   ListRequest,
   RequestOptions,
 } from './http-client.interface.js';

@@ -210,6 +210,32 @@ export function createSequenceFetchMock(
 }
 
 /**
+ * Returns a copy of the response with one extra header (AIS-152).
+ *
+ * Used to exercise the `X-Request-Id` path: the envelopes of this mock do not set
+ * the header, so a test that wants it has to opt in explicitly.
+ *
+ * @param response - the response to copy.
+ * @param name - header name.
+ * @param value - header value.
+ */
+export function withHeader(
+  response: Response,
+  name: string,
+  value: string,
+): Response {
+  const source = response.clone();
+  const headers = new Headers(source.headers);
+  headers.set(name, value);
+
+  return new Response(source.body, {
+    status: source.status,
+    statusText: source.statusText,
+    headers,
+  });
+}
+
+/**
  * Creates a `fetch` double that rejects, simulating a dead network.
  *
  * @param error - the rejection reason (default: a `TypeError` like the real one).

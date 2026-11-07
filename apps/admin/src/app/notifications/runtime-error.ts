@@ -1,6 +1,7 @@
 import { NOTIFICATION_EVENT_DEFAULTS, type NotificationStore } from '@callback/notifications';
 import { RUNTIME_ERROR_MESSAGE, toRuntimeDetail } from '@callback/notifications/react';
 import type { AppRenderErrorHandler } from '../error/app-error-boundary.interface.js';
+import { toRuntimeDetails } from './notification-events.logic.js';
 
 /**
  * Emitter of render crashes — the fifth capture channel (AIS-136 `G3`).
@@ -40,6 +41,9 @@ export function createRuntimeErrorEmitter(
       source: defaults.source,
       message: RUNTIME_ERROR_MESSAGE,
       detail: toRuntimeDetail(report.error, includeDetails),
+      // The structured half of the same crash (AIS-152): the expandable row shows
+      // name, message, stack and React's component trace as separate rows.
+      details: toRuntimeDetails(report, includeDetails),
       toast: defaults.toast,
     });
   };

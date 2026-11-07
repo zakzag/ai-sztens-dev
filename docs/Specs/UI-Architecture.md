@@ -1,6 +1,14 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-07 — AIS-151 (strukturált log-részletek a `@callback/notifications` core-ban).**
+**Utolsó frissítés: 2026-11-07 — AIS-152 (`HttpEvent` bővítés és a `details` mapping bekötése).**
+A transport eseménye négy új, `readonly` mezőt hordoz (`requestId`, `query`, `bodyPreview`,
+`responseMeta`), a body csak **maszkolt, csonkolt prefix**, a token/`Authorization` soha; a capture
+mindhárom csatornája (HTTP, query/mutation hiba, runtime crash) kitölti a strukturált `details`
+tömböt, a címkék `DETAIL_LABEL_*` konstansokból jönnek, az `operation` pedig query/mutation esetén a
+`meta.operation`-ból, HTTP esemény esetén az injektált route-olvasóból (`main.tsx`); a `detail`
+egysoros szövege **változatlan** (lásd §4.1.3).
+
+**AIS-151 (2026-11-07) — strukturált log-részletek a `@callback/notifications` core-ban.**
 A `NotificationEntry` opcionális `details: readonly NotificationDetailField[]` mezőt kap: a store a
 `record` és a kész tömb alakot **ugyanazon** a redakciós úton normalizálja (beszúrási sorrend, label
 szerinti redakció, konstans limitek), az üres eredmény `undefined` lesz, a `sessionStorage` guard
@@ -520,13 +528,29 @@ Toasting there would put two cards on screen for every failed write — one with
 with the code copy. The transport therefore only *records* the attempt, which is what the log panel
 is for: the detail is `"{durationMs} ms"` and the message is `"{METHOD} {path} — {status|hálózati hiba}"`.
 
+**The structured half (AIS-152).** Every emitted entry now also carries `details`, the key/value rows
+of the expandable row (the row itself is AIS-153). Three pure builders produce them, one per channel:
+`toHttpDetails(event, operation)` → method, path, query, status, duration, outcome, `requestId`,
+response timestamp, total items, masked body prefix, operation, source; `toFailureDetails(error, keyLabel, key, surface)`
+→ code, status, `requestId`, resource key, **one row per field issue** (`path` label, message value),
+url, surface, error name; `toRuntimeDetails(report, includeStack)` → name, message, stack (DEV only),
+React's component trace. A row whose value is unknown is *skipped*, never rendered empty, and the
+order of insertion is preserved. Labels are `DETAIL_LABEL_*` constants in
+[`notification.const.ts`](../../apps/admin/src/app/notifications/notification.const.ts:1); the
+operation label comes from `meta.operation` (query/mutation) or from the injected route reader
+(`() => window.location.pathname`, wired once in `main.tsx`), because the transport only sees a URL
+(AIS-152 `D-E`). `repeatCount` and `createdAt` stay store-owned fields of the entry — they are **not**
+duplicated into `details`.
+
 Wiring, in the order `main.tsx` performs it:
 
 1. `app/notifications/notification.store.ts` creates the **single** store and its `sessionStorage`
    mirror (an injected store is *not* seeded by the provider, so the restore happens before the store
    exists — AIS-83 `D3`);
-2. `setHttpEventListener(createHttpEventEmitter(store))` — `services/http-events.ts` is the registry
-   the transport reads, because `services` may not import `app/` (`no-service-to-higher-layer`);
+2. `setHttpEventListener(createHttpEventEmitter(store, readRouteOperation))` — `services/http-events.ts`
+   is the registry the transport reads, because `services` may not import `app/`
+   (`no-service-to-higher-layer`); `readRouteOperation` is the only place that touches
+   `window.location` (AIS-152);
 3. `createAppQueryClient(store)` builds the one `QueryClient` with
    `new QueryCache(createQueryCacheHandlers(store))` and the matching `MutationCache`; the retry and
    refetch defaults are unchanged (`retry: 1`, no refetch on focus);

@@ -5,11 +5,13 @@ import type {
 import type { NotificationStore } from '@callback/notifications';
 import type { HttpEventListener } from '../../services/http-events.interface.js';
 import {
+  readOperationMeta,
   toHttpEntry,
   toMutationErrorEntry,
   toMutationSuccessEntry,
   toQueryErrorEntry,
 } from './notification-events.logic.js';
+import type { OperationReader } from './notification.interface.js';
 
 /**
  * The three adapters that turn app events into store writes (AIS-84).
@@ -21,17 +23,24 @@ import {
  *
  * Taking the `NotificationStore` (not the `Notifier` facade) keeps the adapters
  * React-free and makes them usable from `main.tsx` before any component mounts.
+ *
+ * Since AIS-152 they also forward the **operation** label: a query/mutation reads
+ * it from its own `meta`, a HTTP attempt gets it from the injected reader. Neither
+ * adapter touches `window` itself, so both stay testable with plain values.
  */
 
 /**
  * @param store - the application's single notification store.
+ * @param readOperation - supplies the operation label of a HTTP attempt (the
+ *   route reader, injected by the composition root).
  * @returns the listener `services/http-events.ts` is registered with.
  */
 export function createHttpEventEmitter(
   store: NotificationStore,
+  readOperation: OperationReader,
 ): HttpEventListener {
   return (event) => {
-    store.emit(toHttpEntry(event));
+    store.emit(toHttpEntry(event, readOperation()));
   };
 }
 
@@ -50,7 +59,10 @@ export function createQueryCacheHandlers(
 ): QueryCacheConfig {
   return {
     onError: (error, query) => {
-      const entry = toQueryErrorEntry(error, { queryKey: query.queryKey });
+      const entry = toQueryErrorEntry(error, {
+        queryKey: query.queryKey,
+        operation: readOperationMeta(query.meta),
+      });
 
       if (entry !== null) {
         store.emit(entry);
@@ -77,6 +89,7 @@ export function createMutationCacheHandlers(
       const entry = toMutationSuccessEntry({
         meta: mutation.meta,
         mutationKey: mutation.options.mutationKey,
+        operation: readOperationMeta(mutation.meta),
       });
 
       if (entry !== null) {
@@ -86,6 +99,7 @@ export function createMutationCacheHandlers(
     onError: (error, _variables, _context, mutation) => {
       const entry = toMutationErrorEntry(error, {
         mutationKey: mutation.options.mutationKey,
+        operation: readOperationMeta(mutation.meta),
       });
 
       if (entry !== null) {

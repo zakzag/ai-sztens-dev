@@ -10,18 +10,38 @@ import type { EmitNotificationInput } from '@callback/notifications';
 export type NotificationEntryDraft = EmitNotificationInput;
 
 /**
+ * The domain operation an entry belongs to (AIS-152 decision `D-E`).
+ *
+ * The transport cannot know it — it only sees a URL — so the value is supplied
+ * by whoever does: the route reader for a HTTP event, the query/mutation `meta`
+ * for a cache callback. `null` when nobody declared one, never `''`.
+ */
+export interface OperationContext {
+  /** Operation label, e.g. `api-keys.update`. */
+  readonly operation: string | null;
+}
+
+/**
+ * Supplies the operation label of a HTTP attempt.
+ *
+ * Injected into the capture adapter instead of read there, so the adapter stays
+ * free of `window`/`location` and is testable with a plain function.
+ */
+export type OperationReader = () => string | null;
+
+/**
  * Context of a query failure.
  *
  * The key is what makes a log line useful: the message says *what* went wrong,
  * the key says *about which resource*.
  */
-export interface QueryFailureContext {
+export interface QueryFailureContext extends OperationContext {
   /** Query key of the failed query (`['api-keys', 'list', …]`). */
   readonly queryKey: readonly unknown[];
 }
 
 /** Context of a mutation failure or success. */
-export interface MutationContext {
+export interface MutationContext extends OperationContext {
   /** Mutation key, when the caller declared one (`useApiMutation`). */
   readonly mutationKey?: readonly unknown[];
 }

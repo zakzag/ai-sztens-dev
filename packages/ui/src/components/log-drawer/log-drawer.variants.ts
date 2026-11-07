@@ -147,5 +147,89 @@ export const logEntryRowVariants = cva(
   },
 );
 
+/**
+ * The expandable header band of one row (AIS-153).
+ *
+ * A full-width `<button>`, so the row is operable with `Enter`/`Space` and every
+ * pointer user gets the same target. It intentionally wraps **only** the header
+ * band — glyph, level, chevron and timestamp — while the message and the
+ * one-line `detail` stay outside it: a long sentence inside a button makes the
+ * whole row look pressable, and a nested button inside a button is invalid
+ * HTML.
+ *
+ * The pressed/open state is not carried by colour alone: `aria-expanded` on the
+ * element is the source of truth and the rotated chevron is the visual echo.
+ */
+export const logEntryToggleVariants = cva(
+  'flex w-full items-center gap-2 rounded-control text-left transition-colors duration-fast focus-visible:border-border-focus focus-visible:shadow-focus-ring focus-visible:outline-none',
+  {
+    variants: {
+      isOpen: {
+        true: 'text-text-primary',
+        false: 'text-text-secondary hover:text-text-primary',
+      },
+    },
+    defaultVariants: { isOpen: false },
+  },
+);
+
+/**
+ * The chevron of the header band.
+ *
+ * A separate recipe only because a cva variant can style its **own** element,
+ * not a child: the rotation is the visual half of `isOpen`, so it lives in a
+ * variant instead of an inline conditional string. Rendered `aria-hidden` — the
+ * accessible name of the header button already states the action.
+ */
+export const logEntryChevronVariants = cva(
+  'size-3 shrink-0 transition-transform duration-fast',
+  {
+    variants: {
+      isOpen: { true: 'rotate-180', false: 'rotate-0' },
+    },
+    defaultVariants: { isOpen: false },
+  },
+);
+
+/**
+ * The expandable detail region of one row (AIS-153).
+ *
+ * Separated from the header by a hairline, and **bounded**: `max-h-64` with
+ * `overflow-y-auto` keeps a stack trace or a body prefix from stretching the
+ * whole panel, and `whitespace-pre-wrap` + `break-words` preserve the line
+ * structure of a dump without letting one long URL push the panel wider.
+ */
+export const logEntryDetailsVariants = cva(
+  'mt-1 flex max-h-64 flex-col gap-2 overflow-y-auto border-t border-hairline pt-2 break-words whitespace-pre-wrap',
+);
+
+/**
+ * One `dt`/`dd` pair of the detail region.
+ *
+ * `slot` decides whether the element is the term or the description, `mono`
+ * switches the value to the monospaced recipe for ids, URLs and bodies. Both
+ * are variants (not inline ternaries) so the two halves of a pair can never
+ * drift apart.
+ */
+export const logDetailFieldVariants = cva('', {
+  variants: {
+    slot: {
+      label: 'text-xs font-semibold tracking-wide text-text-muted uppercase',
+      value: 'text-sm text-text-secondary',
+    },
+    mono: { true: 'font-mono text-xs', false: '' },
+  },
+  defaultVariants: { mono: false },
+});
+
 export type LogEntryRowVariants = VariantProps<typeof logEntryRowVariants>;
 export type LogFilterChipVariants = VariantProps<typeof logFilterChipVariants>;
+export type LogEntryToggleVariants = VariantProps<
+  typeof logEntryToggleVariants
+>;
+export type LogEntryChevronVariants = VariantProps<
+  typeof logEntryChevronVariants
+>;
+export type LogDetailFieldVariants = VariantProps<
+  typeof logDetailFieldVariants
+>;

@@ -6,14 +6,29 @@ import {
   LOG_DRAWER_WIDTH_MIN,
   LOG_DRAWER_WIDTH_STEP,
   LOG_DRAWER_WIDTH_STEP_LARGE,
+  LOG_ENTRY_DETAILS_TOGGLE_LABEL_CLOSE,
+  LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN,
+  LOG_ENTRY_REQUEST_ID_FIELD_LABEL,
 } from '../src/components/log-drawer/log-drawer.const.js';
 import {
   clampDrawerWidth,
+  findRequestIdField,
+  toEntryJson,
+  toEntryToggleLabel,
   toWidthFromDrag,
   toWidthFromKey,
   toWidthStyle,
 } from '../src/components/log-drawer/log-drawer.logic.js';
-import type { LogDrawerSizeRange } from '../src/components/log-drawer/log-drawer.interface.js';
+import type {
+  LogDrawerSizeRange,
+  LogEntryItem,
+} from '../src/components/log-drawer/log-drawer.interface.js';
+import {
+  LOG_ENTRY_REQUEST_ID_VALUE,
+  buildLogDetailField,
+  buildLogDetails,
+  buildLogEntry,
+} from './mocks/log-entries.mock.js';
 
 /** The production range, so the tests assert the shipped numbers. */
 const RANGE: LogDrawerSizeRange = {
@@ -91,7 +106,9 @@ describe('toWidthFromDrag', () => {
   });
 
   it('clamps a long drag to the minimum', () => {
-    expect(toWidthFromDrag(600, 4_000, start, RANGE)).toBe(LOG_DRAWER_WIDTH_MIN);
+    expect(toWidthFromDrag(600, 4_000, start, RANGE)).toBe(
+      LOG_DRAWER_WIDTH_MIN,
+    );
   });
 
   it('falls back to the initial width for a non-finite coordinate', () => {
@@ -142,9 +159,9 @@ describe('toWidthFromKey', () => {
     expect(toWidthFromKey('ArrowLeft', LOG_DRAWER_WIDTH_MAX, RANGE, true)).toBe(
       LOG_DRAWER_WIDTH_MAX,
     );
-    expect(toWidthFromKey('ArrowRight', LOG_DRAWER_WIDTH_MIN, RANGE, true)).toBe(
-      LOG_DRAWER_WIDTH_MIN,
-    );
+    expect(
+      toWidthFromKey('ArrowRight', LOG_DRAWER_WIDTH_MIN, RANGE, true),
+    ).toBe(LOG_DRAWER_WIDTH_MIN);
   });
 });
 
@@ -155,5 +172,128 @@ describe('toWidthStyle', () => {
 
   it('produces exactly one property', () => {
     expect(Object.keys(toWidthStyle(LOG_DRAWER_WIDTH_DEFAULT))).toHaveLength(1);
+  });
+});
+
+/** Parsed form of the JSON payload, so assertions need no per-test cast. */
+type ParsedEntryJson = Record<string, unknown>;
+
+/**
+ * Parses the payload the "copy JSON" control would put on the clipboard.
+ *
+ * @param entry - entry to serialise and parse.
+ * @returns the parsed object, keyed by field name.
+ */
+function parseEntryJson(entry: LogEntryItem): ParsedEntryJson {
+  return JSON.parse(toEntryJson(entry)) as ParsedEntryJson;
+}
+
+describe('toEntryToggleLabel', () => {
+  it('names the open action while the row is collapsed', () => {
+    expect(toEntryToggleLabel(false, 0)).toBe(
+      LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN,
+    );
+  });
+
+  it('names the close action while the row is expanded', () => {
+    expect(toEntryToggleLabel(true, 0)).toBe(
+      LOG_ENTRY_DETAILS_TOGGLE_LABEL_CLOSE,
+    );
+  });
+
+  it('appends the number of facts when the entry has any', () => {
+    expect(toEntryToggleLabel(false, 3)).toBe(
+      `${LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN} (3 részlet)`,
+    );
+    expect(toEntryToggleLabel(true, 1)).toBe(
+      `${LOG_ENTRY_DETAILS_TOGGLE_LABEL_CLOSE} (1 részlet)`,
+    );
+  });
+
+  it('ignores a negative count', () => {
+    expect(toEntryToggleLabel(false, -2)).toBe(
+      LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN,
+    );
+  });
+});
+
+describe('toEntryJson', () => {
+  it('is deterministic across calls', () => {
+    const entry = buildLogEntry({
+      detail: 'POST /api/v1/keys → 500',
+      details: buildLogDetails(),
+    });
+
+    expect(toEntryJson(entry)).toBe(toEntryJson(entry));
+  });
+
+  it('carries the identity, severity, message, timestamp and facts', () => {
+    const entry = buildLogEntry({
+      level: 'warning',
+      message: 'Lassú kérés',
+      details: buildLogDetails(),
+    });
+
+    const parsed = parseEntryJson(entry);
+
+    expect(parsed['id']).toBe(entry.id);
+    expect(parsed['level']).toBe('warning');
+    expect(parsed['message']).toBe('Lassú kérés');
+    expect(parsed['createdAt']).toBe(entry.createdAt);
+    expect(parsed['details']).toEqual(buildLogDetails());
+  });
+
+  it('stays valid JSON for an entry with neither detail nor details', () => {
+    const parsed = parseEntryJson(buildLogEntry());
+
+    expect(parsed).not.toHaveProperty('detail');
+    expect(parsed).not.toHaveProperty('details');
+  });
+
+  it('keeps the field order stable', () => {
+    const parsed = parseEntryJson(buildLogEntry({ detail: 'context' }));
+
+    expect(Object.keys(parsed)).toEqual([
+      'id',
+      'level',
+      'message',
+      'detail',
+      'createdAt',
+    ]);
+  });
+});
+
+describe('findRequestIdField', () => {
+  it('finds the request id field of the entry', () => {
+    expect(findRequestIdField(buildLogDetails())?.value).toBe(
+      LOG_ENTRY_REQUEST_ID_VALUE,
+    );
+  });
+
+  it('matches the label regardless of case and surrounding spaces', () => {
+    const field = buildLogDetailField({
+      label: ` ${LOG_ENTRY_REQUEST_ID_FIELD_LABEL.toUpperCase()} `,
+      value: 'req-9',
+    });
+
+    expect(findRequestIdField([field])).toBe(field);
+  });
+
+  it('returns null when the entry has no details at all', () => {
+    expect(findRequestIdField(undefined)).toBeNull();
+    expect(findRequestIdField([])).toBeNull();
+  });
+
+  it('returns null when no field carries the request id label', () => {
+    expect(
+      findRequestIdField([buildLogDetailField({ label: 'url' })]),
+    ).toBeNull();
+  });
+
+  it('prefers the first matching field', () => {
+    const first = buildLogDetailField({ value: 'first' });
+    const second = buildLogDetailField({ value: 'second' });
+
+    expect(findRequestIdField([first, second])).toBe(first);
   });
 });

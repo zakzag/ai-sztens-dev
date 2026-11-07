@@ -12,12 +12,35 @@ import type { LOG_DRAWER_WIDTH_CSS_VAR } from './log-drawer.const.js';
  * (AIS-82 decision D2).
  */
 export type LogLevelFilter =
-  | 'all'
-  | 'success'
-  | 'error'
-  | 'warning'
-  | 'info'
-  | 'system';
+  'all' | 'success' | 'error' | 'warning' | 'info' | 'system';
+
+/**
+ * One key–value fact of an entry, shown in the expandable detail region.
+ *
+ * Declared **here**, not imported from `@callback/notifications`: the core
+ * package's `NotificationDetailField` carries the same three fields, so a
+ * `NotificationEntry` stays assignable without a mapper, and `packages/ui`
+ * keeps its rule of never importing the notifications package. The two shapes
+ * are kept in sync by structural compatibility plus the drawer's own tests —
+ * the same approach as `ToastLevel` and `ToastItem` (AIS-81).
+ *
+ * The `value` is already a string: redaction, serialisation and truncation are
+ * the emitter/store's job (`NOTIFICATION_DETAIL_*`, AIS-151), so the primitive
+ * only has to render what it receives.
+ */
+export interface LogDetailField {
+  /** Name of the fact, e.g. `requestId`. Emitter-owned, already localised/truncated. */
+  readonly label: string;
+  /** Already-redacted, already-stringified value. */
+  readonly value: string;
+  /**
+   * Render the value as pre-formatted, monospaced text.
+   *
+   * Set by the emitter for ids, URLs, header dumps and bodies — anything whose
+   * meaning would suffer from being re-wrapped as prose.
+   */
+  readonly mono?: boolean;
+}
 
 /**
  * One log entry as the notification host hands it to {@link LogDrawer}.
@@ -34,10 +57,64 @@ export interface LogEntryItem {
   readonly level: ToastLevel;
   /** Already-localised, human-readable sentence chosen by the emitter. */
   readonly message: string;
-  /** Redacted technical context: HTTP status, request URL, stack trace. */
+  /**
+   * Redacted technical context: HTTP status, request URL, stack trace.
+   *
+   * Stays a single line on purpose (AIS-151 decision D-A): the toast and the
+   * **collapsed** row show it, while {@link details} is what the expandable
+   * region lists. The two complement each other, neither replaces the other.
+   */
   readonly detail?: string;
+  /**
+   * Structured, already-redacted facts of the entry, in the emitter's order.
+   *
+   * Optional and absent when the emitter had nothing to add — an empty array
+   * never reaches here (the store drops it), so "no `details`" and "no facts"
+   * are the same state. Rendered only while the row is expanded.
+   */
+  readonly details?: readonly LogDetailField[];
   /** Creation time in epoch milliseconds. */
   readonly createdAt: number;
+}
+
+/**
+ * Which copy control of an expanded row gave its feedback.
+ *
+ * A named union (not two booleans, not an inline string) because the row keeps
+ * one independent "copied" flag per target: pressing `JSON` must not relabel
+ * the `requestId` button, so the state and its timer map are keyed by this
+ * type.
+ */
+export type LogEntryCopyTarget = 'requestId' | 'json';
+
+/**
+ * Per-target copy feedback of one row.
+ *
+ * A `Record` keyed by {@link LogEntryCopyTarget} (not one boolean per control)
+ * so a new control cannot be added without deciding its initial flag, and so
+ * the row's reset timer can address its own key only.
+ */
+export type LogEntryCopyFlags = Readonly<Record<LogEntryCopyTarget, boolean>>;
+
+/**
+ * Serialisable projection of one entry, as the "copy JSON" control writes it.
+ *
+ * A named type (not an inline object, not a cast) with a **fixed field order**,
+ * so `toEntryJson` is deterministic and its output is assertable in a test. The
+ * order is the order a human reads an entry in: identity, severity, sentence,
+ * one-line context, then the structured facts of the expanded region.
+ *
+ * Optional fields are left `undefined` rather than set to `null`:
+ * `JSON.stringify` drops them, so a minimal entry serialises to a minimal
+ * object instead of a wall of `null`s.
+ */
+export interface LogEntryJson {
+  readonly id: string;
+  readonly level: ToastLevel;
+  readonly message: string;
+  readonly detail?: string;
+  readonly createdAt: number;
+  readonly details?: readonly LogDetailField[];
 }
 
 /**

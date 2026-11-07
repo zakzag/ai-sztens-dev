@@ -1,7 +1,13 @@
-import type { LogEntryItem } from '../../src/components/log-drawer/log-drawer.interface.js';
+import type {
+  LogDetailField,
+  LogEntryItem,
+} from '../../src/components/log-drawer/log-drawer.interface.js';
 
 /** Base timestamp of every fixture, so the injected formatter is assertable. */
 export const LOG_ENTRY_BASE_TIMESTAMP = 1_700_000_000_000;
+
+/** Marker value of the request-id fixture, so the copy control is assertable. */
+export const LOG_ENTRY_REQUEST_ID_VALUE = 'req-abc-123';
 
 /**
  * Builds one `LogEntryItem` for the log drawer suites.
@@ -39,6 +45,50 @@ export function buildLogEntries(count: number): readonly LogEntryItem[] {
       createdAt: LOG_ENTRY_BASE_TIMESTAMP + index,
     }),
   );
+}
+
+/**
+ * Builds one `LogDetailField` of the expandable detail region.
+ *
+ * Lives here (and not inside the test files) because the repo rule puts every
+ * fixture under `test/mocks`.
+ *
+ * @param overrides - fields to replace on the default request-id field.
+ * @returns a complete `LogDetailField`.
+ */
+export function buildLogDetailField(
+  overrides: Partial<LogDetailField> = {},
+): LogDetailField {
+  return {
+    label: 'requestId',
+    value: LOG_ENTRY_REQUEST_ID_VALUE,
+    ...overrides,
+  };
+}
+
+/**
+ * The facts a typical failed request carries, in emitter order.
+ *
+ * `requestId` comes first so `findRequestIdField` has a hit, and two of the
+ * three values are `mono` so the monospace variant is covered by the default
+ * fixture instead of a bespoke one in every test.
+ *
+ * @returns three fields: request id, URL and body.
+ */
+export function buildLogDetails(): readonly LogDetailField[] {
+  return [
+    buildLogDetailField({
+      label: 'requestId',
+      value: LOG_ENTRY_REQUEST_ID_VALUE,
+      mono: true,
+    }),
+    buildLogDetailField({ label: 'url', value: 'POST /api/v1/keys' }),
+    buildLogDetailField({
+      label: 'body',
+      value: '{"name":"demo"}',
+      mono: true,
+    }),
+  ];
 }
 
 /**

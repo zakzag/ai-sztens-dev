@@ -20,6 +20,8 @@ import {
   LOG_DRAWER_WIDTH_MIN,
   LOG_DRAWER_WIDTH_STEP,
   LOG_DRAWER_WIDTH_STEP_LARGE,
+  LOG_ENTRY_DETAILS_REGION_LABEL,
+  LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN,
   LOG_FILTERS,
   LOG_FILTER_LABELS,
 } from '../src/components/log-drawer/log-drawer.const.js';
@@ -30,6 +32,7 @@ import type {
 } from '../src/components/log-drawer/log-drawer.interface.js';
 import {
   LOG_ENTRY_BASE_TIMESTAMP,
+  buildLogDetails,
   buildLogEntries,
   stubFormatTimestamp,
 } from './mocks/log-entries.mock.js';
@@ -258,7 +261,10 @@ describe('LogDrawer — content', () => {
     renderOpen({ formatTimestamp });
 
     expect(formatTimestamp).toHaveBeenCalledTimes(2);
-    expect(formatTimestamp).toHaveBeenNthCalledWith(1, LOG_ENTRY_BASE_TIMESTAMP);
+    expect(formatTimestamp).toHaveBeenNthCalledWith(
+      1,
+      LOG_ENTRY_BASE_TIMESTAMP,
+    );
     expect(formatTimestamp).toHaveBeenNthCalledWith(
       2,
       LOG_ENTRY_BASE_TIMESTAMP + 1,
@@ -368,8 +374,14 @@ describe('LogDrawer — resizable panel', () => {
 
     expect(handle).toHaveAttribute('aria-orientation', 'vertical');
     expect(handle).toHaveAttribute('aria-valuenow', '480');
-    expect(handle).toHaveAttribute('aria-valuemin', String(LOG_DRAWER_WIDTH_MIN));
-    expect(handle).toHaveAttribute('aria-valuemax', String(LOG_DRAWER_WIDTH_MAX));
+    expect(handle).toHaveAttribute(
+      'aria-valuemin',
+      String(LOG_DRAWER_WIDTH_MIN),
+    );
+    expect(handle).toHaveAttribute(
+      'aria-valuemax',
+      String(LOG_DRAWER_WIDTH_MAX),
+    );
     expect(handle).toHaveAttribute('tabindex', '0');
   });
 
@@ -515,7 +527,10 @@ describe('LogDrawer — resizable panel', () => {
     const { props, handle } = renderResizable();
 
     dispatchPointerEvent(handle, 'pointerdown', { pointerId: 2, clientX: 700 });
-    dispatchPointerEvent(handle, 'pointercancel', { pointerId: 2, clientX: 700 });
+    dispatchPointerEvent(handle, 'pointercancel', {
+      pointerId: 2,
+      clientX: 700,
+    });
 
     expect(props.onResizeStart).toHaveBeenCalledTimes(1);
     expect(props.onResizeEnd).toHaveBeenCalledTimes(1);
@@ -553,8 +568,14 @@ describe('LogDrawer — resizable panel', () => {
     fireEvent.keyDown(handle, { key: 'Home' });
     fireEvent.keyDown(handle, { key: 'End' });
 
-    expect(props.onWidthChange).toHaveBeenNthCalledWith(1, LOG_DRAWER_WIDTH_MIN);
-    expect(props.onWidthChange).toHaveBeenNthCalledWith(2, LOG_DRAWER_WIDTH_MAX);
+    expect(props.onWidthChange).toHaveBeenNthCalledWith(
+      1,
+      LOG_DRAWER_WIDTH_MIN,
+    );
+    expect(props.onWidthChange).toHaveBeenNthCalledWith(
+      2,
+      LOG_DRAWER_WIDTH_MAX,
+    );
   });
 
   it('ignores a key that cannot resize', () => {
@@ -592,5 +613,29 @@ describe('LogDrawer — resizable panel', () => {
     expect(getPanel().style.getPropertyValue(LOG_DRAWER_WIDTH_CSS_VAR)).toBe(
       '512px',
     );
+  });
+});
+
+describe('LogDrawer — expandable rows', () => {
+  it('keeps two expanded rows open without breaking the list', () => {
+    renderOpen({
+      entries: buildLogEntries(2).map((entry) => ({
+        ...entry,
+        details: buildLogDetails(),
+      })),
+    });
+
+    const toggles = screen.getAllByRole('button', {
+      name: new RegExp(LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN),
+    });
+
+    toggles.forEach((toggle) => fireEvent.click(toggle));
+
+    expect(toggles).toHaveLength(2);
+    expect(
+      screen.getAllByRole('region', { name: LOG_ENTRY_DETAILS_REGION_LABEL }),
+    ).toHaveLength(2);
+    expect(screen.getByText('Bejegyzés 1')).toBeInTheDocument();
+    expect(screen.getByText('Bejegyzés 2')).toBeInTheDocument();
   });
 });

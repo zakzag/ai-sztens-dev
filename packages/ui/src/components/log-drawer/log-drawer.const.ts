@@ -1,5 +1,8 @@
 import type { ToastLevel } from '../toast/toast.interface.js';
-import type { LogLevelFilter } from './log-drawer.interface.js';
+import type {
+  LogEntryCopyFlags,
+  LogLevelFilter,
+} from './log-drawer.interface.js';
 
 /** Panel heading and accessible name of the panel. */
 export const LOG_DRAWER_TITLE = 'Rendszernapló';
@@ -139,7 +142,8 @@ export const LOG_DRAWER_WIDTH_STEP_LARGE = 64;
  * The handle carries no visible text, so this label **is** its name: it must
  * say what the separator resizes, not "handle" (AIS-150).
  */
-export const LOG_DRAWER_RESIZE_HANDLE_LABEL = 'Naplópanel szélességének állítása';
+export const LOG_DRAWER_RESIZE_HANDLE_LABEL =
+  'Naplópanel szélességének állítása';
 
 /**
  * CSS custom property carrying the panel width.
@@ -148,3 +152,97 @@ export const LOG_DRAWER_RESIZE_HANDLE_LABEL = 'Naplópanel szélességének áll
  * panel, so the two can never drift apart (AIS-150).
  */
 export const LOG_DRAWER_WIDTH_CSS_VAR = '--log-drawer-width';
+
+/**
+ * Verb of the accessible name of a **collapsed** row's header button.
+ *
+ * The header is a single `<button>` whose glyph and level text say nothing
+ * about the affordance, so the name has to state what activating it would do —
+ * and it flips with the row's state instead of inventing a static "details"
+ * label (AIS-153 decision D-B).
+ */
+export const LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN = 'Részletek megnyitása';
+
+/** Verb of the accessible name of an **expanded** row's header button. */
+export const LOG_ENTRY_DETAILS_TOGGLE_LABEL_CLOSE = 'Részletek bezárása';
+
+/**
+ * Accessible name of the expanded detail region.
+ *
+ * The region has no visible heading — it is a key–value list directly under the
+ * row — so `role="region"` needs this label to be announced as a landmark at
+ * all.
+ */
+export const LOG_ENTRY_DETAILS_REGION_LABEL = 'Részletes adatok';
+
+/**
+ * Shown inside an expanded region whose entry carries no `details`.
+ *
+ * An empty region would be indistinguishable from a broken one, so "no facts"
+ * is stated explicitly instead of rendering nothing (AIS-153 DoD).
+ */
+export const LOG_ENTRY_DETAILS_EMPTY_LABEL = 'Nincs részletes adat';
+
+/**
+ * Suffix of the `useId()` based detail-region id.
+ *
+ * `aria-controls` must point at one unique element per row, and the drawer
+ * renders an unbounded number of rows, so the id is derived per instance.
+ */
+export const LOG_ENTRY_DETAILS_REGION_ID_SUFFIX = '-log-entry-details';
+
+/**
+ * Suffix of the empty-state paragraph's id.
+ *
+ * The region references it through `aria-describedby`, so a screen reader user
+ * learns that the region is empty *before* tabbing into the copy controls.
+ */
+export const LOG_ENTRY_DETAILS_EMPTY_ID_SUFFIX = '-log-entry-details-empty';
+
+/**
+ * Label of the control that copies the entry's request id.
+ *
+ * Visible text, so it doubles as the accessible name — no separate `aria-label`
+ * that could drift from what the user reads.
+ */
+export const LOG_ENTRY_COPY_REQUEST_ID_LABEL = 'requestId másolása';
+
+/** Label of the control that copies the whole entry as JSON. */
+export const LOG_ENTRY_COPY_ENTRY_LABEL = 'JSON másolása';
+
+/**
+ * Feedback a copy control shows after a successful copy.
+ *
+ * Each control owns its own flag and timer (AIS-153 decision A0), so pressing
+ * `JSON` never relabels the request-id button.
+ */
+export const LOG_ENTRY_COPY_DONE_LABEL = 'Kimásolva';
+
+/**
+ * How long a copy control keeps its feedback label, in milliseconds.
+ *
+ * Long enough to be read after the click, short enough that the control is back
+ * to its action label by the time the user wants to copy again.
+ */
+export const LOG_ENTRY_COPY_FEEDBACK_MS = 2000;
+
+/**
+ * Flag state every copy control starts in.
+ *
+ * Declared once so the initial `useState` of the row is not a fresh object
+ * literal on every render, and so "no control has confirmed anything yet" has a
+ * name a test can assert against.
+ */
+export const LOG_ENTRY_COPY_IDLE: LogEntryCopyFlags = {
+  requestId: false,
+  json: false,
+};
+
+/**
+ * Label whose field value the request-id control copies.
+ *
+ * The comparison is case-insensitive (see `findRequestIdField`), because the
+ * label is emitter-owned text and may arrive as `requestId`, `Request-Id` or
+ * `requestID`.
+ */
+export const LOG_ENTRY_REQUEST_ID_FIELD_LABEL = 'requestId';

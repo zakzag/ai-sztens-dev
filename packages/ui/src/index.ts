@@ -295,6 +295,7 @@ export { LogDrawer } from './components/log-drawer/LogDrawer.js';
 export { LogEntryRow } from './components/log-drawer/LogEntryRow.js';
 export {
   LOG_DRAWER_HANDLE_GUTTER,
+  logDetailFieldVariants,
   logDrawerFooterVariants,
   logDrawerHeaderVariants,
   logDrawerListVariants,
@@ -302,11 +303,17 @@ export {
   logDrawerResizeHandleVariants,
   logDrawerResizeRailVariants,
   logDrawerTabVariants,
+  logEntryChevronVariants,
+  logEntryDetailsVariants,
   logEntryRowVariants,
+  logEntryToggleVariants,
   logFilterChipVariants,
 } from './components/log-drawer/log-drawer.variants.js';
 export {
   clampDrawerWidth,
+  findRequestIdField,
+  toEntryJson,
+  toEntryToggleLabel,
   toLogDrawerHandleLabel,
   toWidthFromDrag,
   toWidthFromKey,
@@ -333,22 +340,43 @@ export {
   LOG_DRAWER_WIDTH_STEP,
   LOG_DRAWER_WIDTH_STEP_LARGE,
   LOG_DRAWER_Z_INDEX,
+  LOG_ENTRY_COPY_DONE_LABEL,
+  LOG_ENTRY_COPY_ENTRY_LABEL,
+  LOG_ENTRY_COPY_FEEDBACK_MS,
+  LOG_ENTRY_COPY_IDLE,
+  LOG_ENTRY_COPY_REQUEST_ID_LABEL,
+  LOG_ENTRY_DETAILS_EMPTY_ID_SUFFIX,
+  LOG_ENTRY_DETAILS_EMPTY_LABEL,
+  LOG_ENTRY_DETAILS_REGION_ID_SUFFIX,
+  LOG_ENTRY_DETAILS_REGION_LABEL,
+  LOG_ENTRY_DETAILS_TOGGLE_LABEL_CLOSE,
+  LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN,
+  LOG_ENTRY_REQUEST_ID_FIELD_LABEL,
   LOG_FILTERS,
   LOG_FILTER_LABELS,
   LOG_LEVEL_LABELS,
 } from './components/log-drawer/log-drawer.const.js';
 export type {
+  LogDetailField,
   LogDrawerProps,
   LogDrawerSizeRange,
   LogDrawerWidthStyle,
+  LogEntryCopyFlags,
+  LogEntryCopyTarget,
   LogEntryItem,
+  LogEntryJson,
   LogEntryRowProps,
   LogLevelFilter,
 } from './components/log-drawer/log-drawer.interface.js';
 export type {
+  LogDetailFieldVariants,
+  LogEntryChevronVariants,
   LogEntryRowVariants,
+  LogEntryToggleVariants,
   LogFilterChipVariants,
 } from './components/log-drawer/log-drawer.variants.js';
+
+export { copyText } from './lib/copy-text.js';
 
 export {
   ChevronDownIcon,

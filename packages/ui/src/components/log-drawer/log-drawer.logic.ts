@@ -4,10 +4,16 @@ import {
   LOG_DRAWER_WIDTH_CSS_VAR,
   LOG_DRAWER_WIDTH_STEP,
   LOG_DRAWER_WIDTH_STEP_LARGE,
+  LOG_ENTRY_DETAILS_TOGGLE_LABEL_CLOSE,
+  LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN,
+  LOG_ENTRY_REQUEST_ID_FIELD_LABEL,
 } from './log-drawer.const.js';
 import type {
+  LogDetailField,
   LogDrawerSizeRange,
   LogDrawerWidthStyle,
+  LogEntryItem,
+  LogEntryJson,
 } from './log-drawer.interface.js';
 
 /**
@@ -146,6 +152,90 @@ export function toWidthFromKey(
  */
 export function toWidthStyle(width: number): LogDrawerWidthStyle {
   return { [LOG_DRAWER_WIDTH_CSS_VAR]: `${width}px` };
+}
+
+/**
+ * Builds the accessible name of a row's expandable header button.
+ *
+ * The header button carries a glyph, the level text and the timestamp, none of
+ * which describe the affordance, so the name has to say what a press would do —
+ * and it **flips** with the state, exactly like the drawer's own handle
+ * (`toLogDrawerHandleLabel`). The number of facts is appended when there is
+ * something to reveal, because "open the details" on a row with no facts is a
+ * promise the panel cannot keep.
+ *
+ * @param isOpen - whether the row's detail region is expanded.
+ * @param detailCount - number of `details` the entry carries; `0` means none.
+ * @returns the action label, with the fact count in parentheses when any exist.
+ */
+export function toEntryToggleLabel(
+  isOpen: boolean,
+  detailCount: number,
+): string {
+  const label = isOpen
+    ? LOG_ENTRY_DETAILS_TOGGLE_LABEL_CLOSE
+    : LOG_ENTRY_DETAILS_TOGGLE_LABEL_OPEN;
+
+  if (detailCount <= 0) {
+    return label;
+  }
+
+  return `${label} (${detailCount} részlet)`;
+}
+
+/**
+ * Projects one entry into the deterministic payload of the "copy JSON" control.
+ *
+ * Pure and locale-free on purpose: `createdAt` stays the raw epoch
+ * millisecond value handed in by the store, so two calls with the same entry
+ * always produce byte-identical output — which is what makes the copy control
+ * testable at all. Serialising a formatted date or a `Date` instance would put
+ * the host's locale (and the machine's timezone) into the clipboard.
+ *
+ * Field order comes from {@link LogEntryJson}; `JSON.stringify` drops the
+ * `undefined` optional fields, so a minimal entry yields a minimal object.
+ *
+ * @param entry - the row that was expanded.
+ * @returns pretty-printed JSON, stable across calls.
+ */
+export function toEntryJson(entry: LogEntryItem): string {
+  const details = entry.details ?? [];
+  const payload: LogEntryJson = {
+    id: entry.id,
+    level: entry.level,
+    message: entry.message,
+    detail: entry.detail,
+    createdAt: entry.createdAt,
+    details: details.length === 0 ? undefined : details,
+  };
+
+  return JSON.stringify(payload, null, 2);
+}
+
+/**
+ * Finds the field whose value the request-id copy control should copy.
+ *
+ * The label is emitter-owned text (`NOTIFICATION_DETAIL_*`, AIS-151), so it may
+ * arrive as `requestId`, `Request-Id` or `requestID`; comparing loosely keeps
+ * the control available without imposing a spelling on every emitter. When no
+ * such field exists the control must **not** be rendered at all — an enabled
+ * button that copies an empty string is worse than no button.
+ *
+ * @param details - the entry's structured facts, if any.
+ * @returns the matching field, or `null` when the entry carries none.
+ */
+export function findRequestIdField(
+  details: readonly LogDetailField[] | undefined,
+): LogDetailField | null {
+  if (details === undefined) {
+    return null;
+  }
+
+  const wanted = LOG_ENTRY_REQUEST_ID_FIELD_LABEL.toLowerCase();
+
+  return (
+    details.find((field) => field.label.trim().toLowerCase() === wanted) ?? null
+  );
 }
 
 /**

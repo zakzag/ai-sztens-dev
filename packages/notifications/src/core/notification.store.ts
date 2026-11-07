@@ -6,6 +6,7 @@ import {
 } from './notification.const.js';
 import type {
   EmitNotificationInput,
+  NotificationDetailField,
   NotificationEntry,
   NotificationListener,
   NotificationListenerErrorHandler,
@@ -18,6 +19,7 @@ import {
   createNotificationId,
   findDuplicate,
   markEntriesRead,
+  toDetailFields,
   toRedactedDetail,
   trimEntries,
   trimToastIds,
@@ -107,7 +109,29 @@ export function createNotificationStore(options: NotificationStoreOptions = {}):
     notify();
   }
 
-  function createEntry(input: EmitNotificationInput, createdAt: number): NotificationEntry {
+  /**
+   * Normalises the emit's structured context.
+   *
+   * Redaction and the limits are applied by `toDetailFields`, so an emitter
+   * cannot bypass them (AIS-79 decision D9). An empty result becomes `undefined`
+   * instead of `[]`, so an empty list never inflates a snapshot (AIS-151 D-D).
+   *
+   * @param input - the emit whose `details` are normalised.
+   * @returns the stored fields, or `undefined` when nothing survives.
+   */
+  function normalizeDetails(
+    input: EmitNotificationInput,
+  ): readonly NotificationDetailField[] | undefined {
+    const fields = toDetailFields(input.details);
+
+    return fields.length === 0 ? undefined : fields;
+  }
+
+  function createEntry(
+    input: EmitNotificationInput,
+    createdAt: number,
+    details: readonly NotificationDetailField[] | undefined,
+  ): NotificationEntry {
     sequence += 1;
 
     return {
@@ -115,6 +139,7 @@ export function createNotificationStore(options: NotificationStoreOptions = {}):
       level: input.level,
       message: input.message,
       detail: toRedactedDetail(input.detail),
+      details,
       source: input.source,
       createdAt,
       read: false,
@@ -125,8 +150,12 @@ export function createNotificationStore(options: NotificationStoreOptions = {}):
 
   function emit(input: EmitNotificationInput): NotificationEntry {
     const createdAt = now();
+    const details = normalizeDetails(input);
     const duplicate = findDuplicate(state.entries, input, createdAt, dedupeWindowMs);
-    const entry = duplicate === undefined ? createEntry(input, createdAt) : bumpEntry(duplicate, createdAt);
+    const entry =
+      duplicate === undefined
+        ? createEntry(input, createdAt, details)
+        : bumpEntry(duplicate, createdAt, details);
 
     const entries = trimEntries(
       [entry, ...state.entries.filter((existing) => existing.id !== entry.id)],

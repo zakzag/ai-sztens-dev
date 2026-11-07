@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  NOTIFICATION_DETAILS_INVALID_PLACEHOLDER,
+  NOTIFICATION_DETAIL_LABEL_MAX_LENGTH,
+  NOTIFICATION_DETAIL_MAX_FIELDS,
+  NOTIFICATION_DETAIL_TRUNCATION_SUFFIX,
+  NOTIFICATION_DETAIL_VALUE_MAX_LENGTH,
   NOTIFICATION_LEVELS,
   NOTIFICATION_REDACTED_PLACEHOLDER,
   NOTIFICATION_SOURCES,
@@ -9,16 +14,23 @@ import {
 import type { NotificationEntry } from '../src/core/notification.interface.js';
 import {
   bumpEntry,
+  clampDetailFields,
   createNotificationId,
   findDuplicate,
   markEntriesRead,
   redactRecord,
   redactValue,
+  toDetailFields,
   toRedactedDetail,
   trimEntries,
   trimToastIds,
 } from '../src/core/notification.logic.js';
-import { FIXED_NOW, createTestEntry } from './mocks/notification.fixtures.js';
+import {
+  FIXED_NOW,
+  createTestDetailField,
+  createTestDetailsRecord,
+  createTestEntry,
+} from './mocks/notification.fixtures.js';
 
 const DEDUPE_WINDOW_MS = 2_000;
 
@@ -256,5 +268,159 @@ describe('toRedactedDetail', () => {
     circular.self = circular;
 
     expect(toRedactedDetail(circular)).toBe(NOTIFICATION_UNSERIALIZABLE_DETAIL);
+  });
+});
+
+describe('toDetailFields — record input', () => {
+  it('keeps the insertion order the emitter wrote', () => {
+    const fields = toDetailFields(createTestDetailsRecord());
+
+    expect(fields.map((field) => field.label)).toEqual(['status', 'code', 'requestId']);
+    expect(fields.map((field) => field.value)).toEqual(['422', 'VALIDATION', 'req-1']);
+  });
+
+  it('produces the same list for the same record', () => {
+    const record = createTestDetailsRecord();
+
+    expect(toDetailFields(record)).toEqual(toDetailFields(record));
+  });
+
+  it('redacts the value of a sensitive key', () => {
+    const fields = toDetailFields({ token: 'abc', status: 200 });
+
+    expect(fields).toEqual([
+      { label: 'token', value: NOTIFICATION_REDACTED_PLACEHOLDER },
+      { label: 'status', value: '200' },
+    ]);
+  });
+
+  it('serialises a non-string value', () => {
+    expect(toDetailFields({ body: { code: 'VALIDATION' } })).toEqual([
+      { label: 'body', value: JSON.stringify({ code: 'VALIDATION' }) },
+    ]);
+  });
+
+  it('truncates a long value to the limit with the suffix', () => {
+    const fields = toDetailFields({ stack: 'a'.repeat(NOTIFICATION_DETAIL_VALUE_MAX_LENGTH + 50) });
+    const value = fields[0]?.value ?? '';
+
+    expect(value).toHaveLength(NOTIFICATION_DETAIL_VALUE_MAX_LENGTH);
+    expect(value.endsWith(NOTIFICATION_DETAIL_TRUNCATION_SUFFIX)).toBe(true);
+  });
+
+  it('drops every field above the field cap', () => {
+    const record = Object.fromEntries(
+      Array.from({ length: NOTIFICATION_DETAIL_MAX_FIELDS + 5 }, (_, index) => [`key${index}`, index]),
+    );
+
+    const fields = toDetailFields(record);
+
+    expect(fields).toHaveLength(NOTIFICATION_DETAIL_MAX_FIELDS);
+    expect(fields[0]?.label).toBe('key0');
+    expect(fields.some((field) => field.label === `key${NOTIFICATION_DETAIL_MAX_FIELDS}`)).toBe(false);
+  });
+
+  it('drops a field with a blank label', () => {
+    expect(toDetailFields({ '   ': 'x', status: 200 })).toEqual([{ label: 'status', value: '200' }]);
+  });
+
+  it('never marks a record value as monospace', () => {
+    expect(toDetailFields({ requestId: 'req-1' })[0]?.mono).toBeUndefined();
+  });
+
+  it('falls back to a placeholder for a non-serialisable value', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    expect(() => toDetailFields(circular)).not.toThrow();
+    expect(toDetailFields(circular)).toEqual([
+      { label: 'self', value: NOTIFICATION_DETAILS_INVALID_PLACEHOLDER },
+    ]);
+  });
+
+  it('returns an empty list when no record was supplied', () => {
+    expect(toDetailFields(undefined)).toEqual([]);
+  });
+
+  it('returns an empty list for an empty record', () => {
+    expect(toDetailFields({})).toEqual([]);
+  });
+});
+
+describe('toDetailFields — array input', () => {
+  it('keeps the given order and the mono flag', () => {
+    const fields = toDetailFields([
+      createTestDetailField({ label: 'requestId', value: 'req-1', mono: true }),
+      createTestDetailField({ label: 'status', value: '422' }),
+    ]);
+
+    expect(fields).toEqual([
+      { label: 'requestId', value: 'req-1', mono: true },
+      { label: 'status', value: '422' },
+    ]);
+  });
+
+  it('redacts a value whose label is sensitive', () => {
+    expect(toDetailFields([createTestDetailField({ label: 'Authorization', value: 'Bearer abc' })])).toEqual([
+      { label: 'Authorization', value: NOTIFICATION_REDACTED_PLACEHOLDER },
+    ]);
+  });
+
+  it('truncates a long label to the limit with the suffix', () => {
+    const label = 'l'.repeat(NOTIFICATION_DETAIL_LABEL_MAX_LENGTH + 10);
+    const field = toDetailFields([createTestDetailField({ label })])[0];
+
+    expect(field?.label).toHaveLength(NOTIFICATION_DETAIL_LABEL_MAX_LENGTH);
+    expect(field?.label.endsWith(NOTIFICATION_DETAIL_TRUNCATION_SUFFIX)).toBe(true);
+  });
+
+  it('returns an empty list for an empty array', () => {
+    expect(toDetailFields([])).toEqual([]);
+  });
+});
+
+describe('clampDetailFields', () => {
+  function createFields(count: number): readonly ReturnType<typeof createTestDetailField>[] {
+    return Array.from({ length: count }, (_, index) =>
+      createTestDetailField({ label: `field${index}`, value: `value${index}` }),
+    );
+  }
+
+  it('returns an empty list for an empty input', () => {
+    expect(clampDetailFields([])).toEqual([]);
+  });
+
+  it('keeps exactly the cap', () => {
+    expect(clampDetailFields(createFields(NOTIFICATION_DETAIL_MAX_FIELDS))).toHaveLength(
+      NOTIFICATION_DETAIL_MAX_FIELDS,
+    );
+  });
+
+  it('drops the fields above the cap', () => {
+    const clamped = clampDetailFields(createFields(NOTIFICATION_DETAIL_MAX_FIELDS + 1));
+
+    expect(clamped).toHaveLength(NOTIFICATION_DETAIL_MAX_FIELDS);
+    expect(clamped.at(-1)?.label).toBe(`field${NOTIFICATION_DETAIL_MAX_FIELDS - 1}`);
+  });
+
+  it('drops a field with a blank label', () => {
+    const clamped = clampDetailFields([
+      createTestDetailField({ label: '  ', value: 'x' }),
+      createTestDetailField({ label: 'status', value: '422' }),
+    ]);
+
+    expect(clamped).toEqual([{ label: 'status', value: '422' }]);
+  });
+
+  it('truncates a long value to the limit', () => {
+    const clamped = clampDetailFields([
+      createTestDetailField({ value: 'v'.repeat(NOTIFICATION_DETAIL_VALUE_MAX_LENGTH + 1) }),
+    ]);
+
+    expect(clamped[0]?.value).toHaveLength(NOTIFICATION_DETAIL_VALUE_MAX_LENGTH);
+  });
+
+  it('trims a label before measuring it', () => {
+    expect(clampDetailFields([createTestDetailField({ label: '  status  ' })])[0]?.label).toBe('status');
   });
 });

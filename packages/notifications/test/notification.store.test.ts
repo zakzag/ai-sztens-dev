@@ -11,7 +11,13 @@ import type {
   NotificationStoreOptions,
 } from '../src/core/notification.interface.js';
 import { createNotificationStore } from '../src/core/notification.store.js';
-import { FIXED_NOW, createTestClock, createTestEntry } from './mocks/notification.fixtures.js';
+import {
+  FIXED_NOW,
+  createTestClock,
+  createTestDetailField,
+  createTestDetailsRecord,
+  createTestEntry,
+} from './mocks/notification.fixtures.js';
 
 const SUCCESS_INPUT: EmitNotificationInput = {
   level: 'success',
@@ -369,5 +375,87 @@ describe('createNotificationStore — snapshots and caps', () => {
     expect(store.getServerSnapshot()).toBe(EMPTY_NOTIFICATION_STATE);
     expect(store.getServerSnapshot()).toBe(store.getServerSnapshot());
     expect(Object.isFrozen(store.getServerSnapshot())).toBe(true);
+  });
+});
+
+describe('createNotificationStore — structured details', () => {
+  it('stores a redacted field list in the order the emitter wrote', () => {
+    const { store } = createTestStore();
+
+    const entry = store.emit({ ...ERROR_INPUT, details: createTestDetailsRecord() });
+
+    expect(entry.details).toEqual([
+      { label: 'status', value: '422' },
+      { label: 'code', value: 'VALIDATION' },
+      { label: 'requestId', value: 'req-1' },
+    ]);
+  });
+
+  it('redacts the value of a sensitive key', () => {
+    const { store } = createTestStore();
+
+    const entry = store.emit({ ...ERROR_INPUT, details: { token: 'abc' } });
+
+    expect(entry.details).toEqual([{ label: 'token', value: NOTIFICATION_REDACTED_PLACEHOLDER }]);
+  });
+
+  it('stores an already-built field list and keeps the mono flag', () => {
+    const { store } = createTestStore();
+
+    const entry = store.emit({
+      ...ERROR_INPUT,
+      details: [createTestDetailField({ label: 'requestId', mono: true })],
+    });
+
+    expect(entry.details).toEqual([{ label: 'requestId', value: 'req-1', mono: true }]);
+  });
+
+  it('leaves details undefined when none were supplied', () => {
+    const { store } = createTestStore();
+
+    expect(store.emit(ERROR_INPUT).details).toBeUndefined();
+  });
+
+  it('leaves details undefined for an empty record', () => {
+    const { store } = createTestStore();
+
+    expect(store.emit({ ...ERROR_INPUT, details: {} }).details).toBeUndefined();
+  });
+
+  it('leaves details undefined when every field was dropped', () => {
+    const { store } = createTestStore();
+
+    expect(store.emit({ ...ERROR_INPUT, details: { '   ': 'x' } }).details).toBeUndefined();
+  });
+
+  it('exposes the fields through the snapshot', () => {
+    const { store } = createTestStore();
+
+    const entry = store.emit({ ...ERROR_INPUT, details: { status: 422 } });
+
+    expect(store.getSnapshot().entries[0]).toBe(entry);
+    expect(store.getSnapshot().entries[0]?.details).toEqual([{ label: 'status', value: '422' }]);
+  });
+
+  it('replaces the details when a duplicate carries new ones', () => {
+    const { store, clock } = createTestStore();
+    store.emit({ ...ERROR_INPUT, details: { status: 422 } });
+    clock.advance(1);
+
+    const bumped = store.emit({ ...ERROR_INPUT, details: { status: 500 } });
+
+    expect(bumped.repeatCount).toBe(2);
+    expect(bumped.details).toEqual([{ label: 'status', value: '500' }]);
+  });
+
+  it('keeps the previous details when a duplicate carries none', () => {
+    const { store, clock } = createTestStore();
+    store.emit({ ...ERROR_INPUT, details: { status: 422 } });
+    clock.advance(1);
+
+    const bumped = store.emit(ERROR_INPUT);
+
+    expect(bumped.repeatCount).toBe(2);
+    expect(bumped.details).toEqual([{ label: 'status', value: '422' }]);
   });
 });

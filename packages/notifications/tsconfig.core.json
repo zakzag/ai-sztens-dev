@@ -12,5 +12,6 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src/core", "test/*.ts", "test/mocks/*.ts"]
+  "include": ["src/core", "test/*.ts", "test/mocks/*.ts"],
+  "exclude": ["test/log-drawer-width-storage.test.ts"]
 }

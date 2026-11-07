@@ -1,4 +1,5 @@
 import type {
+  NotificationDetailField,
   NotificationEntry,
   NotificationStoreOptions,
 } from '../../src/core/notification.interface.js';
@@ -35,6 +36,42 @@ export function createTestClock(start: number = FIXED_NOW): TestClock {
     set: (milliseconds: number) => {
       current = milliseconds;
     },
+  };
+}
+
+/**
+ * Builds a structured detail field fixture.
+ *
+ * @param overrides - fields to replace.
+ * @returns a valid field; `mono` stays absent unless the caller sets it.
+ */
+export function createTestDetailField(
+  overrides: Partial<NotificationDetailField> = {},
+): NotificationDetailField {
+  return {
+    label: 'requestId',
+    value: 'req-1',
+    ...overrides,
+  };
+}
+
+/**
+ * Builds a detail record fixture for the `details` record entry point.
+ *
+ * Keys are ordered deliberately so a test can prove that the insertion order is
+ * preserved instead of being sorted.
+ *
+ * @param overrides - values to replace; new keys are appended.
+ * @returns a redactable record with mixed value types.
+ */
+export function createTestDetailsRecord(
+  overrides: Readonly<Record<string, unknown>> = {},
+): Readonly<Record<string, unknown>> {
+  return {
+    status: 422,
+    code: 'VALIDATION',
+    requestId: 'req-1',
+    ...overrides,
   };
 }
 

@@ -7,6 +7,11 @@
 export {
   EMPTY_NOTIFICATION_STATE,
   NOTIFICATION_DEDUPE_WINDOW_MS,
+  NOTIFICATION_DETAILS_INVALID_PLACEHOLDER,
+  NOTIFICATION_DETAIL_LABEL_MAX_LENGTH,
+  NOTIFICATION_DETAIL_MAX_FIELDS,
+  NOTIFICATION_DETAIL_TRUNCATION_SUFFIX,
+  NOTIFICATION_DETAIL_VALUE_MAX_LENGTH,
   NOTIFICATION_LEVELS,
   NOTIFICATION_MAX_ENTRIES,
   NOTIFICATION_MAX_VISIBLE_TOASTS,
@@ -21,11 +26,13 @@ export {
 export { NOTIFICATION_EVENT_DEFAULTS, NOTIFICATION_EVENT_KINDS } from './core/notification-event.const.js';
 export {
   bumpEntry,
+  clampDetailFields,
   createNotificationId,
   findDuplicate,
   markEntriesRead,
   redactRecord,
   redactValue,
+  toDetailFields,
   toRedactedDetail,
   trimEntries,
   trimToastIds,
@@ -39,6 +46,7 @@ export {
 } from './core/notification.storage.logic.js';
 export type {
   EmitNotificationInput,
+  NotificationDetailField,
   NotificationEntry,
   NotificationEventDefaults,
   NotificationEventKind,

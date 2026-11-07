@@ -97,6 +97,48 @@ export const NOTIFICATION_REDACTED_PLACEHOLDER = '<redacted>';
 export const NOTIFICATION_UNSERIALIZABLE_DETAIL = '<unserializable detail>';
 
 /**
+ * Maximum number of structured fields kept on one entry.
+ *
+ * The `sessionStorage` mirror holds 200 entries and the quota is shared with the
+ * rest of the app, so a per-entry field cap keeps the payload realistic
+ * (AIS-151 decision D-D). Fields beyond the cap are dropped silently.
+ */
+export const NOTIFICATION_DETAIL_MAX_FIELDS = 20;
+
+/**
+ * Maximum length of a detail field label.
+ *
+ * A label is a column in the expandable row, not prose: anything longer is
+ * truncated with {@link NOTIFICATION_DETAIL_TRUNCATION_SUFFIX}.
+ */
+export const NOTIFICATION_DETAIL_LABEL_MAX_LENGTH = 40;
+
+/**
+ * Maximum length of a detail field value.
+ *
+ * Long enough for a stack frame list or a request-body prefix, short enough that
+ * 200 persisted entries stay inside the `sessionStorage` quota.
+ */
+export const NOTIFICATION_DETAIL_VALUE_MAX_LENGTH = 2_000;
+
+/**
+ * Marker appended to a truncated label or value.
+ *
+ * Visible on purpose: a truncated value must never look complete to whoever
+ * reads the log.
+ */
+export const NOTIFICATION_DETAIL_TRUNCATION_SUFFIX = '…';
+
+/**
+ * Stands in for a detail value that cannot be turned into text.
+ *
+ * Covers what JSON cannot express (a cycle, a `BigInt`) and the values
+ * `JSON.stringify` silently erases (`Symbol`, function, `undefined`). A log entry
+ * must never break its caller, so these degrade to this marker.
+ */
+export const NOTIFICATION_DETAILS_INVALID_PLACEHOLDER = '<invalid value>';
+
+/**
  * Key names whose value must never reach the log.
  *
  * Matched case-insensitively and as a substring, so `Authorization`,

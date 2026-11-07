@@ -4,6 +4,7 @@ import {
   NOTIFICATION_STORAGE_VERSION,
 } from './notification.const.js';
 import type {
+  NotificationDetailField,
   NotificationEntry,
   NotificationLevel,
   NotificationSource,
@@ -90,6 +91,53 @@ function isOptionalDetail(value: unknown): value is string | undefined {
 }
 
 /**
+ * Narrows an unknown value to one stored structured field.
+ *
+ * A blank label would render an unnoticeable row, so it is rejected here rather
+ * than silently accepted from a tampered payload (AIS-151).
+ *
+ * @param value - value to inspect.
+ * @returns `true` for `{ label: non-empty string, value: string, mono?: boolean }`.
+ */
+function isDetailField(value: unknown): value is NotificationDetailField {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const label: unknown = value['label'];
+
+  return (
+    typeof label === 'string' &&
+    label.length > 0 &&
+    typeof value['value'] === 'string' &&
+    (value['mono'] === undefined || typeof value['mono'] === 'boolean')
+  );
+}
+
+/**
+ * Narrows an unknown value to the optional stored field list.
+ *
+ * Absent is valid: an entry written before AIS-151, or one emitted without
+ * structured context, must keep loading.
+ *
+ * @param value - value to inspect.
+ * @returns `true` for `undefined` or an array whose every element is a field.
+ */
+function isOptionalDetails(value: unknown): value is readonly NotificationDetailField[] | undefined {
+  if (value === undefined) {
+    return true;
+  }
+
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  const fields: readonly unknown[] = value;
+
+  return fields.every(isDetailField);
+}
+
+/**
  * Validates one persisted entry.
  *
  * Field-by-field on purpose (AIS-80 decision D4): the payload is written by us but
@@ -109,6 +157,7 @@ export function isPersistedEntry(value: unknown): value is NotificationEntry {
     isNotificationLevel(value['level']) &&
     typeof value['message'] === 'string' &&
     isOptionalDetail(value['detail']) &&
+    isOptionalDetails(value['details']) &&
     isNotificationSource(value['source']) &&
     isTimestamp(value['createdAt']) &&
     typeof value['read'] === 'boolean' &&

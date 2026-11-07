@@ -18,6 +18,23 @@ export type NotificationLevel = 'success' | 'error' | 'warning' | 'info' | 'syst
 export type NotificationSource = 'form' | 'api' | 'router' | 'runtime' | 'manual';
 
 /**
+ * One labelled technical fact of an entry, rendered by the expandable log row.
+ *
+ * `label` is supplied by the emitter: this package carries no i18n, so the core
+ * never invents user-facing text (AIS-79 decision D15). `value` is already
+ * redacted, serialised and length-clamped by the store, so anything reaching a
+ * consumer is safe to render as it is.
+ */
+export interface NotificationDetailField {
+  /** Name of the fact, e.g. `requestId`. Emitter-owned, already truncated. */
+  readonly label: string;
+  /** Redacted, serialised and truncated value. */
+  readonly value: string;
+  /** Asks for a monospace rendering (ids, query strings, stack traces). */
+  readonly mono?: boolean;
+}
+
+/**
  * One notification or system message.
  *
  * Immutable by contract: the store replaces entries instead of mutating them, so
@@ -31,6 +48,16 @@ export interface NotificationEntry {
   readonly message: string;
   /** Redacted technical context: HTTP status, request URL, stack trace. */
   readonly detail?: string;
+  /**
+   * Structured context of the expandable log row.
+   *
+   * Complements {@link NotificationEntry.detail} rather than replacing it
+   * (AIS-151 decision D-A): `detail` stays the one-line summary the toast and
+   * the collapsed row show, `details` is only read when the row is opened and is
+   * never forwarded to a toast (D-C). `undefined` — never an empty list — when
+   * the emitter supplied nothing, so a snapshot never carries empty arrays.
+   */
+  readonly details?: readonly NotificationDetailField[];
   readonly source: NotificationSource;
   /** Creation time in epoch milliseconds, refreshed when a duplicate is bumped. */
   readonly createdAt: number;
@@ -78,6 +105,15 @@ export interface EmitNotificationInput extends NotificationIdentity {
    * bypass redaction (AIS-79 decision D9); a plain string is stored as it is.
    */
   readonly detail?: string | Readonly<Record<string, unknown>>;
+  /**
+   * Structured context for the expandable log row (AIS-151).
+   *
+   * Both shapes travel the same redaction path as {@link EmitNotificationInput.detail}:
+   * a record keeps its insertion order and every value is redacted by its key, an
+   * already-built field list is re-redacted by its `label` and clamped. Redaction
+   * stays a store responsibility, so no emitter can skip it (D-B).
+   */
+  readonly details?: readonly NotificationDetailField[] | Readonly<Record<string, unknown>>;
   /** Overrides the default (`level !== 'system'`, decision D11). */
   readonly toast?: boolean;
 }

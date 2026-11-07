@@ -1,10 +1,18 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-07 — AIS-150 (átméretezhető log drawer panel).** A panel bal élén
-`role="separator"` fogantyú: egérrel húzható (`pointer capture`) és billentyűzettel állítható
-(320–720 px, default 416 px), `localStorage`-ban perzisztálva, a controllerben tartott állapottal; a
-`md` alatti teljes szélességet CSS adja, húzás közben a panel transform-animációja kimarad (lásd §4
-és §5).
+**Utolsó frissítés: 2026-11-07 — AIS-151 (strukturált log-részletek a `@callback/notifications` core-ban).**
+A `NotificationEntry` opcionális `details: readonly NotificationDetailField[]` mezőt kap: a store a
+`record` és a kész tömb alakot **ugyanazon** a redakciós úton normalizálja (beszúrási sorrend, label
+szerinti redakció, konstans limitek), az üres eredmény `undefined` lesz, a `sessionStorage` guard
+all-or-nothing marad és a séma verzió továbbra is `1` (lásd §5, `packages/notifications core` és
+`sessionStorage mirror`).
+
+**AIS-150 (2026-11-07) — átméretezhető log drawer panel, hover-resize javítással.** A panel bal élén
+`role="separator"` fogantyú: **csak húzásra** méretez át (a saját `pointerId`-ja és
+lenyomott egérgomb mellett), a szélességet a **mutató elmozdulásából** számolja (`toWidthFromDrag`),
+billentyűzettel is állítható (320–720 px, default 416 px), `localStorage`-ban perzisztálva, a
+controllerben tartott állapottal; a `md` alatti teljes szélességet CSS adja, húzás közben a panel
+transform-animációja kimarad (lásd §4 és §5).
 
 **AIS-146 (2026-11-06) — breadcrumb adatmodell + tiszta levezető logika.** A
 `RouteEntry` három breadcrumb mezőt kap (`breadcrumbLabel`, `breadcrumbParentPath`,
@@ -92,6 +100,17 @@ letiltott storage esetén csendben a default-ra esik. Az érték a **controllerb
 `useState`-je), nem globális store-ban, és nem a `packages/ui`-ban — a primitíva továbbra is
 prezentációs. A `md` alatti teljes szélességet CSS oldja meg (`w-full md:w-[var(--log-drawer-width)]`),
 így nincs JS media query; húzás közben a panel `transition-none`-t kap. Részletek §4 és §5.
+
+**AIS-150 follow-up (2026-11-07) — hover-resize hiba javítva.** A fogantyú `pointermove` kezelője
+eddig **minden** mozgásra szélességet jelentett, így a puszta rámutatás is átméretezte a panelt, a
+szélesség pedig `window.innerWidth - clientX`-ből jött — márpedig a `window.innerWidth` a klasszikus
+görgetősávot is tartalmazza, a `fixed right-0` panel jobb éle viszont a
+`document.documentElement.clientWidth`-nél van. A kettő együtt futó viselkedést adott: a lépés
+`~görgetősávnyival` túllőtt, a kurzor kikerült a csíkról, a következő rámutatás újra ugyanabba az
+irányba lépett — `min`-ig, illetve `max`-ig. Javítás: a húzás csak a saját `pointerId`-jával és
+lenyomott gombbal él (a gesztus eredete `LogDrawerDragAnchor` a `useRef`-ben), a szélesség pedig a
+**húzás deltájából** számol (`toWidthFromDrag(startX, currentX, startWidth, range)`), így sem a
+görgetősáv, sem a panel szegélye, sem egy elrendezés-változás nem tud visszacsatolni. Részletek §4.
 
 **AIS-115 (2026-11-04):** a közös form-minta — `features/forms/use-app-form.ts`
 (`useAppForm`) egy helyen fogja össze a zod resolvert, a `toFieldErrors` mezőhiba-leképezést, az
@@ -314,17 +333,25 @@ handle inside it would be unreachable exactly when it is needed. Its position ne
 no viewport-dependent offset and no layout shift. The panel stays **non-modal**: no overlay, no focus
 trap, page still scrollable.
 
-**The panel is resizable from its left edge (AIS-150).** The handle is a `role="separator"`
-element with `aria-orientation="vertical"`, `aria-label={LOG_DRAWER_RESIZE_HANDLE_LABEL}`,
-`aria-valuenow`/`aria-valuemin`/`aria-valuemax` and `tabIndex={0}`, and it is `hidden md:flex`: below
-`md` the panel is full width (`w-full`), so there is nothing to drag and the handle must not be a
-focus stop either. A drag brackets itself with `onResizeStart`/`onResizeEnd` (which is what lets the
-host drop the transform transition through `isResizing`), captures the pointer so the moves keep
-arriving outside the 12 px target, and reports every move via `onWidthChange`; `pointercancel` ends
-the gesture exactly like `pointerup`. Keyboard: `ArrowLeft`/`ArrowRight` = ±`LOG_DRAWER_WIDTH_STEP`
-(16 px), `Shift` = ±`LOG_DRAWER_WIDTH_STEP_LARGE` (64 px), `Home`/`End` = the bounds, anything else
-is ignored (and `preventDefault` only runs when the width actually changes). Double click resets to
-`widthRange.initial`. Geometry is pure (`clampDrawerWidth`, `toWidthFromPointer`, `toWidthFromKey` in
+**The panel is resizable from its left edge (AIS-150, fixed by the AIS-150 follow-up).** The handle
+is a `role="separator"` element with `aria-orientation="vertical"`,
+`aria-label={LOG_DRAWER_RESIZE_HANDLE_LABEL}`, `aria-valuenow`/`aria-valuemin`/`aria-valuemax` and
+`tabIndex={0}`, and it is `hidden md:flex`: below `md` the panel is full width (`w-full`), so there is
+nothing to drag and the handle must not be a focus stop either. A drag brackets itself with
+`onResizeStart`/`onResizeEnd` (which is what lets the host drop the transform transition through
+`isResizing`) and captures the pointer so the moves keep arriving outside the 12 px target.
+`pointermove` is a **hover** event as well, so it only resizes while the drag *this* handle started is
+still running: the gesture origin is kept in a `useRef` (`LogDrawerDragAnchor` — `pointerId`,
+`startX`, `startWidth`), a move carrying another pointer id is ignored, a move with `buttons === 0`
+**ends** the drag (the button may be released outside the window, and no `pointerup` would ever
+arrive), and only the primary button starts a drag. `pointercancel` ends the gesture exactly like
+`pointerup`. The reported width is `startWidth - (currentX - startX)` — the pointer's **travel**,
+never a viewport edge: an edge-anchored `window.innerWidth - clientX` counts the classic scrollbar
+that a `fixed right-0` panel does not have inside it, and it lets a layout shift under a stationary
+cursor feed back into the width. Keyboard: `ArrowLeft`/`ArrowRight` = ±`LOG_DRAWER_WIDTH_STEP` (16 px),
+`Shift` = ±`LOG_DRAWER_WIDTH_STEP_LARGE` (64 px), `Home`/`End` = the bounds, anything else is ignored
+(and `preventDefault` only runs when the width actually changes). Double click resets to
+`widthRange.initial`. Geometry is pure (`clampDrawerWidth`, `toWidthFromDrag`, `toWidthFromKey` in
 `log-drawer.logic.ts`), the width is published as the `--log-drawer-width` custom property, and the
 numbers (416 / 320 / 720 / 16 / 64) are declared **once**, in `log-drawer.const.ts`.
 
@@ -386,6 +413,9 @@ fails the build instead of leaking in.
 | Dedupe                | identical `level` + `message` within `NOTIFICATION_DEDUPE_WINDOW_MS = 2000` (inclusive) bumps `repeatCount`, refreshes `createdAt`, moves the toast to the front |
 | Toast default         | `toast = level !== 'system'`; an explicit `toast` flag wins                                                                                                   |
 | Redaction             | a `detail` record is redacted by the store (`authorization`, `token`, `password`, `apiKey`, `secret`, …) and only then serialised — no emitter can bypass it  |
+| `details` (AIS-151)   | optional `NotificationDetailField[]` (`label`, `value`, optional `mono`) of the expandable log row; `detail` stays the one-line summary for the toast and the collapsed row, `details` never reaches a toast        |
+| Detail normalisation  | `toDetailFields` / `clampDetailFields`: a record keeps the emitter's **insertion order**, **both** branches run `redactValue` (key / label), blank labels are dropped, an empty result becomes `undefined`; a repeat replaces the fields, an emit without fields keeps the previous ones |
+| Detail limits         | `NOTIFICATION_DETAIL_MAX_FIELDS = 20`, `NOTIFICATION_DETAIL_LABEL_MAX_LENGTH = 40`, `NOTIFICATION_DETAIL_VALUE_MAX_LENGTH = 2000`; truncation is marked with `NOTIFICATION_DETAIL_TRUNCATION_SUFFIX = '…'`, an unexpressable value becomes `NOTIFICATION_DETAILS_INVALID_PLACEHOLDER` (a log entry never throws) |
 | Restored entries      | `initialEntries` seeds `entries` **only**; `toasts` always starts empty, so a reload never resurrects an expired toast (AIS-80/83)                            |
 | Injected dependencies | `now()` clock, caps, dedupe window; ids come from `createNotificationId(now, sequence)` — deterministic, no `crypto`/`Math.random` in the core                  |
 | Listener errors       | caught **per listener** and forwarded to `onListenerError` (default `console.error`), so one broken subscriber cannot silence the rest                          |
@@ -409,7 +439,7 @@ reported to the user — losing the mirror is acceptable, breaking the app is no
 | Key / envelope   | `aisztens.notifications.v1`, payload `{ version: 1, entries }` — the version lives in the key *and* in the envelope                                        |
 | Cap              | `NOTIFICATION_STORAGE_MAX_ENTRIES = 200`, oldest dropped (smaller than the 500-entry memory buffer); the cap is also enforced on restore                  |
 | Payload          | `entries` only — never `toasts`, never timers, so a reload cannot resurrect an expired card                                                                |
-| Validation       | all-or-nothing: version, `entries` array, then every entry field (`id`, `level`, `source`, `message`, `detail?`, `createdAt`, `read`, `toast`, `repeatCount`); unknown extra keys are tolerated |
+| Validation       | all-or-nothing: version, `entries` array, then every entry field (`id`, `level`, `source`, `message`, `detail?`, `details?`, `createdAt`, `read`, `toast`, `repeatCount`); `details` may be absent, otherwise every element must be `{ label: non-empty string, value: string, mono?: boolean }` — one bad element rejects the whole payload; unknown extra keys are tolerated |
 | Rejection        | `missing` / `malformed-json` / `wrong-version` / `wrong-shape` → the key is removed (except `missing`) and the store starts empty; no migration in phase 1 |
 | Write coalescing | injected `NotificationWriteScheduler`; default is a microtask, AIS-83 passes `requestAnimationFrame`; the pending write always carries the **latest** entries |
 | Duplicate writes | a payload equal to the last written (or restored) one is skipped — a toast dismissal must not cost an `setItem`                                            |

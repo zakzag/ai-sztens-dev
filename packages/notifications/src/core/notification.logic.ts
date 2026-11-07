@@ -1,9 +1,26 @@
 import {
+  NOTIFICATION_DETAILS_INVALID_PLACEHOLDER,
+  NOTIFICATION_DETAIL_LABEL_MAX_LENGTH,
+  NOTIFICATION_DETAIL_MAX_FIELDS,
+  NOTIFICATION_DETAIL_TRUNCATION_SUFFIX,
+  NOTIFICATION_DETAIL_VALUE_MAX_LENGTH,
   NOTIFICATION_REDACTED_PLACEHOLDER,
   NOTIFICATION_SENSITIVE_KEY_PATTERN,
   NOTIFICATION_UNSERIALIZABLE_DETAIL,
 } from './notification.const.js';
-import type { NotificationEntry, NotificationIdentity } from './notification.interface.js';
+import type {
+  NotificationDetailField,
+  NotificationEntry,
+  NotificationIdentity,
+} from './notification.interface.js';
+
+/**
+ * Frozen, referentially stable empty field list.
+ *
+ * Returned instead of a fresh array so an emitter that supplies nothing cannot
+ * make two otherwise identical snapshots differ by reference (AIS-151).
+ */
+const EMPTY_DETAIL_FIELDS: readonly NotificationDetailField[] = Object.freeze([]);
 
 /**
  * Builds the identifier of a notification entry.
@@ -88,14 +105,22 @@ export function findDuplicate(
  *
  * @param entry - the entry being repeated.
  * @param now - current time in epoch milliseconds.
+ * @param details - already-normalised fields of the repeating emit; omitted
+ *   means the repeat carried none, so the entry keeps the fields it had
+ *   (AIS-151 decision C).
  * @returns a new entry; the input is not mutated.
  */
-export function bumpEntry(entry: NotificationEntry, now: number): NotificationEntry {
+export function bumpEntry(
+  entry: NotificationEntry,
+  now: number,
+  details?: readonly NotificationDetailField[],
+): NotificationEntry {
   return {
     ...entry,
     createdAt: now,
     read: false,
     repeatCount: entry.repeatCount + 1,
+    ...(details === undefined ? {} : { details }),
   };
 }
 
@@ -144,6 +169,169 @@ export function redactRecord(record: Readonly<Record<string, unknown>>): Record<
   }
 
   return redacted;
+}
+
+/**
+ * Cuts a label or value down to its limit, marking the cut.
+ *
+ * @param text - already-trimmed text.
+ * @param maxLength - hard cap, including the suffix.
+ * @returns the text unchanged when it fits, otherwise a prefix plus
+ *   {@link NOTIFICATION_DETAIL_TRUNCATION_SUFFIX}; never longer than `maxLength`.
+ */
+function truncateDetailText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  if (maxLength <= NOTIFICATION_DETAIL_TRUNCATION_SUFFIX.length) {
+    return NOTIFICATION_DETAIL_TRUNCATION_SUFFIX.slice(0, Math.max(maxLength, 0));
+  }
+
+  const head = text.slice(0, maxLength - NOTIFICATION_DETAIL_TRUNCATION_SUFFIX.length);
+
+  return `${head}${NOTIFICATION_DETAIL_TRUNCATION_SUFFIX}`;
+}
+
+/**
+ * Turns any detail value into its stored text form.
+ *
+ * `JSON.stringify` returns `undefined` for what it cannot express (`Symbol`,
+ * function, `undefined`) and throws on a cycle or a `BigInt`; both cases degrade
+ * to {@link NOTIFICATION_DETAILS_INVALID_PLACEHOLDER} instead of breaking the
+ * caller.
+ *
+ * @param value - raw value, possibly already redacted.
+ * @returns the value as text, or the placeholder.
+ */
+function serializeDetailValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  try {
+    const serialized: unknown = JSON.stringify(value);
+
+    return typeof serialized === 'string' ? serialized : NOTIFICATION_DETAILS_INVALID_PLACEHOLDER;
+  } catch {
+    // Cycle or `BigInt`: JSON cannot express the value, and a log entry must
+    // never break its caller, so the failure is recorded as a marker.
+    return NOTIFICATION_DETAILS_INVALID_PLACEHOLDER;
+  }
+}
+
+/**
+ * Builds one stored field from a label and a raw value.
+ *
+ * Redaction, serialisation and both length limits live here so the record and
+ * the array entry point of {@link toDetailFields} cannot drift apart.
+ *
+ * @param rawLabel - label exactly as the emitter spelled it (used as the
+ *   redaction key before it is truncated).
+ * @param rawValue - raw value.
+ * @param mono - `true` when the value wants a monospace rendering.
+ * @returns the normalised field, or `undefined` when the label is blank.
+ */
+function toDetailField(
+  rawLabel: string,
+  rawValue: unknown,
+  mono: boolean | undefined,
+): NotificationDetailField | undefined {
+  const label = truncateDetailText(rawLabel.trim(), NOTIFICATION_DETAIL_LABEL_MAX_LENGTH);
+
+  if (label.length === 0) {
+    return undefined;
+  }
+
+  const value = truncateDetailText(
+    serializeDetailValue(redactValue(rawLabel, rawValue)),
+    NOTIFICATION_DETAIL_VALUE_MAX_LENGTH,
+  );
+
+  return mono === true ? { label, value, mono: true } : { label, value };
+}
+
+/**
+ * Normalises an already-built field list.
+ *
+ * Used for both entry points of {@link toDetailFields}, and shared with the
+ * storage guard's expectations: the field cap, the label/value limits and the
+ * label-keyed redaction apply to a caller-built list too, so no emitter can skip
+ * redaction by pre-building the array (AIS-151 decision B).
+ *
+ * @param details - candidate fields, possibly over-long or unredacted.
+ * @returns a new list with blank labels dropped and the caps applied.
+ */
+export function clampDetailFields(
+  details: readonly NotificationDetailField[],
+): readonly NotificationDetailField[] {
+  const clamped: NotificationDetailField[] = [];
+
+  for (const field of details.slice(0, NOTIFICATION_DETAIL_MAX_FIELDS)) {
+    const normalised = toDetailField(field.label, field.value, field.mono);
+
+    if (normalised !== undefined) {
+      clamped.push(normalised);
+    }
+  }
+
+  return clamped.length === 0 ? EMPTY_DETAIL_FIELDS : clamped;
+}
+
+/**
+ * Narrows the `details` union to its field-list branch.
+ *
+ * `Array.isArray` alone does not narrow a **readonly** array union, so the
+ * discrimination is expressed once, with a real type predicate, instead of being
+ * cast away at the call site.
+ *
+ * @param input - field list or redactable record.
+ * @returns `true` when the input is already a field list.
+ */
+function isDetailFieldList(
+  input: readonly NotificationDetailField[] | Readonly<Record<string, unknown>>,
+): input is readonly NotificationDetailField[] {
+  return Array.isArray(input);
+}
+
+/**
+ * Turns the `details` of an emit into the stored field list.
+ *
+ * A record keeps the **insertion order** the emitter wrote (AIS-151 decision A),
+ * so the expandable row reads exactly as the caller composed it. Every branch
+ * goes through {@link redactValue} and the same limits, which keeps redaction a
+ * single-place concern (AIS-79 decision D9, AIS-151 D-B).
+ *
+ * @param input - field list, redactable record, or nothing.
+ * @returns the normalised fields, or a frozen empty list when nothing survives.
+ */
+export function toDetailFields(
+  input: readonly NotificationDetailField[] | Readonly<Record<string, unknown>> | undefined,
+): readonly NotificationDetailField[] {
+  if (input === undefined) {
+    return EMPTY_DETAIL_FIELDS;
+  }
+
+  if (isDetailFieldList(input)) {
+    return clampDetailFields(input);
+  }
+
+  const record: Readonly<Record<string, unknown>> = input;
+  const fields: NotificationDetailField[] = [];
+
+  for (const [key, rawValue] of Object.entries(record)) {
+    if (fields.length >= NOTIFICATION_DETAIL_MAX_FIELDS) {
+      break;
+    }
+
+    const field = toDetailField(key, rawValue, undefined);
+
+    if (field !== undefined) {
+      fields.push(field);
+    }
+  }
+
+  return fields.length === 0 ? EMPTY_DETAIL_FIELDS : fields;
 }
 
 /**

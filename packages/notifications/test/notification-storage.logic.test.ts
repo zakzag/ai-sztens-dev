@@ -6,7 +6,7 @@ import {
   isPersistedEntry,
   toPersistedEnvelope,
 } from '../src/core/notification.storage.logic.js';
-import { createTestEntry } from './mocks/notification.fixtures.js';
+import { createTestDetailField, createTestEntry } from './mocks/notification.fixtures.js';
 import { createTestEntryList } from './mocks/notification-storage.fixtures.js';
 
 /**
@@ -134,6 +134,12 @@ describe('fromPersistedEnvelope — rejections', () => {
     ['an unknown source', { source: 'somewhere' }],
     ['a non-string message', { message: 42 }],
     ['a non-string detail', { detail: 42 }],
+    ['a non-array details field', { details: 'status=422' }],
+    ['a details element that is not an object', { details: ['status=422'] }],
+    ['a details field with a blank label', { details: [{ label: '', value: '422' }] }],
+    ['a details field with a non-string value', { details: [{ label: 'status', value: 422 }] }],
+    ['a details field with a non-string label', { details: [{ label: 42, value: '422' }] }],
+    ['a non-boolean mono flag', { details: [{ label: 'status', value: '422', mono: 'yes' }] }],
     ['a non-boolean read flag', { read: 'yes' }],
     ['a non-boolean toast flag', { toast: 1 }],
     ['a non-finite createdAt', { createdAt: 'now' }],
@@ -175,11 +181,51 @@ describe('fromPersistedEnvelope — tolerance', () => {
 
     expect(result.ok).toBe(true);
   });
+
+  it('accepts an entry without details, so a pre-AIS-151 payload still loads', () => {
+    expect(fromPersistedEnvelope(raw(envelope([createTestEntry()]))).ok).toBe(true);
+  });
+
+  it('accepts an entry with structured details', () => {
+    const entry = {
+      ...createTestEntry(),
+      details: [createTestDetailField({ label: 'requestId', mono: true })],
+    };
+
+    expect(fromPersistedEnvelope(raw(envelope([entry]))).ok).toBe(true);
+  });
+
+  it('accepts an empty details list', () => {
+    expect(fromPersistedEnvelope(raw(envelope([{ ...createTestEntry(), details: [] }]))).ok).toBe(true);
+  });
+
+  it('keeps the details through a full round trip', () => {
+    const entry = { ...createTestEntry(), details: [createTestDetailField({ value: 'req-1' })] };
+
+    const result = fromPersistedEnvelope(raw(toPersistedEnvelope([entry], 200)));
+
+    expect(result.ok ? result.entries[0]?.details : undefined).toEqual([
+      { label: 'requestId', value: 'req-1' },
+    ]);
+  });
 });
 
 describe('isPersistedEntry', () => {
   it('accepts a complete entry', () => {
     expect(isPersistedEntry(createTestEntry())).toBe(true);
+  });
+
+  it('accepts an entry with a valid details list', () => {
+    expect(isPersistedEntry({ ...createTestEntry(), details: [createTestDetailField()] })).toBe(true);
+  });
+
+  it('rejects a details list with one broken element', () => {
+    expect(
+      isPersistedEntry({
+        ...createTestEntry(),
+        details: [createTestDetailField(), { label: 'status' }],
+      }),
+    ).toBe(false);
   });
 
   it('rejects non-objects and arrays', () => {

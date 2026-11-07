@@ -32,9 +32,12 @@ import { successResponse } from '../../test/mocks/handlers/handler-envelope.js';
 import { renderWithProviders } from '../../test/mocks/render-with-providers.js';
 import { server } from '../../test/mocks/server.js';
 import {
+  API_KEYS_CREATE_LABEL,
+  API_KEYS_CREATE_ROUTE_PATH,
   API_KEYS_EMPTY_MESSAGE,
   API_KEYS_ERROR_TITLE,
   API_KEY_COLUMNS,
+  API_KEY_FORM_LABELS,
 } from './api-keys.const.js';
 import { ApiKeysPage } from './ApiKeysPage.js';
 
@@ -163,6 +166,36 @@ describe('ApiKeysPage', () => {
 
     expect(await screen.findByText(API_KEYS_ERROR_TITLE)).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('renders the create action next to the page title and no inline form', async () => {
+    renderPage();
+
+    await screen.findByText(FILLED_API_KEY.name);
+
+    const createLink = screen.getByRole('link', {
+      name: API_KEYS_CREATE_LABEL,
+    });
+
+    expect(createLink).toHaveAttribute('href', API_KEYS_CREATE_ROUTE_PATH);
+    // AIS-155: the create form moved into the `/api-keys/new` overlay, so the
+    // list page itself must not render a single input.
+    expect(
+      screen.queryByLabelText(API_KEY_FORM_LABELS.name),
+    ).not.toBeInTheDocument();
+  });
+
+  it('links every row to the read-only overlay of that key', async () => {
+    renderPage();
+
+    const rowLink = await screen.findByRole('link', {
+      name: FILLED_API_KEY.name,
+    });
+
+    expect(rowLink).toHaveAttribute(
+      'href',
+      `/api-keys/${FILLED_API_KEY.identifier}/view`,
+    );
   });
 
   it('renders no pager until the first response arrives', async () => {

@@ -18,7 +18,13 @@ export const dialogOverlayVariants = cva(
  * Surface recipe of {@link Dialog}: a centred raised card.
  *
  * The recipe carries layout, shape, border colour, surface, depth and the focus
- * ring; the `size` variant only changes the maximum width.
+ * ring; the `size` variant only changes the width (and, for `fit`, the height
+ * constraint that makes the body scrollable).
+ *
+ * `fit` is the standard of the entity overlays (AIS-155): the panel is as large
+ * as its content needs (`w-auto` overrides the base `w-full`) but never grows
+ * past the viewport, so the header and the footer stay visible while the body
+ * scrolls.
  */
 export const dialogVariants = cva(
   `fixed left-1/2 top-1/2 ${DIALOG_CONTENT_Z_INDEX} flex w-full -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-card border border-hairline border-border-hairline bg-surface-raised p-6 shadow-neu-raised focus-visible:outline-none`,
@@ -28,6 +34,7 @@ export const dialogVariants = cva(
         sm: 'max-w-sm',
         md: 'max-w-md',
         lg: 'max-w-2xl',
+        fit: 'w-auto max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)]',
       },
     },
     defaultVariants: { size: 'md' },

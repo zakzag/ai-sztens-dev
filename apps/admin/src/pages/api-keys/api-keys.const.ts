@@ -21,11 +21,23 @@ export const API_KEYS_PAGE_TITLE = 'API kulcsok';
 export const API_KEYS_PAGE_SUBTITLE =
   'A külső szolgáltatók (pl. hangasszisztens) hozzáférési kulcsai. A kulcs értéke a mentés után nem jelenik meg újra.';
 
+/**
+ * Header action of the list (AIS-155).
+ *
+ * The label is both the visible text and the accessible name — no separate
+ * `aria-label`, so what a screen reader announces is exactly what the user sees
+ * (WCAG 2.5.3). The route literal lives here for the same reason the detail
+ * template does: the page must not import `app`, and the registry mounts exactly
+ * this string.
+ */
+export const API_KEYS_CREATE_LABEL = 'Új API kulcs';
+export const API_KEYS_CREATE_ROUTE_PATH = '/api-keys/new';
+
 /** Table section. */
 export const API_KEYS_TABLE_TITLE = 'Tárolt kulcsok';
 export const API_KEYS_LOADING_MESSAGE = 'API kulcsok betöltése…';
 export const API_KEYS_EMPTY_MESSAGE =
-  'Még nincs tárolt API kulcs. Vedd fel az elsőt a lenti űrlapon.';
+  'Még nincs tárolt API kulcs. Hozd létre az elsőt az „Új API kulcs” gombbal.';
 /**
  * Title of the page-level error state. The retry labels are owned by
  * `lib/error-surface.const.ts`, because every page's retry button reads the same.
@@ -54,10 +66,20 @@ export const API_KEYS_LIMIT_OPTIONS: readonly number[] = Object.freeze([
   LIST_QUERY_MAX_LIMIT,
 ]);
 
-/** Form section. */
-export const API_KEY_FORM_TITLE = 'Új API kulcs felvitele';
-export const API_KEY_FORM_SUBMIT_LABEL = 'Kulcs mentése';
-export const API_KEY_FORM_PENDING_LABEL = 'Mentés…';
+/**
+ * Create overlay (AIS-155).
+ *
+ * The form lives **inside** the overlay body, so it carries no title of its own:
+ * the window title is the heading, and the submit button sits in the overlay
+ * footer and submits this form by its id.
+ */
+export const API_KEY_CREATE_DIALOG_TITLE = 'Új API kulcs';
+export const API_KEY_CREATE_DIALOG_SUBTITLE =
+  'A kulcs értéke a mentés után nem jelenik meg újra, ezért előbb szerezd be a szolgáltatótól.';
+/** DOM id of the create form — the target of the footer submit button. */
+export const API_KEY_CREATE_FORM_ID = 'api-key-create-form';
+export const API_KEY_CREATE_SUBMIT_LABEL = 'Létrehozás';
+export const API_KEY_CREATE_PENDING_LABEL = 'Mentés…';
 export const API_KEY_FORM_SUCCESS_MESSAGE = 'Az új API kulcs elmentve.';
 export const API_KEY_FORM_ERROR_TITLE = 'Az API kulcs mentése nem sikerült.';
 
@@ -124,8 +146,28 @@ export const API_KEY_FORM_DEFAULTS: ApiKeyFormValues = {
  */
 export const API_KEY_DETAIL_ROUTE_PATH = '/api-keys/:identifier';
 
+/**
+ * Route template of the read-only overlay (AIS-155).
+ *
+ * A sibling of the detail route, not a variant of it: `/view` is the standard
+ * read-only window of the list, while the legacy detail page keeps the delete
+ * and the inline editor until it is retired.
+ */
+export const API_KEY_VIEW_ROUTE_PATH = '/api-keys/:identifier/view';
+
 /** Name of the detail route's URL parameter, shared by the router and the page. */
 export const API_KEY_DETAIL_PARAM = 'identifier';
+
+/**
+ * Read-only overlay copy (AIS-155).
+ *
+ * The dismiss label differs from the header `X`'s `Bezárás` on purpose: two
+ * controls with the same accessible name are indistinguishable for a screen
+ * reader user, and this one also says where it goes.
+ */
+export const API_KEY_VIEW_DIALOG_TITLE = 'API kulcs';
+export const API_KEY_VIEW_CLOSE_LABEL = 'Vissza a listához';
+export const API_KEY_VIEW_DELETE_LINK_LABEL = 'Teljes oldal (törlés)';
 
 /** Detail page header. */
 export const API_KEY_DETAIL_TITLE = 'API kulcs';

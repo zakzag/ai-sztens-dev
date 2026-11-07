@@ -5,6 +5,7 @@
  */
 
 import type { ReactNode } from 'react';
+import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import type { DataTableSort } from '@callback/ui';
 import type {
   ApiKeyDetailViewModel,
@@ -99,6 +100,35 @@ export interface ApiKeyDeleteDialogProps {
   readonly isPending: boolean;
   /** Page-level failure text, rendered inside the dialog; `null` when none. */
   readonly errorMessage: string | null;
+}
+
+/**
+ * Props of the create form **fields** (AIS-155).
+ *
+ * The form state (`useAppForm`) is owned by the create overlay, not by this
+ * component: only the owner can hand `isSubmitting` to the overlay's footer
+ * submit button, and only the owner decides what happens after a successful
+ * submit. The fields component therefore receives the two RHF handles and the
+ * residue message, and renders nothing else.
+ */
+export interface ApiKeyFormFieldsProps {
+  /** Passes the react-hook-form registration to every control. */
+  readonly register: UseFormRegister<ApiKeyFormValues>;
+  /** Per-field messages, already mapped by the form pattern. */
+  readonly errors: FieldErrors<ApiKeyFormValues>;
+  /** Page-level copy for a failure no input owns; `null` when there is none. */
+  readonly formError: string | null;
+}
+
+/**
+ * Props of the read-only field block of one key (AIS-155).
+ *
+ * Shared by the legacy detail card and the read-only overlay, so the list of
+ * fields, their labels and their formatting exist once.
+ */
+export interface ApiKeyDetailFieldsProps {
+  /** The key, mapped by `toApiKeyDetailViewModel`. */
+  readonly viewModel: ApiKeyDetailViewModel;
 }
 
 export interface ApiKeysTableProps {

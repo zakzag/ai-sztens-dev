@@ -14,6 +14,20 @@ export interface OverlayShellProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly title: string;
   readonly description?: string;
+  /**
+   * Extra control rendered in the header **before** the title block (AIS-155).
+   *
+   * Kept empty unless a feature really needs a header action: the standard
+   * overlay has exactly one header control, the close `X`.
+   */
+  readonly headerStart?: ReactNode;
+  /**
+   * Extra control rendered in the header **before** the close `X` (AIS-155).
+   *
+   * The `X` is always the last control of the header, so the two series of
+   * overlays never drift on where the close button sits.
+   */
+  readonly headerEnd?: ReactNode;
   /** Action row rendered under the body; the caller owns the buttons. */
   readonly footer?: ReactNode;
   readonly children?: ReactNode;

@@ -25,6 +25,24 @@ export interface RouteEntry {
   readonly element: ReactElement;
 
   /**
+   * Nested routes rendered **inside** {@link element} (AIS-155 `D2`).
+   *
+   * This is what makes a route-based overlay possible: the parent page renders
+   * an `<Outlet/>`, and a child route such as `/api-keys/new` paints its dialog
+   * on top of the still-mounted list. Two rules keep it unambiguous:
+   *
+   * - a child `path` is **absolute** and starts with the parent `path`, so the
+   *   same literal can be matched by the breadcrumb logic and typed into the
+   *   address bar;
+   * - a child is reachable from its parent's own action, which is why it may
+   *   carry `navLabel: null` without a `:param` segment.
+   *
+   * Consumers that work on a flat table (the breadcrumb matcher) receive
+   * `flattenRouteEntries(routes)` instead of the tree.
+   */
+  readonly children?: readonly RouteEntry[];
+
+  /**
    * `true` for routes rendered inside the authenticated layout, `false` for the
    * public ones (the login page).
    */

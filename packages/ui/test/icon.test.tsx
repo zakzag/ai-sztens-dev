@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ChevronDownIcon,
   ChevronRightIcon,
+  CloseIcon,
   MoonIcon,
+  PlusIcon,
   SettingsIcon,
   SunIcon,
   SunsetIcon,
@@ -22,6 +24,8 @@ const ICONS: readonly {
   { name: 'SettingsIcon', Icon: SettingsIcon },
   { name: 'ChevronRightIcon', Icon: ChevronRightIcon },
   { name: 'ChevronDownIcon', Icon: ChevronDownIcon },
+  { name: 'PlusIcon', Icon: PlusIcon },
+  { name: 'CloseIcon', Icon: CloseIcon },
 ];
 
 describe('icon set', () => {

@@ -1,6 +1,11 @@
 /**
- * Tests of the create form — the reference wiring of the shared form pattern
- * (AIS-115) into the notification system (AIS-85).
+ * Tests of the create overlay — the reference wiring of the shared form pattern
+ * (AIS-115) into the notification system (AIS-85) and into the route-mounted
+ * entity overlay (AIS-155).
+ *
+ * The window itself is asserted here too: the submit button lives in the overlay
+ * footer and submits the body's `<form>` by id, `Mégsem` and a successful save
+ * both navigate back to the list URL.
  *
  * The mock point is the **network**, not the service (MSW harness, decision
  * `D1`): the form runs the real mutation hook + transport, and only the wire is
@@ -26,6 +31,8 @@ import {
 } from '@callback/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   API_KEYS_QUERY_KEYS,
@@ -52,13 +59,15 @@ import {
 } from '../../../test/mocks/render-with-providers.js';
 import { server } from '../../../test/mocks/server.js';
 import {
+  API_KEYS_CREATE_ROUTE_PATH,
+  API_KEYS_LIST_ROUTE_PATH,
+  API_KEY_CREATE_PENDING_LABEL,
+  API_KEY_CREATE_SUBMIT_LABEL,
   API_KEY_FORM_ERROR_TITLE,
   API_KEY_FORM_LABELS,
-  API_KEY_FORM_PENDING_LABEL,
-  API_KEY_FORM_SUBMIT_LABEL,
   API_KEY_FORM_SUCCESS_MESSAGE,
 } from '../api-keys.const.js';
-import { ApiKeyForm } from './ApiKeyForm.js';
+import { ApiKeyCreateDialog } from './ApiKeyCreateDialog.js';
 
 /** Hungarian validation copy, i.e. what this bundle renders (AIS-112 `D2`). */
 const HUNGARIAN_VALIDATION = VALIDATION_MESSAGE_CATALOGUE.hu;
@@ -66,14 +75,30 @@ const HUNGARIAN_VALIDATION = VALIDATION_MESSAGE_CATALOGUE.hu;
 /** The seed key the invalidation assertions watch. */
 const SEEDED_LIST_KEY = API_KEYS_QUERY_KEYS.all;
 
-/** Renders the form inside the full provider chain (provider + host). */
-function renderForm(): RenderWithProvidersResult {
-  return renderWithProviders(<ApiKeyForm />);
+/**
+ * Renders the create overlay inside the full provider chain (provider + host).
+ *
+ * @param initialEntries - the URL the memory router starts at.
+ * @returns the render result.
+ */
+function renderForm(
+  initialEntries: readonly string[] = [API_KEYS_CREATE_ROUTE_PATH],
+): RenderWithProvidersResult {
+  return renderWithProviders(<ApiKeyCreateDialog />, {
+    initialEntries: [...initialEntries],
+  });
 }
 
-/** @returns the submit button of the form. */
+/** @returns the submit button the overlay footer renders. */
 function getSubmitButton(): HTMLElement {
-  return screen.getByRole('button', { name: API_KEY_FORM_SUBMIT_LABEL });
+  return screen.getByRole('button', { name: API_KEY_CREATE_SUBMIT_LABEL });
+}
+
+/** Publishes the current pathname, so the close navigation can be asserted. */
+function PathProbe(): ReactNode {
+  const { pathname } = useLocation();
+
+  return <div data-testid="path">{pathname}</div>;
 }
 
 /**
@@ -102,7 +127,7 @@ async function fillRequiredFields(
   );
 }
 
-describe('ApiKeyForm', () => {
+describe('ApiKeyCreateDialog', () => {
   beforeEach(() => {
     server.resetHandlers();
   });
@@ -410,9 +435,46 @@ describe('ApiKeyForm', () => {
     await userEvent.click(getSubmitButton());
 
     const pendingButton = await screen.findByRole('button', {
-      name: API_KEY_FORM_PENDING_LABEL,
+      name: API_KEY_CREATE_PENDING_LABEL,
     });
 
     expect(pendingButton).toBeDisabled();
+  });
+
+  it('returns to the list URL after a successful save', async () => {
+    renderWithProviders(
+      <>
+        <PathProbe />
+        <ApiKeyCreateDialog />
+      </>,
+      { initialEntries: [API_KEYS_CREATE_ROUTE_PATH] },
+    );
+
+    await fillRequiredFields();
+    await userEvent.click(getSubmitButton());
+
+    await waitFor(() => {
+      expect(screen.getByTestId('path').textContent).toBe(
+        API_KEYS_LIST_ROUTE_PATH,
+      );
+    });
+  });
+
+  it('returns to the list URL when the overlay is dismissed', async () => {
+    renderWithProviders(
+      <>
+        <PathProbe />
+        <ApiKeyCreateDialog />
+      </>,
+      { initialEntries: [API_KEYS_CREATE_ROUTE_PATH] },
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mégsem' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('path').textContent).toBe(
+        API_KEYS_LIST_ROUTE_PATH,
+      );
+    });
   });
 });

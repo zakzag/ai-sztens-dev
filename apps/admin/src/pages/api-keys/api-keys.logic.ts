@@ -45,7 +45,11 @@ import type {
   ApiKeyEditFormValues,
   ApiKeyFormValues,
 } from './api-keys.interface.js';
-import { API_KEY_DETAIL_ROUTE_PATH, API_KEY_DETAIL_PARAM } from './api-keys.const.js';
+import {
+  API_KEY_DETAIL_PARAM,
+  API_KEY_DETAIL_ROUTE_PATH,
+  API_KEY_VIEW_ROUTE_PATH,
+} from './api-keys.const.js';
 
 /**
  * Field rules of the create form.
@@ -150,17 +154,34 @@ export function toApiKeyEditFormValues(dto: ApiKey): ApiKeyEditFormValues {
 }
 
 /**
- * Builds the SPA link of one key.
+ * Builds the SPA link of the legacy detail page of one key.
  *
  * The template lives in {@link API_KEY_DETAIL_ROUTE_PATH}, which the route
- * registry mounts as well: the table links to exactly the path the router
- * matches, and neither side can drift.
+ * registry mounts as well: a link can never point at a path the router does not
+ * serve. Since AIS-155 the list itself links to {@link toApiKeyViewRoute}; this
+ * template is still the delete/edit surface, reached from the read-only overlay.
  *
  * @param identifier - unique, URL-safe key of the resource.
  * @returns the route, e.g. `/api-keys/vapi-staging`.
  */
 export function toApiKeyDetailRoute(identifier: string): string {
   return API_KEY_DETAIL_ROUTE_PATH.replace(
+    `:${API_KEY_DETAIL_PARAM}`,
+    encodeURIComponent(identifier),
+  );
+}
+
+/**
+ * Builds the SPA link of the read-only overlay of one key (AIS-155).
+ *
+ * Same contract as {@link toApiKeyDetailRoute}: one literal in
+ * {@link API_KEY_VIEW_ROUTE_PATH}, shared by the table and the route registry.
+ *
+ * @param identifier - unique, URL-safe key of the resource.
+ * @returns the route, e.g. `/api-keys/vapi-staging/view`.
+ */
+export function toApiKeyViewRoute(identifier: string): string {
+  return API_KEY_VIEW_ROUTE_PATH.replace(
     `:${API_KEY_DETAIL_PARAM}`,
     encodeURIComponent(identifier),
   );

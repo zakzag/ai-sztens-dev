@@ -1,6 +1,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { useRef } from 'react';
 import { Button } from '../button/Button.js';
+import { CloseIcon } from '../icon/icons.js';
 import { cn } from '../../lib/cn.js';
 import { dialogOverlayVariants } from './dialog.variants.js';
 import type { OverlayShellProps } from './overlay-shell.interface.js';
@@ -25,6 +26,8 @@ export function OverlayShell({
   onOpenChange,
   title,
   description,
+  headerStart,
+  headerEnd,
   footer,
   children,
   closeLabel,
@@ -70,21 +73,30 @@ export function OverlayShell({
           onCloseAutoFocus={handleCloseAutoFocus}
         >
           <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <DialogPrimitive.Title className="text-lg font-semibold text-text-primary">
-                {title}
-              </DialogPrimitive.Title>
-              {description === undefined ? null : (
-                <DialogPrimitive.Description className="text-sm text-text-secondary">
-                  {description}
-                </DialogPrimitive.Description>
-              )}
+            <div className="flex items-start gap-2">
+              {headerStart === undefined ? null : headerStart}
+              <div className="space-y-1">
+                <DialogPrimitive.Title className="text-lg font-semibold text-text-primary">
+                  {title}
+                </DialogPrimitive.Title>
+                {description === undefined ? null : (
+                  <DialogPrimitive.Description className="text-sm text-text-secondary">
+                    {description}
+                  </DialogPrimitive.Description>
+                )}
+              </div>
             </div>
-            <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="sm" aria-label={closeLabel}>
-                <span aria-hidden="true">✕</span>
-              </Button>
-            </DialogPrimitive.Close>
+            <div className="flex items-center gap-2">
+              {headerEnd === undefined ? null : headerEnd}
+              <DialogPrimitive.Close asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={closeLabel}
+                  icon={<CloseIcon />}
+                />
+              </DialogPrimitive.Close>
+            </div>
           </div>
           {children === undefined ? null : (
             <div className={cn('text-sm text-text-primary', bodyClassName)}>

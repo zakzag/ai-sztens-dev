@@ -21,6 +21,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       type = 'button',
       className,
       disabled,
+      icon,
       children,
       ...rest
     },
@@ -40,7 +41,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             aria-hidden="true"
             className="size-3 rounded-full border border-current border-t-transparent animate-spin"
           />
-        ) : null}
+        ) : (
+          // The spinner replaces the icon while loading, so the button never
+          // shows two leading glyphs at once.
+          icon
+        )}
         {children}
       </button>
     );

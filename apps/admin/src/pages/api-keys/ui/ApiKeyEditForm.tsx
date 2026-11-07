@@ -34,8 +34,9 @@ import { apiKeyEditFormSchema } from '../api-keys.logic.js';
  * still maps it onto the fields.
  *
  * Since AIS-136 the form owns the notification port as well (`useNotifier()`),
- * exactly like `ApiKeyForm` (AIS-85): a successful `PATCH` produces one toast and
- * one log entry. The mutation carries **no** `meta.successMessage`, so the
+ * exactly like the create overlay (`ApiKeyCreateDialog`, AIS-85): a successful
+ * `PATCH` produces one toast and one log entry. The mutation carries **no**
+ * `meta.successMessage`, so the
  * cache-level callback stays silent and cannot duplicate the announcement.
  * The page's own success `Alert` stays (`AIS136-D1`): the toast marks the moment,
  * the `Alert` marks the state of the row that was just saved.

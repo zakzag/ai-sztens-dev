@@ -157,12 +157,14 @@ describe('ApiKeysTable', () => {
     expect(container.textContent).not.toContain(SECOND_API_KEY.apiKey);
   });
 
-  it('links the name cell to the detail route of that key', () => {
+  it('links the name cell to the read-only overlay of that key', () => {
     renderTable();
 
+    // AIS-155: the row opens the `/view` overlay; the legacy detail page is a
+    // step further, reached from inside the overlay.
     expect(
       screen.getByRole('link', { name: FILLED_API_KEY.name }),
-    ).toHaveAttribute('href', `/api-keys/${FILLED_API_KEY.identifier}`);
+    ).toHaveAttribute('href', `/api-keys/${FILLED_API_KEY.identifier}/view`);
   });
 
   it('keeps the identifier a plain text cell', () => {

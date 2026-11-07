@@ -31,6 +31,7 @@ import {
   isApiKeySortable,
   toApiKeyDetailRoute,
   toApiKeyEditFormValues,
+  toApiKeyViewRoute,
   toCreateApiKeyInput,
   toSortParams,
   toTableSort,
@@ -439,6 +440,15 @@ describe('toApiKeyDetailRoute', () => {
   it('substitutes and encodes the identifier', () => {
     expect(toApiKeyDetailRoute('vapi-staging')).toBe('/api-keys/vapi-staging');
     expect(toApiKeyDetailRoute('a b')).toBe('/api-keys/a%20b');
+  });
+
+  it('builds the read-only overlay route from the same parameter', () => {
+    // AIS-155: the table links to `/view`; the legacy detail page stays a
+    // sibling route reached from the overlay.
+    expect(toApiKeyViewRoute('vapi-staging')).toBe(
+      '/api-keys/vapi-staging/view',
+    );
+    expect(toApiKeyViewRoute('a b')).toBe('/api-keys/a%20b/view');
   });
 
   it('keeps the parameter of the route template untouched otherwise', () => {

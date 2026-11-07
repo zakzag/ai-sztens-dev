@@ -65,11 +65,15 @@ describe('route registry', () => {
     expect(login?.navLabel).toBeNull();
   });
 
-  it('keeps an unlinked protected entry addressable only through a URL parameter', () => {
+  it('keeps an unlinked top-level entry addressable only through a URL parameter', () => {
     // A detail page has no place in the navigation (see `RouteEntry.navLabel`),
-    // so `null` is legal — but only for a route a user can address by URL
-    // parameter. A plain page without a label would be unreachable: no nav link
-    // and nothing to type into the address bar.
+    // so `null` is legal — but for a top-level route only when a user can
+    // address it by URL parameter. A plain page without a label would be
+    // unreachable: no nav link and nothing to type into the address bar.
+    //
+    // Nested overlay routes (`/api-keys/new`) are exempt on purpose: they are
+    // reached from their parent's own action button, not from a URL parameter
+    // (AIS-155 `D2`).
     for (const route of PROTECTED_ROUTE_ENTRIES) {
       if (route.navLabel === null) {
         expect(route.path).toContain(':');
@@ -100,6 +104,38 @@ describe('route registry', () => {
   it('keeps the not-found entry unlinked and catch-all', () => {
     expect(NOT_FOUND_ROUTE_ENTRY.path).toBe('*');
     expect(NOT_FOUND_ROUTE_ENTRY.navLabel).toBeNull();
+  });
+
+  it('declares every overlay child under its parent path', () => {
+    // React Router accepts an absolute child path only when it extends the
+    // parent path; the breadcrumb matcher relies on the same property.
+    for (const parent of PROTECTED_ROUTE_ENTRIES) {
+      for (const child of parent.children ?? []) {
+        expect(child.path.startsWith(parent.path)).toBe(true);
+      }
+    }
+  });
+
+  it('keeps overlay children out of the navigation', () => {
+    const overlayChildren = PROTECTED_ROUTE_ENTRIES.flatMap(
+      (route) => route.children ?? [],
+    );
+
+    for (const child of overlayChildren) {
+      expect(child.navLabel).toBeNull();
+    }
+  });
+
+  it('exposes every overlay child to the flat consumers', () => {
+    // The breadcrumb matcher and the invariants of this file work on
+    // `ALL_ROUTE_ENTRIES`, which is the flattened tree (AIS-155 `D3`).
+    const flatPaths = new Set(ALL_ROUTE_ENTRIES.map((route) => route.path));
+
+    for (const parent of PROTECTED_ROUTE_ENTRIES) {
+      for (const child of parent.children ?? []) {
+        expect(flatPaths.has(child.path)).toBe(true);
+      }
+    }
   });
 
   it('keeps the detail page return path in sync with the list route', () => {

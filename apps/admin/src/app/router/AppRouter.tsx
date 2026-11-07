@@ -1,7 +1,9 @@
+import type { ReactElement } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AdminLayout } from '../layout/AdminLayout.js';
 import { ProtectedRoute } from './ProtectedRoute.js';
 import type { AppRouterProps } from './app-router.interface.js';
+import type { RouteEntry } from './route-entry.interface.js';
 
 /**
  * The router of the admin application, built from the route registry.
@@ -25,9 +27,7 @@ export function AppRouter({
 }: AppRouterProps) {
   return (
     <Routes>
-      {publicRoutes.map((route) => (
-        <Route key={route.path} path={route.path} element={route.element} />
-      ))}
+      {toRouteElements(publicRoutes)}
       <Route
         path="/*"
         element={
@@ -67,10 +67,40 @@ interface ProtectedRoutesProps {
 function ProtectedRoutes({ routes, notFoundRoute }: ProtectedRoutesProps) {
   return (
     <Routes>
-      {routes.map((route) => (
-        <Route key={route.path} path={route.path} element={route.element} />
-      ))}
+      {toRouteElements(routes)}
       <Route path={notFoundRoute.path} element={notFoundRoute.element} />
     </Routes>
   );
+}
+
+/**
+ * Turns the registry tree into `<Route>` elements (AIS-155 `D2`).
+ *
+ * An entry with `children` becomes a **layout** route: React Router renders its
+ * `element` whenever the parent path matches and paints the matched child inside
+ * that element's `<Outlet/>`. That is exactly the overlay contract — the list
+ * page stays mounted while `/api-keys/new` renders the dialog above it — and it
+ * needs no query parameter and no second source of "is the dialog open".
+ *
+ * The child paths are absolute and begin with the parent path, which React
+ * Router accepts for nested routes, so the registry keeps one literal per route
+ * that the address bar, the links and the breadcrumb can all reuse.
+ *
+ * @param routes - one level of the registry tree.
+ * @returns the matching `<Route>` elements, children nested under their parent.
+ */
+function toRouteElements(
+  routes: readonly RouteEntry[],
+): readonly ReactElement[] {
+  return routes.map((route) => {
+    if (route.children === undefined || route.children.length === 0) {
+      return <Route key={route.path} path={route.path} element={route.element} />;
+    }
+
+    return (
+      <Route key={route.path} path={route.path} element={route.element}>
+        {toRouteElements(route.children)}
+      </Route>
+    );
+  });
 }

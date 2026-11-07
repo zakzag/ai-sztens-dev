@@ -46,8 +46,13 @@ const FEATURE_FOLDER = '(?:^|/)src/features/([^/]+)/';
  *   re-implementing it per page is exactly what AIS-115 removed. AIS-131 was the
  *   first cross-page consumer and tripped `no-page-to-foreign-feature` until the
  *   allow-list named it.
+ * - `entity-dialog` — the close navigation of a route-mounted entity overlay
+ *   (AIS-155): `useEntityDialog(listPath)` is the one "close → back to the list
+ *   with `replace`" rule, so every entity page uses it instead of calling
+ *   `useNavigate` itself. Same reasoning as `forms`: a hook, shared by every
+ *   entity page, not one page's use case.
  */
-const SHARED_FEATURES = '(?:api|error-surface|forms)';
+const SHARED_FEATURES = '(?:api|error-surface|forms|entity-dialog)';
 
 /**
  * The element model of `apps/admin/src`, exported for documentation and tests.

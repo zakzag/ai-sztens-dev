@@ -1,6 +1,13 @@
 import { ApiKeyDetailPage } from '../../pages/api-keys/ApiKeyDetailPage.js';
-import { API_KEY_DETAIL_ROUTE_PATH } from '../../pages/api-keys/api-keys.const.js';
+import {
+  API_KEYS_CREATE_LABEL,
+  API_KEYS_CREATE_ROUTE_PATH,
+  API_KEY_DETAIL_ROUTE_PATH,
+  API_KEY_VIEW_ROUTE_PATH,
+} from '../../pages/api-keys/api-keys.const.js';
 import { ApiKeysPage } from '../../pages/api-keys/ApiKeysPage.js';
+import { ApiKeyCreateDialog } from '../../pages/api-keys/ui/ApiKeyCreateDialog.js';
+import { ApiKeyViewDialog } from '../../pages/api-keys/ui/ApiKeyViewDialog.js';
 import { LoginPage } from '../../pages/LoginPage.js';
 import { PlaceholderPage } from '../../pages/PlaceholderPage.js';
 import {
@@ -14,6 +21,7 @@ import {
   APP_ROUTE_LOGIN_PATH,
 } from '../app.const.js';
 import type { RouteEntry } from './route-entry.interface.js';
+import { flattenRouteEntries } from './route-tree.logic.js';
 
 /**
  * The route registry — the single place where a route exists (AIS-118, `D1`).
@@ -62,12 +70,38 @@ export const PROTECTED_ROUTE_ENTRIES: readonly RouteEntry[] = [
     breadcrumbLabel: APP_NAV_HOME_LABEL,
   },
   {
+    // The list is a **parent** route since AIS-155: its two overlay children
+    // render into the page's `<Outlet/>`, so the list stays mounted behind the
+    // dialog and the overlay has an address of its own.
     path: APP_ROUTE_API_KEYS_PATH,
     navLabel: APP_API_KEYS_LABEL,
     element: <ApiKeysPage />,
     protected: true,
     breadcrumbLabel: APP_API_KEYS_LABEL,
     breadcrumbParentPath: APP_ROUTE_HOME_PATH,
+    children: [
+      {
+        // Reachable from the list header's action, not from a URL parameter —
+        // which is why a `null` nav label is legal here (AIS-155 `D2`).
+        path: API_KEYS_CREATE_ROUTE_PATH,
+        navLabel: null,
+        element: <ApiKeyCreateDialog />,
+        protected: true,
+        breadcrumbLabel: API_KEYS_CREATE_LABEL,
+        breadcrumbParentPath: APP_ROUTE_API_KEYS_PATH,
+      },
+      {
+        // Read-only overlay of one key: the segment is a parameter, so the crumb
+        // text comes from a resolver, exactly like the detail route's.
+        path: API_KEY_VIEW_ROUTE_PATH,
+        navLabel: null,
+        element: <ApiKeyViewDialog />,
+        protected: true,
+        breadcrumbLabel: null,
+        breadcrumbParentPath: APP_ROUTE_API_KEYS_PATH,
+        resolveBreadcrumbLabel: (params) => params.identifier,
+      },
+    ],
   },
   {
     // The detail page is reached from the list, never from the navigation, so it
@@ -113,8 +147,16 @@ export const NOT_FOUND_ROUTE_ENTRY: RouteEntry = {
   breadcrumbLabel: null,
 };
 
-/** Every route of the application, public and protected alike. */
+/**
+ * Every route of the application, public and protected alike, **flattened**
+ * (AIS-155 `D3`).
+ *
+ * The lists above are a tree because a route may host overlay children
+ * (`RouteEntry.children`), but the breadcrumb matcher and the registry
+ * invariants need one flat table. Flattening here keeps both views derived from
+ * the same literals instead of from a second hand-written list.
+ */
 export const ALL_ROUTE_ENTRIES: readonly RouteEntry[] = [
-  ...PUBLIC_ROUTE_ENTRIES,
-  ...PROTECTED_ROUTE_ENTRIES,
+  ...flattenRouteEntries(PUBLIC_ROUTE_ENTRIES),
+  ...flattenRouteEntries(PROTECTED_ROUTE_ENTRIES),
 ];

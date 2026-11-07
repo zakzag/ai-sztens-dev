@@ -9,7 +9,7 @@ import type { IconProps } from './icon.interface.js';
 /**
  * Attributes every icon shares.
  *
- * All five icons come from the same 24×24 stroke grid, so the geometry
+ * Every icon comes from the same 24×24 stroke grid, so the geometry
  * attributes are declared once here instead of being retyped per icon — a new
  * icon cannot drift on the stroke width or the fill.
  *
@@ -138,6 +138,47 @@ export function ChevronDownIcon({ className }: IconProps) {
   return (
     <svg {...ICON_BASE_PROPS} className={cn(ICON_BASE_CLASS, className)}>
       <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+/**
+ * Plus icon — the "add a new entity" affordance of a list page (AIS-155).
+ *
+ * Always rendered **inside** a control that carries the accessible name (e.g.
+ * `Button` with an `icon` prop), because the glyph itself is decorative.
+ *
+ * Geometry copied from Lucide `plus` (https://lucide.dev/icons/plus),
+ * ISC licence — Copyright (c) Lucide Contributors.
+ *
+ * @param props - see {@link IconProps}.
+ */
+export function PlusIcon({ className }: IconProps) {
+  return (
+    <svg {...ICON_BASE_PROPS} className={cn(ICON_BASE_CLASS, className)}>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  );
+}
+
+/**
+ * Close icon — the SVG replacement of the `✕` text glyph in an overlay header
+ * (AIS-155).
+ *
+ * The control that renders it must carry its own accessible name (`aria-label`
+ * or a visible label); the icon is decorative and never announced.
+ *
+ * Geometry copied from Lucide `x` (https://lucide.dev/icons/x),
+ * ISC licence — Copyright (c) Lucide Contributors.
+ *
+ * @param props - see {@link IconProps}.
+ */
+export function CloseIcon({ className }: IconProps) {
+  return (
+    <svg {...ICON_BASE_PROPS} className={cn(ICON_BASE_CLASS, className)}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
     </svg>
   );
 }

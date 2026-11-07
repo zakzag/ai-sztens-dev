@@ -2,6 +2,7 @@ import { Breadcrumb } from '@callback/ui';
 import type { BreadcrumbLinkRenderer } from '@callback/ui';
 import { Link, useLocation } from 'react-router-dom';
 import { toBreadcrumbItems } from '../router/breadcrumb.logic.js';
+import { flattenRouteEntries } from '../router/route-tree.logic.js';
 import type { AppBreadcrumbProps } from './app-breadcrumb.interface.js';
 
 /**
@@ -40,9 +41,12 @@ const ROUTER_LINK_RENDERER: BreadcrumbLinkRenderer = ({ to, children }) => (
 export function AppBreadcrumb({ routes }: AppBreadcrumbProps) {
   const { pathname } = useLocation();
 
+  // The matcher works on a flat table, the registry is a tree (AIS-155 `D3`):
+  // without the flattening a nested overlay route such as `/api-keys/new`
+  // would match nothing and the trail would be empty on a modal URL.
   return (
     <Breadcrumb
-      items={toBreadcrumbItems(routes, pathname)}
+      items={toBreadcrumbItems(flattenRouteEntries(routes), pathname)}
       renderLink={ROUTER_LINK_RENDERER}
     />
   );

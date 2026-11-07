@@ -201,6 +201,13 @@ export type {
   DialogVariants,
 } from './components/dialog/dialog.variants.js';
 
+export { EntityDialog } from './components/entity-dialog/EntityDialog.js';
+export { ENTITY_DIALOG_CANCEL_LABEL } from './components/entity-dialog/entity-dialog.const.js';
+export type {
+  EntityDialogProps,
+  EntityDialogSubmit,
+} from './components/entity-dialog/entity-dialog.interface.js';
+
 export { ConfirmDialog } from './components/confirm-dialog/ConfirmDialog.js';
 export {
   CONFIRM_DIALOG_CANCEL_LABEL,
@@ -390,7 +397,9 @@ export { isJsonDetailValue, toPrettyJson } from './lib/json.logic.js';
 export {
   ChevronDownIcon,
   ChevronRightIcon,
+  CloseIcon,
   MoonIcon,
+  PlusIcon,
   SettingsIcon,
   SunIcon,
   SunsetIcon,

@@ -1043,10 +1043,10 @@ The palette check in §3.3 is part of the definition of done as well.
 The rules in `.roo/rules/react.coding-standards.md` are **machine-enforced**. Five static gates
 run in the `quality-gates` CI job (`.github/workflows/ci.yml`), one step per gate, so the red step
 names the failing rule. A sixth machine check, `pnpm typecheck`, guards the types themselves and
-runs in `build-test` (§9.5). Locally the five gates are one command:
+runs in `build-test` (§9.5). Locally the six gates are one command:
 
 ```bash
-pnpm quality          # layers → dead code → tokens → field errors → docs
+pnpm quality          # layers → dead code → tokens → themes → field errors → docs
 pnpm test:quality     # the gates' own tests (negative + positive fixtures)
 ```
 
@@ -1068,6 +1068,7 @@ It is the command to run before pushing a branch; it is deliberately _not_ wired
 | `pnpm quality:layers`       | `app → pages → features → entities → services → lib`; no page→page, no feature→feature (shared infra excepted), no cycles | `apps/admin/src` (the only app with layers)            |
 | `pnpm quality:dead-code`    | no unused file, export, exported type or dependency                                                                       | `apps/{admin,web}` + `packages/{ui,api-client,shared}` |
 | `pnpm quality:tokens`       | no colour literal, no Tailwind palette utility, no arbitrary colour value                                                 | `apps/*/src` **and** `packages/ui/src`                 |
+| `pnpm quality:themes`       | every `:root[data-theme="…"]` block declares exactly the `@theme` token set (AIS-168)                                      | `packages/ui/src/styles/theme.css`                     |
 | `pnpm quality:field-errors` | no `error.status ===` / `error.code ===` / `instanceof ApiError` outside a pure decision function                         | `apps/*/src`                                           |
 | `pnpm quality:docs`         | every relative link resolves, every `§N` reference exists, every `docs/Specs` doc carries a valid `**Utolsó frissítés:**`, and every pointer source links [`New-Admin-Page.md`](./New-Admin-Page.md) | `docs/Specs` (minus `outdated/`) + the pointer sources |
 
@@ -1133,6 +1134,14 @@ Both are dependency-free Node ESM scripts in `scripts/quality/`, sharing a posix
   palette utility (incl. `text-white` / `bg-black` and `/50` modifiers), arbitrary colour value.
   The **only** exemption is `packages/ui/src/styles/theme.css` from the literal rule (it _is_ the
   palette); a palette utility inside that file still fails.
+- **Theme gate** (AIS-168, `quality:themes`): parses `theme.css` with a brace scanner, takes the
+  variable names declared in `@theme` as the default set, and fails when an appearance block misses
+  one (`theme-token-missing`), invents one (`theme-token-unknown`), declares nothing
+  (`theme-block-empty`), or when the default/an appearance block is absent. Comments are blanked
+  first — the file documents itself by quoting `:root[data-theme="…"]`, and a quote must not become
+  a block — and only **top-level** blocks are compared, so the `prefers-reduced-transparency` /
+  `prefers-contrast` refinements stay legal. The four state tokens (`--color-scheme`,
+  `--app-backdrop`, `--blur-glass`, `--saturate-glass`) may be restated but are not required.
 - **Field-error gate**: the allowlist _is_ the rule — `apps/*/src/lib/error-surface.logic.ts`,
   `apps/*/src/lib/error-message.ts` and `apps/*/src/**/*.logic.ts`. Test code
   (`*.test.ts(x)`, `apps/*/src/test/**`) is out of scope, and exclusion wins over the allowlist.
@@ -1150,11 +1159,14 @@ Every gate is proven to **fire**, not just to be green — a gate that cannot fa
 | Dead code    | (no fixture: `knip` is a tool, the gate is its exit code)                                                                    | —                                                                                                                            |
 | Tokens       | `fixtures/palette/negative` (a `bg-slate-800` + `text-white/80` + `bg-[#101010]` component, a `#101010`/`rgb(…)` stylesheet) | `fixtures/palette/positive` (token classes, `grid-cols-[2fr_1fr]`, `#main`)                                                  |
 | Field errors | `fixtures/field-errors/negative` (a component and a hook branching on `status` / `code` / `instanceof ApiError`)             | `fixtures/field-errors/positive` (the allowlisted decision file, a clean component, a `*.test.tsx` asserting on error shape) |
+| Themes       | `fixtures/theme/negative/theme.css` (an appearance missing a token, another inventing one)                                   | `fixtures/theme/positive/theme.css` (complete blocks, state tokens, an at-rule refinement)                                   |
 
 **The one accepted deviation (decision D4 of the AIS-122 plan):** `knip` has no fixture pair. It is
 a third-party tool and the gate _is_ its exit code, so a synthetic dead-code tree would test `knip`,
-not our own rule. The "a gate that cannot fail is not a gate" requirement is met by the other three
-gates, each proven red on a real violation **and** green on a legal edge.
+not our own rule. The "a gate that cannot fail is not a gate" requirement is met by the other gates,
+each proven red on a real violation **and** green on a legal edge. The theme gate has a second,
+stronger proof: one of its tests runs against the **real** `theme.css`, so the four shipped
+appearances are checked on every `pnpm test:quality`.
 
 `pnpm test:quality` runs both directions plus unit tests for the walker, the reporter and each rule
 (`*.test.mjs` next to the code, `node --test`). The positive fixture deliberately contains a

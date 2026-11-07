@@ -256,6 +256,27 @@ Every color, border, radius, shadow and duration comes from `packages/ui/src/sty
 | Thickness | `--border-width-hairline/-default/-strong` → utility classes `border-hairline`, `border-strong`                                                       |
 | Shape     | `--radius-control/-card/-pill` → `rounded-control`                                                                                                    |
 | Motion    | `--duration-fast/-base`, `--ease-neu` → `transition-shadow duration-fast`                                                                             |
+| Appearance | `--color-scheme`, `--app-backdrop`, `--blur-glass`, `--saturate-glass` → `surface-glass` (AIS-165/166)                                                |
+
+**Four appearances exist — `light`, `dark`, `ambient`, `glass`** — selected by `data-theme` on `<html>`.
+Two rules follow from that, and both are machine-checked:
+
+1. **A token belongs to the contract, not to one theme.** A new colour, radius or shadow is added to
+   the `@theme` block **and** to every `:root[data-theme="…"]` block; `pnpm quality:themes` fails when
+   an appearance misses or invents one. Never fork a token per theme under a different name.
+2. **A component never branches on the appearance.** Depth, transparency and border weight come from
+   the tokens; the blur affordance is the single `surface-glass` utility
+   (`SURFACE_GLASS_CLASS` in `packages/ui/src/theme/theme.const.ts`) and it is a no-op outside glass,
+   because `--blur-glass` is `0px` there. No `[data-theme="…"]` selector may appear outside
+   `theme.css`, and no `backdrop-filter` outside the `@utility` that owns it.
+
+**Glass recipes (only these elements get blur — the floating layers):**
+
+| Element        | Classes                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Frosted panel  | `rounded-card border border-hairline border-border-hairline bg-surface-raised shadow-neu-raised surface-glass`              |
+| Frosted popover| `rounded-control border border-hairline border-border-hairline bg-surface-overlay shadow-neu-raised surface-glass`          |
+| Never          | cards, table rows, table shells — translucency from the tokens only; one `backdrop-filter` per scrolling row costs frames    |
 
 Dark neomorphism recipes:
 

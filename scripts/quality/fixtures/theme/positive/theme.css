@@ -1,0 +1,41 @@
+/**
+ * Positive theme fixture (AIS-168).
+ *
+ * Every appearance restates the full default set, the state tokens are allowed
+ * on top of it, and the at-rule block at the end is a partial *refinement* — the
+ * gate must accept all three, otherwise a legitimately tuned theme would fail.
+ */
+
+@theme {
+  --color-primary: oklch(0.66 0.14 195);
+  --color-surface-base: oklch(0.17 0.008 250);
+  --radius-card: 1rem;
+}
+
+:root {
+  --color-scheme: dark;
+  --app-backdrop: none;
+}
+
+:root[data-theme='light'] {
+  --color-primary: oklch(0.5 0.13 195);
+  --color-surface-base: oklch(0.94 0.005 250);
+  --radius-card: 1rem;
+  --color-scheme: light;
+  --app-backdrop: none;
+}
+
+:root[data-theme='glass'] {
+  --color-primary: oklch(0.82 0.12 200);
+  --color-surface-base: oklch(0.28 0.06 265);
+  --radius-card: 1.25rem;
+  --color-scheme: dark;
+  --app-backdrop: radial-gradient(teal, transparent);
+  --blur-glass: 18px;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme='glass'] {
+    --blur-glass: 0px;
+  }
+}

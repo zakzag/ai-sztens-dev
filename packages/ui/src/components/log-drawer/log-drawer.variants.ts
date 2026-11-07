@@ -36,9 +36,49 @@ export const logDrawerTabVariants = cva(
  * no mount flag (AIS-82 decision D5). Keeping the element mounted also keeps the
  * tab's `aria-controls` reference valid while the panel is closed. The panel is
  * **not** modal: no overlay, no focus trap, the page behind stays scrollable.
+ *
+ * The width is a CSS custom property, not a fixed class (AIS-150): below `md`
+ * the panel is `w-full` and the property is ignored, above `md` it is the
+ * resizable width. `isResizing` removes the transform transition, so a drag never
+ * animates against the pointer.
  */
 export const logDrawerPanelVariants = cva(
-  `fixed inset-y-0 right-0 ${LOG_DRAWER_Z_INDEX} flex w-full max-w-[26rem] flex-col border-l border-hairline bg-surface-overlay text-sm text-text-primary shadow-neu-raised transition-transform duration-base ease-neu`,
+  `fixed inset-y-0 right-0 ${LOG_DRAWER_Z_INDEX} flex w-full flex-col border-l border-hairline bg-surface-overlay text-sm text-text-primary shadow-neu-raised md:w-[var(--log-drawer-width)]`,
+  {
+    variants: {
+      isResizing: {
+        true: 'transition-none',
+        false: 'transition-transform duration-base ease-neu',
+      },
+    },
+    defaultVariants: { isResizing: false },
+  },
+);
+
+/**
+ * The resize handle on the panel's left edge (AIS-150).
+ *
+ * A `role="separator"` element, so the width is adjustable without a pointer.
+ * It is 12 px wide — a comfortable hit target — while the visible band inside is
+ * only 6 px ({@link logDrawerResizeRailVariants}), and it exists only from `md`
+ * up: below that the panel is full width, so there is nothing to resize.
+ *
+ * `touch-none` is required: without it a touch drag scrolls the page instead of
+ * resizing.
+ */
+export const logDrawerResizeHandleVariants = cva(
+  `group absolute inset-y-0 left-0 hidden w-3 cursor-col-resize touch-none items-center justify-center transition-shadow duration-fast focus-visible:border-border-focus focus-visible:shadow-focus-ring focus-visible:outline-none md:flex`,
+);
+
+/**
+ * Visible band inside the resize handle.
+ *
+ * Purely decorative — the separator's `aria-label`, `aria-valuenow` and
+ * `aria-valuemin`/`aria-valuemax` carry the meaning, so the band is rendered
+ * `aria-hidden` by the component.
+ */
+export const logDrawerResizeRailVariants = cva(
+  'h-full w-1.5 rounded-pill bg-border-hairline transition-colors duration-fast group-hover:bg-border-strong',
 );
 
 /**

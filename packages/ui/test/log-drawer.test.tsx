@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { LogDrawer } from '../src/components/log-drawer/LogDrawer.js';
@@ -12,17 +12,38 @@ import {
   LOG_DRAWER_HEADER_CLOSE_LABEL,
   LOG_DRAWER_LOAD_MORE_LABEL,
   LOG_DRAWER_OPEN_LABEL,
+  LOG_DRAWER_RESIZE_HANDLE_LABEL,
   LOG_DRAWER_TITLE,
+  LOG_DRAWER_WIDTH_CSS_VAR,
+  LOG_DRAWER_WIDTH_DEFAULT,
+  LOG_DRAWER_WIDTH_MAX,
+  LOG_DRAWER_WIDTH_MIN,
+  LOG_DRAWER_WIDTH_STEP,
+  LOG_DRAWER_WIDTH_STEP_LARGE,
   LOG_FILTERS,
   LOG_FILTER_LABELS,
 } from '../src/components/log-drawer/log-drawer.const.js';
 import { toLogDrawerHandleLabel } from '../src/components/log-drawer/log-drawer.logic.js';
-import type { LogDrawerProps } from '../src/components/log-drawer/log-drawer.interface.js';
+import type {
+  LogDrawerProps,
+  LogDrawerSizeRange,
+} from '../src/components/log-drawer/log-drawer.interface.js';
 import {
   LOG_ENTRY_BASE_TIMESTAMP,
   buildLogEntries,
   stubFormatTimestamp,
 } from './mocks/log-entries.mock.js';
+import {
+  dispatchPointerEvent,
+  stubPointerCapture,
+} from './mocks/pointer-capture.mock.js';
+
+/** The production range, so the assertions carry the shipped numbers. */
+const WIDTH_RANGE: LogDrawerSizeRange = {
+  min: LOG_DRAWER_WIDTH_MIN,
+  max: LOG_DRAWER_WIDTH_MAX,
+  initial: LOG_DRAWER_WIDTH_DEFAULT,
+};
 
 function buildProps(overrides: Partial<LogDrawerProps> = {}): LogDrawerProps {
   return {
@@ -37,6 +58,13 @@ function buildProps(overrides: Partial<LogDrawerProps> = {}): LogDrawerProps {
     onLoadMore: vi.fn(),
     onClear: vi.fn(),
     formatTimestamp: stubFormatTimestamp,
+    width: LOG_DRAWER_WIDTH_DEFAULT,
+    widthRange: WIDTH_RANGE,
+    isResizing: false,
+    onWidthChange: vi.fn(),
+    onResizeStart: vi.fn(),
+    onResizeEnd: vi.fn(),
+    onWidthReset: vi.fn(),
     ...overrides,
   };
 }
@@ -309,5 +337,152 @@ describe('LogDrawer — content', () => {
     const panel = screen.getByRole('log', { name: LOG_DRAWER_TITLE });
 
     expect(panel).toHaveAttribute('aria-live', 'off');
+  });
+});
+
+describe('LogDrawer — resizable panel', () => {
+  /**
+   * Renders the open panel and installs the pointer-capture stubs.
+   *
+   * @param overrides - props to replace on the defaults.
+   * @returns the props, the separator element and its capture spies.
+   */
+  function renderResizable(overrides: Partial<LogDrawerProps> = {}) {
+    const props = renderOpen(overrides);
+    const handle = screen.getByRole('separator', {
+      name: LOG_DRAWER_RESIZE_HANDLE_LABEL,
+    });
+
+    return { props, handle, stubs: stubPointerCapture(handle) };
+  }
+
+  /**
+   * @returns the panel element of the open drawer.
+   */
+  function getPanel(): HTMLElement {
+    return screen.getByRole('log', { name: LOG_DRAWER_TITLE });
+  }
+
+  it('exposes the separator semantics and the current value', () => {
+    const { handle } = renderResizable({ width: 480 });
+
+    expect(handle).toHaveAttribute('aria-orientation', 'vertical');
+    expect(handle).toHaveAttribute('aria-valuenow', '480');
+    expect(handle).toHaveAttribute('aria-valuemin', String(LOG_DRAWER_WIDTH_MIN));
+    expect(handle).toHaveAttribute('aria-valuemax', String(LOG_DRAWER_WIDTH_MAX));
+    expect(handle).toHaveAttribute('tabindex', '0');
+  });
+
+  it('is hidden below md so a full-width panel has nothing to drag', () => {
+    const { handle } = renderResizable();
+
+    expect(handle.className).toContain('hidden');
+    expect(handle.className).toContain('md:flex');
+  });
+
+  it('reports the width a pointer drag asks for', () => {
+    const { props, handle } = renderResizable();
+
+    dispatchPointerEvent(handle, 'pointerdown', { pointerId: 1, clientX: 600 });
+    dispatchPointerEvent(handle, 'pointermove', { pointerId: 1, clientX: 600 });
+    dispatchPointerEvent(handle, 'pointerup', { pointerId: 1, clientX: 600 });
+
+    expect(props.onWidthChange).toHaveBeenCalledTimes(1);
+    expect(props.onWidthChange).toHaveBeenCalledWith(window.innerWidth - 600);
+  });
+
+  it('brackets a drag with the resize start and end intents', () => {
+    const { props, handle, stubs } = renderResizable();
+
+    dispatchPointerEvent(handle, 'pointerdown', { pointerId: 7, clientX: 700 });
+    dispatchPointerEvent(handle, 'pointerup', { pointerId: 7, clientX: 700 });
+
+    expect(props.onResizeStart).toHaveBeenCalledTimes(1);
+    expect(props.onResizeEnd).toHaveBeenCalledTimes(1);
+    expect(stubs.setPointerCapture).toHaveBeenCalledWith(7);
+    expect(stubs.releasePointerCapture).toHaveBeenCalledWith(7);
+  });
+
+  it('ends the drag on pointercancel as well', () => {
+    const { props, handle } = renderResizable();
+
+    dispatchPointerEvent(handle, 'pointerdown', { pointerId: 2, clientX: 700 });
+    dispatchPointerEvent(handle, 'pointercancel', { pointerId: 2, clientX: 700 });
+
+    expect(props.onResizeStart).toHaveBeenCalledTimes(1);
+    expect(props.onResizeEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('narrows and widens with the arrow keys', () => {
+    const { props, handle } = renderResizable({ width: 416 });
+
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+    fireEvent.keyDown(handle, { key: 'ArrowRight' });
+
+    expect(props.onWidthChange).toHaveBeenNthCalledWith(
+      1,
+      416 + LOG_DRAWER_WIDTH_STEP,
+    );
+    expect(props.onWidthChange).toHaveBeenNthCalledWith(
+      2,
+      416 - LOG_DRAWER_WIDTH_STEP,
+    );
+  });
+
+  it('takes the large step while Shift is held', () => {
+    const { props, handle } = renderResizable({ width: 416 });
+
+    fireEvent.keyDown(handle, { key: 'ArrowLeft', shiftKey: true });
+
+    expect(props.onWidthChange).toHaveBeenCalledWith(
+      416 + LOG_DRAWER_WIDTH_STEP_LARGE,
+    );
+  });
+
+  it('jumps to the bounds with Home and End', () => {
+    const { props, handle } = renderResizable({ width: 500 });
+
+    fireEvent.keyDown(handle, { key: 'Home' });
+    fireEvent.keyDown(handle, { key: 'End' });
+
+    expect(props.onWidthChange).toHaveBeenNthCalledWith(1, LOG_DRAWER_WIDTH_MIN);
+    expect(props.onWidthChange).toHaveBeenNthCalledWith(2, LOG_DRAWER_WIDTH_MAX);
+  });
+
+  it('ignores a key that cannot resize', () => {
+    const { props, handle } = renderResizable();
+
+    fireEvent.keyDown(handle, { key: 'Enter' });
+
+    expect(props.onWidthChange).not.toHaveBeenCalled();
+  });
+
+  it('resets the width on a double click', () => {
+    const { props, handle } = renderResizable({ width: 700 });
+
+    fireEvent.doubleClick(handle);
+
+    expect(props.onWidthReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the transform transition while resizing', () => {
+    renderResizable({ isResizing: true });
+
+    expect(getPanel().className).not.toContain('transition-transform');
+    expect(getPanel().className).toContain('transition-none');
+  });
+
+  it('keeps the transform transition while idle', () => {
+    renderResizable({ isResizing: false });
+
+    expect(getPanel().className).toContain('transition-transform');
+  });
+
+  it('publishes the width as a custom property on the panel', () => {
+    renderResizable({ width: 512 });
+
+    expect(getPanel().style.getPropertyValue(LOG_DRAWER_WIDTH_CSS_VAR)).toBe(
+      '512px',
+    );
   });
 });

@@ -1,17 +1,69 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { LogDrawerSizeRange } from '@callback/ui';
+import { LOG_DRAWER_WIDTH_RANGE } from '../../src/react/notification-react.const.js';
 import {
   countUnseen,
   createRafScheduler,
   filterEntries,
   formatDefaultTimestamp,
   hasMoreEntries,
+  parseStoredDrawerWidth,
   resolveToastTtl,
+  serializeDrawerWidth,
   sliceWindow,
   toRuntimeDetail,
   toToastItems,
 } from '../../src/react/notification-react.logic.js';
 import type { AnimationFrameScope } from '../../src/react/notification-react.interface.js';
 import { createEntry, createEntryList, REACT_FIXED_NOW } from '../mocks/react/notification-entries.fixture.js';
+
+/** The production range, so the assertions carry the shipped numbers. */
+const WIDTH_RANGE: LogDrawerSizeRange = LOG_DRAWER_WIDTH_RANGE;
+
+describe('parseStoredDrawerWidth', () => {
+  it('returns the initial width when nothing is stored', () => {
+    expect(parseStoredDrawerWidth(null, WIDTH_RANGE)).toBe(
+      WIDTH_RANGE.initial,
+    );
+  });
+
+  it('returns the initial width for an empty payload', () => {
+    expect(parseStoredDrawerWidth('', WIDTH_RANGE)).toBe(WIDTH_RANGE.initial);
+    expect(parseStoredDrawerWidth('   ', WIDTH_RANGE)).toBe(WIDTH_RANGE.initial);
+  });
+
+  it('returns the initial width for a non-numeric payload', () => {
+    expect(parseStoredDrawerWidth('abc', WIDTH_RANGE)).toBe(WIDTH_RANGE.initial);
+    expect(parseStoredDrawerWidth('Infinity', WIDTH_RANGE)).toBe(
+      WIDTH_RANGE.initial,
+    );
+  });
+
+  it('reads a stored width back', () => {
+    expect(parseStoredDrawerWidth('512', WIDTH_RANGE)).toBe(512);
+    expect(parseStoredDrawerWidth(' 512 ', WIDTH_RANGE)).toBe(512);
+  });
+
+  it('raises a stale too-small width to the minimum', () => {
+    expect(parseStoredDrawerWidth('-5', WIDTH_RANGE)).toBe(WIDTH_RANGE.min);
+  });
+
+  it('lowers a stale too-large width to the maximum', () => {
+    expect(parseStoredDrawerWidth('99999', WIDTH_RANGE)).toBe(WIDTH_RANGE.max);
+  });
+
+  it('round-trips through serializeDrawerWidth', () => {
+    expect(parseStoredDrawerWidth(serializeDrawerWidth(512), WIDTH_RANGE)).toBe(
+      512,
+    );
+  });
+});
+
+describe('serializeDrawerWidth', () => {
+  it('writes a plain decimal string', () => {
+    expect(serializeDrawerWidth(416)).toBe('416');
+  });
+});
 
 describe('resolveToastTtl', () => {
   it('gives success and info four seconds', () => {

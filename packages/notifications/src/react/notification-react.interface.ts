@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
-import type { LogLevelFilter, ToastItem } from '@callback/ui';
+import type {
+  LogDrawerSizeRange,
+  LogLevelFilter,
+  ToastItem,
+} from '@callback/ui';
 import type {
   NotificationEntry,
   NotificationLevel,
@@ -9,6 +13,7 @@ import type {
 import type {
   NotificationStorage,
   NotificationWriteScheduler,
+  StorageLike,
 } from '../core/notification.storage.interface.js';
 
 /**
@@ -66,6 +71,53 @@ export interface NotificationProviderProps {
   readonly formatTimestamp?: (epochMs: number) => string;
   /** Write coalescer of the mirror; default: one flush per animation frame. */
   readonly scheduleWrite?: NotificationWriteScheduler;
+  /**
+   * Injected width preference of the log drawer; default:
+   * `createLogDrawerWidthStorage` over the guarded `localStorage`.
+   *
+   * Separate from `storage` on purpose: the log mirror is session data
+   * (`sessionStorage`), the panel width is a UI preference (`localStorage`) that
+   * must survive a browser restart (AIS-150 D2).
+   */
+  readonly widthStorage?: LogDrawerWidthStorage;
+}
+
+/**
+ * The `localStorage` cell holding the panel width of the log drawer.
+ *
+ * Declared structurally for the same reason as {@link StorageLike}: the raw
+ * string is stored, while parsing and clamping belong to
+ * `parseStoredDrawerWidth`, which needs the range. The adapter never throws —
+ * a blocked storage degrades to memory-only (AIS-80 D13, AIS-150 D8).
+ */
+export interface LogDrawerWidthStorage {
+  /**
+   * Reads the stored width.
+   *
+   * @returns the raw payload, or `null` when nothing usable is stored.
+   */
+  load(): string | null;
+
+  /**
+   * Stores a width.
+   *
+   * @param width - width in CSS pixels; serialised by the adapter.
+   */
+  save(width: number): void;
+}
+
+/**
+ * Construction options of {@link LogDrawerWidthStorage}.
+ *
+ * Both fields are optional so the adapter can be built with the production
+ * defaults, and every collaborator is injectable so a test never needs a real
+ * `window`.
+ */
+export interface LogDrawerWidthStorageOptions {
+  /** Backing storage; `undefined`/`null` means memory-only (every call is a no-op). */
+  readonly storage?: StorageLike | null;
+  /** Storage key; defaults to `LOG_DRAWER_WIDTH_STORAGE_KEY`. */
+  readonly key?: string;
 }
 
 /**
@@ -77,6 +129,7 @@ export interface NotificationProviderProps {
 export interface NotificationContextValue {
   readonly store: NotificationStore;
   readonly storage: NotificationStorage;
+  readonly widthStorage: LogDrawerWidthStorage;
   readonly notifier: Notifier;
   readonly includeDetails: boolean;
   readonly formatTimestamp: (epochMs: number) => string;
@@ -98,6 +151,12 @@ export interface LogDrawerController {
   readonly hasMore: boolean;
   /** Unseen entries; drives the collapsed tab's badge. */
   readonly unseenCount: number;
+  /** Panel width in CSS pixels, restored from the width storage on mount. */
+  readonly width: number;
+  /** `true` while a pointer drag on the panel edge is in progress. */
+  readonly isResizing: boolean;
+  /** Bounds the width is clamped to; also the double-click reset target. */
+  readonly widthRange: LogDrawerSizeRange;
   /** Open or close. Opening also marks every entry read (AIS-83 D8). */
   readonly toggle: () => void;
   readonly close: () => void;
@@ -107,6 +166,14 @@ export interface LogDrawerController {
   readonly loadMore: () => void;
   /** Drops the log from the store **and** the `sessionStorage` mirror. */
   readonly clear: () => void;
+  /** A pointer drag started: the panel drops its transform transition (AIS-150). */
+  readonly beginResize: () => void;
+  /** A new width from a pointer move or a key press; clamped, not yet persisted. */
+  readonly updateWidth: (next: number) => void;
+  /** A pointer drag ended: the final width is persisted here, once. */
+  readonly endResize: () => void;
+  /** Double click on the handle: back to the default width and persist it. */
+  readonly resetWidth: () => void;
 }
 
 /** Pause/resume controls the host hands to the toast stack. */

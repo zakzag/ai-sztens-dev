@@ -2,11 +2,13 @@ import type { ReactElement, ReactNode } from 'react';
 import type { NotificationStore } from '../../../src/core/notification.interface.js';
 import type { NotificationStorage } from '../../../src/core/notification.storage.interface.js';
 import { NotificationProvider } from '../../../src/react/notification.context.js';
+import type { LogDrawerWidthStorage } from '../../../src/react/notification-react.interface.js';
 
 /** Everything a binding test may inject into the provider. */
 export interface ProviderHarnessOptions {
   readonly store?: NotificationStore;
   readonly storage?: NotificationStorage;
+  readonly widthStorage?: LogDrawerWidthStorage;
   readonly includeDetails?: boolean;
   readonly formatTimestamp?: (epochMs: number) => string;
 }
@@ -34,6 +36,7 @@ export function createNotificationWrapper(
       <NotificationProvider
         store={options.store}
         storage={options.storage}
+        widthStorage={options.widthStorage}
         includeDetails={options.includeDetails}
         formatTimestamp={options.formatTimestamp}
       >

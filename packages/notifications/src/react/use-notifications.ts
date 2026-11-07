@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { clampDrawerWidth } from '@callback/ui';
 import type { LogLevelFilter, ToastItem } from '@callback/ui';
 import type { NotificationEntry } from '../core/notification.interface.js';
 import { useNotificationContext } from './notification.context.js';
-import { LOG_INITIAL_PAGE, LOG_PAGE_STEP } from './notification-react.const.js';
+import {
+  LOG_DRAWER_WIDTH_RANGE,
+  LOG_INITIAL_PAGE,
+  LOG_PAGE_STEP,
+} from './notification-react.const.js';
 import {
   countUnseen,
   filterEntries,
   hasMoreEntries,
+  parseStoredDrawerWidth,
   resolveToastTtl,
   sliceWindow,
   toToastItems,
@@ -37,20 +43,44 @@ export function useToasts(): readonly ToastItem[] {
 }
 
 /**
- * Open/closed, filter and paging state of the log drawer.
+ * Open/closed, filter, paging and width state of the log drawer.
  *
- * Pure UI state, so it is local `useState`: nothing here is server data, nothing
- * needs to survive a reload, and no second component shares it (AIS-83 D7). The
- * store keeps the content; this hook only decides how much of it is visible.
+ * Pure UI state, so it is local `useState`: nothing here is server data and no
+ * second component shares it (AIS-83 D7). The store keeps the content; this hook
+ * only decides how much of it is visible and how wide the panel is.
+ *
+ * The width is the one value that **does** need to survive a reload, so it is
+ * seeded from the injected width storage and written back when a resize gesture
+ * ends (AIS-150): a pointer drag reports every move through `updateWidth`, but
+ * only `endResize` (or a keyboard change, or a reset) reaches `save`. Writing per
+ * `pointermove` would mean ~60 `setItem` calls per second of the same key.
  *
  * @returns the controller the host — or a custom host — binds to `LogDrawer`.
  */
 export function useLogDrawer(): LogDrawerController {
-  const { store, storage } = useNotificationContext('useLogDrawer');
+  const { store, storage, widthStorage } =
+    useNotificationContext('useLogDrawer');
   const [isOpen, setIsOpen] = useState(false);
   const [levelFilter, setLevelFilterState] = useState<LogLevelFilter>('all');
   const [visibleCount, setVisibleCount] = useState(LOG_INITIAL_PAGE);
+  const [width, setWidth] = useState(() =>
+    parseStoredDrawerWidth(widthStorage.load(), LOG_DRAWER_WIDTH_RANGE),
+  );
+  const [isResizing, setIsResizing] = useState(false);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
+
+  // One write path for every gesture: the effect only runs while no drag is in
+  // progress, so a drag persists once (when `endResize` flips the flag), while a
+  // key press, a reset and the restored initial value all persist immediately.
+  // The mount write is intentional and idempotent — it records the value the
+  // panel actually opens with.
+  useEffect(() => {
+    if (isResizing) {
+      return;
+    }
+
+    widthStorage.save(width);
+  }, [width, isResizing, widthStorage]);
 
   const filtered = useMemo(
     () => filterEntries(state.entries, levelFilter),
@@ -88,6 +118,24 @@ export function useLogDrawer(): LogDrawerController {
     storage.clear();
   }, [store, storage]);
 
+  const beginResize = useCallback(() => {
+    setIsResizing(true);
+  }, []);
+
+  const updateWidth = useCallback((next: number) => {
+    setWidth(clampDrawerWidth(next, LOG_DRAWER_WIDTH_RANGE));
+  }, []);
+
+  const endResize = useCallback(() => {
+    // Persisting is the effect's job: it writes once, with the final width, as
+    // soon as `isResizing` is back to `false`.
+    setIsResizing(false);
+  }, []);
+
+  const resetWidth = useCallback(() => {
+    setWidth(LOG_DRAWER_WIDTH_RANGE.initial);
+  }, []);
+
   return useMemo(
     () => ({
       isOpen,
@@ -95,11 +143,18 @@ export function useLogDrawer(): LogDrawerController {
       visibleCount,
       hasMore: hasMoreEntries(filtered, visibleCount),
       unseenCount,
+      width,
+      isResizing,
+      widthRange: LOG_DRAWER_WIDTH_RANGE,
       toggle,
       close,
       setLevelFilter,
       loadMore,
       clear,
+      beginResize,
+      updateWidth,
+      endResize,
+      resetWidth,
     }),
     [
       isOpen,
@@ -107,11 +162,17 @@ export function useLogDrawer(): LogDrawerController {
       visibleCount,
       filtered,
       unseenCount,
+      width,
+      isResizing,
       toggle,
       close,
       setLevelFilter,
       loadMore,
       clear,
+      beginResize,
+      updateWidth,
+      endResize,
+      resetWidth,
     ],
   );
 }

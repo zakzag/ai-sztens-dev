@@ -299,11 +299,19 @@ export {
   logDrawerHeaderVariants,
   logDrawerListVariants,
   logDrawerPanelVariants,
+  logDrawerResizeHandleVariants,
+  logDrawerResizeRailVariants,
   logDrawerTabVariants,
   logEntryRowVariants,
   logFilterChipVariants,
 } from './components/log-drawer/log-drawer.variants.js';
-export { toLogDrawerHandleLabel } from './components/log-drawer/log-drawer.logic.js';
+export {
+  clampDrawerWidth,
+  toLogDrawerHandleLabel,
+  toWidthFromKey,
+  toWidthFromPointer,
+  toWidthStyle,
+} from './components/log-drawer/log-drawer.logic.js';
 export {
   LOG_DRAWER_CLEAR_LABEL,
   LOG_DRAWER_CLOSE_LABEL,
@@ -316,7 +324,14 @@ export {
   LOG_DRAWER_LOAD_MORE_LABEL,
   LOG_DRAWER_OPEN_LABEL,
   LOG_DRAWER_PANEL_ID_SUFFIX,
+  LOG_DRAWER_RESIZE_HANDLE_LABEL,
   LOG_DRAWER_TITLE,
+  LOG_DRAWER_WIDTH_CSS_VAR,
+  LOG_DRAWER_WIDTH_DEFAULT,
+  LOG_DRAWER_WIDTH_MAX,
+  LOG_DRAWER_WIDTH_MIN,
+  LOG_DRAWER_WIDTH_STEP,
+  LOG_DRAWER_WIDTH_STEP_LARGE,
   LOG_DRAWER_Z_INDEX,
   LOG_FILTERS,
   LOG_FILTER_LABELS,
@@ -324,6 +339,8 @@ export {
 } from './components/log-drawer/log-drawer.const.js';
 export type {
   LogDrawerProps,
+  LogDrawerSizeRange,
+  LogDrawerWidthStyle,
   LogEntryItem,
   LogEntryRowProps,
   LogLevelFilter,

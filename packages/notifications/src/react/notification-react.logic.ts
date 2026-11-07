@@ -1,4 +1,5 @@
-import type { LogLevelFilter, ToastItem } from '@callback/ui';
+import { clampDrawerWidth } from '@callback/ui';
+import type { LogDrawerSizeRange, LogLevelFilter, ToastItem } from '@callback/ui';
 import type {
   NotificationEntry,
   NotificationLevel,
@@ -219,4 +220,45 @@ export function formatDefaultTimestamp(epochMs: number): string {
     minute: '2-digit',
     second: '2-digit',
   });
+}
+
+/**
+ * Turns a stored panel width into a usable number.
+ *
+ * Three outcomes, one rule each (AIS-150):
+ *
+ * - nothing stored (`null` or an empty string) is a normal first visit → `initial`;
+ * - a payload that is not a finite number (`'abc'`, `'Infinity'`) is corrupt
+ *   data, not a width → `initial`;
+ * - a number outside the range is a **stale** preference written by an older
+ *   build → clamped, because losing the user's intent entirely is worse than
+ *   honouring it at the nearest bound.
+ *
+ * @param raw - the raw storage payload.
+ * @param range - bounds and fallback width.
+ * @returns a finite width inside the range.
+ */
+export function parseStoredDrawerWidth(
+  raw: string | null,
+  range: LogDrawerSizeRange,
+): number {
+  if (raw === null || raw.trim() === '') {
+    return range.initial;
+  }
+
+  return clampDrawerWidth(Number(raw.trim()), range);
+}
+
+/**
+ * Serialises a panel width for storage.
+ *
+ * Kept next to the parser so a round-trip test covers both halves of the format;
+ * the value is written as a plain decimal string, which `Number()` reads back
+ * without locale or unit noise.
+ *
+ * @param width - width in CSS pixels.
+ * @returns the payload to store.
+ */
+export function serializeDrawerWidth(width: number): string {
+  return String(width);
 }

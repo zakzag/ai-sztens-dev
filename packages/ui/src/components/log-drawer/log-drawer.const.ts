@@ -106,3 +106,45 @@ export const LOG_LEVEL_LABELS: Record<ToastLevel, string> = {
   info: 'Info',
   system: 'Rendszer',
 };
+
+/**
+ * Panel width the drawer opens with, in CSS pixels.
+ *
+ * Matches the `max-w-[26rem]` the panel had before it became resizable
+ * (AIS-150), so a reload with no stored preference looks unchanged.
+ */
+export const LOG_DRAWER_WIDTH_DEFAULT = 416;
+
+/** Narrowest width the handle allows; below it the header actions collide. */
+export const LOG_DRAWER_WIDTH_MIN = 320;
+
+/**
+ * Widest width the handle allows.
+ *
+ * Deliberately well below `md` viewport width: the panel must never hide the
+ * page it annotates, and the page behind stays interactive (the drawer is
+ * non-modal, AIS-82 D3).
+ */
+export const LOG_DRAWER_WIDTH_MAX = 720;
+
+/** Width change of one `ArrowLeft`/`ArrowRight` press, in CSS pixels. */
+export const LOG_DRAWER_WIDTH_STEP = 16;
+
+/** Width change of one arrow press while `Shift` is held, in CSS pixels. */
+export const LOG_DRAWER_WIDTH_STEP_LARGE = 64;
+
+/**
+ * Accessible name of the resize handle.
+ *
+ * The handle carries no visible text, so this label **is** its name: it must
+ * say what the separator resizes, not "handle" (AIS-150).
+ */
+export const LOG_DRAWER_RESIZE_HANDLE_LABEL = 'Naplópanel szélességének állítása';
+
+/**
+ * CSS custom property carrying the panel width.
+ *
+ * Declared once and shared by the inline style and the width utility of the
+ * panel, so the two can never drift apart (AIS-150).
+ */
+export const LOG_DRAWER_WIDTH_CSS_VAR = '--log-drawer-width';

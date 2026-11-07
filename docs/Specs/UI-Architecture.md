@@ -1,6 +1,12 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-06 — AIS-146 (breadcrumb adatmodell + tiszta levezető logika).** A
+**Utolsó frissítés: 2026-11-07 — AIS-150 (átméretezhető log drawer panel).** A panel bal élén
+`role="separator"` fogantyú: egérrel húzható (`pointer capture`) és billentyűzettel állítható
+(320–720 px, default 416 px), `localStorage`-ban perzisztálva, a controllerben tartott állapottal; a
+`md` alatti teljes szélességet CSS adja, húzás közben a panel transform-animációja kimarad (lásd §4
+és §5).
+
+**AIS-146 (2026-11-06) — breadcrumb adatmodell + tiszta levezető logika.** A
 `RouteEntry` három breadcrumb mezőt kap (`breadcrumbLabel`, `breadcrumbParentPath`,
 `resolveBreadcrumbLabel`), a lánc a `app/router/breadcrumb.logic.ts` **tiszta** függvényeiből áll elő
 — statikus találat előbb, aztán `:param` minta, a catch-all **soha**; ciklus és hiányzó szülő a láncot
@@ -70,13 +76,22 @@ degradáció hiba esetén. A store-hoz **nincs** bekötve: a bekötés az AIS-83
 továbbra sem importál Reactet: a `tsconfig.core.json` a `src/core`-t DOM nélkül fordítja, a
 `tsconfig.json` a React réteget DOM+JSX-szel. Részletek a §4 „React bindings and host" blokkban.
 
-**Utolsó frissítés:** 2026-11-06 (AIS-147: sticky, két sávos admin fejléc — `AdminHeader.tsx`, `ui/ThemeSelector.tsx` és `layout.const.ts`, a fejléc `z-30`-on a log drawer, a dialog és a toast **alatt**, full-bleed `<main>`; a témaválasztás lokális `useState`, nincs store és nincs perzisztencia — lásd §4.1 és §5) (AIS-136: a notification alrendszer app-shell lezárása — egy **mindig látható** log-drawer fogantyú (`aria-expanded`/`aria-controls` mindkét állapotban, váltakozó glyph és accessible name, badge mindkét állapotban), a **toast-mátrix** teljessé tétele (`field` → csak log, `banner`/`page` → log **és** toast), a render-crash bekötése `AppErrorBoundary` injektált `onError` portján át, valamint az `ApiKeyEditForm` `notify` portja — lásd §4.1.3, §4 és §5) (AIS-84: globális notification capture — `QueryCache`/`MutationCache` callbackek + HTTP `onEvent` + `<NotificationHost />` az `AdminLayout`-ban, lásd §4.1.3 és §5) (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
+**Utolsó frissítés:** 2026-11-07 (AIS-147: sticky, két sávos admin fejléc — `AdminHeader.tsx`, `ui/ThemeSelector.tsx` és `layout.const.ts`, a fejléc `z-30`-on a log drawer, a dialog és a toast **alatt**, full-bleed `<main>`; a témaválasztás lokális `useState`, nincs store és nincs perzisztencia — lásd §4.1 és §5) (AIS-136: a notification alrendszer app-shell lezárása — egy **mindig látható** log-drawer fogantyú (`aria-expanded`/`aria-controls` mindkét állapotban, váltakozó glyph és accessible name, badge mindkét állapotban), a **toast-mátrix** teljessé tétele (`field` → csak log, `banner`/`page` → log **és** toast), a render-crash bekötése `AppErrorBoundary` injektált `onError` portján át, valamint az `ApiKeyEditForm` `notify` portja — lásd §4.1.3, §4 és §5) (AIS-84: globális notification capture — `QueryCache`/`MutationCache` callbackek + HTTP `onEvent` + `<NotificationHost />` az `AdminLayout`-ban, lásd §4.1.3 és §5) (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
 **AIS-149 (2026-11-06):** a fejléc témaválasztója **egyszerű select box** — új `SelectMenu`
 primitíva (§4): zárt trigger a kiválasztott téma **ikonjával és feliratával** + chevron, kattintásra
 `menuitemradio` listát nyit, **keresés nélkül**, soronként ikonnal. Ez leváltja az AIS-148-as combo
 boxot (szövegmező + szűrés + `onOpen`/`onClose` portok, törölve); a `Combobox` csak a kereshető
 mezőknél marad. A `THEME_OPTION_ICONS` visszakerült, és új `ChevronDownIcon` került az ikonkészletbe.
 Lásd §4, §4.1 és §5.
+
+**AIS-150 (2026-11-07):** a log drawer panelje **átméretezhető** — a bal élén egy `role="separator"`
+fogantyú (egérrel húzható, `pointercapture`-rel; billentyűzettel `ArrowLeft`/`ArrowRight` ±16 px,
+`Shift`-tel ±64 px, `Home`/`End`, dupla klikk → visszaállítás). A szélesség **320–720 px** között
+marad, alapból **416 px**, és `localStorage`-ban (`aisztens.logdrawer.width.v1`) él túl egy reloadot;
+letiltott storage esetén csendben a default-ra esik. Az érték a **controllerben** él (`useLogDrawer`
+`useState`-je), nem globális store-ban, és nem a `packages/ui`-ban — a primitíva továbbra is
+prezentációs. A `md` alatti teljes szélességet CSS oldja meg (`w-full md:w-[var(--log-drawer-width)]`),
+így nincs JS media query; húzás közben a panel `transition-none`-t kap. Részletek §4 és §5.
 
 **AIS-115 (2026-11-04):** a közös form-minta — `features/forms/use-app-form.ts`
 (`useAppForm`) egy helyen fogja össze a zod resolvert, a `toFieldErrors` mezőhiba-leképezést, az
@@ -277,7 +292,7 @@ three rules above; see §9 for its negative fixture and its exemption list.
 | `SelectMenu` (AIS-149) | `label`, `options[]` (`value`, `label`, `icon?`, `disabled?`), `value`, `onValueChange` | Single-choice **select box without a search field**: the trigger is the `Button` `secondary`/`sm` recipe showing the chosen option's icon + label + a chevron that rotates through `group-data-[state=open]`; the panel reuses the `DropdownMenu` surface/item recipes with Radix `RadioGroup`/`RadioItem`, so the options are `menuitemradio` with `aria-checked` and arrow keys/`Escape` come free. The trigger is named `"<label>: <chosen label>"`, so the visible text stays inside the accessible name (label in name). Fully controlled — no open/close state to mirror. |
 | `Toast` (AIS-81) | `level`: `success` \| `error` \| `warning` \| `info` \| `system`, `message`, `detail?`, `repeatCount?`, `onDismiss`, `onPause?`, `onResume?`, `depth?` | One notification card. The accent is the `Alert`/`Banner` border recipe; `error` → `role="alert"`, every other level → `role="status"`. **Stateless by contract**: no timer, no store, no storage — it reports the dismiss intent and forwards `pointerenter`/`pointerleave`, so the auto-dismiss clock belongs to the host (AIS-83). The entry animation is pure CSS through Tailwind's `starting:` variant, and `onPause` is omitted from the DOM attributes so the media event cannot clash with the callback. `detail` renders clamped to two lines with a `title`. |
 | `ToastStack` (AIS-81) | `toasts` (**newest first**), `onDismiss`, `onPause?`, `onResume?` | Fixed bottom-right container and the live region itself (`role="region"`, `aria-live="polite"`, `aria-atomic="false"`, labelled). Renders at most `TOAST_MAX_VISIBLE` (`3`) cards, so the **newest** survive an overflow, and assigns each card its `depth` (`scale`/`opacity`) so older cards read as “behind”. `TOAST_STACK_Z_INDEX` is `z-60` — a toast must stay readable above the dialog/drawer surface (`z-50`). Pure rules in `toast.logic.ts` (`toToastDepth`). |
-| `LogDrawer` (AIS-82) | `entries` (**newest first**, already sliced), `isOpen`, `unseenCount`, `levelFilter`, `hasMore`, `onToggle`, `onClose`, `onFilterChange`, `onLoadMore`, `onClear`, `formatTimestamp` | Collapsed edge tab (`aria-expanded` + `aria-controls`, count badge only when `unseenCount > 0`) plus a **non-modal** sliding panel: no overlay, no focus trap, page stays scrollable, `Escape` closes. Six chips (`Mind` / `Siker` / `Hiba` / `Figyelmeztetés` / `Info` / `Rendszer`) as `aria-pressed` buttons — `Siker` exists because the store emits `success`. Panel is `role="log"` with `aria-live="off"` (the announcement noise stays on the toasts). `LOG_DRAWER_Z_INDEX` is `z-40`: below the modal overlay and below the toast stack. Paging is **props only**; the 20/50 window belongs to AIS-83. |
+| `LogDrawer` (AIS-82, AIS-150) | `entries` (**newest first**, already sliced), `isOpen`, `unseenCount`, `levelFilter`, `hasMore`, `width`, `widthRange`, `isResizing`, `onToggle`, `onClose`, `onFilterChange`, `onLoadMore`, `onClear`, `onWidthChange`, `onResizeStart`, `onResizeEnd`, `onWidthReset`, `formatTimestamp` | Collapsed edge tab (`aria-expanded` + `aria-controls`, count badge only when `unseenCount > 0`) plus a **non-modal** sliding panel: no overlay, no focus trap, page stays scrollable, `Escape` closes. Six chips (`Mind` / `Siker` / `Hiba` / `Figyelmeztetés` / `Info` / `Rendszer`) as `aria-pressed` buttons — `Siker` exists because the store emits `success`. Panel is `role="log"` with `aria-live="off"` (the announcement noise stays on the toasts). `LOG_DRAWER_Z_INDEX` is `z-40`: below the modal overlay and below the toast stack. Paging is **props only**; the 20/50 window belongs to AIS-83. **Resize (AIS-150):** a `role="separator"` / `aria-orientation="vertical"` handle on the panel's left edge with `aria-valuenow`/`aria-valuemin`/`aria-valuemax`, `tabIndex={0}` and `hidden md:flex` (12 px hit target, 6 px visible rail); the width travels as the `--log-drawer-width` custom property (`w-full md:w-[var(--log-drawer-width)]`), and `isResizing` replaces `transition-transform` with `transition-none`. Every gesture is reported (`onWidthChange`, `onResizeStart`, `onResizeEnd`, `onWidthReset`) — the component never stores the width. |
 | `LogEntryRow` (AIS-82) | `entry`, `formatTimestamp` | One row: level glyph chip **+** level text (severity is never colour-only), injected timestamp, `break-words` message, `detail` only when present. Reuses the `Toast` chip recipe and glyph map, so a toast and its log row cannot disagree about a level. |
 | `Breadcrumb` (AIS-145) | `items: { label, to? }[]`, `ariaLabel?`, `renderLink?` | Router-független: a link elemet a hívó **injektálja** (`renderLink` — az adminban react-router `Link`, alapból `<a href>` fallback), így a `packages/ui` sosem importál routert. Az utolsó crumb `<span aria-current="page">`, **nem** link, akkor sem, ha van `to`-ja; a `to` nélküli nem-utolsó crumb szövegként jelenik meg (nincs halott link); `n` crumb → `n-1` elválasztó `<li aria-hidden="true">`-ban; üres `items` → **nincs** `<nav>` landmark. |
 
@@ -298,6 +313,20 @@ handle inside it would be unreachable exactly when it is needed. Its position ne
 (`right-0`): the open panel reserves a right gutter (`LOG_DRAWER_HANDLE_GUTTER`) instead, so there is
 no viewport-dependent offset and no layout shift. The panel stays **non-modal**: no overlay, no focus
 trap, page still scrollable.
+
+**The panel is resizable from its left edge (AIS-150).** The handle is a `role="separator"`
+element with `aria-orientation="vertical"`, `aria-label={LOG_DRAWER_RESIZE_HANDLE_LABEL}`,
+`aria-valuenow`/`aria-valuemin`/`aria-valuemax` and `tabIndex={0}`, and it is `hidden md:flex`: below
+`md` the panel is full width (`w-full`), so there is nothing to drag and the handle must not be a
+focus stop either. A drag brackets itself with `onResizeStart`/`onResizeEnd` (which is what lets the
+host drop the transform transition through `isResizing`), captures the pointer so the moves keep
+arriving outside the 12 px target, and reports every move via `onWidthChange`; `pointercancel` ends
+the gesture exactly like `pointerup`. Keyboard: `ArrowLeft`/`ArrowRight` = ±`LOG_DRAWER_WIDTH_STEP`
+(16 px), `Shift` = ±`LOG_DRAWER_WIDTH_STEP_LARGE` (64 px), `Home`/`End` = the bounds, anything else
+is ignored (and `preventDefault` only runs when the width actually changes). Double click resets to
+`widthRange.initial`. Geometry is pure (`clampDrawerWidth`, `toWidthFromPointer`, `toWidthFromKey` in
+`log-drawer.logic.ts`), the width is published as the `--log-drawer-width` custom property, and the
+numbers (416 / 320 / 720 / 16 / 64) are declared **once**, in `log-drawer.const.ts`.
 
 The ten form primitives arrived with **AIS-113** and are the mandatory route for new forms:
 a form composes `FormSection` → `FormField` → primitive, and `FormActions` for the buttons.
@@ -406,6 +435,7 @@ React exists. An app mounts **one** pair:
 | Toast lifetimes   | `success`/`info` 4 s, `warning` 6 s, `error` **sticky** (`system` sticky too); one timeout per toast id, owned by `NotificationHost` via `useToastTimers`                            |
 | Pause             | `pointerenter` clears the timer, `pointerleave` restarts a **full** TTL; `document.hidden` clears every timer and becoming visible restarts the countdown of what is still on screen |
 | Log window        | `20` rows on open, `+50` per „Korábbiak betöltése", `hasMore` derived from the filtered buffer; a filter change resets the window — state lives in `useLogDrawer` (`useState`)      |
+| Drawer width      | `width` / `isResizing` live in `useLogDrawer` (`useState`), seeded from `widthStorage.load()` once; the write happens in one effect that runs only while `isResizing === false`, so a drag persists once (`endResize`), a key press or a reset immediately. `localStorage`, **not** `sessionStorage` (a UI preference must survive a restart); storage disabled → silent fallback to `LOG_DRAWER_WIDTH_RANGE.initial`. Never a global store, never `packages/ui` state |
 | Mark read         | opening the drawer calls `markAllRead()` in the toggle handler, not in an effect, so one click = one store write                                                                    |
 | Emitters          | `createNotifier(store)` works without React; `useNotifier()` binds the provider store. There is **no** module-level `notify` singleton                                                            |
 | Runtime capture   | the provider registers `window` `error` + `unhandledrejection` (`source: 'runtime'`, `level: 'error'`) and removes both on unmount; the stack is only recorded with `includeDetails`  |

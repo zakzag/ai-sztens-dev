@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LogLevelFilter } from '@callback/ui';
 import {
+  LOG_DRAWER_WIDTH_RANGE,
   RUNTIME_ERROR_MESSAGE,
 } from '../../src/react/notification-react.const.js';
 import { useNotifier } from '../../src/react/notification.facade.js';
@@ -20,6 +21,7 @@ import {
   createNotificationWrapper,
 } from '../mocks/react/notification-provider-harness.mock.js';
 import { createRecordingStorage } from '../mocks/react/notification-storage.mock.js';
+import { createRecordingWidthStorage } from '../mocks/react/log-drawer-width-storage.mock.js';
 import {
   dispatchUnhandledRejection,
   dispatchWindowError,
@@ -220,6 +222,138 @@ describe('useLogDrawer and useLogEntries', () => {
 
     expect(result.current.entries).toEqual([]);
     expect(storage.clearCount()).toBe(1);
+  });
+});
+
+describe('drawer width', () => {
+  /**
+   * Renders the drawer surface over a recording width storage.
+   *
+   * @param stored - raw payload the width storage hands back.
+   * @returns the hook result and the width storage.
+   */
+  function renderWidth(stored: string | null = null) {
+    const widthStorage = createRecordingWidthStorage(stored);
+    const wrapper = createNotificationWrapper({
+      storage: createRecordingStorage(),
+      widthStorage,
+    });
+
+    return { widthStorage, ...renderHook(useDrawerSurface, { wrapper }) };
+  }
+
+  it('restores the width read exactly once from the injected storage', () => {
+    const { result, widthStorage } = renderWidth('512');
+
+    expect(result.current.controller.width).toBe(512);
+    expect(widthStorage.loadCount()).toBe(1);
+    expect(widthStorage.savedWidths()).toEqual([512]);
+  });
+
+  it('falls back to the default width when nothing is stored', () => {
+    const { result } = renderWidth();
+
+    expect(result.current.controller.width).toBe(
+      LOG_DRAWER_WIDTH_RANGE.initial,
+    );
+  });
+
+  it('falls back to the default width for a corrupt payload', () => {
+    const { result } = renderWidth('abc');
+
+    expect(result.current.controller.width).toBe(
+      LOG_DRAWER_WIDTH_RANGE.initial,
+    );
+  });
+
+  it('clamps a stale stored width into the range', () => {
+    expect(renderWidth('99999').result.current.controller.width).toBe(
+      LOG_DRAWER_WIDTH_RANGE.max,
+    );
+    expect(renderWidth('-5').result.current.controller.width).toBe(
+      LOG_DRAWER_WIDTH_RANGE.min,
+    );
+  });
+
+  it('clamps every width it is given', () => {
+    const { result } = renderWidth();
+
+    act(() => {
+      result.current.controller.updateWidth(10);
+    });
+    expect(result.current.controller.width).toBe(LOG_DRAWER_WIDTH_RANGE.min);
+
+    act(() => {
+      result.current.controller.updateWidth(5_000);
+    });
+    expect(result.current.controller.width).toBe(LOG_DRAWER_WIDTH_RANGE.max);
+  });
+
+  it('writes nothing per pointer move and persists once when the drag ends', () => {
+    const { result, widthStorage } = renderWidth();
+
+    act(() => {
+      result.current.controller.beginResize();
+    });
+    expect(result.current.controller.isResizing).toBe(true);
+
+    act(() => {
+      result.current.controller.updateWidth(480);
+    });
+    act(() => {
+      result.current.controller.updateWidth(520);
+    });
+
+    // Only the mount write happened so far: a drag must not burn an
+    // `setItem` per `pointermove` (AIS-150 D5).
+    expect(widthStorage.saveCount()).toBe(1);
+
+    act(() => {
+      result.current.controller.endResize();
+    });
+
+    expect(result.current.controller.isResizing).toBe(false);
+    expect(widthStorage.lastSaved()).toBe(520);
+    expect(widthStorage.saveCount()).toBe(2);
+  });
+
+  it('persists a keyboard change immediately', () => {
+    const { result, widthStorage } = renderWidth();
+
+    act(() => {
+      result.current.controller.updateWidth(600);
+    });
+
+    expect(widthStorage.lastSaved()).toBe(600);
+  });
+
+  it('resets to the default width and persists it', () => {
+    const { result, widthStorage } = renderWidth('640');
+
+    act(() => {
+      result.current.controller.resetWidth();
+    });
+
+    expect(result.current.controller.width).toBe(
+      LOG_DRAWER_WIDTH_RANGE.initial,
+    );
+    expect(widthStorage.lastSaved()).toBe(LOG_DRAWER_WIDTH_RANGE.initial);
+  });
+
+  it('exposes the range the handle has to clamp to', () => {
+    const { result } = renderWidth();
+
+    expect(result.current.controller.widthRange).toEqual(LOG_DRAWER_WIDTH_RANGE);
+  });
+
+  it('writes nothing more after unmount', () => {
+    const { widthStorage, unmount } = renderWidth();
+
+    const beforeUnmount = widthStorage.saveCount();
+
+    unmount();
+
+    expect(widthStorage.saveCount()).toBe(beforeUnmount);
   });
 });
 

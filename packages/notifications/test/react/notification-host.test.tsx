@@ -2,15 +2,17 @@
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { TOAST_DISMISS_LABEL } from '@callback/ui';
+import { LOG_DRAWER_RESIZE_HANDLE_LABEL, TOAST_DISMISS_LABEL } from '@callback/ui';
 import { createNotificationStore } from '../../src/core/notification.store.js';
 import { createNotifier } from '../../src/react/notification.facade.js';
 import { NotificationHost } from '../../src/react/NotificationHost.js';
+import { LOG_DRAWER_WIDTH_RANGE } from '../../src/react/notification-react.const.js';
 import type { Notifier } from '../../src/react/notification-react.interface.js';
 import {
   createEntryList,
   REACT_FIXED_NOW,
 } from '../mocks/react/notification-entries.fixture.js';
+import { createRecordingWidthStorage } from '../mocks/react/log-drawer-width-storage.mock.js';
 import { createNotificationWrapper } from '../mocks/react/notification-provider-harness.mock.js';
 import { createRecordingStorage } from '../mocks/react/notification-storage.mock.js';
 
@@ -37,6 +39,7 @@ function renderHost(
   const Wrapper = createNotificationWrapper({
     store,
     storage,
+    widthStorage: createRecordingWidthStorage(),
     formatTimestamp: (epochMs) => `t:${epochMs}`,
   });
 
@@ -126,6 +129,31 @@ describe('NotificationHost', () => {
 
     expect(screen.getByRole('button', { expanded: false })).toHaveAccessibleName(
       expect.stringContaining('2'),
+    );
+  });
+
+  it('forwards the drawer width to the resize separator', () => {
+    renderHost({ restored: createEntryList(1) });
+
+    act(() => {
+      screen.getByRole('button', { expanded: false }).click();
+    });
+
+    const separator = screen.getByRole('separator', {
+      name: LOG_DRAWER_RESIZE_HANDLE_LABEL,
+    });
+
+    expect(separator).toHaveAttribute(
+      'aria-valuenow',
+      String(LOG_DRAWER_WIDTH_RANGE.initial),
+    );
+    expect(separator).toHaveAttribute(
+      'aria-valuemin',
+      String(LOG_DRAWER_WIDTH_RANGE.min),
+    );
+    expect(separator).toHaveAttribute(
+      'aria-valuemax',
+      String(LOG_DRAWER_WIDTH_RANGE.max),
     );
   });
 });

@@ -1,4 +1,8 @@
 import { useEffect, useId } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 import { cn } from '../../lib/cn.js';
 import { Badge } from '../badge/Badge.js';
 import { Button } from '../button/Button.js';
@@ -12,17 +16,25 @@ import {
   LOG_DRAWER_HEADER_CLOSE_LABEL,
   LOG_DRAWER_LOAD_MORE_LABEL,
   LOG_DRAWER_PANEL_ID_SUFFIX,
+  LOG_DRAWER_RESIZE_HANDLE_LABEL,
   LOG_DRAWER_TITLE,
   LOG_FILTERS,
   LOG_FILTER_LABELS,
 } from './log-drawer.const.js';
-import { toLogDrawerHandleLabel } from './log-drawer.logic.js';
+import {
+  toLogDrawerHandleLabel,
+  toWidthFromKey,
+  toWidthFromPointer,
+  toWidthStyle,
+} from './log-drawer.logic.js';
 import { LogEntryRow } from './LogEntryRow.js';
 import {
   logDrawerFooterVariants,
   logDrawerHeaderVariants,
   logDrawerListVariants,
   logDrawerPanelVariants,
+  logDrawerResizeHandleVariants,
+  logDrawerResizeRailVariants,
   logDrawerTabVariants,
   logFilterChipVariants,
 } from './log-drawer.variants.js';
@@ -55,6 +67,12 @@ import type { LogDrawerProps } from './log-drawer.interface.js';
  * `✕` and `Escape` remain as secondary close paths; the handle is the primary
  * toggle in both directions.
  *
+ * The resize separator on the panel's left edge (AIS-150) is the same
+ * presentational contract: it reports `onResizeStart`, `onWidthChange`,
+ * `onResizeEnd` and `onWidthReset`, and the host owns the width. It is rendered
+ * only while the panel is open and only from `md` up — below that the panel is
+ * full width, so there is nothing to resize.
+ *
  * @param props - see {@link LogDrawerProps}.
  */
 export function LogDrawer({
@@ -69,8 +87,16 @@ export function LogDrawer({
   onLoadMore,
   onClear,
   formatTimestamp,
+  width,
+  widthRange,
+  isResizing,
+  onWidthChange,
+  onResizeStart,
+  onResizeEnd,
+  onWidthReset,
 }: LogDrawerProps) {
   const panelId = `${useId()}${LOG_DRAWER_PANEL_ID_SUFFIX}`;
+  const widthStyle = toWidthStyle(width);
 
   useEffect(() => {
     if (!isOpen) {
@@ -88,6 +114,67 @@ export function LogDrawer({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  /**
+   * Starts a drag: the host flips `isResizing` and the pointer is captured, so
+   * the moves keep arriving even when the pointer leaves the 12 px handle.
+   *
+   * @param event - the `pointerdown` of the handle.
+   */
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>): void {
+    onResizeStart();
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  /**
+   * Reports the width the pointer asks for.
+   *
+   * The viewport width is read at event time (not stored), so a window resize
+   * during a drag cannot use a stale value.
+   *
+   * @param event - the `pointermove` of the handle.
+   */
+  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>): void {
+    onWidthChange(
+      toWidthFromPointer(event.clientX, window.innerWidth, widthRange),
+    );
+  }
+
+  /**
+   * Ends a drag and releases the capture.
+   *
+   * `pointerup` and `pointercancel` are both wired here: a cancelled gesture must
+   * not leave the host stuck in the resizing state.
+   *
+   * @param event - the `pointerup`/`pointercancel` of the handle.
+   */
+  function handlePointerEnd(event: ReactPointerEvent<HTMLDivElement>): void {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    onResizeEnd();
+  }
+
+  /**
+   * Resizes with the keyboard, following the WAI-ARIA separator pattern.
+   *
+   * The event is only consumed when a key actually changes the width, so
+   * unrelated keys (and an arrow that is already at its bound) still behave
+   * normally.
+   *
+   * @param event - the `keydown` of the handle.
+   */
+  function handleHandleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void {
+    const next = toWidthFromKey(event.key, width, widthRange, event.shiftKey);
+
+    if (next === width) {
+      return;
+    }
+
+    event.preventDefault();
+    onWidthChange(next);
+  }
+
   return (
     <>
       <aside
@@ -96,13 +183,36 @@ export function LogDrawer({
         aria-live="off"
         aria-label={LOG_DRAWER_TITLE}
         aria-hidden={!isOpen}
+        style={widthStyle}
         className={cn(
-          logDrawerPanelVariants(),
+          logDrawerPanelVariants({ isResizing }),
           isOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full',
         )}
       >
         {isOpen ? (
           <>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={LOG_DRAWER_RESIZE_HANDLE_LABEL}
+              aria-valuenow={width}
+              aria-valuemin={widthRange.min}
+              aria-valuemax={widthRange.max}
+              tabIndex={0}
+              className={logDrawerResizeHandleVariants()}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerEnd}
+              onPointerCancel={handlePointerEnd}
+              onKeyDown={handleHandleKeyDown}
+              onDoubleClick={onWidthReset}
+            >
+              <span
+                aria-hidden="true"
+                className={logDrawerResizeRailVariants()}
+              />
+            </div>
+
             <div className={logDrawerHeaderVariants()}>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-semibold">{LOG_DRAWER_TITLE}</h2>

@@ -14,7 +14,8 @@ import {
  * The host is the only place that decides *policy* (AIS-83 D5–D9):
  *
  * - the toast lifetimes come from {@link useToastTimers};
- * - the drawer's open/filter/paging window comes from {@link useLogDrawer};
+ * - the drawer's open/filter/paging window and its width come from
+ *   {@link useLogDrawer};
  * - the timestamp formatter comes from the provider, so `packages/ui` never has
  *   to own localisation.
  *
@@ -51,6 +52,13 @@ export function NotificationHost(): ReactElement {
         onLoadMore={controller.loadMore}
         onClear={controller.clear}
         formatTimestamp={formatTimestamp}
+        width={controller.width}
+        widthRange={controller.widthRange}
+        isResizing={controller.isResizing}
+        onWidthChange={controller.updateWidth}
+        onResizeStart={controller.beginResize}
+        onResizeEnd={controller.endResize}
+        onWidthReset={controller.resetWidth}
       />
     </>
   );

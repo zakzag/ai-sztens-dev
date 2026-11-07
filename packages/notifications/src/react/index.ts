@@ -19,9 +19,12 @@ export {
   useToasts,
 } from './use-notifications.js';
 export { MissingNotificationProviderError } from './notification-react.errors.js';
+export { createLogDrawerWidthStorage } from './log-drawer-width.storage.js';
 export {
   DEFAULT_LOCALE,
   DEFAULT_NOTIFIER_SOURCE,
+  LOG_DRAWER_WIDTH_RANGE,
+  LOG_DRAWER_WIDTH_STORAGE_KEY,
   LOG_INITIAL_PAGE,
   LOG_PAGE_STEP,
   RUNTIME_ERROR_MESSAGE,
@@ -34,7 +37,9 @@ export {
   filterEntries,
   formatDefaultTimestamp,
   hasMoreEntries,
+  parseStoredDrawerWidth,
   resolveToastTtl,
+  serializeDrawerWidth,
   sliceWindow,
   toRuntimeDetail,
   toToastItems,
@@ -42,6 +47,8 @@ export {
 export type {
   AnimationFrameScope,
   LogDrawerController,
+  LogDrawerWidthStorage,
+  LogDrawerWidthStorageOptions,
   NotificationContextValue,
   NotificationProviderProps,
   NotificationToastItem,

@@ -1,3 +1,9 @@
+import {
+  LOG_DRAWER_WIDTH_DEFAULT,
+  LOG_DRAWER_WIDTH_MAX,
+  LOG_DRAWER_WIDTH_MIN,
+} from '@callback/ui';
+import type { LogDrawerSizeRange } from '@callback/ui';
 import type { NotificationSource } from '../core/notification.interface.js';
 import type { ToastTtlByLevel } from './notification-react.interface.js';
 
@@ -26,6 +32,28 @@ export const LOG_INITIAL_PAGE = 20;
 
 /** Rows one "Korábbiak betöltése" activation appends. */
 export const LOG_PAGE_STEP = 50;
+
+/**
+ * Key of the persisted panel width of the log drawer.
+ *
+ * Versioned (`.v1`) like every other stored payload in this package: a future
+ * change of the format must be able to ignore the old value instead of
+ * misreading it (AIS-150).
+ */
+export const LOG_DRAWER_WIDTH_STORAGE_KEY = 'aisztens.logdrawer.width.v1';
+
+/**
+ * Bounds and default of the resizable log drawer.
+ *
+ * The numbers themselves live in `@callback/ui` (AIS-150 D4) — this constant
+ * only binds them into the shape the controller and `LogDrawer` expect, so the
+ * trigger geometry and the stored value can never disagree.
+ */
+export const LOG_DRAWER_WIDTH_RANGE: LogDrawerSizeRange = {
+  min: LOG_DRAWER_WIDTH_MIN,
+  max: LOG_DRAWER_WIDTH_MAX,
+  initial: LOG_DRAWER_WIDTH_DEFAULT,
+};
 
 /** Source a `notify.*` entry is filed under unless the caller says otherwise. */
 export const DEFAULT_NOTIFIER_SOURCE: NotificationSource = 'manual';

@@ -5,6 +5,7 @@ import type { NotificationStore } from '../core/notification.interface.js';
 import { createNotificationStore } from '../core/notification.store.js';
 import type { NotificationStorage, StorageLike } from '../core/notification.storage.interface.js';
 import { createNotificationStorage } from '../core/notification.storage.js';
+import { createLogDrawerWidthStorage } from './log-drawer-width.storage.js';
 import { createNotifier } from './notification.facade.js';
 import { RUNTIME_ERROR_MESSAGE } from './notification-react.const.js';
 import { MissingNotificationProviderError } from './notification-react.errors.js';
@@ -14,6 +15,7 @@ import {
   toRuntimeDetail,
 } from './notification-react.logic.js';
 import type {
+  LogDrawerWidthStorage,
   NotificationContextValue,
   NotificationProviderProps,
 } from './notification-react.interface.js';
@@ -62,6 +64,30 @@ function readSessionStorage(): StorageLike | null {
 }
 
 /**
+ * Reads `localStorage`, tolerating a blocked or absent one.
+ *
+ * The width preference of the log drawer lives here and not in
+ * `sessionStorage`, because it must survive a browser restart (AIS-150 D2).
+ * Same degradation as {@link readSessionStorage}: unreachable storage means the
+ * panel simply forgets the width.
+ *
+ * @returns the browser storage, or `null` when it cannot be reached.
+ */
+function readLocalStorage(): StorageLike | null {
+  const win = getWindow();
+
+  if (win === null) {
+    return null;
+  }
+
+  try {
+    return win.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Owns the store instance, the `sessionStorage` mirror and the global listeners.
  *
  * Everything an app needs to mount once:
@@ -86,6 +112,7 @@ export function NotificationProvider({
   includeDetails = false,
   formatTimestamp = formatDefaultTimestamp,
   scheduleWrite,
+  widthStorage: injectedWidthStorage,
 }: NotificationProviderProps): ReactElement {
   const [storage] = useState<NotificationStorage>(
     () =>
@@ -94,6 +121,12 @@ export function NotificationProvider({
         storage: readSessionStorage(),
         schedule: scheduleWrite ?? createRafScheduler(getWindow()),
       }),
+  );
+
+  const [widthStorage] = useState<LogDrawerWidthStorage>(
+    () =>
+      injectedWidthStorage ??
+      createLogDrawerWidthStorage({ storage: readLocalStorage() }),
   );
 
   const [store] = useState<NotificationStore>(
@@ -158,8 +191,15 @@ export function NotificationProvider({
 
   const notifier = useMemo(() => createNotifier(store), [store]);
   const value = useMemo<NotificationContextValue>(
-    () => ({ store, storage, notifier, includeDetails, formatTimestamp }),
-    [store, storage, notifier, includeDetails, formatTimestamp],
+    () => ({
+      store,
+      storage,
+      widthStorage,
+      notifier,
+      includeDetails,
+      formatTimestamp,
+    }),
+    [store, storage, widthStorage, notifier, includeDetails, formatTimestamp],
   );
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;

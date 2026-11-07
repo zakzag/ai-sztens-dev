@@ -69,8 +69,12 @@ Architecture rules for the frontend layers are in
 ```bash
 pnpm install     # installs all workspace packages
 pnpm build       # builds packages first, then apps/api, apps/web, apps/admin
-pnpm dev         # shared watcher + API (:3000) + web (:5173) + admin (:5174)
+pnpm dev:local   # shared watcher + API (:3000) + web (:5173) + admin (:5174), APP_ENV=local
 ```
+
+`pnpm dev:local` is the developer entry point: it runs `cross-env APP_ENV=local pnpm dev`, so
+NestJS reads `apps/api/.env.local` (localhost CORS list) instead of the droplet's `.env.dev`.
+Plain `pnpm dev` stays environment-agnostic and never sets `APP_ENV`.
 
 Database and full local stack:
 
@@ -97,7 +101,8 @@ Validate every `.env` file offline, and find the other helper scripts, in
 
 | Command                                  | Effect                                                                      |
 | ---------------------------------------- | --------------------------------------------------------------------------- |
-| `pnpm dev`                               | Start all apps in watch mode (NestJS + two Vite dev servers)                |
+| `pnpm dev`                               | Start all apps in watch mode (NestJS + two Vite dev servers), no `APP_ENV` |
+| `pnpm dev:local`                         | The same, with `APP_ENV=local` (cmd, PowerShell and bash)                   |
 | `pnpm build`                             | Build the whole monorepo (topological order)                                |
 | `pnpm test`                              | Unit tests for every package and app                                        |
 | `pnpm test:e2e`                          | API e2e tests (Fastify)                                                     |

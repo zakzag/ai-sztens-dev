@@ -1,6 +1,7 @@
 # Local Development — AIsztens
 
-**Utolsó frissítés:** 2026-11-05 (AIS-133: a header egységesítve a `quality:docs` kapuhoz; a tartalom változatlan)
+**Utolsó frissítés:** 2026-11-07 (a `pnpm dev:local` script javítva: a PowerShell-only `$env:APP_ENV='local'; pnpm dev` test helyett `cross-env APP_ENV=local pnpm dev` fut, mert a `package.json` scripteket nem PowerShell, hanem az OS shellje futtatja — Windows-on `cmd.exe`, POSIX-on `/bin/sh`; §5 és §6.6 mostantól a `pnpm dev:local`-t ajánlja)
+**Previous update:** 2026-11-05 — AIS-133: a header egységesítve a `quality:docs` kapuhoz; a tartalom változatlan.
 **Status:** living spec
 **Last updated:** 2026-11-05 — §5 "Common pitfalls" now separates the two `pnpm install` `os error 32` shapes (a _transient_ collision on a first-time virtual-store folder vs a real lock), documents the `WARN Ignoring broken lockfile` trap, which makes pnpm silently drop pinning and re-resolve the whole graph, and documents the `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` prompt: pnpm appends the exemptions itself, but the run that appended them still fails — the retry is the fix.
 **Previous update:** 2026-11-02 — **Node 24.9+ is a hard requirement**: §2.1 documents the `>=24.9.0` `engines` field and the `.node-version` pin (fnm/nvm), because the `apps/api` e2e suites that boot `AppModule` **silently self-skip** on older runtimes instead of failing.
@@ -325,9 +326,15 @@ one place, the others propagate.
      `DatabaseConfigurationError: DATABASE_URL is not set or blank` — by design
      (AIS-56), there is no silent fallback.
 
-  Start the local flow as `set "APP_ENV=local" && pnpm dev` (cmd) or
-  `$env:APP_ENV='local'; pnpm dev` (PowerShell); the boot banner must then say
-  `APP_ENV=local … CORS origins: http://localhost:5173,…`. Verify with:
+  Start the local flow with **`pnpm dev:local`** — it runs `cross-env APP_ENV=local pnpm dev`,
+  so the variable reaches every child process in cmd, PowerShell **and** bash. The old
+  `$env:APP_ENV='local'; pnpm dev` form only works when typed *into a PowerShell prompt*: a
+  `package.json` script is executed by the OS shell (`cmd.exe` on Windows, `/bin/sh` elsewhere),
+  so that body fails with `The filename, directory name, or volume label syntax is incorrect.`
+  and `APP_ENV` is never set. Plain `pnpm dev` still means "no `APP_ENV`" on purpose — it is the
+  generic, env-agnostic entry point.
+
+  The boot banner must say `APP_ENV=local … CORS origins: http://localhost:5173,…`. Verify with:
 
   ```bash
   curl -s -D - -o NUL -X OPTIONS http://localhost:3000/api/api-keys \
@@ -560,15 +567,18 @@ deploy épül.
 ### 6.6 API + admin indítása
 
 ```bash
-# cmd
-set "APP_ENV=local" && pnpm dev
-# PowerShell
-$env:APP_ENV='local'; pnpm dev
+# minden shell alatt (cmd / PowerShell / bash):
+pnpm dev:local
+
+# kézi megfelelője csak akkor, ha közvetlenül egy interaktív shellbe írod:
+#   cmd        set "APP_ENV=local" && pnpm dev
+#   PowerSh.   $env:APP_ENV='local'; pnpm dev
 ```
 
 Az `APP_ENV=local` nem elhagyható: enélkül a NestJS `dev`-re esik vissza, a `.env.dev`-et olvassa
 előbb, és a **droplet** CORS-listáját szolgálja ki — a böngészőből érkező kérés így elhasal
-(részletek a §5-ben).
+(részletek a §5-ben). A `pnpm dev:local` a [`cross-env`](https://github.com/kentcdodds/cross-env)
+fejlesztői függőségen keresztül állítja be a változót, ezért nem shell-specifikus.
 
 Várt sorok a kimenetben:
 

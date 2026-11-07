@@ -17,7 +17,7 @@
     "quality": "pnpm quality:layers && pnpm quality:dead-code && pnpm quality:tokens && pnpm quality:field-errors && pnpm quality:docs",
     "test:quality": "node --test \"scripts/quality/*.test.mjs\" \"scripts/lib/vite-build.logic.test.mjs\"",
     "dev": "concurrently -k -n shared,api,web,admin -c yellow,blue,green,magenta \"pnpm --filter @callback/shared dev\" \"pnpm --filter @callback/api start:dev\" \"pnpm --filter @callback/web dev\" \"pnpm --filter @callback/admin dev\"",
-    "dev:local": "$env:APP_ENV='local'; pnpm dev",
+    "dev:local": "cross-env APP_ENV=local pnpm dev",
     "db:up": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml up -d",
     "db:down": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml down",
     "build": "pnpm -r build",
@@ -39,6 +39,7 @@
   "devDependencies": {
     "@sonar/scan": "^4.4.0",
     "concurrently": "^9.2.4",
+    "cross-env": "^10.1.0",
     "dependency-cruiser": "^16",
     "knip": "^5",
     "prettier": "^3.9.9"

@@ -337,6 +337,21 @@ The resolved id appears as `meta.requestId` / `error.requestId` **and** as the `
 | 3. App        | dismissible top banner (session + notification store) | `401`, offline (`status === null`), `503`          | **yes**         |
 | 4. Log drawer | entries with `code`, `status`, `requestId` and the structured `details` rows | all `5xx`, schema-drift payloads, the expanded request/response trail | n/a             |
 
+Tier 4 is the **diagnostic** tier and since AIS-143 it carries the whole wire context, not just a
+sentence (AIS-152 filled the fields, AIS-153 made the row expandable, AIS-163 added the JSON
+expansion):
+
+| Where | What tier 4 receives |
+| --- | --- |
+| Every finished HTTP attempt | `method`, `path`, `query` (full, no whitelist), `status`, `durationMs`, `outcome`, `requestId` (the `X-Request-Id` response header, falling back to `meta.requestId`), `responseMeta`, and the request body only as a **masked, truncated prefix** (`HTTP_BODY_PREVIEW_MAX_LENGTH` + `…`) |
+| A failed query/mutation | `code`, `status`, `requestId`, `queryKey` / `mutationKey`, the failing `url` with its query string, the error tier (`field` / `banner` / `page`) and every `issues[]` entry as its own row (`path: message`) |
+| A runtime error | the error `name`, the stack (only with `includeDetails`, i.e. DEV) and React's `componentStack` |
+
+The value never re-enters the other tiers: the drawer is read-only, owns no retry and emits nothing,
+so a log entry can never become a second error surface. Redaction happens once, in the notifications
+core (`redactValue`), and a JSON-shaped value is only *displayed* indented — the stored string stays
+exactly what the store saved.
+
 Tier 3 is the only tier that speaks **twice** on purpose: the banner expresses the persistent
 condition (offline / expired session / 503) and survives a dismissed toast, while the toast marks the
 moment the failure happened. Tier 1 stays off the toast channel, because the input keeps focus and

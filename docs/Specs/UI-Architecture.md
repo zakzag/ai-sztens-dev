@@ -880,6 +880,16 @@ table implementation to migrate. `packages/ui/package.json` is unchanged.
 its own `size`/`color` axes next to the design tokens. No row was added to the table above and
 `packages/ui/package.json` stays unchanged.
 
+**AIS-143 (the log-drawer story) added no dependency at all.** The width preference uses
+`localStorage` through a small, hand-written adapter
+([`log-drawer-width.storage.ts`](../../packages/notifications/src/react/log-drawer-width.storage.ts:1))
+with a `StorageLike` port, the pointer gesture uses `setPointerCapture`/`pointermove` from the DOM, the
+clipboard uses `navigator.clipboard` behind [`lib/copy-text.ts`](../../packages/ui/src/lib/copy-text.ts:1),
+and the pretty-printed JSON is plain `JSON.parse`/`JSON.stringify`
+([`lib/json.logic.ts`](../../packages/ui/src/lib/json.logic.ts:1)). Not one of those needed a package, and
+`zustand` stays _planned_: the drawer's width lives in the `useLogDrawer` controller, the row's open
+state and JSON expansions are component-local `useState`. `package.json` files are unchanged.
+
 **AIS-117 added the first runtime dependencies of `packages/ui`** — behaviour-only Radix
 packages, all three in `dependencies` (`react`/`react-dom` remain `peerDependencies`):
 

@@ -9,8 +9,8 @@ import {
 } from '../src/components/log-drawer/log-drawer.const.js';
 import {
   clampDrawerWidth,
+  toWidthFromDrag,
   toWidthFromKey,
-  toWidthFromPointer,
   toWidthStyle,
 } from '../src/components/log-drawer/log-drawer.logic.js';
 import type { LogDrawerSizeRange } from '../src/components/log-drawer/log-drawer.interface.js';
@@ -65,22 +65,42 @@ describe('clampDrawerWidth', () => {
   });
 });
 
-describe('toWidthFromPointer', () => {
-  it('derives the width from the distance to the right edge', () => {
-    expect(toWidthFromPointer(600, 1024, RANGE)).toBe(424);
+describe('toWidthFromDrag', () => {
+  const start = LOG_DRAWER_WIDTH_DEFAULT;
+
+  it('keeps the start width while the pointer does not travel', () => {
+    expect(toWidthFromDrag(600, 600, start, RANGE)).toBe(start);
   });
 
-  it('clamps a pointer near the left edge to the maximum', () => {
-    expect(toWidthFromPointer(10, 1024, RANGE)).toBe(LOG_DRAWER_WIDTH_MAX);
+  it('widens the panel when the pointer travels left', () => {
+    expect(toWidthFromDrag(600, 550, start, RANGE)).toBe(start + 50);
   });
 
-  it('clamps a pointer at the right edge to the minimum', () => {
-    expect(toWidthFromPointer(1020, 1024, RANGE)).toBe(LOG_DRAWER_WIDTH_MIN);
+  it('narrows the panel when the pointer travels right', () => {
+    expect(toWidthFromDrag(600, 650, start, RANGE)).toBe(start - 50);
   });
 
-  it('clamps a pointer outside the viewport', () => {
-    expect(toWidthFromPointer(-200, 1024, RANGE)).toBe(LOG_DRAWER_WIDTH_MAX);
-    expect(toWidthFromPointer(4_000, 1024, RANGE)).toBe(LOG_DRAWER_WIDTH_MIN);
+  it('ignores the absolute pointer position', () => {
+    expect(toWidthFromDrag(120, 100, start, RANGE)).toBe(
+      toWidthFromDrag(1_020, 1_000, start, RANGE),
+    );
+  });
+
+  it('clamps a long drag to the maximum', () => {
+    expect(toWidthFromDrag(600, -400, start, RANGE)).toBe(LOG_DRAWER_WIDTH_MAX);
+  });
+
+  it('clamps a long drag to the minimum', () => {
+    expect(toWidthFromDrag(600, 4_000, start, RANGE)).toBe(LOG_DRAWER_WIDTH_MIN);
+  });
+
+  it('falls back to the initial width for a non-finite coordinate', () => {
+    expect(toWidthFromDrag(600, Number.NaN, start, RANGE)).toBe(
+      LOG_DRAWER_WIDTH_DEFAULT,
+    );
+    expect(toWidthFromDrag(Number.POSITIVE_INFINITY, 600, start, RANGE)).toBe(
+      LOG_DRAWER_WIDTH_DEFAULT,
+    );
   });
 });
 

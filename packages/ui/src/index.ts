@@ -308,8 +308,8 @@ export {
 export {
   clampDrawerWidth,
   toLogDrawerHandleLabel,
+  toWidthFromDrag,
   toWidthFromKey,
-  toWidthFromPointer,
   toWidthStyle,
 } from './components/log-drawer/log-drawer.logic.js';
 export {

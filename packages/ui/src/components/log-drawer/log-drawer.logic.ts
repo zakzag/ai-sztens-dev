@@ -63,23 +63,35 @@ export function clampDrawerWidth(
 }
 
 /**
- * Converts a pointer position into a panel width.
+ * Converts the pointer travel of a drag into a panel width.
  *
- * The panel is pinned to the **right** edge, so the visible width is the
- * distance from the pointer to the right edge of the viewport. Clamping through
- * `clampDrawerWidth` makes an out-of-window pointer harmless.
+ * The width is anchored to the two things a drag actually knows — the width the
+ * gesture started with and how far the pointer has moved since — and never to a
+ * viewport edge. Two defects of the former edge-anchored calculation
+ * (`window.innerWidth - clientX`) are gone with it: `window.innerWidth` counts
+ * the classic scrollbar while a `fixed right-0` panel ends at
+ * `document.documentElement.clientWidth` (so every step overshot by the
+ * scrollbar width), and a layout shift under a stationary pointer can no longer
+ * feed back into the width, because the delta of a pointer that has not moved is
+ * `0` for any `currentX === startX` — which is what kept the panel ratcheting
+ * towards `min`/`max` while the user only hovered the separator.
  *
- * @param clientX - pointer x coordinate in CSS pixels.
- * @param viewportWidth - current viewport width in CSS pixels.
+ * The handle sits on the panel's **left** edge, so moving the pointer left
+ * (`currentX < startX`) widens the panel.
+ *
+ * @param startX - pointer x at `pointerdown`, in CSS pixels.
+ * @param currentX - pointer x of the current `pointermove`, in CSS pixels.
+ * @param startWidth - panel width when the drag started, in CSS pixels.
  * @param range - bounds and fallback widths.
- * @returns the clamped width the pointer asks for.
+ * @returns the clamped width the drag asks for.
  */
-export function toWidthFromPointer(
-  clientX: number,
-  viewportWidth: number,
+export function toWidthFromDrag(
+  startX: number,
+  currentX: number,
+  startWidth: number,
   range: LogDrawerSizeRange,
 ): number {
-  return clampDrawerWidth(viewportWidth - clientX, range);
+  return clampDrawerWidth(startWidth - (currentX - startX), range);
 }
 
 /**

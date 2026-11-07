@@ -72,6 +72,24 @@ export interface LogDrawerSizeRange {
 }
 
 /**
+ * Geometry of one in-flight pointer drag of the resize separator.
+ *
+ * Kept by the component (a `useRef`, not a prop) because only the handle knows
+ * the gesture's origin. `startX`/`startWidth` are the anchor the width is
+ * derived from: the reported width is `startWidth - (currentX - startX)`, so it
+ * depends on the pointer's **travel** and never on a viewport edge — see
+ * `toWidthFromDrag` in `log-drawer.logic.ts`.
+ */
+export interface LogDrawerDragAnchor {
+  /** `pointerId` of the pointer that started the drag; a move of any other pointer is ignored. */
+  readonly pointerId: number;
+  /** Pointer x at `pointerdown`, in CSS pixels. */
+  readonly startX: number;
+  /** Panel width at `pointerdown`, in CSS pixels. */
+  readonly startWidth: number;
+}
+
+/**
  * Inline style carrying the panel width as a CSS custom property.
  *
  * The custom property name is declared in

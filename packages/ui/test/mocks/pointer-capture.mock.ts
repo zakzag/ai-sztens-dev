@@ -22,6 +22,21 @@ export interface PointerDispatchInit {
   readonly pointerId: number;
   /** Horizontal viewport coordinate, in CSS pixels. */
   readonly clientX: number;
+  /**
+   * Buttons held during the event.
+   *
+   * `0` (the default) is what a browser reports for a plain **hover**; a drag
+   * reports `1`. The handle refuses to resize unless a button is held, so a test
+   * that means a drag has to say so.
+   */
+  readonly buttons?: number;
+  /**
+   * Button that caused a `pointerdown`; `0` is the primary button.
+   *
+   * Only the primary button may start a drag, so a secondary-button test has to
+   * pass `2`.
+   */
+  readonly button?: number;
 }
 
 /**
@@ -80,6 +95,8 @@ export function dispatchPointerEvent(
     bubbles: true,
     cancelable: true,
     clientX: init.clientX,
+    buttons: init.buttons ?? 0,
+    button: init.button ?? 0,
   });
 
   Object.defineProperty(event, 'pointerId', { value: init.pointerId });

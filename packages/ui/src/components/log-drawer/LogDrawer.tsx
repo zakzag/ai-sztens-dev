@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
@@ -23,8 +23,8 @@ import {
 } from './log-drawer.const.js';
 import {
   toLogDrawerHandleLabel,
+  toWidthFromDrag,
   toWidthFromKey,
-  toWidthFromPointer,
   toWidthStyle,
 } from './log-drawer.logic.js';
 import { LogEntryRow } from './LogEntryRow.js';
@@ -38,7 +38,10 @@ import {
   logDrawerTabVariants,
   logFilterChipVariants,
 } from './log-drawer.variants.js';
-import type { LogDrawerProps } from './log-drawer.interface.js';
+import type {
+  LogDrawerDragAnchor,
+  LogDrawerProps,
+} from './log-drawer.interface.js';
 
 /**
  * Side log panel with **one** always-visible arrow handle (AIS-82, AIS-136).
@@ -69,9 +72,13 @@ import type { LogDrawerProps } from './log-drawer.interface.js';
  *
  * The resize separator on the panel's left edge (AIS-150) is the same
  * presentational contract: it reports `onResizeStart`, `onWidthChange`,
- * `onResizeEnd` and `onWidthReset`, and the host owns the width. It is rendered
- * only while the panel is open and only from `md` up — below that the panel is
- * full width, so there is nothing to resize.
+ * `onResizeEnd` and `onWidthReset`, and the host owns the width. It resizes on
+ * a **drag only** — `pointermove` is a hover event too, so a move is reported
+ * only while this handle's own drag is running, and the width it reports comes
+ * from the pointer's travel since `pointerdown`, never from a viewport edge (a
+ * hover used to resize the panel, ratcheting it towards `min`/`max`). It is
+ * rendered only while the panel is open and only from `md` up — below that the
+ * panel is full width, so there is nothing to resize.
  *
  * @param props - see {@link LogDrawerProps}.
  */
@@ -98,6 +105,16 @@ export function LogDrawer({
   const panelId = `${useId()}${LOG_DRAWER_PANEL_ID_SUFFIX}`;
   const widthStyle = toWidthStyle(width);
 
+  /**
+   * The pointer drag in progress, or `null`.
+   *
+   * `pointermove` also fires while the pointer merely hovers the separator, so
+   * the handler has to know whether a drag *it* started is still running; the
+   * anchor is that proof. It also carries the width the gesture started with,
+   * which the reported width is measured against (see `toWidthFromDrag`).
+   */
+  const dragAnchor = useRef<LogDrawerDragAnchor | null>(null);
+
   useEffect(() => {
     if (!isOpen) {
       return undefined;
@@ -115,27 +132,60 @@ export function LogDrawer({
   }, [isOpen, onClose]);
 
   /**
-   * Starts a drag: the host flips `isResizing` and the pointer is captured, so
-   * the moves keep arriving even when the pointer leaves the 12 px handle.
+   * Starts a drag: the host flips `isResizing`, the gesture's origin is recorded
+   * and the pointer is captured, so the moves keep arriving even when the
+   * pointer leaves the 12 px handle.
+   *
+   * A non-primary button is ignored — a right-click on the separator must not
+   * resize the panel. Touch and pen report button `0`, so they keep working.
    *
    * @param event - the `pointerdown` of the handle.
    */
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>): void {
+    if (event.button !== 0) {
+      return;
+    }
+
+    dragAnchor.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: width,
+    };
     onResizeStart();
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   /**
-   * Reports the width the pointer asks for.
+   * Reports the width the drag asks for.
    *
-   * The viewport width is read at event time (not stored), so a window resize
-   * during a drag cannot use a stale value.
+   * `pointermove` is a **hover** event as well, so this does nothing unless a
+   * drag started by this handle is still running: no anchor — or one belonging
+   * to another pointer — means the cursor merely passed over the separator. A
+   * move with no button held means the gesture was released outside the panel
+   * and no `pointerup` will ever arrive, so it ends the drag instead of
+   * resizing.
    *
    * @param event - the `pointermove` of the handle.
    */
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>): void {
+    const anchor = dragAnchor.current;
+
+    if (anchor === null || anchor.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (event.buttons === 0) {
+      handlePointerEnd(event);
+      return;
+    }
+
     onWidthChange(
-      toWidthFromPointer(event.clientX, window.innerWidth, widthRange),
+      toWidthFromDrag(
+        anchor.startX,
+        event.clientX,
+        anchor.startWidth,
+        widthRange,
+      ),
     );
   }
 
@@ -148,6 +198,8 @@ export function LogDrawer({
    * @param event - the `pointerup`/`pointercancel` of the handle.
    */
   function handlePointerEnd(event: ReactPointerEvent<HTMLDivElement>): void {
+    dragAnchor.current = null;
+
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }

@@ -380,15 +380,123 @@ describe('LogDrawer — resizable panel', () => {
     expect(handle.className).toContain('md:flex');
   });
 
-  it('reports the width a pointer drag asks for', () => {
+  it('ignores a pointer that only hovers the separator', () => {
+    const { props, handle } = renderResizable();
+
+    dispatchPointerEvent(handle, 'pointermove', { pointerId: 1, clientX: 600 });
+    dispatchPointerEvent(handle, 'pointermove', { pointerId: 1, clientX: 550 });
+
+    expect(props.onResizeStart).not.toHaveBeenCalled();
+    expect(props.onWidthChange).not.toHaveBeenCalled();
+  });
+
+  it('reports the width the pointer travel asks for', () => {
+    const { props, handle } = renderResizable({ width: 416 });
+
+    dispatchPointerEvent(handle, 'pointerdown', { pointerId: 1, clientX: 600 });
+    dispatchPointerEvent(handle, 'pointermove', {
+      pointerId: 1,
+      clientX: 520,
+      buttons: 1,
+    });
+    dispatchPointerEvent(handle, 'pointerup', { pointerId: 1, clientX: 520 });
+
+    expect(props.onWidthChange).toHaveBeenCalledTimes(1);
+    expect(props.onWidthChange).toHaveBeenCalledWith(496);
+  });
+
+  it('does not let the absolute pointer position decide the width', () => {
+    const { props, handle } = renderResizable({ width: 416 });
+
+    dispatchPointerEvent(handle, 'pointerdown', { pointerId: 1, clientX: 900 });
+    dispatchPointerEvent(handle, 'pointermove', {
+      pointerId: 1,
+      clientX: 900,
+      buttons: 1,
+    });
+
+    expect(props.onWidthChange).toHaveBeenCalledWith(416);
+  });
+
+  it('clamps the drag at both bounds', () => {
+    const { props, handle } = renderResizable({ width: 416 });
+
+    dispatchPointerEvent(handle, 'pointerdown', { pointerId: 1, clientX: 600 });
+    dispatchPointerEvent(handle, 'pointermove', {
+      pointerId: 1,
+      clientX: 0,
+      buttons: 1,
+    });
+    dispatchPointerEvent(handle, 'pointermove', {
+      pointerId: 1,
+      clientX: 5_000,
+      buttons: 1,
+    });
+
+    expect(props.onWidthChange).toHaveBeenNthCalledWith(
+      1,
+      LOG_DRAWER_WIDTH_MAX,
+    );
+    expect(props.onWidthChange).toHaveBeenNthCalledWith(
+      2,
+      LOG_DRAWER_WIDTH_MIN,
+    );
+  });
+
+  it('ends the drag instead of resizing when no button is held', () => {
+    const { props, handle } = renderResizable();
+
+    dispatchPointerEvent(handle, 'pointerdown', { pointerId: 4, clientX: 600 });
+    dispatchPointerEvent(handle, 'pointermove', { pointerId: 4, clientX: 560 });
+
+    expect(props.onWidthChange).not.toHaveBeenCalled();
+    expect(props.onResizeEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a pointermove that belongs to another pointer', () => {
     const { props, handle } = renderResizable();
 
     dispatchPointerEvent(handle, 'pointerdown', { pointerId: 1, clientX: 600 });
-    dispatchPointerEvent(handle, 'pointermove', { pointerId: 1, clientX: 600 });
-    dispatchPointerEvent(handle, 'pointerup', { pointerId: 1, clientX: 600 });
+    dispatchPointerEvent(handle, 'pointermove', {
+      pointerId: 2,
+      clientX: 500,
+      buttons: 1,
+    });
 
-    expect(props.onWidthChange).toHaveBeenCalledTimes(1);
-    expect(props.onWidthChange).toHaveBeenCalledWith(window.innerWidth - 600);
+    expect(props.onWidthChange).not.toHaveBeenCalled();
+  });
+
+  it('ignores a pointermove after the drag ended', () => {
+    const { props, handle } = renderResizable();
+
+    dispatchPointerEvent(handle, 'pointerdown', { pointerId: 1, clientX: 600 });
+    dispatchPointerEvent(handle, 'pointerup', { pointerId: 1, clientX: 600 });
+    dispatchPointerEvent(handle, 'pointermove', {
+      pointerId: 1,
+      clientX: 500,
+      buttons: 1,
+    });
+
+    expect(props.onWidthChange).not.toHaveBeenCalled();
+  });
+
+  it('does not start a drag on a secondary button', () => {
+    const { props, handle, stubs } = renderResizable();
+
+    dispatchPointerEvent(handle, 'pointerdown', {
+      pointerId: 9,
+      clientX: 600,
+      button: 2,
+    });
+    dispatchPointerEvent(handle, 'pointermove', {
+      pointerId: 9,
+      clientX: 500,
+      buttons: 2,
+    });
+
+    expect(props.onResizeStart).not.toHaveBeenCalled();
+    expect(stubs.setPointerCapture).not.toHaveBeenCalled();
+    expect(props.onWidthChange).not.toHaveBeenCalled();
   });
 
   it('brackets a drag with the resize start and end intents', () => {

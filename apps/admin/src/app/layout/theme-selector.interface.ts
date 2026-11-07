@@ -1,12 +1,17 @@
 /**
- * Types of the appearance selector of the admin header (AIS-147, AIS-149).
+ * Types of the appearance selector of the admin header (AIS-147, AIS-149,
+ * AIS-167).
  *
- * The selector is **UI only**: the theme is not applied anywhere yet, so the
- * value type describes a choice, not a feature (AIS-140 `D3`).
+ * The value type is **`ThemeName` from `@callback/ui`**, not a second union: the
+ * token file and the selector cannot drift apart, so the selector can never offer
+ * an appearance that has no token block and the engine can never accept one the
+ * selector cannot produce.
  */
 
-/** One selectable appearance. */
-export type ThemeOption = 'light' | 'dark' | 'ambient';
+import type { ThemeName } from '@callback/ui';
+
+/** One selectable appearance — the token contract's own union, not a copy. */
+export type ThemeOption = ThemeName;
 
 /**
  * One entry of the appearance list.
@@ -25,11 +30,16 @@ export interface ThemeOptionEntry {
 /** Props of {@link ThemeSelector}. */
 export interface ThemeSelectorProps {
   /**
-   * Receives the newly selected value after the visual selection moved.
+   * The appearance currently applied (AIS-167).
    *
-   * It is a **port**: the header currently hands over a documented no-op,
-   * because applying a theme (tokens, `data-theme`, persistence) is not part of
-   * AIS-147 (AIS-140 `D3`).
+   * The selector no longer owns the choice: `app/theme/theme-provider.tsx` does,
+   * because the appearance outlives navigation. Keeping the control **purely
+   * controlled** means it applies nothing itself — no `<html>` attribute, no
+   * storage write — which is why its test can still assert the absence of side
+   * effects, and the wiring is asserted once, on `AdminLayout`.
    */
+  readonly value: ThemeOption;
+
+  /** Receives the newly selected value after the visual selection moved. */
   readonly onThemeChange: (value: ThemeOption) => void;
 }

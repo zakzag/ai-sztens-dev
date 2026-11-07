@@ -25,6 +25,7 @@ import {
   ADMIN_HEADER_TOP_ROW_HEIGHT,
   ADMIN_HEADER_Z_INDEX,
   APP_USER_SETTINGS_ARIA_LABEL,
+  DEFAULT_THEME_OPTION,
   THEME_OPTION_DARK_LABEL,
   THEME_OPTION_LIGHT,
   THEME_OPTION_LIGHT_LABEL,
@@ -35,12 +36,19 @@ import {
  * Renders the header at the stub detail route, where the breadcrumb has two
  * crumbs and therefore renders a landmark.
  *
+ * The header stays props-driven (AIS-167): it receives the applied appearance
+ * and forwards the port, so no theme provider is needed to mount it.
+ *
  * @returns the render result plus the `onThemeChange` spy.
  */
 function renderHeader() {
   const onThemeChange = vi.fn();
   const result = renderWithRouter(
-    <AdminHeader routes={MOCK_ROUTE_ENTRIES} onThemeChange={onThemeChange} />,
+    <AdminHeader
+      routes={MOCK_ROUTE_ENTRIES}
+      theme={DEFAULT_THEME_OPTION}
+      onThemeChange={onThemeChange}
+    />,
     { initialEntries: ['/detail'] },
   );
 

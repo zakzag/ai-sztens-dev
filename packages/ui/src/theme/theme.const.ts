@@ -18,8 +18,19 @@ import type { ThemeName } from './theme.interface.js';
  */
 export const DEFAULT_THEME_NAME: ThemeName = 'dark';
 
-/** Every appearance the token file implements, in display order. */
-export const THEME_NAMES: readonly ThemeName[] = ['light', DEFAULT_THEME_NAME, 'ambient'];
+/**
+ * Every appearance the token file implements, in display order.
+ *
+ * The order is also the option order of the header's select box: the two
+ * neutral appearances, the warm one, and glass last because it is the only one
+ * that changes the *depth* language, not just the palette (AIS-167).
+ */
+export const THEME_NAMES: readonly ThemeName[] = [
+  'light',
+  DEFAULT_THEME_NAME,
+  'ambient',
+  'glass',
+];
 
 /**
  * The blur affordance of the glass appearance (AIS-166).

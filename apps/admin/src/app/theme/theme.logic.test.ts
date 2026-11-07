@@ -21,6 +21,7 @@ describe('isThemeName', () => {
     expect(isThemeName('light')).toBe(true);
     expect(isThemeName('dark')).toBe(true);
     expect(isThemeName('ambient')).toBe(true);
+    expect(isThemeName('glass')).toBe(true);
   });
 
   it('rejects a name the token file does not implement', () => {

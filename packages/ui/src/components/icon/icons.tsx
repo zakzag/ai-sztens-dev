@@ -69,6 +69,26 @@ export function MoonIcon({ className }: IconProps) {
 }
 
 /**
+ * Layers icon — the “Üveg” (glass) theme option.
+ *
+ * Geometry copied from Lucide `layers` (https://lucide.dev/icons/layers),
+ * ISC licence — Copyright (c) Lucide Contributors. Stacked panes read as
+ * *translucent planes*, which is what the glass appearance actually changes,
+ * whereas a droplet or a sparkle would suggest a colour rather than a material.
+ *
+ * @param props - see {@link IconProps}.
+ */
+export function LayersIcon({ className }: IconProps) {
+  return (
+    <svg {...ICON_BASE_PROPS} className={cn(ICON_BASE_CLASS, className)}>
+      <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+      <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
+      <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
+    </svg>
+  );
+}
+
+/**
  * Sunset icon — the “Ambient” theme option.
  *
  * Geometry copied from Lucide `sunset` (https://lucide.dev/icons/sunset),

@@ -22,7 +22,7 @@
       (function () {
         try {
           var stored = window.localStorage.getItem('aisztens.theme');
-          var implemented = ['light', 'dark', 'ambient'];
+          var implemented = ['light', 'dark', 'ambient', 'glass'];
           document.documentElement.setAttribute(
             'data-theme',
             implemented.indexOf(stored) === -1 ? 'dark' : stored,

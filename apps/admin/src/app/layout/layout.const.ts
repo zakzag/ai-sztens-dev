@@ -9,7 +9,7 @@
  *   between the component and its specification.
  */
 
-import { MoonIcon, SunIcon, SunsetIcon } from '@callback/ui';
+import { LayersIcon, MoonIcon, SunIcon, SunsetIcon } from '@callback/ui';
 import type { IconProps } from '@callback/ui';
 import type { ComponentType } from 'react';
 import type {
@@ -57,6 +57,15 @@ export const DEFAULT_THEME_OPTION: ThemeOption = 'dark';
 /** Value of the ambient appearance. */
 export const THEME_OPTION_AMBIENT: ThemeOption = 'ambient';
 
+/**
+ * Value of the glass (frosted) appearance (AIS-166, AIS-167).
+ *
+ * It is the only appearance that changes the *depth* language — translucent
+ * surfaces, light rims and a backdrop blur — instead of only the palette, which
+ * is why it comes last in the list.
+ */
+export const THEME_OPTION_GLASS: ThemeOption = 'glass';
+
 /** Label of the light appearance. */
 export const THEME_OPTION_LIGHT_LABEL = 'Világos';
 
@@ -66,11 +75,15 @@ export const THEME_OPTION_DARK_LABEL = 'Sötét';
 /** Label of the ambient appearance. */
 export const THEME_OPTION_AMBIENT_LABEL = 'Ambient';
 
+/** Label of the glass appearance. */
+export const THEME_OPTION_GLASS_LABEL = 'Üveg';
+
 /** The appearance options in display order. */
 export const THEME_SELECTOR_OPTIONS: readonly ThemeOptionEntry[] = [
   { value: THEME_OPTION_LIGHT, label: THEME_OPTION_LIGHT_LABEL },
   { value: DEFAULT_THEME_OPTION, label: THEME_OPTION_DARK_LABEL },
   { value: THEME_OPTION_AMBIENT, label: THEME_OPTION_AMBIENT_LABEL },
+  { value: THEME_OPTION_GLASS, label: THEME_OPTION_GLASS_LABEL },
 ];
 
 /**
@@ -87,4 +100,5 @@ export const THEME_OPTION_ICONS: Readonly<
   [THEME_OPTION_LIGHT]: SunIcon,
   [DEFAULT_THEME_OPTION]: MoonIcon,
   [THEME_OPTION_AMBIENT]: SunsetIcon,
+  [THEME_OPTION_GLASS]: LayersIcon,
 };

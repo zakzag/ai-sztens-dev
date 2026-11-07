@@ -15,11 +15,19 @@ export interface AdminHeaderProps {
   readonly routes: readonly RouteEntry[];
 
   /**
-   * Receives the appearance the user picked.
+   * The appearance currently applied (AIS-167).
    *
-   * A port on purpose: applying a theme is out of scope here (AIS-140 `D3`), so
-   * the shell passes a documented no-op and the wiring can change without
-   * touching the selector.
+   * The header itself never reads the theme context: it stays props-driven, so a
+   * test can mount it without a provider and the shell remains the only place
+   * that knows about the engine.
+   */
+  readonly theme: ThemeOption;
+
+  /**
+   * Receives the appearance the user picked, forwarded unchanged.
+   *
+   * A port on purpose: the header does not apply anything, so the shell decides
+   * what "changing the appearance" means (today: the theme provider).
    */
   readonly onThemeChange: (value: ThemeOption) => void;
 }

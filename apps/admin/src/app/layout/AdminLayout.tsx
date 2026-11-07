@@ -1,23 +1,10 @@
 import { NotificationHost } from '@callback/notifications/react';
 import { AppErrorBanner } from '../../components/error/AppErrorBanner.js';
 import { useSessionActions } from '../session/use-require-session.js';
+import { useTheme } from '../theme/use-theme.js';
 import { AdminHeader } from './AdminHeader.js';
 import { ADMIN_HEADER_PADDING_X } from './layout.const.js';
 import type { AdminLayoutProps } from './admin-layout.interface.js';
-
-/**
- * Handler the shell gives the appearance selector.
- *
- * It is **intentionally empty** and takes no argument: AIS-147 ships the
- * selector's UI contract, not the theme implementation. Applying a theme means
- * `[data-theme]` token overrides, `color-scheme`, persistence and a flash-free
- * boot — a separate story (AIS-140 `D3`). Declared at module scope so the
- * identity is stable and no re-render is ever caused by it; a zero-parameter
- * function is still a legal `(value: ThemeOption) => void` port.
- */
-const NOOP_THEME_CHANGE = (): void => {
-  // Deliberately empty, see the doc comment above.
-};
 
 /**
  * The shell of the authenticated admin application.
@@ -42,6 +29,10 @@ const NOOP_THEME_CHANGE = (): void => {
  * no `max-w-*` — because the header spans the whole viewport and a centred,
  * narrower content column would break that alignment (AIS-140 `D2`).
  *
+ * The shell reads the theme context (AIS-167) and is therefore **not** optional
+ * to wrap in `<ThemeProvider>`: the login page is themed too, which is why the
+ * provider sits in the app provider chain rather than around this component.
+ *
  * `<NotificationHost />` is mounted here for the same reason as the banner: the
  * toast stack and the log drawer belong to the authenticated shell, so they
  * survive navigation and appear on every protected page without a page ever
@@ -55,11 +46,21 @@ const NOOP_THEME_CHANGE = (): void => {
 export function AdminLayout({ routes, children }: AdminLayoutProps) {
   const { logout } = useSessionActions();
 
+  /**
+   * The applied appearance and its setter (AIS-167).
+   *
+   * The shell — not the header and not the selector — is the one place that
+   * knows the appearance is real: it hands the current value down as a prop and
+   * the provider's setter as the selector's port, so the two components stay
+   * props-driven and a test can mount either of them without a provider.
+   */
+  const { theme, setTheme } = useTheme();
+
   return (
     <div className="flex min-h-screen flex-col">
       <AppErrorBanner onLogin={logout} />
 
-      <AdminHeader routes={routes} onThemeChange={NOOP_THEME_CHANGE} />
+      <AdminHeader routes={routes} theme={theme} onThemeChange={setTheme} />
 
       <main className={`w-full flex-1 ${ADMIN_HEADER_PADDING_X} py-8`}>
         {children}

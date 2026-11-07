@@ -398,6 +398,7 @@ export {
   ChevronDownIcon,
   ChevronRightIcon,
   CloseIcon,
+  LayersIcon,
   MoonIcon,
   PlusIcon,
   SettingsIcon,

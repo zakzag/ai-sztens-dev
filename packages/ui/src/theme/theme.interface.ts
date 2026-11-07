@@ -17,6 +17,8 @@
  * One selectable appearance.
  *
  * `dark` is the value the `@theme` block itself carries, so an `<html>` element
- * with no `data-theme` attribute renders exactly that appearance.
+ * with no `data-theme` attribute renders exactly that appearance. `glass` adds a
+ * translucent, blurred variant on top of the token contract rather than a fourth
+ * colour axis (AIS-166).
  */
-export type ThemeName = 'light' | 'dark' | 'ambient';
+export type ThemeName = 'light' | 'dark' | 'ambient' | 'glass';

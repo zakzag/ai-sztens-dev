@@ -5,12 +5,15 @@
  * involved: the option mapping and the narrowing are tested directly.
  */
 
+import { THEME_NAMES } from '@callback/ui';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_THEME_OPTION,
   THEME_OPTION_AMBIENT,
   THEME_OPTION_AMBIENT_LABEL,
   THEME_OPTION_DARK_LABEL,
+  THEME_OPTION_GLASS,
+  THEME_OPTION_GLASS_LABEL,
   THEME_OPTION_LIGHT,
   THEME_OPTION_LIGHT_LABEL,
   THEME_SELECTOR_OPTIONS,
@@ -27,13 +30,24 @@ describe('toThemeSelectOptions', () => {
       THEME_OPTION_LIGHT,
       DEFAULT_THEME_OPTION,
       THEME_OPTION_AMBIENT,
+      THEME_OPTION_GLASS,
     ]);
     expect(options.map((option) => option.label)).toEqual([
       THEME_OPTION_LIGHT_LABEL,
       THEME_OPTION_DARK_LABEL,
       THEME_OPTION_AMBIENT_LABEL,
+      THEME_OPTION_GLASS_LABEL,
     ]);
     expect(options.every((option) => option.icon !== undefined)).toBe(true);
+  });
+
+  it('offers exactly the appearances the token file implements', () => {
+    // The selector and the token file must not drift: a theme without a token
+    // block would render as the default, a token block without an option would
+    // be unreachable (AIS-167).
+    expect(toThemeSelectOptions().map((option) => option.value)).toEqual([
+      ...THEME_NAMES,
+    ]);
   });
 
   it('gives every option its own icon element', () => {
@@ -44,7 +58,12 @@ describe('toThemeSelectOptions', () => {
 });
 
 describe('toThemeOption', () => {
-  it.each([THEME_OPTION_LIGHT, DEFAULT_THEME_OPTION, THEME_OPTION_AMBIENT])(
+  it.each([
+    THEME_OPTION_LIGHT,
+    DEFAULT_THEME_OPTION,
+    THEME_OPTION_AMBIENT,
+    THEME_OPTION_GLASS,
+  ])(
     'narrows the declared value "%s"',
     (value) => {
       expect(toThemeOption(value)).toBe(value);

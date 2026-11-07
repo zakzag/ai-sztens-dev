@@ -19,6 +19,13 @@ import {
   renderWithRouter,
 } from '../../test/mocks/app-router.mock.js';
 import {
+  readDocumentTheme,
+  resetDocumentTheme,
+} from '../../test/mocks/document-theme.mock.js';
+import { createOverlayUser } from '../../test/mocks/overlay-environment.mock.js';
+import { installRecordingStorages } from '../../test/mocks/web-storage.mock.js';
+import { ThemeProvider } from '../theme/theme-provider.js';
+import {
   createTestQueryClient,
   TestQueryProvider,
 } from '../../test/mocks/query-client.mock.js';
@@ -30,11 +37,16 @@ import {
 } from '../../test/mocks/route-registry.mock.js';
 import { APP_BRAND_LABEL, APP_NAV_LABEL } from '../app.const.js';
 import { SessionContext } from '../providers/session-provider.js';
+import { THEME_STORAGE_KEY } from '../theme/theme.const.js';
 import { AdminLayout } from './AdminLayout.js';
 import {
   ADMIN_HEADER_CRUMB_ROW_HEIGHT,
   ADMIN_HEADER_PADDING_X,
   ADMIN_HEADER_TOP_ROW_HEIGHT,
+  THEME_OPTION_DARK_LABEL,
+  THEME_OPTION_GLASS,
+  THEME_OPTION_GLASS_LABEL,
+  THEME_SELECTOR_LABEL,
 } from './layout.const.js';
 
 describe('AdminLayout', () => {
@@ -227,9 +239,13 @@ describe('AdminLayout', () => {
         <TestQueryProvider client={createTestQueryClient()}>
           <MemoryRouter>
             <SessionContext.Provider value={createMockSession()}>
-              <AdminLayout routes={MOCK_ROUTE_ENTRIES}>
-                <p>page content</p>
-              </AdminLayout>
+              {/* The theme provider is present so the *notification* error is
+                  the one that fires (the shell reads the theme, AIS-167). */}
+              <ThemeProvider>
+                <AdminLayout routes={MOCK_ROUTE_ENTRIES}>
+                  <p>page content</p>
+                </AdminLayout>
+              </ThemeProvider>
             </SessionContext.Provider>
           </MemoryRouter>
         </TestQueryProvider>,
@@ -255,5 +271,36 @@ describe('AdminLayout', () => {
     ).toThrow(/useRequireSession/);
 
     consoleError.mockRestore();
+  });
+
+  it('applies and persists the appearance picked in the header', async () => {
+    // AIS-167: the shell is the single place that knows the appearance is real —
+    // the header and the selector only forward the value and the port.
+    const storage = installRecordingStorages();
+    const user = createOverlayUser();
+
+    resetDocumentTheme();
+
+    renderWithRouter(
+      <AdminLayout routes={MOCK_ROUTE_ENTRIES}>
+        <p>page content</p>
+      </AdminLayout>,
+    );
+
+    await user.click(
+      screen.getByRole('button', {
+        name: `${THEME_SELECTOR_LABEL}: ${THEME_OPTION_DARK_LABEL}`,
+      }),
+    );
+    await screen.findByRole('menu');
+    await user.click(
+      screen.getByRole('menuitemradio', { name: THEME_OPTION_GLASS_LABEL }),
+    );
+
+    expect(readDocumentTheme()).toBe(THEME_OPTION_GLASS);
+    expect(storage.local.getItem(THEME_STORAGE_KEY)).toBe(THEME_OPTION_GLASS);
+
+    storage.restore();
+    resetDocumentTheme();
   });
 });

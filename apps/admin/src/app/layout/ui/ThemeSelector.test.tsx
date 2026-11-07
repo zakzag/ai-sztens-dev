@@ -1,17 +1,18 @@
 /**
  * Tests of the appearance selector.
  *
- * The component is a controlled-by-nobody **select box** (AIS-149): it owns its
- * selection locally and reports every change through the `onThemeChange` port.
- * The suite covers the compact contract — closed it shows **only** the chosen
- * appearance with its icon, open it lists all three — and the negative
- * contract: selecting an appearance changes **nothing** outside the component
- * (AIS-140 `D3`).
+ * The component is a **purely controlled** select box (AIS-149, AIS-167): it
+ * renders the value it is given and reports a pick. The suite covers the compact
+ * contract — closed it shows **only** the chosen appearance with its icon, open
+ * it lists the four appearances — and the negative contract: the control itself
+ * touches neither the document nor the storage. The wiring (attribute +
+ * persistence) is asserted once, on `AdminLayout`.
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createOverlayUser } from '../../../test/mocks/overlay-environment.mock.js';
+import { ThemeSelectorHarness } from '../../../test/mocks/theme-selector-harness.mock.js';
 import {
   installRecordingStorages,
   type WebStorageHarness,
@@ -19,22 +20,22 @@ import {
 import {
   THEME_OPTION_AMBIENT_LABEL,
   THEME_OPTION_DARK_LABEL,
-  THEME_OPTION_LIGHT,
+  THEME_OPTION_GLASS,
+  THEME_OPTION_GLASS_LABEL,
   THEME_OPTION_LIGHT_LABEL,
   THEME_SELECTOR_LABEL,
 } from '../layout.const.js';
-import { ThemeSelector } from './ThemeSelector.js';
 
 /**
- * Renders the selector with a fresh port spy.
+ * Renders the selector with a stateful owner and a fresh change spy.
  *
- * @returns the render result plus the `onThemeChange` spy.
+ * @returns the render result plus the `onChange` spy.
  */
 function renderSelector() {
-  const onThemeChange = vi.fn();
-  const result = render(<ThemeSelector onThemeChange={onThemeChange} />);
+  const onChange = vi.fn();
+  const result = render(<ThemeSelectorHarness onChange={onChange} />);
 
-  return { ...result, onThemeChange };
+  return { ...result, onChange };
 }
 
 /**
@@ -64,6 +65,7 @@ describe('ThemeSelector', () => {
 
   afterEach(() => {
     storage.restore();
+    document.documentElement.removeAttribute('data-theme');
   });
 
   it('closes into a select box that shows only the chosen appearance', () => {
@@ -83,6 +85,9 @@ describe('ThemeSelector', () => {
     expect(
       screen.queryByText(THEME_OPTION_AMBIENT_LABEL),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(THEME_OPTION_GLASS_LABEL),
+    ).not.toBeInTheDocument();
   });
 
   it('offers no search field, unlike a combobox', () => {
@@ -92,7 +97,7 @@ describe('ThemeSelector', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('lists the three appearances with an icon each and marks the current one', async () => {
+  it('lists the four appearances with an icon each and marks the current one', async () => {
     const user = createOverlayUser();
 
     renderSelector();
@@ -113,6 +118,7 @@ describe('ThemeSelector', () => {
       THEME_OPTION_LIGHT_LABEL,
       THEME_OPTION_DARK_LABEL,
       THEME_OPTION_AMBIENT_LABEL,
+      THEME_OPTION_GLASS_LABEL,
     ]);
     expect(
       options.every((option) => option.querySelector('svg') !== null),
@@ -122,7 +128,7 @@ describe('ThemeSelector', () => {
 
   it('moves the selection, closes, and shows the new appearance', async () => {
     const user = createOverlayUser();
-    const { onThemeChange } = renderSelector();
+    const { onChange } = renderSelector();
 
     await user.click(
       screen.getByRole('button', {
@@ -134,8 +140,8 @@ describe('ThemeSelector', () => {
       screen.getByRole('menuitemradio', { name: THEME_OPTION_LIGHT_LABEL }),
     );
 
-    expect(onThemeChange).toHaveBeenCalledTimes(1);
-    expect(onThemeChange).toHaveBeenCalledWith(THEME_OPTION_LIGHT);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith('light');
     await waitFor(() => {
       expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     });
@@ -144,6 +150,24 @@ describe('ThemeSelector', () => {
         name: toTriggerName(THEME_OPTION_LIGHT_LABEL),
       }),
     ).toBeInTheDocument();
+  });
+
+  it('reports the glass appearance as the token union value', async () => {
+    const user = createOverlayUser();
+    const { onChange } = renderSelector();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: toTriggerName(THEME_OPTION_DARK_LABEL),
+      }),
+    );
+    await screen.findByRole('menu');
+    await user.click(
+      screen.getByRole('menuitemradio', { name: THEME_OPTION_GLASS_LABEL }),
+    );
+
+    expect(onChange).toHaveBeenCalledWith(THEME_OPTION_GLASS);
+    expect(onChange).toHaveBeenCalledWith('glass');
   });
 
   it('touches neither the document nor the storage', async () => {

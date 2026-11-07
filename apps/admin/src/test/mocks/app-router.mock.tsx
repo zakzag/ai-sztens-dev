@@ -11,16 +11,18 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { AuthProvider } from '../../auth/AuthContext.js';
 import { SessionContext } from '../../app/providers/session-provider.js';
 import type { SessionState } from '../../app/session/session.interface.js';
+import { ThemeProvider } from '../../app/theme/theme-provider.js';
 import { createNotificationHarness } from './notification-provider.mock.js';
 
 /**
  * Render helpers for the `app/` layer tests.
  *
- * The `app/` components read five contexts: the router, the session, the query
+ * The `app/` components read six contexts: the router, the session, the query
  * client (the app-level banner reads the query cache), the auth provider (the
- * login page needs it) and the notification provider (the layout renders
- * `<NotificationHost />`, AIS-84). These wrappers supply them, so a component
- * test can focus on the component instead of rebuilding the provider chain.
+ * login page needs it), the notification provider (the layout renders
+ * `<NotificationHost />`, AIS-84) and the theme provider (the shell reads the
+ * applied appearance, AIS-167). These wrappers supply them, so a component test
+ * can focus on the component instead of rebuilding the provider chain.
  */
 
 /** Props of {@link renderWithRouter}. */
@@ -62,7 +64,7 @@ export function renderWithRouter(
           <MemoryRouter initialEntries={initialEntries}>
             <AuthProvider>
               <SessionContext.Provider value={session}>
-                {children}
+                <ThemeProvider>{children}</ThemeProvider>
               </SessionContext.Provider>
             </AuthProvider>
           </MemoryRouter>

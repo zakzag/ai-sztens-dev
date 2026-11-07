@@ -30,15 +30,16 @@ import type { AdminHeaderProps } from './admin-header.interface.js';
  * - **full bleed** — only the inner padding, no `max-w-*`, so the header and the
  *   `<main>` below share the same left edge (AIS-140 `D2`).
  *
- * The appearance selector and the user-settings button are deliberately **not
- * functional** yet: AIS-147 ships the UI contract, not the theming or the
- * settings screen (AIS-140 `D3` / `D4`). The settings button therefore has no
- * `onClick` and never navigates.
+ * The appearance selector is wired since AIS-167, but the header still only
+ * *forwards* the value and the port — it never reads the theme context, so the
+ * shell stays the single place that knows about the engine. The user-settings
+ * button remains deliberately inert: AIS-147 shipped the UI contract, not the
+ * settings screen (AIS-140 `D4`), so it has no `onClick` and never navigates.
  *
  * @param props - see {@link AdminHeaderProps}.
  * @returns the sticky header.
  */
-export function AdminHeader({ routes, onThemeChange }: AdminHeaderProps) {
+export function AdminHeader({ routes, theme, onThemeChange }: AdminHeaderProps) {
   return (
     <header
       className={`sticky top-0 ${ADMIN_HEADER_Z_INDEX} border-b border-border-hairline bg-surface-raised`}
@@ -54,7 +55,7 @@ export function AdminHeader({ routes, onThemeChange }: AdminHeaderProps) {
         </Link>
 
         <div className="flex items-center gap-4">
-          <ThemeSelector onThemeChange={onThemeChange} />
+          <ThemeSelector value={theme} onThemeChange={onThemeChange} />
           <Button
             type="button"
             variant="ghost"

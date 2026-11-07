@@ -1,8 +1,9 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-08 — AIS-165 / AIS-166 (témamotor: `data-theme`, `light` / `ambient` /
-`glass` token-blokkok, perzisztencia, villogásmentes boot, `surface-glass` blur a lebegő rétegeken —
-lásd §3.2.2 és §5).** Korábbi: AIS-155 (route-alapú `EntityDialog` szabvány + api-keys lista-első oldal).
+**Utolsó frissítés: 2026-11-08 — AIS-165 / AIS-166 / AIS-167 (témamotor: `data-theme`, `light` /
+`ambient` / `glass` token-blokkok, perzisztencia, villogásmentes boot, `surface-glass` blur a lebegő
+rétegeken, negyedik `Üveg` opció a fejléc választójában — lásd §3.2.2 és §5).** Korábbi: AIS-155
+(route-alapú `EntityDialog` szabvány + api-keys lista-első oldal).
 Minden entitás-létrehozó/-módosító felület **route-mountolt overlay** (`EntityDialog`, `size="fit"`,
 opcionális footer submit `form` attribútummal, read-only mód `submit: null`-lal), a lista pedig
 mountolva marad mögötte: a `RouteEntry` új `children` mezőt kapott, az `AppRouter` rekurzívan renderel,

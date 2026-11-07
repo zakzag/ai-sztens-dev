@@ -1,4 +1,5 @@
 import { cva } from 'class-variance-authority';
+import { SURFACE_GLASS_CLASS } from '../../theme/theme.const.js';
 
 /**
  * Surface recipe of the dropdown panel.
@@ -7,7 +8,7 @@ import { cva } from 'class-variance-authority';
  * the same as every other floating layer in the kit.
  */
 export const dropdownMenuContentVariants = cva(
-  'z-50 min-w-40 rounded-control border border-hairline border-border-hairline bg-surface-overlay p-1 shadow-neu-raised',
+  `z-50 min-w-40 rounded-control border border-hairline border-border-hairline bg-surface-overlay p-1 shadow-neu-raised ${SURFACE_GLASS_CLASS}`,
 );
 
 /**

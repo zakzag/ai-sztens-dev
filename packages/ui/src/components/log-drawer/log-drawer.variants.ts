@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import { SURFACE_GLASS_CLASS } from '../../theme/theme.const.js';
 import { LOG_DRAWER_Z_INDEX } from './log-drawer.const.js';
 
 /**
@@ -16,7 +17,7 @@ import { LOG_DRAWER_Z_INDEX } from './log-drawer.const.js';
  * off-screen on a narrow viewport.
  */
 export const logDrawerTabVariants = cva(
-  `fixed top-1/2 right-0 ${LOG_DRAWER_Z_INDEX} flex w-10 -translate-y-1/2 flex-col items-center gap-2 rounded-l-card border border-r-0 border-hairline bg-surface-overlay py-3 transition-shadow duration-fast focus-visible:border-border-focus focus-visible:shadow-focus-ring focus-visible:outline-none`,
+  `fixed top-1/2 right-0 ${LOG_DRAWER_Z_INDEX} flex w-10 -translate-y-1/2 flex-col items-center gap-2 rounded-l-card border border-r-0 border-hairline bg-surface-overlay py-3 transition-shadow duration-fast ${SURFACE_GLASS_CLASS} focus-visible:border-border-focus focus-visible:shadow-focus-ring focus-visible:outline-none`,
   {
     variants: {
       isOpen: {
@@ -43,7 +44,7 @@ export const logDrawerTabVariants = cva(
  * animates against the pointer.
  */
 export const logDrawerPanelVariants = cva(
-  `fixed inset-y-0 right-0 ${LOG_DRAWER_Z_INDEX} flex w-full flex-col border-l border-hairline bg-surface-overlay text-sm text-text-primary shadow-neu-raised md:w-[var(--log-drawer-width)]`,
+  `fixed inset-y-0 right-0 ${LOG_DRAWER_Z_INDEX} flex w-full flex-col border-l border-hairline bg-surface-overlay text-sm text-text-primary shadow-neu-raised ${SURFACE_GLASS_CLASS} md:w-[var(--log-drawer-width)]`,
   {
     variants: {
       isResizing: {

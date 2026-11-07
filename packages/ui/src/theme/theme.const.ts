@@ -20,3 +20,17 @@ export const DEFAULT_THEME_NAME: ThemeName = 'dark';
 
 /** Every appearance the token file implements, in display order. */
 export const THEME_NAMES: readonly ThemeName[] = ['light', DEFAULT_THEME_NAME, 'ambient'];
+
+/**
+ * The blur affordance of the glass appearance (AIS-166).
+ *
+ * `backdrop-filter` is a property, not a token value, so it cannot be switched
+ * by a theme block; the recipes that own a *floating* surface therefore carry
+ * this utility unconditionally. It reads `--blur-glass` / `--saturate-glass`,
+ * which are `0px` / `100%` for every opaque appearance — so the class is a
+ * visual no-op there and no component has to branch on the theme.
+ *
+ * Declared once here, because a class name repeated in ten recipes is a rename
+ * hazard (the same reason `placeholder:` and friends are not retyped).
+ */
+export const SURFACE_GLASS_CLASS = 'surface-glass';

@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import { SURFACE_GLASS_CLASS } from '../../theme/theme.const.js';
 import { DIALOG_CONTENT_Z_INDEX } from '../dialog/dialog.const.js';
 
 /**
@@ -9,7 +10,7 @@ import { DIALOG_CONTENT_Z_INDEX } from '../dialog/dialog.const.js';
  * the two overlays cannot drift apart visually.
  */
 export const drawerVariants = cva(
-  `fixed top-0 bottom-0 ${DIALOG_CONTENT_Z_INDEX} flex w-full max-w-md flex-col gap-4 border border-hairline border-border-hairline bg-surface-raised p-6 shadow-neu-raised focus-visible:outline-none`,
+  `fixed top-0 bottom-0 ${DIALOG_CONTENT_Z_INDEX} flex w-full max-w-md flex-col gap-4 border border-hairline border-border-hairline bg-surface-raised p-6 shadow-neu-raised ${SURFACE_GLASS_CLASS} focus-visible:outline-none`,
   {
     variants: {
       side: {

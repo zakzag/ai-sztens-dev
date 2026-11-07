@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import { SURFACE_GLASS_CLASS } from '../../theme/theme.const.js';
 import { TOAST_STACK_Z_INDEX } from './toast.const.js';
 
 /**
@@ -16,7 +17,7 @@ import { TOAST_STACK_Z_INDEX } from './toast.const.js';
  * "back" so the newest one reads as the front of the pile (D6).
  */
 export const toastVariants = cva(
-  'pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-card border-strong border-border-hairline bg-surface-overlay px-4 py-3 text-sm text-text-primary shadow-neu-raised transition-[transform,opacity] duration-base ease-neu starting:-translate-y-2 starting:scale-95 starting:opacity-0',
+  `pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-card border-strong border-border-hairline bg-surface-overlay px-4 py-3 text-sm text-text-primary shadow-neu-raised ${SURFACE_GLASS_CLASS} transition-[transform,opacity] duration-base ease-neu starting:-translate-y-2 starting:scale-95 starting:opacity-0`,
   {
     variants: {
       level: {

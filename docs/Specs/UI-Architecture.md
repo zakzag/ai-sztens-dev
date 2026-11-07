@@ -1,8 +1,8 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-08 — AIS-165 (témamotor: `data-theme`, `light` / `ambient` token-blokkok,
-perzisztencia, villogásmentes boot — lásd §5).** Korábbi: AIS-155 (route-alapú `EntityDialog` szabvány
-+ api-keys lista-első oldal).
+**Utolsó frissítés: 2026-11-08 — AIS-165 / AIS-166 (témamotor: `data-theme`, `light` / `ambient` /
+`glass` token-blokkok, perzisztencia, villogásmentes boot, `surface-glass` blur a lebegő rétegeken —
+lásd §3.2.2 és §5).** Korábbi: AIS-155 (route-alapú `EntityDialog` szabvány + api-keys lista-első oldal).
 Minden entitás-létrehozó/-módosító felület **route-mountolt overlay** (`EntityDialog`, `size="fit"`,
 opcionális footer submit `form` attribútummal, read-only mód `submit: null`-lal), a lista pedig
 mountolva marad mögötte: a `RouteEntry` új `children` mezőt kapott, az `AppRouter` rekurzívan renderel,
@@ -269,6 +269,31 @@ _names_ are unchanged, so no component had to be touched to pick up the new look
 custom `@utility` declarations: Tailwind v4 has no theme namespace for border
 widths or transition durations, so the tokens are plain custom properties
 exposed through those utilities (decision **D15**).
+
+### 3.2.2 Appearance-state and glass tokens (AIS-165, AIS-166)
+
+Four tokens cannot live in `@theme`: `--color-*` is Tailwind's colour namespace,
+so a token called `--color-scheme` would be emitted as a *colour* named "scheme".
+They are plain `:root` custom properties, overridden by each appearance block:
+
+| Token                                  | Role                                                                                                              |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `--color-scheme`                       | feeds `color-scheme` on `body`, so native widgets (scrollbars, controls, caret) follow the appearance             |
+| `--app-backdrop`                       | body `background-image`; `none` everywhere except `ambient` and `glass`, which need a gradient behind translucent panels |
+| `--blur-glass`, `--saturate-glass`     | the values the `surface-glass` utility reads; `0px` / `100%` outside the glass appearance, which makes the class a no-op |
+
+**`surface-glass` is a property, not a value**, so no appearance block can switch
+it on. The floating-surface recipes therefore carry it unconditionally — dialog,
+drawer, dropdown/select panel, tooltip, toast, banner, log-drawer panel and its
+handle, plus the combobox listbox — and the *tokens* decide whether it does
+anything. Blur is deliberately **never** applied to the card or the table rows:
+one `backdrop-filter` per scrolling row is the known frame-cost worst case. The
+class name has a single home (`SURFACE_GLASS_CLASS` in
+`packages/ui/src/theme/theme.const.ts`), so a rename cannot miss a recipe.
+
+`prefers-reduced-transparency: reduce` and `prefers-contrast: more` re-declare the
+glass surface and border tokens as **opaque** and zero the blur, so the appearance
+degrades instead of becoming unreadable.
 
 ### 3.2.1 Default border colour (**D40**)
 

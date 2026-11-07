@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import { SURFACE_GLASS_CLASS } from '../../theme/theme.const.js';
 import {
   DIALOG_CONTENT_Z_INDEX,
   DIALOG_OVERLAY_Z_INDEX,
@@ -27,7 +28,7 @@ export const dialogOverlayVariants = cva(
  * scrolls.
  */
 export const dialogVariants = cva(
-  `fixed left-1/2 top-1/2 ${DIALOG_CONTENT_Z_INDEX} flex w-full -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-card border border-hairline border-border-hairline bg-surface-raised p-6 shadow-neu-raised focus-visible:outline-none`,
+  `fixed left-1/2 top-1/2 ${DIALOG_CONTENT_Z_INDEX} flex w-full -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-card border border-hairline border-border-hairline bg-surface-raised p-6 shadow-neu-raised ${SURFACE_GLASS_CLASS} focus-visible:outline-none`,
   {
     variants: {
       size: {

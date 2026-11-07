@@ -119,6 +119,23 @@
   transition-duration: var(--duration-base);
 }
 
+/**
+ * The glass affordance (AIS-166).
+ *
+ * `backdrop-filter` is a *property*, not a token value, so a theme block cannot
+ * switch it on — which is why the floating-surface recipes carry this utility
+ * unconditionally (`SURFACE_GLASS_CLASS` in `src/theme/theme.const.ts`). It reads
+ * the two glass tokens, and those are `0px` / `100%` for every opaque
+ * appearance, so the class is a visual no-op outside the glass theme and no
+ * component has to branch on `data-theme`.
+ *
+ * `-webkit-` first: Safari still wants the prefixed form for `saturate()`.
+ */
+@utility surface-glass {
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(var(--saturate-glass));
+  backdrop-filter: blur(var(--blur-glass)) saturate(var(--saturate-glass));
+}
+
 @layer base {
   /**
    * Tailwind v4 preflight leaves `border-color` at `currentColor`, which made
@@ -310,4 +327,116 @@
   --color-scheme: dark;
   --app-backdrop: radial-gradient(1100px 620px at 12% -12%, oklch(0.42 0.09 55 / 0.55), transparent 62%),
     radial-gradient(900px 520px at 92% 112%, oklch(0.34 0.07 320 / 0.42), transparent 65%);
+}
+
+/**
+ * Glass — the frosted appearance (AIS-166).
+ *
+ * Unlike `light` and `ambient` this is not a re-tint of the neomorphic look: the
+ * surfaces carry **alpha** (a translucent panel), the borders become light rims
+ * instead of dark hairlines, the depth becomes one soft drop shadow plus an inner
+ * highlight, and the radii get rounder. Translucency alone would be unreadable
+ * over a flat page, so the body gets `--app-backdrop`: three wide radial
+ * gradients the blur can actually work against.
+ *
+ * `--blur-glass` / `--saturate-glass` are the only values the `surface-glass`
+ * utility reads; they live here so nothing in a component names a blur radius.
+ */
+:root[data-theme="glass"] {
+  /* Brand */
+  --color-primary: oklch(0.82 0.12 200);
+  --color-primary-hover: oklch(0.87 0.11 200);
+  --color-primary-foreground: oklch(0.22 0.04 230);
+  --color-secondary: oklch(0.78 0.12 300);
+  --color-secondary-foreground: oklch(0.2 0.03 300);
+  --color-tertiary: oklch(0.8 0.12 340);
+  --color-quaternary: oklch(0.82 0.1 150);
+
+  /* Surfaces — translucent, stacked so a popover over a panel stays readable */
+  --color-surface-base: oklch(0.28 0.06 265);
+  --color-surface-raised: oklch(0.42 0.05 265 / 0.35);
+  --color-surface-sunken: oklch(0.3 0.04 265 / 0.5);
+  --color-surface-overlay: oklch(0.5 0.05 265 / 0.45);
+
+  /* Borders — light rims, never a dark hairline */
+  --color-border-hairline: oklch(1 0 0 / 0.18);
+  --color-border-default: oklch(1 0 0 / 0.28);
+  --color-border-strong: oklch(1 0 0 / 0.45);
+  --color-border-focus: oklch(0.86 0.13 200);
+
+  /* Text */
+  --color-text-primary: oklch(0.98 0.005 250);
+  --color-text-secondary: oklch(0.88 0.01 250);
+  --color-text-muted: oklch(0.76 0.012 250);
+  --color-text-inverse: oklch(0.2 0.02 250);
+
+  /* State */
+  --color-success: oklch(0.78 0.13 158);
+  --color-success-foreground: oklch(0.18 0.03 158);
+  --color-warning: oklch(0.85 0.13 85);
+  --color-warning-foreground: oklch(0.22 0.03 85);
+  --color-danger: oklch(0.7 0.17 22);
+  --color-danger-foreground: oklch(0.99 0.01 22);
+  --color-info: oklch(0.78 0.1 235);
+  --color-info-foreground: oklch(0.18 0.02 235);
+
+  /* Depth — soft drop plus an inner highlight instead of the double neomorphic pair */
+  --shadow-neu-raised: 0 24px 48px -24px oklch(0.12 0.03 265 / 0.7), inset 0 1px 0 oklch(1 0 0 / 0.35);
+  --shadow-neu-inset: inset 0 1px 2px oklch(1 0 0 / 0.12), inset 0 -1px 2px oklch(0.1 0.02 265 / 0.25);
+  --shadow-neu-pressed: inset 0 2px 6px oklch(0.1 0.02 265 / 0.35), inset 0 -1px 1px oklch(1 0 0 / 0.12);
+  --shadow-focus-ring: 0 0 0 3px oklch(0.86 0.13 200 / 0.4);
+
+  /* Shape */
+  --radius-control: 0.75rem;
+  --radius-card: 1.25rem;
+  --radius-pill: 9999px;
+
+  /* Motion */
+  --ease-neu: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Appearance state */
+  --color-scheme: dark;
+  --app-backdrop: radial-gradient(1200px 640px at 14% -10%, oklch(0.62 0.16 195 / 0.55), transparent 62%),
+    radial-gradient(900px 560px at 88% 8%, oklch(0.6 0.18 320 / 0.45), transparent 65%),
+    radial-gradient(1000px 700px at 50% 120%, oklch(0.55 0.16 265 / 0.5), transparent 70%);
+  --blur-glass: 18px;
+  --saturate-glass: 140%;
+}
+
+/**
+ * Readability fallbacks of the glass appearance.
+ *
+ * Two user settings must be able to take the glass *away* without touching a
+ * component: reduced transparency (motion sickness, older GPUs, a slow remote
+ * desktop) and increased contrast. Both drop the blur and return opaque,
+ * higher-contrast surfaces; the hues stay, so the theme is still recognisable.
+ *
+ * These blocks are intentionally **partial** overrides — the `theme-tokens` gate
+ * (AIS-168) compares top-level `:root[data-theme="…"]` blocks only, because a
+ * media-query refinement is not an appearance.
+ */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme="glass"] {
+    --color-surface-raised: oklch(0.33 0.05 265);
+    --color-surface-sunken: oklch(0.24 0.04 265);
+    --color-surface-overlay: oklch(0.37 0.05 265);
+    --color-border-hairline: oklch(0.5 0.03 265);
+    --color-border-default: oklch(0.58 0.03 265);
+    --color-border-strong: oklch(0.68 0.03 265);
+    --blur-glass: 0px;
+    --saturate-glass: 100%;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root[data-theme="glass"] {
+    --color-surface-raised: oklch(0.2 0.03 265);
+    --color-surface-overlay: oklch(0.24 0.03 265);
+    --color-text-primary: oklch(1 0 0);
+    --color-text-secondary: oklch(0.94 0.005 250);
+    --color-border-hairline: oklch(0.75 0.02 265);
+    --color-border-default: oklch(0.82 0.02 265);
+    --blur-glass: 0px;
+    --saturate-glass: 100%;
+  }
 }

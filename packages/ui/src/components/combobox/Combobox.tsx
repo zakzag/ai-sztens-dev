@@ -13,6 +13,7 @@ import {
   COMBOBOX_LISTBOX_ID_SUFFIX,
 } from './combobox.const.js';
 import { cn } from '../../lib/cn.js';
+import { SURFACE_GLASS_CLASS } from '../../theme/theme.const.js';
 import type { ComboboxOption, ComboboxProps } from './combobox.interface.js';
 
 const ARROW_DIRECTIONS: Readonly<Record<string, ComboboxDirection>> = {
@@ -136,7 +137,10 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(
           <ul
             id={listboxId}
             role="listbox"
-            className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-control border border-border-hairline bg-surface-overlay p-1 shadow-neu-raised"
+            className={cn(
+              'absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-control border border-border-hairline bg-surface-overlay p-1 shadow-neu-raised',
+              SURFACE_GLASS_CLASS,
+            )}
           >
             {filtered.length === 0 ? (
               <li

@@ -108,7 +108,10 @@ describe('ApiKeysTable', () => {
       screen.getByRole('button', { name: API_KEY_COLUMNS.name }),
     );
 
-    expect(onSortChange).toHaveBeenCalledWith({ columnId: 'name', order: 'desc' });
+    expect(onSortChange).toHaveBeenCalledWith({
+      columnId: 'name',
+      order: 'desc',
+    });
   });
 
   it('renders skeleton rows and an announcement while loading', () => {
@@ -135,6 +138,17 @@ describe('ApiKeysTable', () => {
     renderTable({ pagination: <p>Lapozó</p> });
 
     expect(screen.getByText('Lapozó')).toBeInTheDocument();
+  });
+
+  it('keeps the pager in the spaced body group of the table', () => {
+    // Regression: the card wraps its children in its own element, so the pager
+    // used to sit flush against the table (0 px). The table and the pager must
+    // be direct children of the same spacing group to stay separated.
+    const { container } = renderTable({ pagination: <p>Lapozó</p> });
+    const body = container.querySelector('table')?.closest('.space-y-4');
+
+    expect(body).not.toBeNull();
+    expect(body).toContainElement(screen.getByText('Lapozó'));
   });
 
   it('renders no pager when the page passes none', () => {

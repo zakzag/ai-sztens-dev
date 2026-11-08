@@ -13,7 +13,10 @@ import type {
   CreateApiKeyInput,
   UpdateApiKeyInput,
 } from '@callback/shared';
-import type { ApiErrorView, PaginatedMeta } from '../api/api-hooks.interface.js';
+import type {
+  ApiErrorView,
+  PaginatedMeta,
+} from '../api/api-hooks.interface.js';
 import type { ErrorSurface } from '../../lib/error-surface.interface.js';
 
 /**
@@ -100,7 +103,7 @@ export interface UseCreateApiKeyMutationResult {
  * rejects it), and `apiKey` is the stored token — rotating it is a separate,
  * auditable flow (AIS-75), not a side effect of editing a description.
  */
-export type ApiKeyEditFormFieldName = 'name' | 'description' | 'expiresAt';
+export type ApiKeyEditFieldName = 'name' | 'description' | 'expiresAt';
 
 /**
  * Read side of one key: the resource plus the four UI states.

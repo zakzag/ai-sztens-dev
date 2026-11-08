@@ -6,13 +6,14 @@
 
 import type { ReactNode } from 'react';
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
+import type { ApiKey } from '@callback/shared';
 import type { DataTableSort } from '@callback/ui';
 import type {
   ApiKeyDetailViewModel,
   ApiKeyViewModels,
 } from '../../entities/api-key/api-key.interface.js';
 import type {
-  ApiKeyEditFormFieldName,
+  ApiKeyEditFieldName,
   ApiKeyFormFieldName,
 } from '../../features/api-keys/api-keys.interface.js';
 
@@ -41,65 +42,35 @@ export type ApiKeyFormValues = Record<ApiKeyFormFieldName, string>;
  * component stays unaware of the pager contract: the page decides whether a
  * pager exists at all (`meta === null` while loading).
  */
-export type ApiKeyEditFormValues = Record<ApiKeyEditFormFieldName, string>;
+export type ApiKeyEditValues = Record<ApiKeyEditFieldName, string>;
 
 /**
- * Props of the read-only detail card.
+ * Props of the edit overlay's form window (AIS-172).
  *
- * The view model is already formatted (AIS-131): a description is never `null`
- * and the expiry verdict is a badge model, so this component decides no colour,
- * no label and no emptiness rule. The delete **request** is a callback: the card
- * does not own a mutation, the page does.
+ * The window owns `useAppForm` and the `<form>`; the route element
+ * (`ApiKeyEditDialog`) owns the detail query and the failure states, so this
+ * component is only mounted when the row exists. It receives the **row**, not
+ * pre-mapped form values: the `updatedAt` concurrency token and the value
+ * mapping both belong to this half — the token never reaches an input, and the
+ * expiry is converted once, by `toApiKeyEditValues`.
  */
-export interface ApiKeyDetailCardProps {
-  /** The key, mapped by `toApiKeyDetailViewModel`. */
-  readonly viewModel: ApiKeyDetailViewModel;
-  /** Asks the page to open the confirmation dialog. */
-  readonly onRequestDelete: () => void;
-  /** `true` while the delete request is in flight; the button is disabled. */
-  readonly isDeleting: boolean;
-}
-
-/**
- * Props of the edit form.
- *
- * Values arrive as plain form values, not as the wire row: the token (`apiKey`)
- * must not reach the component at all, and the expiry is already a calendar day
- * that an `<input type="date">` can display.
- */
-export interface ApiKeyEditFormProps {
-  /** Initial values, derived from the current version of the row. */
-  readonly values: ApiKeyEditFormValues;
+export interface ApiKeyEditDialogFormProps {
+  /** The current version of the row the overlay was opened for. */
+  readonly data: ApiKey;
+  /** `:identifier` from the URL — the address the `PATCH` is sent to. */
+  readonly identifier: string;
+  /** Closes the overlay (runs after a successful save and on every dismiss). */
+  readonly onClose: () => void;
   /**
-   * Performs the write.
+   * Re-reads the row after a refused write.
    *
-   * Owned by the page, because the `updatedAt` concurrency token and the
-   * `STALE_WRITE` decision belong to the page: the form declares *what* it
-   * submits, the page knows *which version* it edits. The callback must reject
-   * with the raw error — `useAppForm` maps it onto the fields.
+   * A `409 STALE_WRITE` means somebody saved the same key first, so the version
+   * the form carries is dead. The store is not patched (invalidation only runs
+   * after a successful write), hence the explicit re-read: it brings the new
+   * `updatedAt`, the parent remounts this window, and the user sees the values
+   * they lost the race to instead of a snapshot that can never be saved again.
    */
-  readonly submit: (values: ApiKeyEditFormValues) => Promise<unknown>;
-  /** Runs after a successful save (the page shows the confirmation). */
-  readonly onSaved: () => void;
-}
-
-/**
- * Props of the delete confirmation.
- *
- * `open` is owned by the page: only the page knows whether the mutation
- * succeeded, and the dialog must stay open on failure (AIS-117 `D4`).
- */
-export interface ApiKeyDeleteDialogProps {
-  /** Whether the dialog is visible. */
-  readonly open: boolean;
-  /** Reports a close request (`Esc`, the cancel button, the overlay). */
-  readonly onOpenChange: (open: boolean) => void;
-  /** Confirms the deletion; the dialog stays open until the page closes it. */
-  readonly onConfirm: () => void;
-  /** `true` while the request is in flight. */
-  readonly isPending: boolean;
-  /** Page-level failure text, rendered inside the dialog; `null` when none. */
-  readonly errorMessage: string | null;
+  readonly onStaleWrite: () => void;
 }
 
 /**

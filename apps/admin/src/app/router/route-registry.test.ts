@@ -8,7 +8,12 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { API_KEYS_LIST_ROUTE_PATH } from '../../pages/api-keys/api-keys.const.js';
+import {
+  API_KEYS_LIST_ROUTE_PATH,
+  API_KEY_EDIT_DIALOG_TITLE,
+  API_KEY_EDIT_ROUTE_PATH,
+  API_KEY_VIEW_ROUTE_PATH,
+} from '../../pages/api-keys/api-keys.const.js';
 import {
   APP_API_PATH_PREFIX,
   APP_NAV_HOME_LABEL,
@@ -73,7 +78,9 @@ describe('route registry', () => {
     //
     // Nested overlay routes (`/api-keys/new`) are exempt on purpose: they are
     // reached from their parent's own action button, not from a URL parameter
-    // (AIS-155 `D2`).
+    // (AIS-155 `D2`). Since AIS-173 retired the legacy `/api-keys/:identifier`
+    // page, no top-level entry is unlinked any more, so the loop guards the rule
+    // for the next page that adds one.
     for (const route of PROTECTED_ROUTE_ENTRIES) {
       if (route.navLabel === null) {
         expect(route.path).toContain(':');
@@ -81,16 +88,24 @@ describe('route registry', () => {
     }
   });
 
-  it('declares the api-key detail route under the identifier parameter', () => {
-    // The page reads the value with `useParams` and sends it straight to
-    // `GET /api/api-keys/:identifier`, so the parameter name is part of the
-    // contract between the route and the service.
-    const detail = PROTECTED_ROUTE_ENTRIES.find((route) =>
+  it('keeps the identifier parameter on the overlay children only', () => {
+    // The overlays read the value with `useParams` and send it straight to
+    // `/api/api-keys/:identifier`, so the parameter name is part of the contract
+    // between the route and the service. The standalone detail page that used to
+    // own the same parameter was retired in AIS-173: `/api-keys/x` now falls to
+    // the catch-all, while `/api-keys/x/view` and `/api-keys/x/edit` still resolve.
+    const parameterised = ALL_ROUTE_ENTRIES.filter((route) =>
       route.path.includes(':identifier'),
     );
 
-    expect(detail).toBeDefined();
-    expect(detail?.navLabel).toBeNull();
+    expect(parameterised.map((route) => route.path)).toEqual([
+      API_KEY_VIEW_ROUTE_PATH,
+      API_KEY_EDIT_ROUTE_PATH,
+    ]);
+    for (const route of parameterised) {
+      expect(route.navLabel).toBeNull();
+      expect(route.resolveBreadcrumbLabel).toBeDefined();
+    }
   });
 
   it('never links a hidden route', () => {
@@ -138,8 +153,8 @@ describe('route registry', () => {
     }
   });
 
-  it('keeps the detail page return path in sync with the list route', () => {
-    // `pages` must not import `app`, so the detail page carries its own copy of
+  it('keeps the overlay return path in sync with the list route', () => {
+    // `pages` must not import `app`, so the overlays carry their own copy of
     // the list path; this assertion is what keeps the copy honest.
     expect(API_KEYS_LIST_ROUTE_PATH).toBe(APP_ROUTE_API_KEYS_PATH);
   });
@@ -225,13 +240,32 @@ describe('route registry breadcrumb metadata (AIS-146)', () => {
     }
   });
 
-  it('mounts the detail page under the list section', () => {
-    const detail = PROTECTED_ROUTE_ENTRIES.find((route) =>
-      route.path.includes(':identifier'),
+  it('mounts the edit overlay under the list, with the identifier crumb', () => {
+    // AIS-172: editing is a URL of its own. The crumb text is the window title,
+    // and the parameter fills the last segment, so a reloaded `/edit` URL still
+    // says which key is being edited.
+    const edit = ALL_ROUTE_ENTRIES.find(
+      (route) => route.path === API_KEY_EDIT_ROUTE_PATH,
     );
 
-    expect(detail?.breadcrumbParentPath).toBe(APP_ROUTE_API_KEYS_PATH);
-    expect(detail?.resolveBreadcrumbLabel?.({ identifier: 'abc123' })).toBe(
+    expect(edit).toBeDefined();
+    expect(edit?.navLabel).toBeNull();
+    expect(edit?.breadcrumbLabel).toBe(API_KEY_EDIT_DIALOG_TITLE);
+    expect(edit?.breadcrumbParentPath).toBe(APP_ROUTE_API_KEYS_PATH);
+    expect(edit?.resolveBreadcrumbLabel?.({ identifier: 'abc123' })).toBe(
+      'abc123',
+    );
+  });
+
+  it('mounts the view overlay under the list section', () => {
+    // AIS-173 retired the standalone detail page, so this is now the entry that
+    // carries the identifier crumb of a read.
+    const view = ALL_ROUTE_ENTRIES.find(
+      (route) => route.path === API_KEY_VIEW_ROUTE_PATH,
+    );
+
+    expect(view?.breadcrumbParentPath).toBe(APP_ROUTE_API_KEYS_PATH);
+    expect(view?.resolveBreadcrumbLabel?.({ identifier: 'abc123' })).toBe(
       'abc123',
     );
   });

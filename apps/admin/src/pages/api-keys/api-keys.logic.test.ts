@@ -21,16 +21,16 @@ import {
 } from '@callback/shared';
 import type { DataTableSort } from '@callback/ui';
 import type {
-  ApiKeyEditFormValues,
+  ApiKeyEditValues,
   ApiKeyFormValues,
 } from './api-keys.interface.js';
-import { API_KEY_DETAIL_ROUTE_PATH } from './api-keys.const.js';
+import { API_KEY_EDIT_ROUTE_PATH } from './api-keys.const.js';
 import {
   apiKeyEditFormSchema,
   apiKeyFormSchema,
   isApiKeySortable,
-  toApiKeyDetailRoute,
-  toApiKeyEditFormValues,
+  toApiKeyEditValues,
+  toApiKeyEditRoute,
   toApiKeyViewRoute,
   toCreateApiKeyInput,
   toSortParams,
@@ -110,9 +110,11 @@ describe('apiKeyFormSchema', () => {
         withValues({ name: 'a'.repeat(API_KEY_NAME_MAX_LENGTH + 1) }),
         'name',
       ),
-    ).toBe(formatMessage(HUNGARIAN.TOO_LONG_TEMPLATE, {
-      max: API_KEY_NAME_MAX_LENGTH,
-    }));
+    ).toBe(
+      formatMessage(HUNGARIAN.TOO_LONG_TEMPLATE, {
+        max: API_KEY_NAME_MAX_LENGTH,
+      }),
+    );
   });
 
   it('accepts a name of exactly the shared limit', () => {
@@ -164,9 +166,11 @@ describe('apiKeyFormSchema', () => {
         }),
         'description',
       ),
-    ).toBe(formatMessage(HUNGARIAN.TOO_LONG_TEMPLATE, {
-      max: API_KEY_DESCRIPTION_MAX_LENGTH,
-    }));
+    ).toBe(
+      formatMessage(HUNGARIAN.TOO_LONG_TEMPLATE, {
+        max: API_KEY_DESCRIPTION_MAX_LENGTH,
+      }),
+    );
   });
 
   it('rejects a whitespace-only api key value', () => {
@@ -181,9 +185,11 @@ describe('apiKeyFormSchema', () => {
         withValues({ apiKey: 'k'.repeat(API_KEY_VALUE_MAX_LENGTH + 1) }),
         'apiKey',
       ),
-    ).toBe(formatMessage(HUNGARIAN.TOO_LONG_TEMPLATE, {
-      max: API_KEY_VALUE_MAX_LENGTH,
-    }));
+    ).toBe(
+      formatMessage(HUNGARIAN.TOO_LONG_TEMPLATE, {
+        max: API_KEY_VALUE_MAX_LENGTH,
+      }),
+    );
   });
 
   it('rejects a malformed expiry date', () => {
@@ -311,7 +317,7 @@ describe('toSortParams', () => {
 });
 
 /** Valid values of the edit form; tests override one field at a time. */
-const VALID_EDIT_VALUES: ApiKeyEditFormValues = {
+const VALID_EDIT_VALUES: ApiKeyEditValues = {
   name: 'Vapi prod',
   description: 'Produkciós kulcs',
   expiresAt: '2027-02-01',
@@ -324,15 +330,15 @@ const UPDATED_AT = '2026-11-04T09:00:00.000Z';
  * @param patch - fields to override.
  * @returns the base edit values with the patch applied.
  */
-function withEditValues(
-  patch: Partial<ApiKeyEditFormValues>,
-): ApiKeyEditFormValues {
+function withEditValues(patch: Partial<ApiKeyEditValues>): ApiKeyEditValues {
   return { ...VALID_EDIT_VALUES, ...patch };
 }
 
 describe('apiKeyEditFormSchema', () => {
   it('accepts the three editable fields', () => {
-    expect(apiKeyEditFormSchema.safeParse(VALID_EDIT_VALUES).success).toBe(true);
+    expect(apiKeyEditFormSchema.safeParse(VALID_EDIT_VALUES).success).toBe(
+      true,
+    );
   });
 
   it('rejects an empty name with the shared required copy', () => {
@@ -367,8 +373,10 @@ describe('apiKeyEditFormSchema', () => {
 
   it('rejects the concurrency token as a field of its own', () => {
     expect(
-      apiKeyEditFormSchema.safeParse({ ...VALID_EDIT_VALUES, updatedAt: UPDATED_AT })
-        .success,
+      apiKeyEditFormSchema.safeParse({
+        ...VALID_EDIT_VALUES,
+        updatedAt: UPDATED_AT,
+      }).success,
     ).toBe(false);
   });
 });
@@ -409,14 +417,17 @@ describe('toUpdateApiKeyInput', () => {
 
   it('throws for a calendar day that does not exist', () => {
     expect(() =>
-      toUpdateApiKeyInput(withEditValues({ expiresAt: '2027-02-31' }), UPDATED_AT),
+      toUpdateApiKeyInput(
+        withEditValues({ expiresAt: '2027-02-31' }),
+        UPDATED_AT,
+      ),
     ).toThrow(RangeError);
   });
 });
 
-describe('toApiKeyEditFormValues', () => {
+describe('toApiKeyEditValues', () => {
   it('seeds the form with the current values and a date-input expiry', () => {
-    const values = toApiKeyEditFormValues(FILLED_API_KEY);
+    const values = toApiKeyEditValues(FILLED_API_KEY);
 
     expect(values.name).toBe(FILLED_API_KEY.name);
     expect(values.description).toBe(FILLED_API_KEY.description ?? '');
@@ -425,7 +436,7 @@ describe('toApiKeyEditFormValues', () => {
   });
 
   it('renders an empty expiry for a row without one', () => {
-    const values = toApiKeyEditFormValues({
+    const values = toApiKeyEditValues({
       ...FILLED_API_KEY,
       description: null,
       expiresAt: null,
@@ -436,22 +447,24 @@ describe('toApiKeyEditFormValues', () => {
   });
 });
 
-describe('toApiKeyDetailRoute', () => {
-  it('substitutes and encodes the identifier', () => {
-    expect(toApiKeyDetailRoute('vapi-staging')).toBe('/api-keys/vapi-staging');
-    expect(toApiKeyDetailRoute('a b')).toBe('/api-keys/a%20b');
-  });
-
-  it('builds the read-only overlay route from the same parameter', () => {
-    // AIS-155: the table links to `/view`; the legacy detail page stays a
-    // sibling route reached from the overlay.
+describe('overlay route builders', () => {
+  it('builds the read-only overlay route from the URL parameter', () => {
+    // AIS-155: the table links to `/view`, which since AIS-173 is the only
+    // detail surface of the section.
     expect(toApiKeyViewRoute('vapi-staging')).toBe(
       '/api-keys/vapi-staging/view',
     );
     expect(toApiKeyViewRoute('a b')).toBe('/api-keys/a%20b/view');
   });
 
+  it('builds the edit overlay route from the same parameter (AIS-172)', () => {
+    expect(toApiKeyEditRoute('vapi-staging')).toBe(
+      '/api-keys/vapi-staging/edit',
+    );
+    expect(toApiKeyEditRoute('a b')).toBe('/api-keys/a%20b/edit');
+  });
+
   it('keeps the parameter of the route template untouched otherwise', () => {
-    expect(API_KEY_DETAIL_ROUTE_PATH).toBe('/api-keys/:identifier');
+    expect(API_KEY_EDIT_ROUTE_PATH).toBe('/api-keys/:identifier/edit');
   });
 });

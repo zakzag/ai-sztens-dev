@@ -42,12 +42,12 @@ import type { DataTableSort } from '@callback/ui';
 import { z } from 'zod';
 import { toDateInputValue, toExpiryIso } from '../../lib/date.js';
 import type {
-  ApiKeyEditFormValues,
+  ApiKeyEditValues,
   ApiKeyFormValues,
 } from './api-keys.interface.js';
 import {
   API_KEY_DETAIL_PARAM,
-  API_KEY_DETAIL_ROUTE_PATH,
+  API_KEY_EDIT_ROUTE_PATH,
   API_KEY_VIEW_ROUTE_PATH,
 } from './api-keys.const.js';
 
@@ -124,7 +124,7 @@ export const apiKeyEditFormSchema = updateApiKeySchema
  *   behind {@link apiKeyEditFormSchema}, and deliberately loud if it happens.
  */
 export function toUpdateApiKeyInput(
-  values: ApiKeyEditFormValues,
+  values: ApiKeyEditValues,
   updatedAt: string,
 ): UpdateApiKeyInput {
   const description = values.description.trim();
@@ -145,7 +145,7 @@ export function toUpdateApiKeyInput(
  * @returns form values: the expiry as a local calendar day, so the date input
  *   shows the same day the user picked when creating the key.
  */
-export function toApiKeyEditFormValues(dto: ApiKey): ApiKeyEditFormValues {
+export function toApiKeyEditValues(dto: ApiKey): ApiKeyEditValues {
   return {
     name: dto.name,
     description: dto.description ?? '',
@@ -154,34 +154,34 @@ export function toApiKeyEditFormValues(dto: ApiKey): ApiKeyEditFormValues {
 }
 
 /**
- * Builds the SPA link of the legacy detail page of one key.
- *
- * The template lives in {@link API_KEY_DETAIL_ROUTE_PATH}, which the route
- * registry mounts as well: a link can never point at a path the router does not
- * serve. Since AIS-155 the list itself links to {@link toApiKeyViewRoute}; this
- * template is still the delete/edit surface, reached from the read-only overlay.
- *
- * @param identifier - unique, URL-safe key of the resource.
- * @returns the route, e.g. `/api-keys/vapi-staging`.
- */
-export function toApiKeyDetailRoute(identifier: string): string {
-  return API_KEY_DETAIL_ROUTE_PATH.replace(
-    `:${API_KEY_DETAIL_PARAM}`,
-    encodeURIComponent(identifier),
-  );
-}
-
-/**
  * Builds the SPA link of the read-only overlay of one key (AIS-155).
  *
- * Same contract as {@link toApiKeyDetailRoute}: one literal in
- * {@link API_KEY_VIEW_ROUTE_PATH}, shared by the table and the route registry.
+ * The template lives in {@link API_KEY_VIEW_ROUTE_PATH}, which the route
+ * registry mounts as well: a link can never point at a path the router does not
+ * serve.
  *
  * @param identifier - unique, URL-safe key of the resource.
  * @returns the route, e.g. `/api-keys/vapi-staging/view`.
  */
 export function toApiKeyViewRoute(identifier: string): string {
   return API_KEY_VIEW_ROUTE_PATH.replace(
+    `:${API_KEY_DETAIL_PARAM}`,
+    encodeURIComponent(identifier),
+  );
+}
+
+/**
+ * Builds the SPA link of the edit overlay of one key (AIS-172).
+ *
+ * Same contract as {@link toApiKeyViewRoute}: one literal in
+ * {@link API_KEY_EDIT_ROUTE_PATH}, shared by the read-only overlay's footer
+ * action and the route registry.
+ *
+ * @param identifier - unique, URL-safe key of the resource.
+ * @returns the route, e.g. `/api-keys/vapi-staging/edit`.
+ */
+export function toApiKeyEditRoute(identifier: string): string {
+  return API_KEY_EDIT_ROUTE_PATH.replace(
     `:${API_KEY_DETAIL_PARAM}`,
     encodeURIComponent(identifier),
   );

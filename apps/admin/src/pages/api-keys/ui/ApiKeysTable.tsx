@@ -68,6 +68,13 @@ const API_KEY_TABLE_COLUMNS: readonly DataTableColumn<ApiKeyViewModel>[] = [
  * The loading sentence is `sr-only` on purpose: the skeleton rows are
  * `aria-hidden`, so without it a screen reader would get no announcement at all.
  *
+ * Spacing (the card header vs. the body, and the table vs. the pager) is owned
+ * by two separate groups on purpose. `Card` wraps its children in its own
+ * element, so a `space-y-*` passed to the card only ever reaches the title and
+ * that single wrapper — the table and the pager inside it stayed flush (0 px).
+ * The body therefore carries its own `space-y-4`, which is the element the
+ * table and the pager are direct children of.
+ *
  * The `apiKey` token is not part of {@link ApiKeysTableProps}, so this component
  * cannot leak it even by accident.
  *
@@ -81,26 +88,25 @@ export function ApiKeysTable({
   pagination,
 }: ApiKeysTableProps) {
   return (
-    <Card className="space-y-4">
-      <h2 className="text-lg font-semibold text-text-primary">
-        {API_KEYS_TABLE_TITLE}
-      </h2>
-      {isLoading ? (
-        <p role="status" className="sr-only">
-          {API_KEYS_LOADING_MESSAGE}
-        </p>
-      ) : null}
-      <DataTable
-        rows={apiKeys}
-        columns={API_KEY_TABLE_COLUMNS}
-        rowKey={(apiKey) => apiKey.id}
-        sort={sort}
-        onSortChange={onSortChange}
-        isLoading={isLoading}
-        caption={API_KEYS_TABLE_TITLE}
-        empty={<EmptyState title={API_KEYS_EMPTY_MESSAGE} />}
-      />
-      {pagination}
+    <Card title={API_KEYS_TABLE_TITLE}>
+      <div className="space-y-4">
+        {isLoading ? (
+          <p role="status" className="sr-only">
+            {API_KEYS_LOADING_MESSAGE}
+          </p>
+        ) : null}
+        <DataTable
+          rows={apiKeys}
+          columns={API_KEY_TABLE_COLUMNS}
+          rowKey={(apiKey) => apiKey.id}
+          sort={sort}
+          onSortChange={onSortChange}
+          isLoading={isLoading}
+          caption={API_KEYS_TABLE_TITLE}
+          empty={<EmptyState title={API_KEYS_EMPTY_MESSAGE} />}
+        />
+        {pagination}
+      </div>
     </Card>
   );
 }

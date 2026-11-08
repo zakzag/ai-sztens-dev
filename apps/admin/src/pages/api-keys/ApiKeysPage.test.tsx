@@ -36,6 +36,7 @@ import {
   API_KEYS_CREATE_ROUTE_PATH,
   API_KEYS_EMPTY_MESSAGE,
   API_KEYS_ERROR_TITLE,
+  API_KEYS_PAGE_TITLE,
   API_KEY_COLUMNS,
   API_KEY_FORM_LABELS,
 } from './api-keys.const.js';
@@ -183,6 +184,25 @@ describe('ApiKeysPage', () => {
     expect(
       screen.queryByLabelText(API_KEY_FORM_LABELS.name),
     ).not.toBeInTheDocument();
+  });
+
+  it('renders the list at the titles level, inside the shared page shell', async () => {
+    renderPage();
+
+    const table = await screen.findByRole('table');
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: API_KEYS_PAGE_TITLE,
+    });
+
+    // AIS-171: the table is the `PageShell` `children` slot, so it comes after
+    // the heading and never inside the header row.
+    expect(
+      (heading.compareDocumentPosition(table) &
+        Node.DOCUMENT_POSITION_FOLLOWING) !==
+        0,
+    ).toBe(true);
+    expect(heading.closest('header')?.contains(table)).toBe(false);
   });
 
   it('links every row to the read-only overlay of that key', async () => {

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { apiKeyListQuerySchema } from '@callback/shared';
-import { Pagination, buttonVariants } from '@callback/ui';
+import { PageShell, Pagination, buttonVariants } from '@callback/ui';
 import { PlusIcon } from '@callback/ui';
 import type { DataTableSort } from '@callback/ui';
 import { Link, Outlet } from 'react-router-dom';
@@ -70,29 +70,22 @@ export function ApiKeysPage() {
   };
 
   return (
-    <section className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">
-            {API_KEYS_PAGE_TITLE}
-          </h1>
-          <p className="mt-2 text-sm text-text-secondary">
-            {API_KEYS_PAGE_SUBTITLE}
-          </p>
-        </div>
-
-        {/*
+    <PageShell
+      title={API_KEYS_PAGE_TITLE}
+      subtitle={API_KEYS_PAGE_SUBTITLE}
+      actions={
+        /*
           A link, not a button: opening the create overlay is a navigation to
           `/api-keys/new`, so the browser's own affordances (open in a new tab,
           copy the link) work. `buttonVariants` keeps the primary look without a
           second hand-written class recipe.
-        */}
+        */
         <Link to={API_KEYS_CREATE_ROUTE_PATH} className={buttonVariants()}>
           <PlusIcon />
           {API_KEYS_CREATE_LABEL}
         </Link>
-      </header>
-
+      }
+    >
       {pageErrorMessage !== null ? (
         <PageErrorState
           title={API_KEYS_ERROR_TITLE}
@@ -125,6 +118,6 @@ export function ApiKeysPage() {
 
       {/* The overlay routes (`new`, `:identifier/view`) render here. */}
       <Outlet />
-    </section>
+    </PageShell>
   );
 }

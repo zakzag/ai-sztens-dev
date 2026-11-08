@@ -23,7 +23,11 @@ import {
   MOCK_CRUMB_STATIC_LABEL_DETAIL_LABEL,
   MOCK_CRUMB_STATIC_LABEL_DETAIL_PATH,
 } from '../../test/mocks/breadcrumb-routes.mock.js';
-import { interpolatePath, matchRoute, toBreadcrumbItems } from './breadcrumb.logic.js';
+import {
+  interpolatePath,
+  matchRoute,
+  toBreadcrumbItems,
+} from './breadcrumb.logic.js';
 import type { RouteEntry } from './route-entry.interface.js';
 
 /** A minimal entry helper for the ad-hoc registries of single tests. */
@@ -61,9 +65,7 @@ describe('toBreadcrumbItems', () => {
   });
 
   it('resolves the label of a dynamic route from its params', () => {
-    expect(
-      toBreadcrumbItems(MOCK_CRUMB_ROUTES, '/api-keys/abc123'),
-    ).toEqual([
+    expect(toBreadcrumbItems(MOCK_CRUMB_ROUTES, '/api-keys/abc123')).toEqual([
       { label: MOCK_CRUMB_ROOT_LABEL, to: MOCK_CRUMB_ROOT_PATH },
       { label: MOCK_CRUMB_LIST_LABEL, to: MOCK_CRUMB_LIST_PATH },
       { label: 'abc123' },
@@ -71,9 +73,9 @@ describe('toBreadcrumbItems', () => {
   });
 
   it('treats a trailing slash as the same path', () => {
-    expect(toBreadcrumbItems(MOCK_CRUMB_ROUTES, `${MOCK_CRUMB_LIST_PATH}/`)).toEqual(
-      toBreadcrumbItems(MOCK_CRUMB_ROUTES, MOCK_CRUMB_LIST_PATH),
-    );
+    expect(
+      toBreadcrumbItems(MOCK_CRUMB_ROUTES, `${MOCK_CRUMB_LIST_PATH}/`),
+    ).toEqual(toBreadcrumbItems(MOCK_CRUMB_ROUTES, MOCK_CRUMB_LIST_PATH));
   });
 
   it('decodes an escaped segment the way the router does', () => {
@@ -89,22 +91,22 @@ describe('toBreadcrumbItems', () => {
   });
 
   it('skips an entry without a crumb but keeps its parent chain', () => {
-    expect(
-      toBreadcrumbItems(MOCK_CRUMB_ROUTES, '/plain/xyz'),
-    ).toEqual([
+    expect(toBreadcrumbItems(MOCK_CRUMB_ROUTES, '/plain/xyz')).toEqual([
       { label: MOCK_CRUMB_ROOT_LABEL, to: MOCK_CRUMB_ROOT_PATH },
       { label: 'xyz' },
     ]);
   });
 
   it('stops at a parent path that names no entry, without throwing', () => {
-    expect(toBreadcrumbItems(MOCK_CRUMB_ROUTES, MOCK_CRUMB_ORPHAN_PATH)).toEqual([
-      { label: MOCK_CRUMB_ORPHAN_LABEL },
-    ]);
+    expect(
+      toBreadcrumbItems(MOCK_CRUMB_ROUTES, MOCK_CRUMB_ORPHAN_PATH),
+    ).toEqual([{ label: MOCK_CRUMB_ORPHAN_LABEL }]);
   });
 
   it('stops on a parent cycle and returns a finite trail', () => {
-    expect(toBreadcrumbItems(MOCK_CRUMB_ROUTES, MOCK_CRUMB_CYCLE_A_PATH)).toEqual([
+    expect(
+      toBreadcrumbItems(MOCK_CRUMB_ROUTES, MOCK_CRUMB_CYCLE_A_PATH),
+    ).toEqual([
       { label: MOCK_CRUMB_CYCLE_B_LABEL, to: '/cycle-b' },
       { label: MOCK_CRUMB_CYCLE_A_LABEL },
     ]);
@@ -125,7 +127,12 @@ describe('toBreadcrumbItems', () => {
 
   it('prefers a static path over a matching parameter template', () => {
     const routes: readonly RouteEntry[] = [
-      entry(MOCK_CRUMB_DETAIL_PATH, null, MOCK_CRUMB_LIST_PATH, (params) => params.identifier),
+      entry(
+        MOCK_CRUMB_DETAIL_PATH,
+        null,
+        MOCK_CRUMB_LIST_PATH,
+        (params) => params.identifier,
+      ),
       entry(MOCK_CRUMB_LIST_PATH, MOCK_CRUMB_LIST_LABEL, MOCK_CRUMB_ROOT_PATH),
       entry(MOCK_CRUMB_ROOT_PATH, MOCK_CRUMB_ROOT_LABEL),
     ];
@@ -137,9 +144,7 @@ describe('toBreadcrumbItems', () => {
   });
 
   it('uses the static label of a dynamic route that has no resolver', () => {
-    expect(
-      toBreadcrumbItems(MOCK_CRUMB_ROUTES, '/labelled/42'),
-    ).toEqual([
+    expect(toBreadcrumbItems(MOCK_CRUMB_ROUTES, '/labelled/42')).toEqual([
       { label: MOCK_CRUMB_ROOT_LABEL, to: MOCK_CRUMB_ROOT_PATH },
       { label: MOCK_CRUMB_STATIC_LABEL_DETAIL_LABEL },
     ]);
@@ -218,9 +223,9 @@ describe('matchRoute', () => {
 
 describe('interpolatePath', () => {
   it('fills a known param', () => {
-    expect(interpolatePath('/api-keys/:identifier', { identifier: 'abc' })).toBe(
-      '/api-keys/abc',
-    );
+    expect(
+      interpolatePath('/api-keys/:identifier', { identifier: 'abc' }),
+    ).toBe('/api-keys/abc');
   });
 
   it('fills several params', () => {
@@ -236,6 +241,8 @@ describe('interpolatePath', () => {
   });
 
   it('keeps the root path intact', () => {
-    expect(interpolatePath(MOCK_CRUMB_ROOT_PATH, {})).toBe(MOCK_CRUMB_ROOT_PATH);
+    expect(interpolatePath(MOCK_CRUMB_ROOT_PATH, {})).toBe(
+      MOCK_CRUMB_ROOT_PATH,
+    );
   });
 });

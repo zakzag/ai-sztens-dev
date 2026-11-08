@@ -6,12 +6,12 @@ import type { ApiKeyDetailFieldsProps } from '../api-keys.interface.js';
 /**
  * The read-only field block of one stored key (AIS-155).
  *
- * Extracted from `ApiKeyDetailCard` so the legacy detail page and the read-only
- * overlay render **the same** labels, order and formatting: two copies of a field
- * list drift the moment one of them gains a row. The component decides no
- * colour, no label and no emptiness rule — the view model is already formatted
- * (AIS-131) and the token (`apiKey`) never reaches it, because the mapper drops
- * it.
+ * The **single** field list of the section: the read-only overlay renders it
+ * today, and the card view of the future will reuse it (AIS-173 `D-D`), so two
+ * copies of a field list can never drift the moment one of them gains a row. The
+ * component decides no colour, no label and no emptiness rule — the view model is
+ * already formatted (AIS-131) and the token (`apiKey`) never reaches it, because
+ * the mapper drops it.
  *
  * @param props - see {@link ApiKeyDetailFieldsProps}.
  * @returns the expiry verdict plus the description list of the key.

@@ -224,7 +224,9 @@ export function interpolatePath(
  * @returns `true` when the entry contributes a crumb of its own.
  */
 function isInTrail(entry: RouteEntry): boolean {
-  return entry.breadcrumbLabel !== null || entry.resolveBreadcrumbLabel !== undefined;
+  return (
+    entry.breadcrumbLabel !== null || entry.resolveBreadcrumbLabel !== undefined
+  );
 }
 
 /**
@@ -240,7 +242,9 @@ function parentOf(
     return undefined;
   }
 
-  return routes.find((candidate) => candidate.path === entry.breadcrumbParentPath);
+  return routes.find(
+    (candidate) => candidate.path === entry.breadcrumbParentPath,
+  );
 }
 
 /**

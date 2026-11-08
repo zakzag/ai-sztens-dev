@@ -94,7 +94,9 @@ function toRouteElements(
 ): readonly ReactElement[] {
   return routes.map((route) => {
     if (route.children === undefined || route.children.length === 0) {
-      return <Route key={route.path} path={route.path} element={route.element} />;
+      return (
+        <Route key={route.path} path={route.path} element={route.element} />
+      );
     }
 
     return (

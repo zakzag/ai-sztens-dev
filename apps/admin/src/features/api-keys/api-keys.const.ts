@@ -4,7 +4,7 @@ import {
   type ApiKeyListQuery,
 } from '@callback/shared';
 import type {
-  ApiKeyEditFormFieldName,
+  ApiKeyEditFieldName,
   ApiKeyFormFieldName,
 } from './api-keys.interface.js';
 
@@ -60,7 +60,7 @@ export const API_KEY_FIELD_PATHS: readonly ApiKeyFormFieldName[] =
  * `D3` of the AIS-131 plan). The order still drives which field takes focus
  * after a server rejection.
  */
-export const API_KEY_EDIT_FIELD_PATHS: readonly ApiKeyEditFormFieldName[] =
+export const API_KEY_EDIT_FIELD_PATHS: readonly ApiKeyEditFieldName[] =
   Object.freeze(['name', 'description', 'expiresAt']);
 
 /**

@@ -275,6 +275,12 @@ export const apiKeysUpdateStaleWrite = http.patch(
     ),
 );
 
+/** Update that stays in flight forever — for the pending-state assertion. */
+export const apiKeysUpdatePending = http.patch(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  () => delay('infinite'),
+);
+
 /** `422 SEMANTIC_VALIDATION_FAILED` blaming the `expiresAt` field. */
 export const apiKeysUpdateSemanticInvalid = http.patch(
   API_KEYS_DETAIL_PATH_PATTERN,
@@ -311,6 +317,49 @@ export const apiKeysDeleteNotFound = http.delete(
       path: `${API_KEYS_PATH}/ghost`,
     }),
 );
+
+/** Delete that stays in flight forever — for the pending-state assertion. */
+export const apiKeysDeletePending = http.delete(
+  API_KEYS_DETAIL_PATH_PATTERN,
+  () => delay('infinite'),
+);
+
+/**
+ * The version some other reader left behind — the row a stale write loses to.
+ *
+ * Both fields differ from {@link VALID_API_KEY}, because the edit overlay keys
+ * its form on `updatedAt` (AIS-172): a handler that echoed the same version and
+ * the same name could not prove that the refetch actually reached the inputs.
+ */
+export const API_KEY_AFTER_STALE_WRITE: ApiKey = {
+  ...VALID_API_KEY,
+  name: 'Vapi prod (közben mentve)',
+  description: 'Egy másik szerkesztő mentette',
+  updatedAt: '2026-11-06T09:30:00.000Z',
+};
+
+/**
+ * Detail read where the **first** answer is the fixture row and every later one
+ * is {@link API_KEY_AFTER_STALE_WRITE}.
+ *
+ * A factory rather than a constant on purpose: the counter belongs to one test,
+ * so a second render in the same file starts from the original row again.
+ *
+ * @returns a handler for the single-resource route with per-instance state.
+ */
+export function createApiKeysDetailRefetchHandler(): ReturnType<
+  typeof http.get
+> {
+  let readCount = 0;
+
+  return http.get(API_KEYS_DETAIL_PATH_PATTERN, () => {
+    readCount += 1;
+
+    return successResponse(
+      readCount === 1 ? VALID_API_KEY : API_KEY_AFTER_STALE_WRITE,
+    );
+  });
+}
 
 /** Default handler set registered by the global server. */
 export const apiKeysHandlers = [

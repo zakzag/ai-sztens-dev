@@ -16,10 +16,7 @@ import type { RouteEntry } from './route-entry.interface.js';
  * @param children - optional nested entries.
  * @returns a minimal registry entry for the tests.
  */
-function toEntry(
-  path: string,
-  children?: readonly RouteEntry[],
-): RouteEntry {
+function toEntry(path: string, children?: readonly RouteEntry[]): RouteEntry {
   return {
     path,
     navLabel: null,
@@ -60,9 +57,7 @@ describe('flattenRouteEntries', () => {
   });
 
   it('flattens more than one nesting level', () => {
-    const routes = [
-      toEntry('/a', [toEntry('/a/b', [toEntry('/a/b/c')])]),
-    ];
+    const routes = [toEntry('/a', [toEntry('/a/b', [toEntry('/a/b/c')])])];
 
     expect(flattenRouteEntries(routes).map((route) => route.path)).toEqual([
       '/a',
@@ -90,7 +85,10 @@ describe('flattenRouteEntries', () => {
 
   it('declares every path exactly once for a well-formed tree', () => {
     const routes = [
-      toEntry('/api-keys', [toEntry('/api-keys/new'), toEntry('/api-keys/:identifier/view')]),
+      toEntry('/api-keys', [
+        toEntry('/api-keys/new'),
+        toEntry('/api-keys/:identifier/view'),
+      ]),
     ];
     const paths = flattenRouteEntries(routes).map((route) => route.path);
 

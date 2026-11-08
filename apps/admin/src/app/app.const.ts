@@ -11,9 +11,6 @@ export const APP_BRAND_LABEL = 'AIsztens — Admin';
 /** Accessible name of the navigation landmark. */
 export const APP_NAV_LABEL = 'Admin navigáció';
 
-/** Title of the catch-all route (unknown URL). */
-export const APP_NOT_FOUND_MESSAGE = 'Nem található';
-
 /** Title of the error boundary. */
 export const APP_ERROR_BOUNDARY_TITLE = 'Az oldal betöltése nem sikerült';
 

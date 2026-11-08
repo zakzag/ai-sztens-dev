@@ -28,7 +28,9 @@ const DEFAULTS = `@theme {
 `;
 
 test('strips comments but keeps the line count', () => {
-  const stripped = stripCssComments('/* note\nabout blocks */\n--color-primary: x;');
+  const stripped = stripCssComments(
+    '/* note\nabout blocks */\n--color-primary: x;',
+  );
 
   assert.equal(stripped.split('\n').length, 3);
   assert.equal(stripped.includes('note'), false);
@@ -48,7 +50,9 @@ test('finds only top-level blocks, so an at-rule refinement is not an appearance
 });
 
 test('skips statements outside a block', () => {
-  const blocks = findTopLevelBlocks('@import "tailwindcss";\n@theme { --a: 1; }\n');
+  const blocks = findTopLevelBlocks(
+    '@import "tailwindcss";\n@theme { --a: 1; }\n',
+  );
 
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0].selector, '@theme');
@@ -89,6 +93,24 @@ test('accepts the appearance-state tokens on top of the default set', () => {
   assert.deepEqual(findings, []);
 });
 
+test('accepts a thicker frame of a translucent appearance', () => {
+  // The glass family widens the border ladder; thickness is appearance state, so
+  // an appearance block may restate it without the gate reporting an invent.
+  const findings = checkThemeTokens(
+    FILE,
+    `${DEFAULTS}:root[data-theme='glass'] {
+  --color-primary: oklch(0.84 0.09 220);
+  --color-surface-base: oklch(0.36 0.045 255);
+  --border-width-hairline: 2px;
+  --border-width-default: 2.5px;
+  --border-width-strong: 3px;
+}
+`,
+  );
+
+  assert.deepEqual(findings, []);
+});
+
 test('reports a token the appearance forgot', () => {
   const findings = checkThemeTokens(
     FILE,
@@ -120,7 +142,10 @@ test('reports a token the default does not declare', () => {
 });
 
 test('reports an appearance block that declares nothing', () => {
-  const findings = checkThemeTokens(FILE, `${DEFAULTS}:root[data-theme='light'] {}\n`);
+  const findings = checkThemeTokens(
+    FILE,
+    `${DEFAULTS}:root[data-theme='light'] {}\n`,
+  );
 
   assert.equal(findings.length, 1);
   assert.equal(findings[0].rule, THEME_RULES.blockEmpty);

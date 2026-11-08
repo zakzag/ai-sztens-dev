@@ -14,7 +14,7 @@
 
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { Card } from '../src';
+import { Card, Table } from '../src';
 import { bannerVariants } from '../src/components/banner/banner.variants.js';
 import { dialogVariants } from '../src/components/dialog/dialog.variants.js';
 import { drawerVariants } from '../src/components/drawer/drawer.variants.js';
@@ -25,7 +25,10 @@ import {
 } from '../src/components/log-drawer/log-drawer.variants.js';
 import { toastVariants } from '../src/components/toast/toast.variants.js';
 import { tooltipVariants } from '../src/components/tooltip/tooltip.variants.js';
-import { SURFACE_GLASS_CLASS } from '../src/theme/theme.const.js';
+import {
+  SHEEN_GLASS_CLASS,
+  SURFACE_GLASS_CLASS,
+} from '../src/theme/theme.const.js';
 
 describe('surface-glass', () => {
   it('keeps one spelling of the utility class', () => {
@@ -58,5 +61,29 @@ describe('surface-glass', () => {
     expect(container.firstElementChild?.className).not.toContain(
       SURFACE_GLASS_CLASS,
     );
+  });
+});
+
+describe('sheen-glass', () => {
+  it('keeps one spelling of the utility class', () => {
+    expect(SHEEN_GLASS_CLASS).toBe('sheen-glass');
+  });
+
+  it('gives the card the gloss without the blur', () => {
+    const { container } = render(<Card>Tartalom</Card>);
+    const className = container.firstElementChild?.className ?? '';
+
+    expect(className).toContain(SHEEN_GLASS_CLASS);
+    expect(className).not.toContain(SURFACE_GLASS_CLASS);
+  });
+
+  it('gives the table shell the same gloss', () => {
+    const { container } = render(
+      <Table>
+        <tbody />
+      </Table>,
+    );
+
+    expect(container.firstElementChild?.className).toContain(SHEEN_GLASS_CLASS);
   });
 });

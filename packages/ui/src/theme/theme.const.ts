@@ -48,3 +48,15 @@ export const THEME_NAMES: readonly ThemeName[] = [
  * hazard (the same reason `placeholder:` and friends are not retyped).
  */
 export const SURFACE_GLASS_CLASS = 'surface-glass';
+
+/**
+ * The catch-light of the static glass surfaces.
+ *
+ * `surface-glass` bundles the blur with the sheen, and blur is reserved for the
+ * floating layers — one `backdrop-filter` per scrolling card or table shell is the
+ * known frame-cost worst case. Cards and tables still have to glint, otherwise a
+ * thick rim reads as painted plastic, so they carry this **gloss-only** utility
+ * instead. It applies the same `--glass-sheen` gradient and is a no-op outside the
+ * glass family, where `--glass-sheen` is `none`.
+ */
+export const SHEEN_GLASS_CLASS = 'sheen-glass';

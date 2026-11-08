@@ -1,6 +1,6 @@
 # Admin Data Flow — contract → transport → service → hook → UI
 
-**Utolsó frissítés:** 2026-11-05 (AIS-133: a fájlszintű „új erőforrás” recept egyetlen helyre, a [`New-Admin-Page.md`](New-Admin-Page.md)-ba került — ez a doksi a **folyamokat** tartja meg: a 3.6 alatti lista-adatfolyamot és a 3.7 alatti CRUD-adatfolyamot, a lépéssort nem; a korábbi, elavult szekcióhivatkozások javítva; AIS-131: a referencia-szelet teljes CRUD; AIS-116: a lista-recept; AIS-110: registry ⇄ service lefedettségi kapu)
+**Utolsó frissítés:** 2026-11-08 (AIS-172: a szerkesztés `/api-keys/:identifier/edit` overlay (`ApiKeyEditDialog` + `ApiKeyEditDialogForm`); a `409 STALE_WRITE` egyetlen felülete a capture toast + azonnali újraolvasás — lásd §3.7) (AIS-133: a fájlszintű „új erőforrás” recept egyetlen helyre, a [`New-Admin-Page.md`](New-Admin-Page.md)-ba került — ez a doksi a **folyamokat** tartja meg: a 3.6 alatti lista-adatfolyamot és a 3.7 alatti CRUD-adatfolyamot, a lépéssort nem; a korábbi, elavult szekcióhivatkozások javítva; AIS-131: a referencia-szelet teljes CRUD; AIS-116: a lista-recept; AIS-110: registry ⇄ service lefedettségi kapu)
 **Story:** AIS-102 (data flow), AIS-110 (client operation coverage + resource template)
 **Status:** living document — a jelenlegi állapotot írja le, nem pillanatképet.
 
@@ -19,11 +19,11 @@ apps/admin            pages/<page>/        kompozíció + `ui/` részek
 
 Két szabály, amit ez a doksi **nem** ismétel meg, mert máshol él:
 
-| Téma                                                                                                    | Hol van leírva                                       |
-| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| A HTTP szerződés (envelope, hibakódok, lista query, `PATCH`/`DELETE` konvenció, `operationId` registry) | [`API-Convention.md`](API-Convention.md) §1–§8, §4.2 |
+| Téma                                                                                                    | Hol van leírva                                          |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| A HTTP szerződés (envelope, hibakódok, lista query, `PATCH`/`DELETE` konvenció, `operationId` registry) | [`API-Convention.md`](API-Convention.md) §1–§8, §4.2    |
 | Az admin rétegek, tokenek, primitívek, state-bucketek, primitív-vokabulár                               | [`UI-Architecture.md`](UI-Architecture.md) §3.3, §4, §6 |
-| Az „új admin oldal” lépéssor (fájlnév-szintű, réteg-sorrendű) — **az egyetlen igazságforrás**          | [`New-Admin-Page.md`](New-Admin-Page.md)             |
+| Az „új admin oldal” lépéssor (fájlnév-szintű, réteg-sorrendű) — **az egyetlen igazságforrás**           | [`New-Admin-Page.md`](New-Admin-Page.md)                |
 
 Ez a doksi a **kettő közötti** részt fedi le: hogyan lesz egy végpontból működő admin adatfolyam, és
 hogyan lehet ezt egy új erőforrásra másolni.
@@ -54,11 +54,11 @@ mindegyiknél a kötelező tartalmat is.
 
 Ez a doksi azt tartja meg, amit a checklist nem tud kifejezni:
 
-| Marad itt | Miért |
-| --- | --- |
-| §2 réteg-felelősségek | táblázat arról, mi **tilos** egy rétegben — nem lépés, hanem szabály |
-| §3.6 a lista adatfolyama | egy vonal, a `useListParams → useApiList → DataTable` sorrend |
-| §3.7 a detail/edit/delete adatfolyama | a teljes CRUD-szelet öt szabálya |
+| Marad itt                             | Miért                                                                |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| §2 réteg-felelősségek                 | táblázat arról, mi **tilos** egy rétegben — nem lépés, hanem szabály |
+| §3.6 a lista adatfolyama              | egy vonal, a `useListParams → useApiList → DataTable` sorrend        |
+| §3.7 a detail/edit/delete adatfolyama | a teljes CRUD-szelet öt szabálya                                     |
 
 Az HTTP-oldali szerződés (envelope, lista query, `PATCH`/`DELETE` szemantika, `operationId` registry)
 továbbra is a [`API-Convention.md`](API-Convention.md) §1.1 és §4.2-ben él; a registry ⇄ service
@@ -97,7 +97,7 @@ Négy szabály, ami ezt a vonalat egyben tartja:
 A négy megjelenítési állapot így oszlik meg: loading → skeleton sorok (fejléc marad) + `sr-only`
 státuszszöveg; üres → `EmptyState`; siker → sorok + lapozó; hiba → `PageErrorState`.
 
-### 3.7 Egy detail + edit + delete adatfolyama (AIS-131)
+### 3.7 Egy detail + edit + delete adatfolyama (AIS-131, AIS-172)
 
 A referencia-szelet a listán túl a **teljes CRUD**-ot mutatja. Az `api-keys` a minta itt is; a cégek
 (AIS-20/21/22) ezt másolják.
@@ -108,7 +108,7 @@ URL (/api-keys/:identifier)                     a lap azonosítója az URL-ben (
   → useApiDetail<ApiKey>                        features/api/use-api-detail.ts (query key: API_KEYS_QUERY_KEYS.detail)
   → toApiKeyDetailViewModel(dto)                entities/api-key/api-key.mapper.ts (token eldobva, időpontok formázva, expiry → StatusBadge)
   → <DescriptionList> + <StatusBadge>           packages/ui
-  → <ApiKeyEditForm> (useAppForm)               defaultValues a detail-ből; submit = PATCH
+  → <ApiKeyEditDialog> → <ApiKeyEditDialogForm>   /api-keys/:identifier/edit; useAppForm, defaultValues a detail-ből, submit = PATCH
   → useUpdateApiKeyMutation(identifier)         invalidate: API_KEYS_QUERY_KEYS.all
   → <ApiKeyDeleteDialog> (ConfirmDialog) → useDeleteApiKeyMutation(identifier) → navigate(lista)
 ```
@@ -118,14 +118,17 @@ URL (/api-keys/:identifier)                     a lap azonosítója az URL-ben (
 1. **Egy route, egy registry bejegyzés.** A detail route (`API_KEY_DETAIL_ROUTE_PATH`) a page
    konstansában él, mert a tábla linkje és a registry is ugyanazt a literált használja; a `pages` nem
    importálhat `app`-ot. A registry-teszt pineli a lista-path egyezését.
-2. **A `PATCH` mindig viszi az `updatedAt`-et.** A `useAppForm` `submit`-ja a page-en keresztül megy,
-   mert a verzió-token és a `STALE_WRITE` döntés a page-é; a form csak az értékeket adja.
-3. **`409 STALE_WRITE` → page szintű `Alert` + újratöltés, nem mezőhiba.** A döntés a allowlistelt
-   `isStaleWriteFailure` (`lib/error-surface.logic.ts`); komponensben tilos `error.code ===` vizsgálat.
+2. **A `PATCH` mindig viszi az `updatedAt`-et.** A `useAppForm` `submit`-ja az overlay
+   form-window-jában áll össze (AIS-172): a verzió-token a betöltött sorból jön, és a `STALE_WRITE`
+   eldobása után a route-elem újraolvassa a sort.
+3. **`409 STALE_WRITE` → egyetlen capture toast + azonnali újraolvasás, nem mezőhiba.** A kód
+   `fieldMessage` nélkül szerepel a katalógusban, ezért `page` szintű; a döntés a allowlistelt
+   `isStaleWriteFailure` (`lib/error-surface.logic.ts`), komponensben tilos `error.code ===` vizsgálat.
 4. **`422 SEMANTIC_VALIDATION_FAILED` → mezőn.** A `toFieldErrors` a `details[].path` alapján teszi a
    hibás inputra, és az kap fókuszt.
-5. **Sikeres mentés után a form újramountol** (`key={updatedAt}`), mert a `useAppForm` a
-   `reset(defaultValues)`-szel zár — statikus default-okkal a mentés előtti értékek jönnének vissza.
+5. **Új `updatedAt` után a form újramountol** (`key={updatedAt}`): sikeres mentésnél az ablak bezárul,
+   `STALE_WRITE` után viszont az újraolvasott sor értékei csak így jutnak el az inputokig — a
+   `useAppForm` a `reset(defaultValues)`-szel zár, statikus default-okkal a régi értékek jönnének vissza.
 
 Törlés: a `ConfirmDialog` csak a döntést jelenti; a dialógus addig marad nyitva, amíg a mutáció nem
 sikerül, hiba esetén a leírása a leképezett hibaüzenet (nem toast, nem eltűnő dialógus).

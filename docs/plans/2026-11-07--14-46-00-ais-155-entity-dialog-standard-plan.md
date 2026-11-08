@@ -11,29 +11,29 @@ cím, alcím, fejléc SVG `X` bezárással, opcionális extra gombok bal/jobb ol
 
 ## Decisions
 
-| #   | Decision | Why |
-| --- | -------- | --- |
-| D1 | A prezentáció `packages/ui`-ban él (`EntityDialog`), a route-kötés az adminban | A primitíva nem importálhat routert és nem ismerhet entitást; a domain-tudás az adminban marad |
-| D2 | **Nested route**: `RouteEntry.children` + `<Outlet/>`; a gyerek `path` **abszolút** (a szülő path-jával kezdődik), és a szülő `element`-e rendereli az `<Outlet/>`-et | Megosztható URL, reload-biztos, és a lista **mountolva marad** a dialógus mögött |
-| D3 | A regisztrált fa **lapítását** egy tiszta `flattenRouteEntries()` adja (`app/router`), és ezt fogyasztja `ALL_ROUTE_ENTRIES`, a nav és a breadcrumb-matcher | A meglévő [breadcrumb matcher](apps/admin/src/app/router/breadcrumb.logic.ts:181) és a nav flat listán dolgozik — nem kell átírni, csak etetni |
-| D4 | A submit **opcionális és a formhoz van kikötve**: `submit: { label, pendingLabel?, isSubmitting?, formId }`, a gomb `type="submit" form={formId}`; `submit` hiányában nincs submit gomb | A `<form>` + `useAppForm` marad a tulajdonos, a footer csak egy külső submit-gomb; read-only módban egy gomb sincs |
-| D5 | Az `EntityDialog`-nak **nincs `open` propja**: mountolva = nyitva; `onOpenChange` → `onClose` | Az URL az egyetlen láthatóság-tulajdonos, így nem lehet második igazság |
-| D6 | Fejléc-slotok: `headerStart`, `headerEnd`; az `X` mindig utolsó; az api-keys oldalon egyik slot sincs kitöltve | Paraméterezhető, de a konkrét oldal minimál marad |
-| D7 | Bezárás mindig `navigate(listPath, { replace: true })`, egy shared hookból (`features/entity-dialog/use-entity-dialog.ts`) | Deep linkből is a listára kell jutni, nem az előzménybe; a page nem importálhat `app`-ot, a `features/api/use-list-params.ts` pedig már most is használ router-hookot |
-| D8 | A táblázat sor-linkje **most rögtön a `/view` overlay-re** mutat; a régi `/api-keys/:identifier` detail oldal változatlanul megmarad, és a view overlay footer-extrája („Kulcs törlése”) navigál rá | Az overlay a valódi belépési pont (különben halott route lenne), a törlés pedig nem tűnik el: a read-only ablak maga nem destruktív, csak átadja a régi oldalnak |
-| D9 | Egy `PlusIcon` + `Button.icon` slot szolgálja ki a „+ új elem” mintát mindenhol | Egyszer megírt, konzisztens akció a jövőbeli listákon |
-| D10 | Az overlay route-ok **saját morzsát** kapnak: create → `breadcrumbLabel: 'Új API kulcs'`, view → `resolveBreadcrumbLabel: (p) => p.identifier`, mindkettő `breadcrumbParentPath: '/api-keys'` | A [registry teszt](apps/admin/src/app/router/route-registry.test.ts:134) tiltja a morzsa nélküli protected entry-t, és a felhasználó lássa, hol van |
-| D11 | A `✕` → `CloseIcon` csere **csak az `OverlayShell`-ben** történik meg; a Toast/Banner/LogDrawer glyphje marad | Egy közös shell érinti a `Dialog`/`Drawer`/`ConfirmDialog` teszteket is — a három másik komponens külön follow-up, nincs benne a ticketben |
-| D12 | A read-only nézet a meglévő mezőlistát használja: `ui/ApiKeyDetailFields.tsx` kiemelve a `ApiKeyDetailCard`-ból, a kártya és a dialog is ezt rendereli | Ne legyen két mezőlista; a `Card` wrapper a dialogban vizuálisan rossz lenne |
+| #   | Decision                                                                                                                                                                                            | Why                                                                                                                                                                   |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | A prezentáció `packages/ui`-ban él (`EntityDialog`), a route-kötés az adminban                                                                                                                      | A primitíva nem importálhat routert és nem ismerhet entitást; a domain-tudás az adminban marad                                                                        |
+| D2  | **Nested route**: `RouteEntry.children` + `<Outlet/>`; a gyerek `path` **abszolút** (a szülő path-jával kezdődik), és a szülő `element`-e rendereli az `<Outlet/>`-et                               | Megosztható URL, reload-biztos, és a lista **mountolva marad** a dialógus mögött                                                                                      |
+| D3  | A regisztrált fa **lapítását** egy tiszta `flattenRouteEntries()` adja (`app/router`), és ezt fogyasztja `ALL_ROUTE_ENTRIES`, a nav és a breadcrumb-matcher                                         | A meglévő [breadcrumb matcher](apps/admin/src/app/router/breadcrumb.logic.ts:181) és a nav flat listán dolgozik — nem kell átírni, csak etetni                        |
+| D4  | A submit **opcionális és a formhoz van kikötve**: `submit: { label, pendingLabel?, isSubmitting?, formId }`, a gomb `type="submit" form={formId}`; `submit` hiányában nincs submit gomb             | A `<form>` + `useAppForm` marad a tulajdonos, a footer csak egy külső submit-gomb; read-only módban egy gomb sincs                                                    |
+| D5  | Az `EntityDialog`-nak **nincs `open` propja**: mountolva = nyitva; `onOpenChange` → `onClose`                                                                                                       | Az URL az egyetlen láthatóság-tulajdonos, így nem lehet második igazság                                                                                               |
+| D6  | Fejléc-slotok: `headerStart`, `headerEnd`; az `X` mindig utolsó; az api-keys oldalon egyik slot sincs kitöltve                                                                                      | Paraméterezhető, de a konkrét oldal minimál marad                                                                                                                     |
+| D7  | Bezárás mindig `navigate(listPath, { replace: true })`, egy shared hookból (`features/entity-dialog/use-entity-dialog.ts`)                                                                          | Deep linkből is a listára kell jutni, nem az előzménybe; a page nem importálhat `app`-ot, a `features/api/use-list-params.ts` pedig már most is használ router-hookot |
+| D8  | A táblázat sor-linkje **most rögtön a `/view` overlay-re** mutat; a régi `/api-keys/:identifier` detail oldal változatlanul megmarad, és a view overlay footer-extrája („Kulcs törlése”) navigál rá | Az overlay a valódi belépési pont (különben halott route lenne), a törlés pedig nem tűnik el: a read-only ablak maga nem destruktív, csak átadja a régi oldalnak      |
+| D9  | Egy `PlusIcon` + `Button.icon` slot szolgálja ki a „+ új elem” mintát mindenhol                                                                                                                     | Egyszer megírt, konzisztens akció a jövőbeli listákon                                                                                                                 |
+| D10 | Az overlay route-ok **saját morzsát** kapnak: create → `breadcrumbLabel: 'Új API kulcs'`, view → `resolveBreadcrumbLabel: (p) => p.identifier`, mindkettő `breadcrumbParentPath: '/api-keys'`       | A [registry teszt](apps/admin/src/app/router/route-registry.test.ts:134) tiltja a morzsa nélküli protected entry-t, és a felhasználó lássa, hol van                   |
+| D11 | A `✕` → `CloseIcon` csere **csak az `OverlayShell`-ben** történik meg; a Toast/Banner/LogDrawer glyphje marad                                                                                       | Egy közös shell érinti a `Dialog`/`Drawer`/`ConfirmDialog` teszteket is — a három másik komponens külön follow-up, nincs benne a ticketben                            |
+| D12 | A read-only nézet a meglévő mezőlistát használja: `ui/ApiKeyDetailFields.tsx` kiemelve a `ApiKeyDetailCard`-ból, a kártya és a dialog is ezt rendereli                                              | Ne legyen két mezőlista; a `Card` wrapper a dialogban vizuálisan rossz lenne                                                                                          |
 
 ## Routes
 
-| Route | Tartalom |
-| ----- | -------- |
-| `/api-keys` | lista (parent, `<Outlet/>`-tel a modálokhoz) + „Új API kulcs” gomb jobb felül |
-| `/api-keys/new` | create overlay (`EntityDialog`, submit: „Létrehozás”) — statikus szegmens, a React Router és a breadcrumb-matcher is a `:identifier` elé sorolja |
-| `/api-keys/:identifier/view` | read-only overlay (`submit` nélkül, footer: „Bezárás”) |
-| `/api-keys/:identifier` | marad: régi detail oldal (törlés + inline szerkesztő); a view overlay „Kulcs törlése” footer-extrája navigál ide |
+| Route                        | Tartalom                                                                                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/api-keys`                  | lista (parent, `<Outlet/>`-tel a modálokhoz) + „Új API kulcs” gomb jobb felül                                                                    |
+| `/api-keys/new`              | create overlay (`EntityDialog`, submit: „Létrehozás”) — statikus szegmens, a React Router és a breadcrumb-matcher is a `:identifier` elé sorolja |
+| `/api-keys/:identifier/view` | read-only overlay (`submit` nélkül, footer: „Bezárás”)                                                                                           |
+| `/api-keys/:identifier`      | marad: régi detail oldal (törlés + inline szerkesztő); a view overlay „Kulcs törlése” footer-extrája navigál ide                                 |
 
 ```mermaid
 flowchart LR
@@ -86,3 +86,19 @@ pnpm quality
 - Soronkénti ikon-akciók a táblázatban.
 - A Toast/Banner/LogDrawer `✕` glyphjének cseréje.
 - Más entitások átállítása az új overlay-re (külön ticketek).
+
+---
+
+## Utólagos jegyzet (2026-11-08, AIS-174)
+
+A terv fenti szövege **nem lett átírva** — a döntések történeti rekordok. Az alábbi három pont azonban
+már nem egyezik a kóddal, ezért itt pontosítjuk őket:
+
+| Döntés                                                                                                                                  | Mi történt                                                                                                                                                                                                                                     | Élő szabály                                                                                                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `D9` — „`PlusIcon` + `Button.icon` szolgálja ki a »+ új elem« mintát mindenhol"                                                         | A kód `<Link className={buttonVariants()}>` + `PlusIcon`, nem `Button` — és ez a helyes minta: az overlay megnyitása **navigáció** egy valódi URL-re (`/api-keys/new`), így az új fülön nyitás, a link másolása és a középső kattintás működik | `docs/Specs/UI-Architecture.md` §4.0 „The list header action is a link, not a button (AIS-174)"; referencia: [`ApiKeysPage.tsx`](../../apps/admin/src/pages/api-keys/ApiKeysPage.tsx:76) |
+| `D8` — „a régi `/api-keys/:identifier` detail oldal változatlanul megmarad, a view overlay footer-extrája (»Kulcs törlése«) navigál rá" | A legacy detail oldal, a route-ja és a `ApiKeyDeleteDialog` wrapper **törölve**; a törlés a read-only overlay saját akciója lett, lokális `useState`-tel nyitott `ConfirmDialog`-gal (**nem** route)                                           | `docs/Specs/UI-Architecture.md` §5 (megerősítő ablak kivétele), AIS-173                                                                                                                  |
+| Routes tábla `/api-keys/:identifier` sora („marad: régi detail oldal")                                                                  | Nem maradt meg; a `:identifier` szegmens csak a `view` és az `edit` overlay-child-on él                                                                                                                                                        | [`route-registry.tsx`](../../apps/admin/src/app/router/route-registry.tsx:84)                                                                                                            |
+
+Ami **változatlanul érvényes** ebből a tervből: `D1`–`D7`, `D10`–`D12`, a szakasz- és komponens-sorrend,
+a teszt-elv (mock csak `test/mocks/` alatt) és a `RouteEntry.children` + `flattenRouteEntries()` mechanika.

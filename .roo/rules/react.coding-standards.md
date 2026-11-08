@@ -141,12 +141,12 @@ export function toStatusVariant(status: CallbackRequestStatus): BadgeVariant {
 Four buckets. The **order is the rule**: always try the earlier bucket first, and move down only when
 the previous one provably cannot hold the state.
 
-| # | Bucket                  | Owner                                                        | Examples                                                        | Never inside                          |
-| - | ----------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------- |
-| 1 | List / navigation state | the **URL** — `useSearchParams` behind one typed hook (§6.2) | filter, sort, page, page size, active tab, linkable selected id | secrets, server payloads, form values |
-| 2 | Server state            | TanStack Query cache                                         | request lists, call details, mutation results                   | a copy in a store or in `useState`    |
-| 3 | Transient page UI       | page-local store factory — Zustand (§6.3)                    | open drawer, selected row, column filters, bulk selection       | server data, derived server data      |
-| 4 | Local component state   | `useState` in the component that owns the interaction        | open menu of one dropdown, a search field's own text            | state a sibling or the page needs     |
+| #   | Bucket                  | Owner                                                        | Examples                                                        | Never inside                          |
+| --- | ----------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------- |
+| 1   | List / navigation state | the **URL** — `useSearchParams` behind one typed hook (§6.2) | filter, sort, page, page size, active tab, linkable selected id | secrets, server payloads, form values |
+| 2   | Server state            | TanStack Query cache                                         | request lists, call details, mutation results                   | a copy in a store or in `useState`    |
+| 3   | Transient page UI       | page-local store factory — Zustand (§6.3)                    | open drawer, selected row, column filters, bulk selection       | server data, derived server data      |
+| 4   | Local component state   | `useState` in the component that owns the interaction        | open menu of one dropdown, a search field's own text            | state a sibling or the page needs     |
 
 **Form state is a separate bucket and always react-hook-form** (§0.3): the form component owns it,
 never a store and never the URL.
@@ -183,6 +183,13 @@ it is recorded in the state plan of [`docs/Specs/UI-Architecture.md`](../../docs
 - `persist` is allowed only with an explicit whitelist (`partialize`), documented in the state plan.
 - The only global store is `useSessionStore` (token, role) in `app/`.
 - A store that mirrors URL state or Query state is a defect, not a convenience (§6.1, steps 1–2).
+- **The confirmation exception (AIS-173):** the open flag of a dialog that is **not navigable** — a
+  `ConfirmDialog` that only asks a question, which nothing links to and nothing reloads into — is
+  local `useState` in the component that renders it, never a route and never a store. The rule
+  "a dialog's open state lives in the URL" therefore applies to dialogs that **have an address of
+  their own** (create, view, edit); a confirmation has none, so a `/delete` route would only add a
+  registry entry, a breadcrumb rule and a test for a window the user passes through in one click.
+  See [`docs/Specs/UI-Architecture.md`](../../docs/Specs/UI-Architecture.md) §5.
 
 ### 6.4 `zustand` is not installed yet (AIS-130)
 
@@ -245,18 +252,18 @@ export function useDashboardStore<T>(selector: (state: DashboardStore) => T): T 
 
 Every color, border, radius, shadow and duration comes from `packages/ui/src/styles/theme.css`:
 
-| Group     | Token → class                                                                                                                                         |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Brand     | `--color-primary/-foreground`, `--color-secondary`, `--color-tertiary`, `--color-quaternary` → `bg-primary`, `text-primary-foreground`, `bg-tertiary` |
-| Surface   | `--color-surface-base/-raised/-sunken/-overlay` → `bg-surface-raised`                                                                                 |
-| Border    | `--color-border-hairline/-default/-strong/-focus` → `border-border-hairline`                                                                          |
-| Text      | `--color-text-primary/-secondary/-muted/-inverse` → `text-text-secondary`                                                                             |
-| State     | `--color-success/-warning/-danger/-info` + `-foreground` → `bg-danger text-danger-foreground`                                                         |
-| Depth     | `--shadow-neu-raised/-inset/-pressed`, `--shadow-focus-ring` → `shadow-neu-raised`                                                                    |
-| Thickness | `--border-width-hairline/-default/-strong` → utility classes `border-hairline`, `border-strong`                                                       |
-| Shape     | `--radius-control/-card/-pill` → `rounded-control`                                                                                                    |
-| Motion    | `--duration-fast/-base`, `--ease-neu` → `transition-shadow duration-fast`                                                                             |
-| Appearance | `--color-scheme`, `--app-backdrop`, `--blur-glass`, `--saturate-glass`, `--glass-sheen` → `surface-glass` (AIS-165/166/169)                          |
+| Group      | Token → class                                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Brand      | `--color-primary/-foreground`, `--color-secondary`, `--color-tertiary`, `--color-quaternary` → `bg-primary`, `text-primary-foreground`, `bg-tertiary`                       |
+| Surface    | `--color-surface-base/-raised/-sunken/-overlay` → `bg-surface-raised`                                                                                                       |
+| Border     | `--color-border-hairline/-default/-strong/-focus` → `border-border-hairline`                                                                                                |
+| Text       | `--color-text-primary/-secondary/-muted/-inverse` → `text-text-secondary`                                                                                                   |
+| State      | `--color-success/-warning/-danger/-info` + `-foreground` → `bg-danger text-danger-foreground`                                                                               |
+| Depth      | `--shadow-neu-raised/-inset/-pressed`, `--shadow-focus-ring` → `shadow-neu-raised`                                                                                          |
+| Thickness  | `--border-width-hairline/-default/-strong` → utility classes `border-hairline`, `border-strong`                                                                             |
+| Shape      | `--radius-control/-card/-pill` → `rounded-control`                                                                                                                          |
+| Motion     | `--duration-fast/-base`, `--ease-neu` → `transition-shadow duration-fast`                                                                                                   |
+| Appearance | `--color-scheme`, `--app-backdrop`, `--blur-glass`, `--saturate-glass`, `--glass-sheen` → `surface-glass` (blur + gloss) / `sheen-glass` (gloss only) (AIS-165/166/169/170) |
 
 **Seven appearances exist — `light`, `dark`, `ambient`, and the glass family
 `glass` / `glass-frost` / `glass-crystal` / `glass-smoke`** — selected by `data-theme` on `<html>`.
@@ -275,11 +282,16 @@ from all of that, and both are machine-checked:
 
 **Glass recipes (only these elements get blur — the floating layers):**
 
-| Element        | Classes                                                                                                                    |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Frosted panel  | `rounded-card border border-hairline border-border-hairline bg-surface-raised shadow-neu-raised surface-glass`              |
-| Frosted popover| `rounded-control border border-hairline border-border-hairline bg-surface-overlay shadow-neu-raised surface-glass`          |
-| Never          | cards, table rows, table shells — translucency from the tokens only; one `backdrop-filter` per scrolling row costs frames    |
+| Element         | Classes                                                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Frosted panel   | `rounded-card border border-hairline border-border-hairline bg-surface-raised shadow-neu-raised surface-glass`                     |
+| Frosted popover | `rounded-control border border-hairline border-border-hairline bg-surface-overlay shadow-neu-raised surface-glass`                 |
+| Glossy shell    | `rounded-card border border-hairline border-border-hairline bg-surface-raised shadow-neu-raised sheen-glass`                       |
+| Never (blur)    | cards, table rows, table shells — translucency and gloss from the tokens, but one `backdrop-filter` per scrolling row costs frames |
+
+The glass family thickens the frame ladder to `2 / 2.5 / 3px`: glass must read as a pane edge,
+so `--border-width-*` is appearance state and an appearance block may restate it. Its panels are
+deliberately the **most transparent** surfaces of the app and its blur stays in the 9–18px band.
 
 Dark neomorphism recipes:
 

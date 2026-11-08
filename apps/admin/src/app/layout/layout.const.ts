@@ -9,7 +9,15 @@
  *   between the component and its specification.
  */
 
-import { LayersIcon, MoonIcon, SunIcon, SunsetIcon } from '@callback/ui';
+import {
+  CloudIcon,
+  DropletIcon,
+  LayersIcon,
+  MoonIcon,
+  SnowflakeIcon,
+  SunIcon,
+  SunsetIcon,
+} from '@callback/ui';
 import type { IconProps } from '@callback/ui';
 import type { ComponentType } from 'react';
 import type {
@@ -58,13 +66,23 @@ export const DEFAULT_THEME_OPTION: ThemeOption = 'dark';
 export const THEME_OPTION_AMBIENT: ThemeOption = 'ambient';
 
 /**
- * Value of the glass (frosted) appearance (AIS-166, AIS-167).
+ * Value of the balanced glass appearance (AIS-166, AIS-167, AIS-169).
  *
- * It is the only appearance that changes the *depth* language — translucent
- * surfaces, light rims and a backdrop blur — instead of only the palette, which
- * is why it comes last in the list.
+ * The glass *family* is the only appearance that changes the **depth language** —
+ * translucent surfaces, a bright bevelled rim, a specular sheen and a backdrop
+ * blur — instead of only the palette. The four members differ in how much glass
+ * they are, so the choice between them is made in the UI, not in the code.
  */
 export const THEME_OPTION_GLASS: ThemeOption = 'glass';
+
+/** Value of the milky, heavy-blur glass appearance (AIS-169). */
+export const THEME_OPTION_GLASS_FROST: ThemeOption = 'glass-frost';
+
+/** Value of the almost-invisible, brightest-rim glass appearance (AIS-169). */
+export const THEME_OPTION_GLASS_CRYSTAL: ThemeOption = 'glass-crystal';
+
+/** Value of the dark, dense smoked-glass appearance (AIS-169). */
+export const THEME_OPTION_GLASS_SMOKE: ThemeOption = 'glass-smoke';
 
 /** Label of the light appearance. */
 export const THEME_OPTION_LIGHT_LABEL = 'Világos';
@@ -78,12 +96,34 @@ export const THEME_OPTION_AMBIENT_LABEL = 'Ambient';
 /** Label of the glass appearance. */
 export const THEME_OPTION_GLASS_LABEL = 'Üveg';
 
-/** The appearance options in display order. */
+/** Label of the milky glass appearance. */
+export const THEME_OPTION_GLASS_FROST_LABEL = 'Fagyott üveg';
+
+/** Label of the crystal glass appearance. */
+export const THEME_OPTION_GLASS_CRYSTAL_LABEL = 'Kristályüveg';
+
+/** Label of the smoked glass appearance. */
+export const THEME_OPTION_GLASS_SMOKE_LABEL = 'Füstüveg';
+
+/**
+ * The appearance options in display order.
+ *
+ * The three neutral appearances come first, then the glass family from the
+ * clearest to the densest: frost (heaviest fill), crystal (thin, bright rim),
+ * glass (balanced) and smoke (dark) — the order a reviewer naturally reads them
+ * in when comparing.
+ */
 export const THEME_SELECTOR_OPTIONS: readonly ThemeOptionEntry[] = [
   { value: THEME_OPTION_LIGHT, label: THEME_OPTION_LIGHT_LABEL },
   { value: DEFAULT_THEME_OPTION, label: THEME_OPTION_DARK_LABEL },
   { value: THEME_OPTION_AMBIENT, label: THEME_OPTION_AMBIENT_LABEL },
   { value: THEME_OPTION_GLASS, label: THEME_OPTION_GLASS_LABEL },
+  { value: THEME_OPTION_GLASS_FROST, label: THEME_OPTION_GLASS_FROST_LABEL },
+  {
+    value: THEME_OPTION_GLASS_CRYSTAL,
+    label: THEME_OPTION_GLASS_CRYSTAL_LABEL,
+  },
+  { value: THEME_OPTION_GLASS_SMOKE, label: THEME_OPTION_GLASS_SMOKE_LABEL },
 ];
 
 /**
@@ -101,4 +141,7 @@ export const THEME_OPTION_ICONS: Readonly<
   [DEFAULT_THEME_OPTION]: MoonIcon,
   [THEME_OPTION_AMBIENT]: SunsetIcon,
   [THEME_OPTION_GLASS]: LayersIcon,
+  [THEME_OPTION_GLASS_FROST]: SnowflakeIcon,
+  [THEME_OPTION_GLASS_CRYSTAL]: DropletIcon,
+  [THEME_OPTION_GLASS_SMOKE]: CloudIcon,
 };

@@ -17,8 +17,20 @@
  * One selectable appearance.
  *
  * `dark` is the value the `@theme` block itself carries, so an `<html>` element
- * with no `data-theme` attribute renders exactly that appearance. `glass` adds a
- * translucent, blurred variant on top of the token contract rather than a fourth
- * colour axis (AIS-166).
+ * with no `data-theme` attribute renders exactly that appearance.
+ *
+ * The `glass-*` members are not extra colour axes but four readings of the same
+ * material (AIS-166, AIS-169): `glass` balanced frost, `glass-frost` the milky
+ * one, `glass-crystal` the almost-invisible one with the brightest rim, and
+ * `glass-smoke` the dark, dense one. They exist as separate appearances so the
+ * choice between them is a *product* decision made in the selector, not a code
+ * change.
  */
-export type ThemeName = 'light' | 'dark' | 'ambient' | 'glass';
+export type ThemeName =
+  | 'light'
+  | 'dark'
+  | 'ambient'
+  | 'glass'
+  | 'glass-frost'
+  | 'glass-crystal'
+  | 'glass-smoke';

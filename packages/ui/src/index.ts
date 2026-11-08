@@ -397,11 +397,14 @@ export { isJsonDetailValue, toPrettyJson } from './lib/json.logic.js';
 export {
   ChevronDownIcon,
   ChevronRightIcon,
+  CloudIcon,
   CloseIcon,
+  DropletIcon,
   LayersIcon,
   MoonIcon,
   PlusIcon,
   SettingsIcon,
+  SnowflakeIcon,
   SunIcon,
   SunsetIcon,
 } from './components/icon/icons.js';

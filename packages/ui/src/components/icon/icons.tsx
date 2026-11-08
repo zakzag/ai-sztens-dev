@@ -89,6 +89,61 @@ export function LayersIcon({ className }: IconProps) {
 }
 
 /**
+ * Snowflake icon — the “Fagyott üveg” (frost) theme option (AIS-169).
+ *
+ * Geometry copied from Lucide `snowflake` (https://lucide.dev/icons/snowflake),
+ * ISC licence — Copyright (c) Lucide Contributors.
+ *
+ * @param props - see {@link IconProps}.
+ */
+export function SnowflakeIcon({ className }: IconProps) {
+  return (
+    <svg {...ICON_BASE_PROPS} className={cn(ICON_BASE_CLASS, className)}>
+      <path d="M12 2v20" />
+      <path d="m4.93 4.93 14.14 14.14" />
+      <path d="m19.07 4.93-14.14 14.14" />
+      <path d="M2 12h20" />
+      <path d="m9 5 3-3 3 3" />
+      <path d="m9 19 3 3 3-3" />
+      <path d="m5 9-3 3 3 3" />
+      <path d="m19 9 3 3-3 3" />
+    </svg>
+  );
+}
+
+/**
+ * Droplet icon — the “Kristályüveg” (crystal) theme option (AIS-169).
+ *
+ * Geometry copied from Lucide `droplet` (https://lucide.dev/icons/droplet),
+ * ISC licence — Copyright (c) Lucide Contributors.
+ *
+ * @param props - see {@link IconProps}.
+ */
+export function DropletIcon({ className }: IconProps) {
+  return (
+    <svg {...ICON_BASE_PROPS} className={cn(ICON_BASE_CLASS, className)}>
+      <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />
+    </svg>
+  );
+}
+
+/**
+ * Cloud icon — the “Füstüveg” (smoke) theme option (AIS-169).
+ *
+ * Geometry copied from Lucide `cloud` (https://lucide.dev/icons/cloud),
+ * ISC licence — Copyright (c) Lucide Contributors.
+ *
+ * @param props - see {@link IconProps}.
+ */
+export function CloudIcon({ className }: IconProps) {
+  return (
+    <svg {...ICON_BASE_PROPS} className={cn(ICON_BASE_CLASS, className)}>
+      <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+    </svg>
+  );
+}
+
+/**
  * Sunset icon — the “Ambient” theme option.
  *
  * Geometry copied from Lucide `sunset` (https://lucide.dev/icons/sunset),

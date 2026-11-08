@@ -21,7 +21,10 @@ import {
   THEME_OPTION_AMBIENT_LABEL,
   THEME_OPTION_DARK_LABEL,
   THEME_OPTION_GLASS,
+  THEME_OPTION_GLASS_CRYSTAL_LABEL,
+  THEME_OPTION_GLASS_FROST_LABEL,
   THEME_OPTION_GLASS_LABEL,
+  THEME_OPTION_GLASS_SMOKE_LABEL,
   THEME_OPTION_LIGHT_LABEL,
   THEME_SELECTOR_LABEL,
 } from '../layout.const.js';
@@ -97,7 +100,7 @@ describe('ThemeSelector', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('lists the four appearances with an icon each and marks the current one', async () => {
+  it('lists the seven appearances with an icon each and marks the current one', async () => {
     const user = createOverlayUser();
 
     renderSelector();
@@ -119,6 +122,9 @@ describe('ThemeSelector', () => {
       THEME_OPTION_DARK_LABEL,
       THEME_OPTION_AMBIENT_LABEL,
       THEME_OPTION_GLASS_LABEL,
+      THEME_OPTION_GLASS_FROST_LABEL,
+      THEME_OPTION_GLASS_CRYSTAL_LABEL,
+      THEME_OPTION_GLASS_SMOKE_LABEL,
     ]);
     expect(
       options.every((option) => option.querySelector('svg') !== null),

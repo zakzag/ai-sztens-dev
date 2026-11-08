@@ -101,6 +101,7 @@
   --app-backdrop: none;
   --blur-glass: 16px;
   --saturate-glass: 135%;
+  --glass-sheen: none;
 }
 
 @utility border-hairline {
@@ -134,6 +135,17 @@
 @utility surface-glass {
   -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(var(--saturate-glass));
   backdrop-filter: blur(var(--blur-glass)) saturate(var(--saturate-glass));
+
+  /**
+   * The specular streak (AIS-169).
+   *
+   * A uniform border alone reads flat: real glass catches light along a diagonal
+   * and the highlight travels across the pane. This is a `background-image`, not a
+   * `background-color`, so it stacks on top of `bg-surface-*` instead of replacing
+   * it — and `none` for every appearance that is not glass keeps the utility a
+   * no-op there.
+   */
+  background-image: var(--glass-sheen);
 }
 
 @layer base {
@@ -330,65 +342,83 @@
 }
 
 /**
- * Glass — the frosted appearance (AIS-166).
+ * Glass family — four frosted appearances (AIS-166, AIS-169).
  *
- * Unlike `light` and `ambient` this is not a re-tint of the neomorphic look: the
- * surfaces carry **alpha** (a translucent panel), the borders become light rims
- * instead of dark hairlines, the depth becomes one soft drop shadow plus an inner
- * highlight, and the radii get rounder. Translucency alone would be unreadable
- * over a flat page, so the body gets `--app-backdrop`: three wide radial
- * gradients the blur can actually work against.
+ * They share one recipe and differ only in *how much* glass they are. Every block
+ * follows the four-part contract of real glass:
  *
- * `--blur-glass` / `--saturate-glass` are the only values the `surface-glass`
- * utility reads; they live here so nothing in a component names a blur radius.
+ * 1. **a barely-there fill** — the surface tokens carry alpha, so the backdrop
+ *    shows through instead of the panel being a grey card;
+ * 2. **a catch-light edge** — the border tokens are white at 22–65%, never a dark
+ *    hairline, because the bright rim does more for the illusion than any shadow;
+ * 3. **a bevel in the depth slots** — a bright inner rim on the top edge, a faint
+ *    dark rim on the bottom edge (that pair is what reads as *thickness*), plus one
+ *    large, soft, low-alpha drop shadow underneath;
+ * 4. **a diagonal specular sheen** — `--glass-sheen`, the streak a uniform border
+ *    cannot produce, layered as a `background-image` by `surface-glass`.
+ *
+ * Two limits are deliberate. The blur stays in the 12–26px band: past ~30px the
+ * backdrop stops reading as shapes and the panel turns into fog. And `saturate()`
+ * is not optional — a blur is an averaging filter, so it drains chroma; the
+ * 120–155% here buys it back.
+ *
+ * The fills are calibrated against each variant's own base lightness, because text
+ * sits on the *composited* surface: base + fill alpha has to leave the near-white
+ * text token above 4.5:1.
+ */
+
+/**
+ * `glass` — balanced frost, the default glass. 10–14% fill, 16px blur, a firm
+ * 1px rim and a soft lift. Closest to the "pane floating over a soft backdrop"
+ * reference.
  */
 :root[data-theme="glass"] {
   /* Brand */
-  --color-primary: oklch(0.82 0.12 200);
-  --color-primary-hover: oklch(0.87 0.11 200);
-  --color-primary-foreground: oklch(0.22 0.04 230);
-  --color-secondary: oklch(0.78 0.12 300);
-  --color-secondary-foreground: oklch(0.2 0.03 300);
-  --color-tertiary: oklch(0.8 0.12 340);
-  --color-quaternary: oklch(0.82 0.1 150);
+  --color-primary: oklch(0.84 0.09 220);
+  --color-primary-hover: oklch(0.89 0.08 220);
+  --color-primary-foreground: oklch(0.22 0.04 250);
+  --color-secondary: oklch(0.8 0.09 285);
+  --color-secondary-foreground: oklch(0.2 0.03 285);
+  --color-tertiary: oklch(0.82 0.09 330);
+  --color-quaternary: oklch(0.84 0.08 160);
 
   /* Surfaces — translucent, stacked so a popover over a panel stays readable */
-  --color-surface-base: oklch(0.28 0.06 265);
-  --color-surface-raised: oklch(0.42 0.05 265 / 0.35);
-  --color-surface-sunken: oklch(0.3 0.04 265 / 0.5);
-  --color-surface-overlay: oklch(0.5 0.05 265 / 0.45);
+  --color-surface-base: oklch(0.36 0.045 255);
+  --color-surface-raised: oklch(1 0 0 / 0.1);
+  --color-surface-sunken: oklch(0.18 0.03 255 / 0.4);
+  --color-surface-overlay: oklch(1 0 0 / 0.14);
 
   /* Borders — light rims, never a dark hairline */
-  --color-border-hairline: oklch(1 0 0 / 0.18);
-  --color-border-default: oklch(1 0 0 / 0.28);
-  --color-border-strong: oklch(1 0 0 / 0.45);
-  --color-border-focus: oklch(0.86 0.13 200);
+  --color-border-hairline: oklch(1 0 0 / 0.3);
+  --color-border-default: oklch(1 0 0 / 0.4);
+  --color-border-strong: oklch(1 0 0 / 0.55);
+  --color-border-focus: oklch(0.9 0.09 220);
 
   /* Text */
-  --color-text-primary: oklch(0.98 0.005 250);
-  --color-text-secondary: oklch(0.88 0.01 250);
-  --color-text-muted: oklch(0.76 0.012 250);
+  --color-text-primary: oklch(0.98 0.004 250);
+  --color-text-secondary: oklch(0.9 0.008 250);
+  --color-text-muted: oklch(0.8 0.01 250);
   --color-text-inverse: oklch(0.2 0.02 250);
 
   /* State */
-  --color-success: oklch(0.78 0.13 158);
-  --color-success-foreground: oklch(0.18 0.03 158);
-  --color-warning: oklch(0.85 0.13 85);
+  --color-success: oklch(0.8 0.12 158);
+  --color-success-foreground: oklch(0.2 0.03 158);
+  --color-warning: oklch(0.86 0.12 85);
   --color-warning-foreground: oklch(0.22 0.03 85);
-  --color-danger: oklch(0.7 0.17 22);
+  --color-danger: oklch(0.72 0.16 22);
   --color-danger-foreground: oklch(0.99 0.01 22);
-  --color-info: oklch(0.78 0.1 235);
-  --color-info-foreground: oklch(0.18 0.02 235);
+  --color-info: oklch(0.8 0.09 235);
+  --color-info-foreground: oklch(0.2 0.02 235);
 
-  /* Depth — soft drop plus an inner highlight instead of the double neomorphic pair */
-  --shadow-neu-raised: 0 24px 48px -24px oklch(0.12 0.03 265 / 0.7), inset 0 1px 0 oklch(1 0 0 / 0.35);
-  --shadow-neu-inset: inset 0 1px 2px oklch(1 0 0 / 0.12), inset 0 -1px 2px oklch(0.1 0.02 265 / 0.25);
-  --shadow-neu-pressed: inset 0 2px 6px oklch(0.1 0.02 265 / 0.35), inset 0 -1px 1px oklch(1 0 0 / 0.12);
-  --shadow-focus-ring: 0 0 0 3px oklch(0.86 0.13 200 / 0.4);
+  /* Depth — bevel: top light rim, bottom dark rim, one soft lift */
+  --shadow-neu-raised: 0 18px 44px -20px oklch(0.16 0.03 255 / 0.55), inset 0 1px 0 oklch(1 0 0 / 0.45), inset 0 -1px 0 oklch(0.12 0.02 255 / 0.2);
+  --shadow-neu-inset: inset 0 1px 2px oklch(0.16 0.02 255 / 0.3), inset 0 -1px 0 oklch(1 0 0 / 0.22);
+  --shadow-neu-pressed: inset 0 2px 6px oklch(0.16 0.02 255 / 0.38), inset 0 -1px 0 oklch(1 0 0 / 0.18);
+  --shadow-focus-ring: 0 0 0 3px oklch(0.9 0.09 220 / 0.45);
 
   /* Shape */
-  --radius-control: 0.75rem;
-  --radius-card: 1.25rem;
+  --radius-control: 0.875rem;
+  --radius-card: 1.5rem;
   --radius-pill: 9999px;
 
   /* Motion */
@@ -396,11 +426,207 @@
 
   /* Appearance state */
   --color-scheme: dark;
-  --app-backdrop: radial-gradient(1200px 640px at 14% -10%, oklch(0.62 0.16 195 / 0.55), transparent 62%),
-    radial-gradient(900px 560px at 88% 8%, oklch(0.6 0.18 320 / 0.45), transparent 65%),
-    radial-gradient(1000px 700px at 50% 120%, oklch(0.55 0.16 265 / 0.5), transparent 70%);
-  --blur-glass: 18px;
+  --app-backdrop: radial-gradient(1100px 620px at 18% -12%, oklch(0.62 0.09 225 / 0.5), transparent 62%),
+    radial-gradient(900px 520px at 86% 6%, oklch(0.6 0.1 300 / 0.4), transparent 65%),
+    radial-gradient(1000px 700px at 50% 118%, oklch(0.58 0.09 265 / 0.45), transparent 70%);
+  --blur-glass: 16px;
   --saturate-glass: 140%;
+  --glass-sheen: linear-gradient(135deg, oklch(1 0 0 / 0.16), transparent 34%, transparent 66%, oklch(1 0 0 / 0.06));
+}
+
+/**
+ * `glass-frost` — the milky one. Heaviest fill, widest blur, quietest rim: the
+ * backdrop is only guessed at, and the panel carries the surface itself.
+ */
+:root[data-theme="glass-frost"] {
+  /* Brand */
+  --color-primary: oklch(0.84 0.08 200);
+  --color-primary-hover: oklch(0.89 0.07 200);
+  --color-primary-foreground: oklch(0.22 0.03 240);
+  --color-secondary: oklch(0.82 0.07 280);
+  --color-secondary-foreground: oklch(0.2 0.03 280);
+  --color-tertiary: oklch(0.84 0.08 330);
+  --color-quaternary: oklch(0.86 0.07 160);
+
+  /* Surfaces — the most opaque glass of the family */
+  --color-surface-base: oklch(0.34 0.03 250);
+  --color-surface-raised: oklch(1 0 0 / 0.2);
+  --color-surface-sunken: oklch(0.18 0.02 250 / 0.42);
+  --color-surface-overlay: oklch(1 0 0 / 0.24);
+
+  /* Borders — softly lit, not crisp */
+  --color-border-hairline: oklch(1 0 0 / 0.24);
+  --color-border-default: oklch(1 0 0 / 0.32);
+  --color-border-strong: oklch(1 0 0 / 0.45);
+  --color-border-focus: oklch(0.9 0.08 200);
+
+  /* Text */
+  --color-text-primary: oklch(0.98 0.004 250);
+  --color-text-secondary: oklch(0.92 0.006 250);
+  --color-text-muted: oklch(0.84 0.008 250);
+  --color-text-inverse: oklch(0.2 0.02 250);
+
+  /* State */
+  --color-success: oklch(0.82 0.1 158);
+  --color-success-foreground: oklch(0.2 0.03 158);
+  --color-warning: oklch(0.88 0.11 85);
+  --color-warning-foreground: oklch(0.22 0.03 85);
+  --color-danger: oklch(0.74 0.15 22);
+  --color-danger-foreground: oklch(0.99 0.01 22);
+  --color-info: oklch(0.82 0.08 235);
+  --color-info-foreground: oklch(0.2 0.02 235);
+
+  /* Depth — a wider, softer lift with a gentler bevel */
+  --shadow-neu-raised: 0 26px 60px -26px oklch(0.16 0.02 250 / 0.5), inset 0 1px 0 oklch(1 0 0 / 0.32), inset 0 -1px 0 oklch(0.12 0.02 250 / 0.16);
+  --shadow-neu-inset: inset 0 1px 2px oklch(0.2 0.02 250 / 0.22), inset 0 -1px 0 oklch(1 0 0 / 0.2);
+  --shadow-neu-pressed: inset 0 2px 6px oklch(0.2 0.02 250 / 0.3), inset 0 -1px 0 oklch(1 0 0 / 0.16);
+  --shadow-focus-ring: 0 0 0 3px oklch(0.9 0.08 200 / 0.4);
+
+  /* Shape — the roundest of the family */
+  --radius-control: 1rem;
+  --radius-card: 1.75rem;
+  --radius-pill: 9999px;
+
+  /* Motion */
+  --ease-neu: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Appearance state */
+  --color-scheme: dark;
+  --app-backdrop: radial-gradient(1200px 700px at 22% -14%, oklch(0.7 0.05 220 / 0.45), transparent 64%),
+    radial-gradient(900px 560px at 84% 10%, oklch(0.68 0.05 285 / 0.35), transparent 66%);
+  --blur-glass: 26px;
+  --saturate-glass: 120%;
+  --glass-sheen: linear-gradient(135deg, oklch(1 0 0 / 0.1), transparent 28%, transparent 72%, oklch(1 0 0 / 0.04));
+}
+
+/**
+ * `glass-crystal` — the clearest one. 5–7% fill, a crisp bright rim and a strong
+ * sheen: almost no colour of its own, so the backdrop does all the talking.
+ */
+:root[data-theme="glass-crystal"] {
+  /* Brand */
+  --color-primary: oklch(0.88 0.1 200);
+  --color-primary-hover: oklch(0.93 0.08 200);
+  --color-primary-foreground: oklch(0.2 0.04 240);
+  --color-secondary: oklch(0.86 0.1 275);
+  --color-secondary-foreground: oklch(0.18 0.03 275);
+  --color-tertiary: oklch(0.86 0.1 330);
+  --color-quaternary: oklch(0.88 0.09 155);
+
+  /* Surfaces — barely there */
+  --color-surface-base: oklch(0.3 0.06 265);
+  --color-surface-raised: oklch(1 0 0 / 0.05);
+  --color-surface-sunken: oklch(0.12 0.03 265 / 0.35);
+  --color-surface-overlay: oklch(1 0 0 / 0.07);
+
+  /* Borders — the brightest rims, this is what sells the pane */
+  --color-border-hairline: oklch(1 0 0 / 0.48);
+  --color-border-default: oklch(1 0 0 / 0.55);
+  --color-border-strong: oklch(1 0 0 / 0.65);
+  --color-border-focus: oklch(0.94 0.1 200);
+
+  /* Text */
+  --color-text-primary: oklch(0.99 0.003 250);
+  --color-text-secondary: oklch(0.92 0.006 250);
+  --color-text-muted: oklch(0.82 0.008 250);
+  --color-text-inverse: oklch(0.18 0.02 250);
+
+  /* State */
+  --color-success: oklch(0.86 0.12 158);
+  --color-success-foreground: oklch(0.18 0.03 158);
+  --color-warning: oklch(0.9 0.12 85);
+  --color-warning-foreground: oklch(0.2 0.03 85);
+  --color-danger: oklch(0.76 0.16 22);
+  --color-danger-foreground: oklch(0.99 0.01 22);
+  --color-info: oklch(0.86 0.1 235);
+  --color-info-foreground: oklch(0.18 0.02 235);
+
+  /* Depth — tight lift, hard bright bevel */
+  --shadow-neu-raised: 0 12px 32px -16px oklch(0.14 0.03 265 / 0.5), inset 0 1px 0 oklch(1 0 0 / 0.6), inset 0 -1px 0 oklch(0.1 0.02 265 / 0.22);
+  --shadow-neu-inset: inset 0 1px 3px oklch(0.14 0.02 265 / 0.28), inset 0 -1px 0 oklch(1 0 0 / 0.28);
+  --shadow-neu-pressed: inset 0 2px 7px oklch(0.14 0.02 265 / 0.35), inset 0 -1px 0 oklch(1 0 0 / 0.22);
+  --shadow-focus-ring: 0 0 0 3px oklch(0.94 0.1 200 / 0.45);
+
+  /* Shape */
+  --radius-control: 1rem;
+  --radius-card: 1.5rem;
+  --radius-pill: 9999px;
+
+  /* Motion */
+  --ease-neu: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Appearance state */
+  --color-scheme: dark;
+  --app-backdrop: radial-gradient(1300px 700px at 16% -16%, oklch(0.66 0.12 205 / 0.5), transparent 62%),
+    radial-gradient(1000px 620px at 88% 112%, oklch(0.6 0.12 285 / 0.42), transparent 66%);
+  --blur-glass: 12px;
+  --saturate-glass: 155%;
+  --glass-sheen: linear-gradient(135deg, oklch(1 0 0 / 0.26), transparent 30%, transparent 70%, oklch(1 0 0 / 0.1));
+}
+
+/**
+ * `glass-smoke` — smoked glass. A dark, dense fill with a thin light rim: the
+ * calmest of the four, meant for long sessions.
+ */
+:root[data-theme="glass-smoke"] {
+  /* Brand */
+  --color-primary: oklch(0.8 0.11 285);
+  --color-primary-hover: oklch(0.86 0.1 285);
+  --color-primary-foreground: oklch(0.2 0.03 285);
+  --color-secondary: oklch(0.78 0.08 240);
+  --color-secondary-foreground: oklch(0.2 0.03 240);
+  --color-tertiary: oklch(0.8 0.1 330);
+  --color-quaternary: oklch(0.8 0.08 160);
+
+  /* Surfaces — smoked, dense */
+  --color-surface-base: oklch(0.16 0.015 265);
+  --color-surface-raised: oklch(0.2 0.02 265 / 0.55);
+  --color-surface-sunken: oklch(0.1 0.01 265 / 0.5);
+  --color-surface-overlay: oklch(0.24 0.02 265 / 0.6);
+
+  /* Borders — a thin light rim on dark glass */
+  --color-border-hairline: oklch(1 0 0 / 0.22);
+  --color-border-default: oklch(1 0 0 / 0.3);
+  --color-border-strong: oklch(1 0 0 / 0.42);
+  --color-border-focus: oklch(0.86 0.11 285);
+
+  /* Text */
+  --color-text-primary: oklch(0.95 0.004 265);
+  --color-text-secondary: oklch(0.86 0.008 265);
+  --color-text-muted: oklch(0.74 0.01 265);
+  --color-text-inverse: oklch(0.16 0.015 265);
+
+  /* State */
+  --color-success: oklch(0.8 0.11 158);
+  --color-success-foreground: oklch(0.18 0.03 158);
+  --color-warning: oklch(0.86 0.12 85);
+  --color-warning-foreground: oklch(0.2 0.03 85);
+  --color-danger: oklch(0.7 0.16 22);
+  --color-danger-foreground: oklch(0.99 0.01 22);
+  --color-info: oklch(0.8 0.09 235);
+  --color-info-foreground: oklch(0.18 0.02 235);
+
+  /* Depth — deep lift, restrained bevel */
+  --shadow-neu-raised: 0 22px 50px -22px oklch(0.08 0.02 265 / 0.75), inset 0 1px 0 oklch(1 0 0 / 0.18), inset 0 -1px 0 oklch(0.06 0.01 265 / 0.4);
+  --shadow-neu-inset: inset 0 1px 3px oklch(0.06 0.01 265 / 0.5), inset 0 -1px 0 oklch(1 0 0 / 0.12);
+  --shadow-neu-pressed: inset 0 2px 7px oklch(0.06 0.01 265 / 0.55), inset 0 -1px 0 oklch(1 0 0 / 0.1);
+  --shadow-focus-ring: 0 0 0 3px oklch(0.86 0.11 285 / 0.4);
+
+  /* Shape */
+  --radius-control: 0.875rem;
+  --radius-card: 1.5rem;
+  --radius-pill: 9999px;
+
+  /* Motion */
+  --ease-neu: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Appearance state */
+  --color-scheme: dark;
+  --app-backdrop: radial-gradient(1100px 620px at 20% -12%, oklch(0.34 0.05 285 / 0.5), transparent 62%),
+    radial-gradient(900px 520px at 84% 108%, oklch(0.3 0.04 250 / 0.45), transparent 66%);
+  --blur-glass: 20px;
+  --saturate-glass: 130%;
+  --glass-sheen: linear-gradient(135deg, oklch(1 0 0 / 0.08), transparent 32%, transparent 68%, oklch(1 0 0 / 0.03));
 }
 
 /**
@@ -416,20 +642,30 @@
  * media-query refinement is not an appearance.
  */
 @media (prefers-reduced-transparency: reduce) {
-  :root[data-theme="glass"] {
-    --color-surface-raised: oklch(0.33 0.05 265);
-    --color-surface-sunken: oklch(0.24 0.04 265);
-    --color-surface-overlay: oklch(0.37 0.05 265);
-    --color-border-hairline: oklch(0.5 0.03 265);
-    --color-border-default: oklch(0.58 0.03 265);
-    --color-border-strong: oklch(0.68 0.03 265);
+  :root[data-theme="glass"],
+  :root[data-theme="glass-frost"],
+  :root[data-theme="glass-crystal"],
+  :root[data-theme="glass-smoke"] {
+    /* One shared opaque ladder: a variant keeps its accent and its radii, but the
+       surface stops being a pane. Four per-variant ladders would be four near
+       duplicates of the same neutral ramp. */
+    --color-surface-raised: oklch(0.32 0.03 255);
+    --color-surface-sunken: oklch(0.22 0.02 255);
+    --color-surface-overlay: oklch(0.36 0.03 255);
+    --color-border-hairline: oklch(0.5 0.02 255);
+    --color-border-default: oklch(0.58 0.02 255);
+    --color-border-strong: oklch(0.68 0.02 255);
     --blur-glass: 0px;
     --saturate-glass: 100%;
+    --glass-sheen: none;
   }
 }
 
 @media (prefers-contrast: more) {
-  :root[data-theme="glass"] {
+  :root[data-theme="glass"],
+  :root[data-theme="glass-frost"],
+  :root[data-theme="glass-crystal"],
+  :root[data-theme="glass-smoke"] {
     --color-surface-raised: oklch(0.2 0.03 265);
     --color-surface-overlay: oklch(0.24 0.03 265);
     --color-text-primary: oklch(1 0 0);
@@ -438,5 +674,6 @@
     --color-border-default: oklch(0.82 0.02 265);
     --blur-glass: 0px;
     --saturate-glass: 100%;
+    --glass-sheen: none;
   }
 }

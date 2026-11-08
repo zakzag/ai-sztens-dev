@@ -1,9 +1,9 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-08 — AIS-165 / AIS-166 / AIS-167 (témamotor: `data-theme`, `light` /
-`ambient` / `glass` token-blokkok, perzisztencia, villogásmentes boot, `surface-glass` blur a lebegő
-rétegeken, negyedik `Üveg` opció a fejléc választójában — lásd §3.2.2 és §5).** Korábbi: AIS-155
-(route-alapú `EntityDialog` szabvány + api-keys lista-első oldal).
+**Utolsó frissítés: 2026-11-08 — AIS-165 / AIS-166 / AIS-167 / AIS-169 (témamotor: `data-theme`,
+`light` / `ambient` + négy üveg variáns token-blokkja, perzisztencia, villogásmentes boot,
+`surface-glass` blur + csillanás a lebegő rétegeken, hét opció a fejléc választójában — lásd §3.2.2
+és §5).** Korábbi: AIS-155 (route-alapú `EntityDialog` szabvány + api-keys lista-első oldal).
 Minden entitás-létrehozó/-módosító felület **route-mountolt overlay** (`EntityDialog`, `size="fit"`,
 opcionális footer submit `form` attribútummal, read-only mód `submit: null`-lal), a lista pedig
 mountolva marad mögötte: a `RouteEntry` új `children` mezőt kapott, az `AppRouter` rekurzívan renderel,
@@ -281,7 +281,8 @@ They are plain `:root` custom properties, overridden by each appearance block:
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `--color-scheme`                       | feeds `color-scheme` on `body`, so native widgets (scrollbars, controls, caret) follow the appearance             |
 | `--app-backdrop`                       | body `background-image`; `none` everywhere except `ambient` and `glass`, which need a gradient behind translucent panels |
-| `--blur-glass`, `--saturate-glass`     | the values the `surface-glass` utility reads; `0px` / `100%` outside the glass appearance, which makes the class a no-op |
+| `--blur-glass`, `--saturate-glass`     | the values the `surface-glass` utility reads; `0px` / `100%` outside the glass family, which makes the class a no-op |
+| `--glass-sheen`                        | the diagonal specular streak, applied by `surface-glass` as a `background-image`; `none` outside the glass family and in both readability fallbacks (AIS-169) |
 
 **`surface-glass` is a property, not a value**, so no appearance block can switch
 it on. The floating-surface recipes therefore carry it unconditionally — dialog,
@@ -295,6 +296,28 @@ class name has a single home (`SURFACE_GLASS_CLASS` in
 `prefers-reduced-transparency: reduce` and `prefers-contrast: more` re-declare the
 glass surface and border tokens as **opaque** and zero the blur, so the appearance
 degrades instead of becoming unreadable.
+
+**Seven appearances exist since AIS-169: `light`, `dark`, `ambient` and four
+readings of one material.** The glass members are not colour axes — they are the
+same recipe at different strengths, so the choice between them is a product
+decision made in the header selector, not a code change:
+
+| Value           | Label         | Fill (raised / overlay) | Blur / saturate | Rim (border) | Character                                        |
+| --------------- | ------------- | ----------------------- | --------------- | ------------ | ------------------------------------------------ |
+| `glass`         | Üveg          | `10% / 14%` white       | 16px / 140%     | `0.30 / 0.40`| balanced frost, the default glass                |
+| `glass-frost`   | Fagyott üveg  | `20% / 24%` white       | 26px / 120%     | `0.24 / 0.32`| milky: the panel carries the surface             |
+| `glass-crystal` | Kristályüveg  | `5% / 7%` white         | 12px / 155%     | `0.48 / 0.55`| almost invisible, brightest rim, strongest sheen |
+| `glass-smoke`   | Füstüveg      | `55% / 60%` dark        | 20px / 130%     | `0.22 / 0.30`| smoked, dense, calmest                           |
+
+Every member follows the four-part contract of real glass: a barely-there fill, a
+**catch-light edge** (borders are white at 22–65%, never a dark hairline), a
+**bevel** in the depth slots (bright inner rim on top, faint dark rim at the
+bottom — that pair is what reads as *thickness* — plus one large soft drop
+shadow), and the **specular sheen** a uniform border cannot produce. The fills are
+calibrated per variant against its own base lightness, because text sits on the
+*composited* surface: base + fill has to leave `text-text-primary` above 4.5:1.
+Blur stays inside 12–26px on purpose — past ~30px the backdrop stops reading as
+shapes and the panel turns into fog.
 
 ### 3.2.1 Default border colour (**D40**)
 

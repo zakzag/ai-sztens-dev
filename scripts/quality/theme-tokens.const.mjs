@@ -35,6 +35,7 @@ export const THEME_STATE_TOKENS = Object.freeze([
   '--app-backdrop',
   '--blur-glass',
   '--saturate-glass',
+  '--glass-sheen',
 ]);
 
 /** Rule ids, in reporting priority order. */

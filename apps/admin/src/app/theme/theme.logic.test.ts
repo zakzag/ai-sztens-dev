@@ -6,7 +6,7 @@
  * a storage that throws. Nothing here mounts React.
  */
 
-import { DEFAULT_THEME_NAME } from '@callback/ui';
+import { DEFAULT_THEME_NAME, THEME_NAMES } from '@callback/ui';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createBrokenStorage,
@@ -22,6 +22,24 @@ describe('isThemeName', () => {
     expect(isThemeName('dark')).toBe(true);
     expect(isThemeName('ambient')).toBe(true);
     expect(isThemeName('glass')).toBe(true);
+    expect(isThemeName('glass-frost')).toBe(true);
+    expect(isThemeName('glass-crystal')).toBe(true);
+    expect(isThemeName('glass-smoke')).toBe(true);
+  });
+
+  it('accepts exactly the names the token file implements', () => {
+    // The union, the token blocks and the boot script all read the same list;
+    // this is the assertion that keeps a fifth glass variant from being half
+    // added (AIS-169).
+    expect([...THEME_NAMES]).toEqual([
+      'light',
+      'dark',
+      'ambient',
+      'glass',
+      'glass-frost',
+      'glass-crystal',
+      'glass-smoke',
+    ]);
   });
 
   it('rejects a name the token file does not implement', () => {

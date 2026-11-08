@@ -256,10 +256,13 @@ Every color, border, radius, shadow and duration comes from `packages/ui/src/sty
 | Thickness | `--border-width-hairline/-default/-strong` → utility classes `border-hairline`, `border-strong`                                                       |
 | Shape     | `--radius-control/-card/-pill` → `rounded-control`                                                                                                    |
 | Motion    | `--duration-fast/-base`, `--ease-neu` → `transition-shadow duration-fast`                                                                             |
-| Appearance | `--color-scheme`, `--app-backdrop`, `--blur-glass`, `--saturate-glass` → `surface-glass` (AIS-165/166)                                                |
+| Appearance | `--color-scheme`, `--app-backdrop`, `--blur-glass`, `--saturate-glass`, `--glass-sheen` → `surface-glass` (AIS-165/166/169)                          |
 
-**Four appearances exist — `light`, `dark`, `ambient`, `glass`** — selected by `data-theme` on `<html>`.
-Two rules follow from that, and both are machine-checked:
+**Seven appearances exist — `light`, `dark`, `ambient`, and the glass family
+`glass` / `glass-frost` / `glass-crystal` / `glass-smoke`** — selected by `data-theme` on `<html>`.
+The glass members are four strengths of one material, not four palettes: the choice
+between them belongs to the product, so they are separate values. Two rules follow
+from all of that, and both are machine-checked:
 
 1. **A token belongs to the contract, not to one theme.** A new colour, radius or shadow is added to
    the `@theme` block **and** to every `:root[data-theme="…"]` block; `pnpm quality:themes` fails when

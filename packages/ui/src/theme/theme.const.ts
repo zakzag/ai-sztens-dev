@@ -30,6 +30,9 @@ export const THEME_NAMES: readonly ThemeName[] = [
   DEFAULT_THEME_NAME,
   'ambient',
   'glass',
+  'glass-frost',
+  'glass-crystal',
+  'glass-smoke',
 ];
 
 /**

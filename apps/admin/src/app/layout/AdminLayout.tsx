@@ -1,14 +1,15 @@
-import { Link } from 'react-router-dom';
+import { NotificationHost } from '@callback/notifications/react';
 import { AppErrorBanner } from '../../components/error/AppErrorBanner.js';
-import { APP_BRAND_LABEL, APP_ROUTE_HOME_PATH } from '../app.const.js';
 import { useSessionActions } from '../session/use-require-session.js';
-import { AdminNav } from './AdminNav.js';
+import { useTheme } from '../theme/use-theme.js';
+import { AdminHeader } from './AdminHeader.js';
+import { ADMIN_HEADER_PADDING_X } from './layout.const.js';
 import type { AdminLayoutProps } from './admin-layout.interface.js';
 
 /**
  * The shell of the authenticated admin application.
  *
- * It owns the frame — the header with the brand and the navigation, and the
+ * It owns the frame — the sticky [`AdminHeader`](./AdminHeader.tsx:1) and the
  * `<main>` the routed page renders into — and nothing else. The navigation is
  * generated from the route registry, so a new page shows up in the nav without
  * touching this file (AIS-118, `D1`).
@@ -20,7 +21,24 @@ import type { AdminLayoutProps } from './admin-layout.interface.js';
  *
  * The tier-3 banner lives here because it expresses a condition that outlives
  * the page — offline, expired session, maintenance — and must survive
- * navigation (plan `D11`).
+ * navigation (plan `D11`). It is deliberately **not** sticky and sits **above**
+ * the header, so scrolling moves it out of the view: the header is permanent,
+ * the banner is a condition (AIS-140 `D7`).
+ *
+ * `<main>` is full bleed — `w-full` plus the header's own horizontal padding,
+ * no `max-w-*` — because the header spans the whole viewport and a centred,
+ * narrower content column would break that alignment (AIS-140 `D2`).
+ *
+ * The shell reads the theme context (AIS-167) and is therefore **not** optional
+ * to wrap in `<ThemeProvider>`: the login page is themed too, which is why the
+ * provider sits in the app provider chain rather than around this component.
+ *
+ * `<NotificationHost />` is mounted here for the same reason as the banner: the
+ * toast stack and the log drawer belong to the authenticated shell, so they
+ * survive navigation and appear on every protected page without a page ever
+ * rendering them (AIS-84). The public routes (the login page) deliberately have
+ * no host — there is nothing to report before a session exists, and a stray
+ * toast over the login form would be noise.
  *
  * @param props - see {@link AdminLayoutProps}.
  * @returns the application shell.
@@ -28,25 +46,27 @@ import type { AdminLayoutProps } from './admin-layout.interface.js';
 export function AdminLayout({ routes, children }: AdminLayoutProps) {
   const { logout } = useSessionActions();
 
+  /**
+   * The applied appearance and its setter (AIS-167).
+   *
+   * The shell — not the header and not the selector — is the one place that
+   * knows the appearance is real: it hands the current value down as a prop and
+   * the provider's setter as the selector's port, so the two components stay
+   * props-driven and a test can mount either of them without a provider.
+   */
+  const { theme, setTheme } = useTheme();
+
   return (
     <div className="flex min-h-screen flex-col">
       <AppErrorBanner onLogin={logout} />
 
-      <header className="border-b border-border-hairline bg-surface-raised">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-3">
-          <Link
-            to={APP_ROUTE_HOME_PATH}
-            className="text-lg font-semibold text-text-primary"
-          >
-            {APP_BRAND_LABEL}
-          </Link>
-          <AdminNav routes={routes} />
-        </div>
-      </header>
+      <AdminHeader routes={routes} theme={theme} onThemeChange={setTheme} />
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
+      <main className={`w-full flex-1 ${ADMIN_HEADER_PADDING_X} py-8`}>
         {children}
       </main>
+
+      <NotificationHost />
     </div>
   );
 }

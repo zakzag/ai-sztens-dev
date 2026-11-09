@@ -14,7 +14,10 @@
 import { API_ERROR_CODE, resolveApiErrorStatus } from '@callback/shared';
 import type { ApiErrorCode, ApiErrorDetail } from '@callback/shared';
 import type { AppErrorInit } from './app-error.interface.js';
-import { NOT_FOUND_MESSAGE } from './api-messages.const.js';
+import {
+  NOT_FOUND_MESSAGE,
+  STALE_UPDATED_AT_DETAIL,
+} from './api-messages.const.js';
 
 /** Base class of every failure the application raises on purpose. */
 export class AppError extends Error {
@@ -77,5 +80,53 @@ export class ConflictAppError extends AppError {
   ) {
     super({ code, message, details });
     this.name = 'ConflictAppError';
+  }
+}
+
+/**
+ * Optimistic concurrency failure (AIS-108): the client wrote against a version
+ * that is no longer current.
+ *
+ * A subclass of its own rather than a `ConflictAppError` with the
+ * `STALE_WRITE` code, because the *retry advice* differs: a uniqueness conflict
+ * means “pick another value”, a stale write means “re-read, re-apply, resend”.
+ * The detail always names `updatedAt`, which is the field the client has to
+ * refresh before retrying.
+ */
+export class StaleWriteAppError extends AppError {
+  /**
+   * @param message - developer-facing summary.
+   * @param details - field-level issues; defaults to the `updatedAt` entry,
+   *   because a stale write is always about that token.
+   */
+  constructor(
+    message: string,
+    details: readonly ApiErrorDetail[] = [STALE_UPDATED_AT_DETAIL],
+  ) {
+    super({ code: API_ERROR_CODE.STALE_WRITE, message, details });
+    this.name = 'StaleWriteAppError';
+  }
+}
+
+/**
+ * The request shape is valid, its content is not (AIS-108).
+ *
+ * `422`, not `400`: nothing about the JSON is malformed, so telling the client
+ * “your payload is invalid” would send it looking for a syntax problem. What is
+ * wrong is the *value* (an expiry in the past), and that is what `details`
+ * names.
+ */
+export class SemanticValidationAppError extends AppError {
+  /**
+   * @param message - developer-facing summary.
+   * @param details - one `{ path, message }` entry per offending field.
+   */
+  constructor(message: string, details: readonly ApiErrorDetail[]) {
+    super({
+      code: API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
+      message,
+      details,
+    });
+    this.name = 'SemanticValidationAppError';
   }
 }

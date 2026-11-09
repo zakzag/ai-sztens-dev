@@ -10,8 +10,13 @@
  * that shape, never define a second copy of it.
  */
 
-import type { ApiKey, CreateApiKeyInput } from '@callback/shared';
+import type {
+  ApiKey,
+  CreateApiKeyInput,
+  UpdateApiKeyInput,
+} from '@callback/shared';
 import type { ApiKeyRow, NewApiKeyRow } from '../db/schema.js';
+import type { ApiKeyPatch } from './api-keys.interface.js';
 
 /**
  * Converts a `Date` to the ISO 8601 string used on the wire.
@@ -27,6 +32,11 @@ function toIsoString(value: Date): string {
 /** Same as {@link toIsoString}, but keeps `null` as `null` (never `undefined`). */
 function toNullableIsoString(value: Date | null): string | null {
   return value === null ? null : value.toISOString();
+}
+
+/** The inverse of {@link toNullableIsoString}: wire string → `Date`, `null` stays `null`. */
+function toNullableDate(value: string | null): Date | null {
+  return value === null ? null : new Date(value);
 }
 
 /**
@@ -74,5 +84,35 @@ export function toNewApiKeyRow(input: CreateApiKeyInput): NewApiKeyRow {
     description: input.description === undefined ? null : input.description,
     apiKey: input.apiKey,
     expiresAt,
+  };
+}
+
+/**
+ * Maps a validated `PATCH` body to the column subset the repository writes.
+ *
+ * The distinction the two have to preserve is `undefined` vs. `null`:
+ *
+ * - an **absent** key stays absent in the patch, which the repository reads as
+ *   “do not touch this column”;
+ * - an explicit **`null`** is passed through as `null`, which clears it.
+ *
+ * `updatedAt` is read by the caller (it is the concurrency token, compared
+ * against the stored value) and is deliberately **not** part of the patch — the
+ * column is owned by the database, so writing it would defeat the guard.
+ *
+ * @param input - validated body of `PATCH /api/api-keys/:identifier`.
+ * @returns the columns to write; possibly empty, which is a valid (if
+ *   pointless) update that still bumps `updatedAt`.
+ */
+export function toApiKeyPatch(input: UpdateApiKeyInput): ApiKeyPatch {
+  return {
+    ...(input.name === undefined ? {} : { name: input.name }),
+    ...(input.description === undefined
+      ? {}
+      : { description: input.description }),
+    ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
+    ...(input.expiresAt === undefined
+      ? {}
+      : { expiresAt: toNullableDate(input.expiresAt) }),
   };
 }

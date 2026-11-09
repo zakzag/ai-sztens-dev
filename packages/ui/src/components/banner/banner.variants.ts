@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import { SURFACE_GLASS_CLASS } from '../../theme/theme.const.js';
 
 /**
  * Visual recipe for {@link Banner} — the app-level, full-width strip that
@@ -10,7 +11,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
  * text token (like `Alert`), so WCAG AA contrast never depends on the accent.
  */
 export const bannerVariants = cva(
-  'flex w-full items-start justify-between gap-4 border-b border-hairline bg-surface-overlay px-4 py-2.5 text-sm shadow-neu-raised',
+  `flex w-full items-start justify-between gap-4 border-b border-hairline bg-surface-overlay px-4 py-2.5 text-sm shadow-neu-raised ${SURFACE_GLASS_CLASS}`,
   {
     variants: {
       variant: {

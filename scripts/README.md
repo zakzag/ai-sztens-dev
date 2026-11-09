@@ -16,6 +16,7 @@ scripts/
 ├── init.ps1             # AI-agent artefact sync       (Windows PowerShell wrapper)
 ├── test-syntax.ps1      # PowerShell syntax guard for init.ps1
 ├── lib/agent-artifacts/ # shared Node generator behind init.sh / init.ps1
+├── lib/vite-build.mjs   # Vite CLI wrapper with a project-local temp dir
 ├── env-test/            # .env validation suite        → env-test/README.md
 ├── ssh/                 # local SSH key tooling        → ssh/README.md
 ├── sonar/               # local SonarQube analysis     → sonar/README.md
@@ -101,6 +102,31 @@ scripts/init.sh                  # bash
 scripts/init.ps1                 # Windows PowerShell
 ```
 
+### `lib/vite-build.mjs` — Vite build/dev wrapper
+
+Thin wrapper around an app's own `vite` CLI. Its single job is to hand the whole
+Vite process tree a **project-local temp directory** (`<repo>/.tmp/esbuild`, git-ignored)
+before Vite starts, because `esbuild` resolves `os.tmpdir()` once at startup.
+
+Why: on Windows `vite build` intermittently died with
+
+```text
+[vite:esbuild-transpile] remove C:\Users\<user>\AppData\Local\Temp\esbuild-<hash>:
+Access is denied.
+```
+
+— *after* `483 modules transformed`, i.e. the code was fine and the profile temp
+directory was not (a scanner or another handle holder owns the file). A
+`vite.config.ts` cannot fix this, because it is itself transpiled by esbuild
+before any of its code runs.
+
+`apps/admin` and `apps/web` call it from every script that would otherwise say
+`vite` (`dev`, `dev:dev`, `dev:prod`, `build`, `build:dev`, `build:prod`,
+`preview`); all arguments are forwarded, and the exit code/signal is propagated so
+`pnpm -r build` still fails exactly when Vite fails. Pure helpers live in
+`lib/vite-build.logic.mjs` with `lib/vite-build.logic.test.mjs` (run by
+`pnpm test:quality`).
+
 ### `test-syntax.ps1` — PowerShell syntax guard
 
 Parses `scripts/init.ps1` with the PowerShell AST parser and exits non-zero on any parse
@@ -140,6 +166,42 @@ See [`sonar/README.md`](sonar/README.md) for the file-level breakdown and
 | [`env-test/`](env-test/README.md) | `.env` validation: an offline syntax/consistency checker plus an explicit live-access checker.                                                                                                                                                                                                                                                                                                                                                                                                                                   | [`env-test/README.md`](env-test/README.md) |
 | [`ssh/`](ssh/README.md)           | Local SSH key tooling (PPK → OpenSSH conversion, key inspection, passphrase removal).                                                                                                                                                                                                                                                                                                                                                                                                                                            | [`ssh/README.md`](ssh/README.md)           |
 | [`sonar/`](sonar/README.md)       | Local SonarQube analysis: config validation + server pre-flight, then `@sonar/scan`; plus the LCOV merge that makes monorepo coverage readable by SonarQube.                                                                                                                                                                                                                                                                                                                                                                     | [`sonar/README.md`](sonar/README.md)       |
+
+## Troubleshooting
+
+### `ERR_PNPM_BROKEN_LOCKFILE: … expected a single document in the stream, but found more`
+
+`pnpm-lock.yaml` holds **two YAML documents**: the dependency lockfile plus a
+`packageManagerDependencies` block that a pnpm **12** process appended (it records
+the pnpm version it manages for `packageManager`). Any other pnpm refuses the file,
+aborts the install halfway and leaves `node_modules` half-pruned — which then shows
+up as `Cannot find module '…/node_modules/typescript/bin/tsc'` or a wall of
+`TS2307: Cannot find module '@radix-ui/…'` on the next build.
+
+Recovery:
+
+```bash
+git checkout -- pnpm-lock.yaml   # back to the single-document lockfile
+pnpm install --frozen-lockfile   # repopulate node_modules from the local store
+pnpm build                       # verify
+```
+
+`.npmrc` sets `manage-package-manager-versions=false` so the running pnpm does not
+download and record a managed version of itself.
+
+### `apps/api` — one failing `create-fastify-adapter` test, `light-my-request` 6.8.0
+
+`pnpm-workspace.yaml` pins `light-my-request: 6.6.0` via `overrides`. **pnpm 9 does
+not read `pnpm-workspace.yaml` overrides** (only pnpm 10+ does; it read the removed
+`package.json#pnpm` field instead), so a pnpm 9 install resolves 6.8.0 and the
+`cookie`/ESM bug that the pin exists for resurfaces. Use the same toolchain as CI
+(pnpm 10 on Node 24) — `corepack enable` honours the `packageManager` field.
+
+### `pnpm test:quality` — `Could not find 'scripts/quality/*.test.mjs'`
+
+`node --test` only expands globs from Node 22 on. On Node 20 pass the files
+explicitly (`node --test scripts/quality/report.test.mjs …`) or use Node 24, as CI
+does.
 
 ## Conventions
 

@@ -4,18 +4,20 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:dev": "vite --mode dev",
-    "dev:prod": "vite --mode prod",
-    "build": "tsc --noEmit -p tsconfig.json && vite build",
-    "build:dev": "tsc --noEmit -p tsconfig.json && vite build --mode dev",
-    "build:prod": "tsc --noEmit -p tsconfig.json && vite build --mode prod",
-    "preview": "vite preview",
+    "dev": "node ../../scripts/lib/vite-build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev:dev": "node ../../scripts/lib/vite-build.mjs --mode dev",
+    "dev:prod": "node ../../scripts/lib/vite-build.mjs --mode prod",
+    "build": "tsc --noEmit -p tsconfig.json && node ../../scripts/lib/vite-build.mjs build",
+    "build:dev": "tsc --noEmit -p tsconfig.json && node ../../scripts/lib/vite-build.mjs build --mode dev",
+    "build:prod": "tsc --noEmit -p tsconfig.json && node ../../scripts/lib/vite-build.mjs build --mode prod",
+    "preview": "node ../../scripts/lib/vite-build.mjs preview",
     "test": "echo \"@callback/web: no unit tests yet\" && exit 0",
     "lint": "echo \"@callback/web: no eslint config yet\" && exit 0"
   },
   "dependencies": {
     "@callback/shared": "workspace:*",
+    "@callback/ui": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0"

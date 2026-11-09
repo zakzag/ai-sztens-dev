@@ -3,7 +3,7 @@
 **Dátum:** 2026-10-30 15:15 (Europe/Budapest)
 **Ticket:** AIS-121 (subtask az AIS-105 alatt: „Admin alkalmazás-alap és minőségkapu")
 **Téma:** a `build-test` CI job ma csak az API unit teszteket futtatja; a `shared`, `api-client`, `ui` és `admin` tesztek halott kódok a CI szempontjából.
-**Státusz:** implementálva (a negatív bizonyíték még hátra van — lásd §4 Fázis 2)
+**Státusz:** implementálva és **bizonyítva** (a negatív bizonyíték is lefutott — lásd §4 Fázis 2)
 **Implementáció:** [`docs/history/2026-10-30--16-35-00-ais-121-ci-full-test-matrix.md`](../history/2026-10-30--16-35-00-ais-121-ci-full-test-matrix.md:1) · **Milestone:** [`docs/milestones/2026-10-30--16-35-00-ais-121-ci-full-test-matrix.milestone.md`](../milestones/2026-10-30--16-35-00-ais-121-ci-full-test-matrix.milestone.md:1)
 
 ---
@@ -170,35 +170,35 @@ Mivel a Node 24-es `api` unit suite **soha nem futott** még (a `build-test` job
 - [x] **1.4** A fejléckomment (12. sor) frissítése.
 - [x] **1.5** `prettier --check .github/workflows/ci.yml` → **tiszta**.
 
-### Fázis 2 — A negatív bizonyíték (a DoD szigorú része) ⬜ HÁTRALÉVŐ
+### Fázis 2 — A negatív bizonyíték (a DoD szigorú része) ✅ ELKÉSZÜLT
 
 **Ez a fázis nyílt PR-t igényel** — a negatív bizonyíték csak a CI-ben bizonyítható, lokálisan nem.
 
-- [ ] **2.1** Eldobható branch a lokális `dev`-ből.
-- [ ] **2.2** Szándékosan elrontott admin-teszt (például `apps/admin/src/lib/date.test.ts` egy `expect` értéke).
-- [ ] **2.3** PR nyitása → a `build-test` job **piros**, a hibaüzenetben a hibás teszt neve.
-- [ ] **2.4** **Ellenőrzés:** a CI logban a `shared` és `api-client` suite **zöld** (lefutott), és az `admin` suite **piros** → bizonyítja, hogy a lánc a helyen áll meg, és az admin-tesztek tényleg a CI-ban futnak.
-- [ ] **2.5** A teszt visszaállítása → a CI **zöld**.
-- [ ] **2.6** A branch törlése.
+- [x] **2.1** Eldobható branch: `chore/ais-121-negative-proof` (a `main`-ből).
+- [x] **2.2** Szándékosan elrontott admin-teszt: `apps/admin/src/lib/date.test.ts:46` — `getDate()` `1` → `2`. Lokálisan: **1 failed / 172 passed**.
+- [x] **2.3** PR #8 nyitva → a CI run `41135219763` a `Unit tests (full matrix)` lépésen **piros**.
+- [x] **2.4** **Ellenőrzés:** a build-test job lépései — a 8. lépésig (checkout, setup, install, build, lint) mind ✅, a 9. lépés (`Unit tests (full matrix)`) ❌. A lánc tehát a `shared`/`api-client`/`ui` zöld futása **után** az `admin` suite-nél állt meg — bizonyítva, hogy az admin-tesztek valóban a CI-ban futnak. A job 47 s alatt failelt (nem timeout).
+- [x] **2.5** A teszt visszaállítása (`dc40361` revert) → PR #8 merge `674cae5` → **4 checks passed**.
+- [x] **2.6** A branch törölve (lokálisan és a remote-on), a PR #8 lezárva.
 
 ### Fázis 3 — Dokumentáció ✅ ELKÉSZÜLT
 
 - [x] **3.1** [`docs/Specs/SonarQube.md`](../../docs/Specs/SonarQube.md:100) §7 frissítése + a fejléc dátuma.
 - [x] **3.2** `docs/history/2026-10-30--16-35-00-ais-121-ci-full-test-matrix.md` megírása.
 - [x] **3.3** `docs/milestones/2026-10-30--16-35-00-ais-121-ci-full-test-matrix.milestone.md` megírása (a 6 kötelező szektorral).
-- [ ] **3.4** Az AIS-121 Jira ticket DoD-jának kipipálása a bizonyítékok alapján — **a 2. fázis után**, mert a negatív bizonyíték még nincs.
+- [x] **3.4** Az AIS-121 Jira ticket DoD-jának kipipálása a bizonyítékok alapján — a negatív bizonyíték lefutott (Fázis 2).
 
 ---
 
 ## 5. A DoD ellenőrzési listája
 
-| DoD pont                                                                                                     | Hol bizonyul                                              | Státusz                                                       |
-| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- | ------------------------------------------------------------- |
-| A `build-test` job lefuttatja a `shared`, `api-client`, `ui` és `admin` teszteket is                         | A CI log a `pnpm test` kimenete — mind az 5 suite látszik | ✅ Fázis 1 — lokálisan igazolt: 772 teszt / 71 fájl / 0 bukás |
-| **Negatív bizonyíték:** a szándékosan elrontott admin-teszttel a CI **piros**, a visszaállítás után **zöld** | Fázis 2 teljes jegyzőkönyve                               | ⬜ **hátralévő** — nyitott PR kell                            |
-| A job futásideje a változás előtti értékhez képest ésszerű (a timeout nem kell)                              | A job sikeres lefutása + a timeout 20 perc                | ✅ Fázis 1 — a mátrix ~1 percet ad hozzá                      |
-| `docs/Specs/SonarQube.md` és a CI komment frissül                                                            | Fázis 3.1 + 1.4 diff                                      | ✅ Fázis 3                                                    |
-| _(kiegészítő)_ Az `api` unit suite valódi module-compile tesztje is fut, nem skipel                          | Fázis 0.2 — a loud skip warning hiánya a CI logban        | ✅ Fázis 0 — Node 24-en lefutott (419 ms)                     |
+| DoD pont                                                                                                     | Hol bizonyul                                              | Státusz                                                                                |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| A `build-test` job lefuttatja a `shared`, `api-client`, `ui` és `admin` teszteket is                         | A CI log a `pnpm test` kimenete — mind az 5 suite látszik | ✅ Fázis 1 — lokálisan igazolt: 772 teszt / 71 fájl / 0 bukás                          |
+| **Negatív bizonyíték:** a szándékosan elrontott admin-teszttel a CI **piros**, a visszaállítás után **zöld** | Fázis 2 teljes jegyzőkönyve                               | ✅ Fázis 2 — CI run `41135219763` ❌ failure, PR #8 merge `674cae5` ✅ 4 checks passed |
+| A job futásideje a változás előtti értékhez képest ésszerű (a timeout nem kell)                              | A job sikeres lefutása + a timeout 20 perc                | ✅ Fázis 1 — a mátrix ~1 percet ad hozzá                                               |
+| `docs/Specs/SonarQube.md` és a CI komment frissül                                                            | Fázis 3.1 + 1.4 diff                                      | ✅ Fázis 3                                                                             |
+| _(kiegészítő)_ Az `api` unit suite valódi module-compile tesztje is fut, nem skipel                          | Fázis 0.2 — a loud skip warning hiánya a CI logban        | ✅ Fázis 0 — Node 24-en lefutott (419 ms)                                              |
 
 ---
 

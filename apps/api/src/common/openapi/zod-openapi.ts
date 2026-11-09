@@ -30,11 +30,13 @@ import {
   apiKeyListSchema,
   apiKeySchema,
   createApiKeySchema,
+  noPayloadSchema,
   paginationMetaSchema,
   responseMetaSchema,
   resolveApiErrorStatus,
+  updateApiKeySchema,
 } from '@callback/shared';
-import type { ApiErrorCode } from '@callback/shared';
+import type { ApiEndpointContract, ApiErrorCode } from '@callback/shared';
 import { UnregisteredPayloadSchemaError } from './openapi.errors.js';
 import type {
   OpenApiParameter,
@@ -94,6 +96,13 @@ const PAYLOAD_COMPONENTS: ReadonlyMap<z.ZodTypeAny, string> = new Map<
   [apiKeySchema, 'ApiKey'],
   [apiKeyListSchema, 'ApiKeyList'],
   [createApiKeySchema, 'CreateApiKey'],
+  // `UpdateApiKey` is a **request** component (AIS-108): `envelopeOf()` never
+  // wraps it, but `payloadComponentName()` resolves the request body's `$ref`
+  // through this same table, so it has to be named here.
+  [updateApiKeySchema, 'UpdateApiKey'],
+  // `NoPayload` is the `null` of a call that has nothing to return, e.g. the
+  // `DELETE` payload — see `no-payload.schema.ts`.
+  [noPayloadSchema, 'NoPayload'],
 ]);
 
 /**
@@ -278,4 +287,28 @@ export function pathParameters(path: string): OpenApiParameter[] {
       required: true,
       schema: { type: 'string' as const },
     }));
+}
+
+/**
+ * Declares the query-string parameters a registry entry accepts (AIS-107).
+ *
+ * The descriptors come from the shared contract, not from the validation
+ * schema: the list query ends in a `transform`, which cannot be rendered as a
+ * parameter, and the descriptors are built from the same constants the schema
+ * uses. One documented cast, here at the boundary — `@callback/shared` has no
+ * dependency on an OpenAPI library and must not grow one.
+ *
+ * @param entry - registry entry being documented.
+ * @returns one `in: query` parameter per descriptor, in publication order.
+ */
+export function queryParametersOf(
+  entry: ApiEndpointContract,
+): OpenApiParameter[] {
+  return (entry.queryParameters ?? []).map((parameter) => ({
+    in: 'query' as const,
+    name: parameter.name,
+    description: parameter.description,
+    required: parameter.required,
+    schema: parameter.schema,
+  }));
 }

@@ -11,9 +11,6 @@ export const APP_BRAND_LABEL = 'AIsztens — Admin';
 /** Accessible name of the navigation landmark. */
 export const APP_NAV_LABEL = 'Admin navigáció';
 
-/** Title of the catch-all route (unknown URL). */
-export const APP_NOT_FOUND_MESSAGE = 'Nem található';
-
 /** Title of the error boundary. */
 export const APP_ERROR_BOUNDARY_TITLE = 'Az oldal betöltése nem sikerült';
 
@@ -24,8 +21,19 @@ export const APP_ERROR_BOUNDARY_MESSAGE =
 /** Label of the error boundary's reload button. */
 export const APP_ERROR_BOUNDARY_RELOAD_LABEL = 'Oldal újratöltése';
 
-/** Label of the navigation entry pointing to the landing page. */
+/**
+ * Label of the landing page.
+ *
+ * Shared by the navigation entry and the breadcrumb root (AIS-146): the same
+ * route must read the same way in both places, so the wording lives here once.
+ */
 export const APP_NAV_HOME_LABEL = 'Kezdőlap';
+
+/** Label of the API-key manager, used by the nav and the breadcrumb (AIS-146). */
+export const APP_API_KEYS_LABEL = 'API kulcsok';
+
+/** Label of the (placeholder) calls page, used by the nav and the breadcrumb (AIS-146). */
+export const APP_CALLS_LABEL = 'Hívások';
 
 /** Path of the landing page. */
 export const APP_ROUTE_HOME_PATH = '/';
@@ -35,6 +43,14 @@ export const APP_ROUTE_LOGIN_PATH = '/login';
 
 /** Path of the API-key manager. */
 export const APP_ROUTE_API_KEYS_PATH = '/api-keys';
+
+/*
+ * The **detail** route template (`/api-keys/:identifier`) is deliberately *not*
+ * declared here (AIS-131): the table links to it and the route registry mounts
+ * it, and `pages` must not import `app` (`no-page-to-higher-layer`). It
+ * therefore lives in `pages/api-keys/api-keys.const.ts`, and the registry — which
+ * may import a page — takes the template from there. One literal, two consumers.
+ */
 
 /** Path of the (placeholder) calls page. */
 export const APP_ROUTE_CALLS_PATH = '/calls';

@@ -42,9 +42,18 @@ interface ApiKeyBody {
   readonly updatedAt: string;
 }
 
+/** `meta.pagination` of a paginated list (AIS-107). */
+interface PaginationMetaBody {
+  readonly page: number;
+  readonly limit: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
 interface ResponseMetaBody {
   readonly requestId: string;
   readonly timestamp: string;
+  readonly pagination?: PaginationMetaBody;
 }
 
 interface SuccessEnvelopeBody<T> {
@@ -137,6 +146,16 @@ describe('ApiKeysController (e2e)', () => {
   const identifier = `e2e-${randomUUID()}`;
   const otherIdentifier = `e2e-${randomUUID()}`;
 
+  /**
+   * Prefix of the seeded pagination fixtures.
+   *
+   * The table is shared with the dev stack, so an unfiltered list is not
+   * deterministic: every pagination assertion below filters on this prefix
+   * (`?q=`), which is exactly the feature the ticket adds.
+   */
+  const pagePrefix = `e2e-${randomUUID()}`;
+  const seededCount = 12;
+
   beforeAll(async () => {
     const booted = await bootApp();
     if (booted === null) return;
@@ -155,6 +174,24 @@ describe('ApiKeysController (e2e)', () => {
 
     app = booted;
     database = handle;
+  });
+
+  beforeAll(async () => {
+    if (database === null) return;
+
+    // Twelve rows so a 10-row page boundary is observable: page 2 holds the
+    // last two, and `totalPages` is 2 (AIS-107 DoD).
+    await database.insert(apiKeys).values(
+      Array.from({ length: seededCount }, (_, index) => {
+        const suffix = String(index + 1).padStart(2, '0');
+
+        return {
+          name: `${pagePrefix}-${suffix}`,
+          identifier: `${pagePrefix}-${suffix}`,
+          apiKey: `tok_page_${suffix}`,
+        };
+      }),
+    );
   });
 
   afterAll(async () => {
@@ -240,12 +277,13 @@ describe('ApiKeysController (e2e)', () => {
     expect(envelope.data.expiresAt).toBeNull();
   });
 
-  it('GET /api/api-keys lists the created keys inside `data`', async () => {
+  it('GET /api/api-keys lists the created keys inside `data` with `meta.pagination`', async () => {
     if (app === null) return;
 
     const response = await app.inject({
       method: 'GET',
-      url: '/api/api-keys',
+      // `limit=100` keeps the assertion independent of the table's other rows.
+      url: '/api/api-keys?limit=100',
       // A valid inbound id must survive end-to-end (proxy/client trace chaining).
       headers: { [REQUEST_ID_HEADER]: 'test-123' },
     });
@@ -255,12 +293,92 @@ describe('ApiKeysController (e2e)', () => {
     const envelope = readEnvelope<unknown>(response.json());
     expect(envelope.meta.requestId).toBe('test-123');
     expect(readHeader(response.headers[REQUEST_ID_HEADER])).toBe('test-123');
+    expect(envelope.meta.pagination).toEqual(
+      expect.objectContaining({ page: 1, limit: 100 }),
+    );
     expect(isApiKeyList(envelope.data)).toBe(true);
     if (!isApiKeyList(envelope.data)) return;
 
     const identifiers = envelope.data.map((item) => item.identifier);
     expect(identifiers).toContain(identifier);
     expect(identifiers).toContain(otherIdentifier);
+  });
+
+  it('GET /api/api-keys serves page 2 of a filtered, name-ascending list', async () => {
+    if (app === null) return;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/api-keys?q=${pagePrefix}&page=2&limit=10&sort=name&order=asc`,
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const envelope = readEnvelope<unknown>(response.json());
+    expect(isApiKeyList(envelope.data)).toBe(true);
+    if (!isApiKeyList(envelope.data)) return;
+
+    // Sorted by name ascending, the 12 seeded rows put `-11` and `-12` on page 2.
+    expect(envelope.data.map((item) => item.name)).toEqual([
+      `${pagePrefix}-11`,
+      `${pagePrefix}-12`,
+    ]);
+    expect(envelope.meta.pagination).toEqual({
+      page: 2,
+      limit: 10,
+      total: seededCount,
+      totalPages: 2,
+    });
+  });
+
+  it('GET /api/api-keys answers an empty result with 200, `data: []` and `total: 0`', async () => {
+    if (app === null) return;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/api-keys?q=${pagePrefix}-does-not-exist`,
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const envelope = readEnvelope<unknown>(response.json());
+    expect(envelope.data).toEqual([]);
+    expect(envelope.meta.pagination).toEqual({
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 0,
+    });
+  });
+
+  it('GET /api/api-keys rejects limit=101 with 400 + a `limit` detail', async () => {
+    if (app === null) return;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/api-keys?limit=101',
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    const body = readError(response.json());
+    expect(body.error.code).toBe('VALIDATION_FAILED');
+    expect(body.error.details[0]?.path).toBe('limit');
+  });
+
+  it('GET /api/api-keys rejects an unknown sort column with 400 + a `sort` detail', async () => {
+    if (app === null) return;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/api-keys?sort=passwordHash',
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    const body = readError(response.json());
+    expect(body.error.code).toBe('VALIDATION_FAILED');
+    expect(body.error.details[0]?.path).toBe('sort');
   });
 
   it('GET /api/api-keys/:identifier returns the key inside `data`', async () => {
@@ -379,5 +497,204 @@ describe('ApiKeysController (e2e)', () => {
 
     expect(response.statusCode).toBe(400);
     expect(readError(response.json()).error.code).toBe('VALIDATION_FAILED');
+  });
+
+  /**
+   * The mutation convention (AIS-108): `PATCH` is partial and version-guarded,
+   * `DELETE` is a soft delete that answers `data: null`, and a semantically
+   * impossible payload is a `422` — not a `400`.
+   *
+   * The block owns its own row so the scenarios can run in order and the
+   * delete steps cannot disturb the list/pagination assertions above.
+   */
+  describe('mutation convention', () => {
+    const mutationIdentifier = `e2e-${randomUUID()}`;
+
+    /** Version the client last saw — the token every `PATCH` has to send. */
+    let knownUpdatedAt = '';
+
+    it('PATCH with the current version updates the row and bumps updatedAt', async () => {
+      if (app === null) return;
+
+      const created = await app.inject({
+        method: 'POST',
+        url: '/api/api-keys',
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({
+          name: 'E2E mutation',
+          identifier: mutationIdentifier,
+          apiKey: 'tok_e2e_mutation',
+        }),
+      });
+      expect(created.statusCode).toBe(201);
+
+      const createdEnvelope = readEnvelope<unknown>(created.json());
+      expect(isApiKeyBody(createdEnvelope.data)).toBe(true);
+      if (!isApiKeyBody(createdEnvelope.data)) return;
+      knownUpdatedAt = createdEnvelope.data.updatedAt;
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/api-keys/${mutationIdentifier}`,
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({
+          name: 'E2E mutation renamed',
+          updatedAt: knownUpdatedAt,
+        }),
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const envelope = readEnvelope<unknown>(response.json());
+      expect(envelope.meta.requestId.length).toBeGreaterThan(0);
+      expect(isApiKeyBody(envelope.data)).toBe(true);
+      if (!isApiKeyBody(envelope.data)) return;
+
+      expect(envelope.data.name).toBe('E2E mutation renamed');
+      expect(envelope.data.identifier).toBe(mutationIdentifier);
+      // The server owns `updatedAt`: the new version is strictly newer than the
+      // token the client sent, which is what makes the next stale write fail.
+      expect(Date.parse(envelope.data.updatedAt)).toBeGreaterThan(
+        Date.parse(knownUpdatedAt),
+      );
+    });
+
+    it('PATCH replayed with the previous version answers 409 STALE_WRITE', async () => {
+      if (app === null) return;
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/api-keys/${mutationIdentifier}`,
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({
+          name: 'E2E lost update',
+          updatedAt: knownUpdatedAt,
+        }),
+      });
+
+      expect(response.statusCode).toBe(409);
+
+      const body = readError(response.json());
+      expect(body.error.code).toBe('STALE_WRITE');
+      expect(body.error.status).toBe(409);
+      expect(body.error.details[0]?.path).toBe('updatedAt');
+    });
+
+    it('PATCH with an expiry in the past answers 422 SEMANTIC_VALIDATION_FAILED', async () => {
+      if (app === null) return;
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/api-keys/${mutationIdentifier}`,
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({
+          expiresAt: '2020-01-01T00:00:00.000Z',
+          updatedAt: knownUpdatedAt,
+        }),
+      });
+
+      expect(response.statusCode).toBe(422);
+
+      const body = readError(response.json());
+      expect(body.error.code).toBe('SEMANTIC_VALIDATION_FAILED');
+      expect(body.error.details[0]?.path).toBe('expiresAt');
+    });
+
+    it('PATCH rejects a server-managed field with 400 (`.strict()`)', async () => {
+      if (app === null) return;
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/api-keys/${mutationIdentifier}`,
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({
+          identifier: 'e2e-renamed',
+          updatedAt: knownUpdatedAt,
+        }),
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(readError(response.json()).error.code).toBe('VALIDATION_FAILED');
+    });
+
+    it('PATCH without updatedAt answers 400 (the token is required)', async () => {
+      if (app === null) return;
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/api-keys/${mutationIdentifier}`,
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({ name: 'E2E no token' }),
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(readError(response.json()).error.code).toBe('VALIDATION_FAILED');
+    });
+
+    it('DELETE answers 200 with `data: null` and hides the row from every read', async () => {
+      if (app === null) return;
+
+      const deleted = await app.inject({
+        method: 'DELETE',
+        url: `/api/api-keys/${mutationIdentifier}`,
+      });
+
+      expect(deleted.statusCode).toBe(200);
+
+      const envelope = readEnvelope<unknown>(deleted.json());
+      // `200` + `data: null`, never `204`: the envelope still carries `meta`.
+      expect(envelope.data).toBeNull();
+      expect(envelope.meta.requestId.length).toBeGreaterThan(0);
+
+      const read = await app.inject({
+        method: 'GET',
+        url: `/api/api-keys/${mutationIdentifier}`,
+      });
+      expect(read.statusCode).toBe(404);
+      expect(readError(read.json()).error.code).toBe('NOT_FOUND');
+
+      const patched = await app.inject({
+        method: 'PATCH',
+        url: `/api/api-keys/${mutationIdentifier}`,
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({
+          name: 'E2E after delete',
+          updatedAt: knownUpdatedAt,
+        }),
+      });
+      expect(patched.statusCode).toBe(404);
+    });
+
+    it('DELETE a second time answers 404 (idempotency is 404, not 204)', async () => {
+      if (app === null) return;
+
+      const response = await app.inject({
+        method: 'DELETE',
+        url: `/api/api-keys/${mutationIdentifier}`,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(readError(response.json()).error.code).toBe('NOT_FOUND');
+    });
+
+    it('GET /api/api-keys?q=<deleted identifier> omits it from data and total', async () => {
+      if (app === null) return;
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/api-keys?q=${mutationIdentifier}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const envelope = readEnvelope<unknown>(response.json());
+      expect(envelope.data).toEqual([]);
+      expect(envelope.meta.pagination).toEqual({
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+      });
+    });
   });
 });

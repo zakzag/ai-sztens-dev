@@ -8,13 +8,18 @@
  */
 
 import type { z } from 'zod';
-import type { ApiErrorDetail } from '@callback/shared';
+import type { ApiErrorDetail, ResponseMeta } from '@callback/shared';
 
 /** The body was a valid `{ data, meta }` envelope and matched the caller schema. */
 export interface EnvelopeUnwrapSuccess<T> {
   readonly ok: true;
   /** The unwrapped payload, already validated by the caller's schema. */
   readonly data: T;
+  /**
+   * The validated `meta` block (`requestId`, `timestamp`, and `pagination` on a
+   * list). Detail endpoints ignore it; the list path needs it.
+   */
+  readonly meta: ResponseMeta;
 }
 
 /** The body was not a valid envelope, or its `data` did not match the schema. */

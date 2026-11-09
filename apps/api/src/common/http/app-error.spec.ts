@@ -3,6 +3,8 @@ import {
   AppError,
   ConflictAppError,
   NotFoundAppError,
+  SemanticValidationAppError,
+  StaleWriteAppError,
   ValidationAppError,
 } from './app-error.js';
 import type { AppErrorInit } from './app-error.interface.js';
@@ -76,6 +78,44 @@ describe('AppError', () => {
 
     expect(error.code).toBe(API_ERROR_CODE.CONFLICT);
     expect(error.status).toBe(409);
+  });
+
+  it('builds a STALE_WRITE error with the updatedAt detail (AIS-108)', () => {
+    const error = new StaleWriteAppError('someone else wrote first');
+
+    expect(error.code).toBe(API_ERROR_CODE.STALE_WRITE);
+    // The status comes from the catalogue, so the class cannot drift from it.
+    expect(error.status).toBe(409);
+    expect(error.name).toBe('StaleWriteAppError');
+    expect(error.details).toEqual([
+      expect.objectContaining({ path: 'updatedAt' }),
+    ]);
+  });
+
+  it('lets a stale write carry a custom detail list', () => {
+    const error = new StaleWriteAppError('stale', [
+      { path: 'updatedAt', message: 'custom' },
+    ]);
+
+    expect(error.details[0]?.message).toBe('custom');
+  });
+
+  it('builds a SEMANTIC_VALIDATION_FAILED error with a 422 status', () => {
+    const error = new SemanticValidationAppError('expiry in the past', [
+      { path: 'expiresAt', message: 'The expiry must not be in the past.' },
+    ]);
+
+    expect(error.code).toBe(API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED);
+    expect(error.status).toBe(422);
+    expect(error.name).toBe('SemanticValidationAppError');
+    expect(error.details[0]?.path).toBe('expiresAt');
+  });
+
+  it('keeps a semantic failure distinct from a shape failure', () => {
+    // A 422 must not be reported as a 400: the client retries differently.
+    expect(new SemanticValidationAppError('x', []).status).not.toBe(
+      new ValidationAppError('x', []).status,
+    );
   });
 
   it('does not compile an init with a code outside the catalogue', () => {

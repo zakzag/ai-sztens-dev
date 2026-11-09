@@ -24,7 +24,7 @@ export function BuildInfoFooter() {
 
   return (
     <p
-      className="pt-2 text-center text-xs text-slate-500"
+      className="pt-2 text-center text-xs text-text-muted"
       data-testid="build-info"
     >
       <span title={deployDate ?? 'Build idő nem elérhető'}>

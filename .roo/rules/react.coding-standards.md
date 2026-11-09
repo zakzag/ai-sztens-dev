@@ -1,7 +1,7 @@
 # React UI Coding Standards — AI Code-Generation Rules
 
 **Applies to:** [`apps/web`](../../apps/web/package.json:1), [`apps/admin`](../../apps/admin/package.json:1), `packages/ui`, `packages/api-client`.
-**Stack:** React 18, TypeScript strict, Vite, Tailwind CSS v4 (`@theme` tokens), TanStack Query v5, Zustand, react-hook-form + Zod, React Router 6.
+**Stack:** React 18, TypeScript strict, Vite, Tailwind CSS v4 (`@theme` tokens), TanStack Query v5, Zustand (transient page UI only, §6), react-hook-form + Zod, React Router 6.
 **Authority:** this file wins over generic advice, habit or personal preference. Architecture reference: [`docs/Specs/UI-Architecture.md`](../../docs/Specs/UI-Architecture.md:1) — it documents how this repo implements the rules below (layer map, tokens, primitives, per-page state plan, new-page recipe, dependency list).
 
 ---
@@ -10,8 +10,8 @@
 
 1. **Components render.** They do not fetch, validate business rules, map domain data or own page-wide state.
 2. **All backend access** goes through a service in `packages/api-client`, consumed only through TanStack Query hooks in `features/`.
-3. **Three state buckets only:** server data → TanStack Query; page UI state → that page's Zustand store; form state → react-hook-form. Never mix them.
-4. **One page = one folder.** Its store lives inside the folder and is never imported by another page.
+3. **State has a fixed decision order:** list/navigation state → the **URL**; server data → TanStack Query; transient page UI state → that page's Zustand store **only if** the first two cannot own it; form state → react-hook-form. Never mix them, and never copy one bucket into another (§6).
+4. **One page = one folder.** If the page has a store, it lives inside the folder and is never imported by another page.
 5. **No color literals, no Tailwind palette utilities, no arbitrary color values.** Only `packages/ui` tokens and primitives.
 6. **Imports flow downwards only:** `app → pages → features → entities → services → lib`. No page→page, no feature→feature imports.
 7. **SOLID / KISS / DRY:** one function = one responsibility; pure functions preferred; extract duplication instead of copying it.
@@ -28,7 +28,7 @@ apps/<app>/src/
   app/                    providers, router, layout shell, error boundary, session store
   pages/<page>/
     <Page>.tsx            route entry — composition only
-    <page>.store.ts       page-scoped Zustand factory (see §6)
+    <page>.store.ts       (optional) page-scoped Zustand factory — transient UI state only (§6)
     <page>.interface.ts   page-local types
     <page>.const.ts       query keys, defaults, labels
     ui/                   page-only presentational parts
@@ -87,7 +87,7 @@ Shared code between pages/features goes to `entities` or `lib` — never importe
 | Pure logic     | `<name>.logic.ts`              | `callback-form.logic.ts`                                 |
 | Types          | `<name>.interface.ts`          | `dashboard.interface.ts`                                 |
 | Constants      | `<name>.const.ts`              | `dashboard.const.ts`                                     |
-| Store          | `<page>.store.ts`              | `dashboard.store.ts`                                     |
+| Store (opt.)   | `<page>.store.ts`              | `dashboard.store.ts` — only when §6.1 step 3 is **yes**  |
 | Service        | `<domain>.service.ts`          | `callback-requests.service.ts`                           |
 | Variants       | `<primitive>.variants.ts`      | `button.variants.ts`                                     |
 
@@ -136,22 +136,69 @@ export function toStatusVariant(status: CallbackRequestStatus): BadgeVariant {
 
 ---
 
-## 6. State: three buckets
+## 6. State: URL first, then Query, then — maybe — a store
 
-| Bucket        | Owner                    | Examples                                       | Forbidden inside                 |
-| ------------- | ------------------------ | ---------------------------------------------- | -------------------------------- |
-| Server state  | TanStack Query           | request lists, call details, mutation results  | copy of server data in Zustand   |
-| Page UI state | page-local Zustand store | filters, sort, tabs, selected row, drawer open | server data, derived server data |
-| Form state    | react-hook-form          | field values, field errors, dirty/touched      | submitting to services directly  |
+Four buckets. The **order is the rule**: always try the earlier bucket first, and move down only when
+the previous one provably cannot hold the state.
 
-Rules:
+| #   | Bucket                  | Owner                                                        | Examples                                                        | Never inside                          |
+| --- | ----------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------- |
+| 1   | List / navigation state | the **URL** — `useSearchParams` behind one typed hook (§6.2) | filter, sort, page, page size, active tab, linkable selected id | secrets, server payloads, form values |
+| 2   | Server state            | TanStack Query cache                                         | request lists, call details, mutation results                   | a copy in a store or in `useState`    |
+| 3   | Transient page UI       | page-local store factory — Zustand (§6.3)                    | open drawer, selected row, column filters, bulk selection       | server data, derived server data      |
+| 4   | Local component state   | `useState` in the component that owns the interaction        | open menu of one dropdown, a search field's own text            | state a sibling or the page needs     |
 
-- Query keys are declared in `*.const.ts` and reused — never inline arrays in components.
-- Invalidate/refetch through the query client after mutations; do not hand-patch unrelated caches.
-- Store factory pattern (below) — one store instance per mounted page, so state resets on navigation.
-- `persist` is allowed only with an explicit whitelist (`partialize`) and documented in the state plan.
-- Components subscribe with selectors: `useDashboardStore((s) => s.filters)`.
+**Form state is a separate bucket and always react-hook-form** (§0.3): the form component owns it,
+never a store and never the URL.
+
+### 6.1 The decision test
+
+Ask in this order and stop at the first **yes**:
+
+1. Must the state survive a reload, a copied link, or the back button? → **the URL**.
+2. Does the value originate on the server? → **TanStack Query** (never copy it out).
+3. Do two or more parts of the page share it, and may it be lost on navigation? → **page-local store**.
+
+If all three are **no**, the state is local: `useState` in the component that owns the interaction.
+Most pages therefore end up with **no store at all** — "no store" is a decision, not an omission, and
+it is recorded in the state plan of [`docs/Specs/UI-Architecture.md`](../../docs/Specs/UI-Architecture.md:368) §5.
+
+### 6.2 The URL bucket
+
+- List state is parsed and written by **one** hook
+  ([`features/api/use-list-params.ts`](../../apps/admin/src/features/api/use-list-params.ts:1)) using
+  the resource's shared list-query schema. A component never reads `searchParams` itself, and list
+  state never enters a store.
+- One user interaction = **one** URL write (`setParams(patch)`). Two writes rebuild the URL from the
+  same pre-render value, so the first change is lost and two history entries appear.
+- Schema defaults are omitted from the URL; an invalid parameter falls back to the default instead of
+  throwing.
+
+### 6.3 The store bucket
+
+- Store factory pattern (below), **one instance per mounted page**, so navigation resets it.
+- The page folder owns `<Page>StoreProvider` + `use<Page>Store<T>(selector)`; no store export leaves
+  that folder and no page imports another page's store.
+- Components subscribe with selectors: `useDashboardStore((s) => s.filters)` — never the whole store.
+- `persist` is allowed only with an explicit whitelist (`partialize`), documented in the state plan.
 - The only global store is `useSessionStore` (token, role) in `app/`.
+- A store that mirrors URL state or Query state is a defect, not a convenience (§6.1, steps 1–2).
+- **The confirmation exception (AIS-173):** the open flag of a dialog that is **not navigable** — a
+  `ConfirmDialog` that only asks a question, which nothing links to and nothing reloads into — is
+  local `useState` in the component that renders it, never a route and never a store. The rule
+  "a dialog's open state lives in the URL" therefore applies to dialogs that **have an address of
+  their own** (create, view, edit); a confirmation has none, so a `/delete` route would only add a
+  registry entry, a breadcrumb rule and a test for a window the user passes through in one click.
+  See [`docs/Specs/UI-Architecture.md`](../../docs/Specs/UI-Architecture.md) §5.
+
+### 6.4 `zustand` is not installed yet (AIS-130)
+
+The factory below is the **reference pattern**, not a required file. `zustand` is in **no**
+`package.json` today, because no page has genuine transient UI state yet. The page that first needs
+one adds the dependency in the **same** change, switches the `zustand` row of
+[`docs/Specs/UI-Architecture.md`](../../docs/Specs/UI-Architecture.md:442) §7 to `installed`, and
+ships the store tests (init → patch → selector). Until then **no** `<page>.store.ts` is created — an
+unused store would also fail the dead-code gate (`pnpm quality:dead-code`).
 
 ```ts
 import { createStore } from 'zustand/vanilla';
@@ -173,7 +220,31 @@ export function createDashboardStore(init?: Partial<DashboardState>) {
 }
 ```
 
-The page folder owns `<Page>StoreProvider` + `use<Page>Store<T>(selector)`; no store export leaves that folder.
+The provider and the selector hook stay in the page folder, so the instance is created once per mount:
+
+```ts
+// pages/dashboard/dashboard-store.provider.tsx — the only place an instance is created
+export function DashboardStoreProvider({ children }: PropsWithChildren) {
+  const [store] = useState(() => createDashboardStore());
+  return (
+    <DashboardStoreContext.Provider value={store}>
+      {children}
+    </DashboardStoreContext.Provider>
+  );
+}
+
+export function useDashboardStore<T>(selector: (state: DashboardStore) => T): T {
+  const store = useContext(DashboardStoreContext);
+  if (store === null) throw new MissingStoreProviderError('DashboardStore');
+  return useStore(store, selector);
+}
+```
+
+### 6.5 The server-state bucket
+
+- Query keys are declared in `*.const.ts` and reused — never inline arrays in components.
+- Invalidate/refetch through the query client after mutations; do not hand-patch unrelated caches.
+- Server data is read from the cache; it is never copied into `useState` or into a store.
 
 ---
 
@@ -181,17 +252,46 @@ The page folder owns `<Page>StoreProvider` + `use<Page>Store<T>(selector)`; no s
 
 Every color, border, radius, shadow and duration comes from `packages/ui/src/styles/theme.css`:
 
-| Group     | Token → class                                                                                                                                         |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Brand     | `--color-primary/-foreground`, `--color-secondary`, `--color-tertiary`, `--color-quaternary` → `bg-primary`, `text-primary-foreground`, `bg-tertiary` |
-| Surface   | `--color-surface-base/-raised/-sunken/-overlay` → `bg-surface-raised`                                                                                 |
-| Border    | `--color-border-hairline/-default/-strong/-focus` → `border-border-hairline`                                                                          |
-| Text      | `--color-text-primary/-secondary/-muted/-inverse` → `text-text-secondary`                                                                             |
-| State     | `--color-success/-warning/-danger/-info` + `-foreground` → `bg-danger text-danger-foreground`                                                         |
-| Depth     | `--shadow-neu-raised/-inset/-pressed`, `--shadow-focus-ring` → `shadow-neu-raised`                                                                    |
-| Thickness | `--border-width-hairline/-default/-strong` → utility classes `border-hairline`, `border-strong`                                                       |
-| Shape     | `--radius-control/-card/-pill` → `rounded-control`                                                                                                    |
-| Motion    | `--duration-fast/-base`, `--ease-neu` → `transition-shadow duration-fast`                                                                             |
+| Group      | Token → class                                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Brand      | `--color-primary/-foreground`, `--color-secondary`, `--color-tertiary`, `--color-quaternary` → `bg-primary`, `text-primary-foreground`, `bg-tertiary`                       |
+| Surface    | `--color-surface-base/-raised/-sunken/-overlay` → `bg-surface-raised`                                                                                                       |
+| Border     | `--color-border-hairline/-default/-strong/-focus` → `border-border-hairline`                                                                                                |
+| Text       | `--color-text-primary/-secondary/-muted/-inverse` → `text-text-secondary`                                                                                                   |
+| State      | `--color-success/-warning/-danger/-info` + `-foreground` → `bg-danger text-danger-foreground`                                                                               |
+| Depth      | `--shadow-neu-raised/-inset/-pressed`, `--shadow-focus-ring` → `shadow-neu-raised`                                                                                          |
+| Thickness  | `--border-width-hairline/-default/-strong` → utility classes `border-hairline`, `border-strong`                                                                             |
+| Shape      | `--radius-control/-card/-pill` → `rounded-control`                                                                                                                          |
+| Motion     | `--duration-fast/-base`, `--ease-neu` → `transition-shadow duration-fast`                                                                                                   |
+| Appearance | `--color-scheme`, `--app-backdrop`, `--blur-glass`, `--saturate-glass`, `--glass-sheen` → `surface-glass` (blur + gloss) / `sheen-glass` (gloss only) (AIS-165/166/169/170) |
+
+**Seven appearances exist — `light`, `dark`, `ambient`, and the glass family
+`glass` / `glass-frost` / `glass-crystal` / `glass-smoke`** — selected by `data-theme` on `<html>`.
+The glass members are four strengths of one material, not four palettes: the choice
+between them belongs to the product, so they are separate values. Two rules follow
+from all of that, and both are machine-checked:
+
+1. **A token belongs to the contract, not to one theme.** A new colour, radius or shadow is added to
+   the `@theme` block **and** to every `:root[data-theme="…"]` block; `pnpm quality:themes` fails when
+   an appearance misses or invents one. Never fork a token per theme under a different name.
+2. **A component never branches on the appearance.** Depth, transparency and border weight come from
+   the tokens; the blur affordance is the single `surface-glass` utility
+   (`SURFACE_GLASS_CLASS` in `packages/ui/src/theme/theme.const.ts`) and it is a no-op outside glass,
+   because `--blur-glass` is `0px` there. No `[data-theme="…"]` selector may appear outside
+   `theme.css`, and no `backdrop-filter` outside the `@utility` that owns it.
+
+**Glass recipes (only these elements get blur — the floating layers):**
+
+| Element         | Classes                                                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Frosted panel   | `rounded-card border border-hairline border-border-hairline bg-surface-raised shadow-neu-raised surface-glass`                     |
+| Frosted popover | `rounded-control border border-hairline border-border-hairline bg-surface-overlay shadow-neu-raised surface-glass`                 |
+| Glossy shell    | `rounded-card border border-hairline border-border-hairline bg-surface-raised shadow-neu-raised sheen-glass`                       |
+| Never (blur)    | cards, table rows, table shells — translucency and gloss from the tokens, but one `backdrop-filter` per scrolling row costs frames |
+
+The glass family thickens the frame ladder to `2 / 2.5 / 3px`: glass must read as a pane edge,
+so `--border-width-*` is appearance state and an appearance block may restate it. Its panels are
+deliberately the **most transparent** surfaces of the app and its blur stays in the 9–18px band.
 
 Dark neomorphism recipes:
 
@@ -285,16 +385,15 @@ export const buttonVariants = cva(
 
 ## 12. New page recipe
 
-1. Create `pages/<page>/` with `<Page>.tsx`, `<page>.interface.ts`, `<page>.const.ts`.
-2. Add the server needs to `packages/api-client` (interface + implementation + Zod schema).
-3. Add `features/<use-case>/use-*.ts` (query/mutation) and move decisions into `*.logic.ts`.
-4. If the page has UI state, add `<page>.store.ts` + provider/hook; otherwise add no store.
-5. Compose the page from `packages/ui` primitives and page-only parts in `ui/`.
-6. Implement loading/empty/error/success explicitly.
-7. Register the route in `app/router`.
-8. Add tests (logic, store, hook) and mocks in `src/test/mocks`.
-9. Add a row to the state plan in `docs/Specs/UI-Architecture.md`.
-10. Run `pnpm lint`, `pnpm test`, `pnpm build` for the app.
+The single, file-name-level, layer-ordered checklist is
+[`docs/Specs/New-Admin-Page.md`](../../docs/Specs/New-Admin-Page.md) (owner AIS-133). It is the only
+place that lists the steps; this section does not repeat them. Four rules are non-negotiable whatever
+the checklist says:
+
+1. **Components render.** No `fetch`, no business rule, no page-wide state inside a component.
+2. **All backend access** goes through `packages/api-client`; forms go through `useAppForm`.
+3. **State order is fixed:** URL → TanStack Query → page store (only per §6.1) → `useState`.
+4. **New code ships with tests**, and `pnpm quality` (including `quality:docs`) must stay green.
 
 ---
 
@@ -302,7 +401,7 @@ export const buttonVariants = cva(
 
 - [ ] No `fetch` outside `packages/api-client`.
 - [ ] No business rule inside JSX; logic extracted to `*.logic.ts`.
-- [ ] Server state in TanStack Query, page state in the page store, forms in RHF — no mixing.
+- [ ] List state in the URL, server state in TanStack Query, transient page state in the page store (if any), forms in RHF — no mixing.
 - [ ] No color literal, palette class or arbitrary color: `rg "#[0-9a-fA-F]{3,8}|(bg|text|border|ring|from|to|via)-(slate|gray|zinc|neutral|stone|indigo|red|amber|green|emerald|blue)-\d{2,3}" apps/web/src apps/admin/src` returns nothing.
 - [ ] Only `packages/ui` primitives used for buttons, inputs, cards, badges, alerts, tables.
 - [ ] Loading / empty / error / success states present.

@@ -7,6 +7,7 @@ import {
   ENVELOPE_EXEMPTIONS,
   VALID_API_KEY,
   VALID_API_KEY_LIST,
+  VALID_UPDATE_API_KEY_REQUEST,
   apiKeySchema,
   findEndpoint,
   successEnvelopeSchema,
@@ -51,6 +52,10 @@ const SAMPLE_PAYLOADS: Readonly<Record<string, unknown>> = {
   'apiKeys.list': VALID_API_KEY_LIST,
   'apiKeys.findByIdentifier': VALID_KEY,
   'apiKeys.create': VALID_KEY,
+  'apiKeys.update': VALID_KEY,
+  // A `DELETE` returns nothing, so its payload is `null` — a value, not an
+  // absent field (see `no-payload.schema.ts`).
+  'apiKeys.remove': null,
 };
 
 /** Minimal envelope `meta`; the registry only cares about the payload. */
@@ -82,12 +87,62 @@ function camelCaseOf(tag: string): string {
 }
 
 describe('endpoint registry', () => {
-  it('registers the three api-keys endpoints', () => {
+  it('registers the five api-keys endpoints', () => {
     expect(API_KEYS_ENDPOINTS.map((entry) => entry.operationId)).toEqual([
       'apiKeys.list',
       'apiKeys.findByIdentifier',
       'apiKeys.create',
+      'apiKeys.update',
+      'apiKeys.remove',
     ]);
+  });
+
+  it('documents the update endpoint as a PATCH on the single-resource path', () => {
+    const update = findEndpoint('apiKeys.update');
+
+    expect(update?.method).toBe('PATCH');
+    expect(update?.path).toBe(`${API_KEYS_PATH}/:identifier`);
+    expect(update?.successStatus).toBe(200);
+    expect(update?.requestSchema).toBeDefined();
+    expect(update?.envelope).toBe(true);
+  });
+
+  it('documents the delete endpoint as a DELETE on the single-resource path', () => {
+    const remove = findEndpoint('apiKeys.remove');
+
+    expect(remove?.method).toBe('DELETE');
+    expect(remove?.path).toBe(`${API_KEYS_PATH}/:identifier`);
+    expect(remove?.successStatus).toBe(200);
+    expect(remove?.requestSchema).toBeUndefined();
+    expect(remove?.envelope).toBe(true);
+  });
+
+  it('lists the mutation failure codes of the update endpoint', () => {
+    const errors = findEndpoint('apiKeys.update')?.errors ?? [];
+
+    expect(errors).toContain(API_ERROR_CODE.STALE_WRITE);
+    expect(errors).toContain(API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED);
+    expect(errors).toContain(API_ERROR_CODE.VALIDATION_FAILED);
+    expect(errors).toContain(API_ERROR_CODE.NOT_FOUND);
+  });
+
+  it('parses the update fixture with the update request schema', () => {
+    const schema = findEndpoint('apiKeys.update')?.requestSchema;
+
+    expect(schema?.safeParse(VALID_UPDATE_API_KEY_REQUEST).success).toBe(true);
+  });
+
+  it('rejects an update body without the concurrency token', () => {
+    const schema = findEndpoint('apiKeys.update')?.requestSchema;
+
+    expect(schema?.safeParse({ name: 'Vapi production' }).success).toBe(false);
+  });
+
+  it('describes the delete payload as null', () => {
+    const schema = findEndpoint('apiKeys.remove')?.dataSchema;
+
+    expect(schema?.safeParse(null).success).toBe(true);
+    expect(schema?.safeParse({}).success).toBe(false);
   });
 
   it('keeps operationIds unique across the whole registry', () => {

@@ -13,6 +13,12 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
+    // Absolute base URL for the API client under test: the transport joins the
+    // injected base URL with the service path, and jsdom cannot resolve a
+    // relative `/api/...` URL. Matching the origin MSW resolves handlers
+    // against (`http://localhost:3000`) keeps `import.meta.env.VITE_API_BASE_URL`
+    // out of the test files and makes every intercepted request absolute.
+    env: { VITE_API_BASE_URL: 'http://localhost:3000/api' },
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     restoreMocks: true,

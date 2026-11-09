@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --coverageReporters=lcov --coverageDirectory=../../coverage/api-client"
@@ -37,6 +38,7 @@
     ],
     "moduleNameMapper": {
       "^@callback/shared$": "<rootDir>/../shared/src/index.ts",
+      "^(\\.{1,2}/.*\\.json\\.js)$": "$1",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "rootDir": ".",

@@ -165,6 +165,17 @@ export function createAbortError(): Error {
 }
 
 /**
+ * @returns the cancellation TanStack Query raises when a component unmounts or a
+ *   newer request supersedes the current one — the other name the classifier
+ *   treats as silencing.
+ */
+export function createCancelledError(): Error {
+  const error = new Error('Cancelled');
+  error.name = 'CancelledError';
+  return error;
+}
+
+/**
  * @returns a broken-backend failure that also carries a correlation id, so the
  *   log tier (AIS-86) can be asserted against a realistic envelope.
  */

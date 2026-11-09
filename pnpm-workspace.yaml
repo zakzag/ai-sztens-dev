@@ -1,7 +1,73 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm settings live here, not in package.json: from pnpm 10/11 on, the `pnpm`
+# field of package.json is no longer read, and a lockfile written under the old
+# location makes `pnpm <script>` fail with ERR_PNPM_VERIFY_DEPS_BEFORE_RUN
+# ("installing would drop pnpm.overrides ... because the pnpm field in
+# package.json is no longer read by pnpm"). AIS-122 moved the block here.
+
+# pnpm 12 turns the supply-chain `minimumReleaseAge` guard on by default (24h).
+# Declaring it explicitly keeps the intent visible and stable if the default
+# changes.
+#
+# The list below holds two kinds of exemptions:
+#   * bare package names (`strtok3`) — the package is trusted for *any* version;
+#   * `name@exact-version` pins (`@babel/core@7.29.13`) — a single release that
+#     reached `pnpm-lock.yaml` before the 24h window elapsed. pnpm 12 wrote the
+#     `name@version` batch below automatically at the confirmation prompt; keep
+#     the format, a bare name would widen the exemption to future releases.
+#
+# Downgrading these again would be churn with no security gain for packages we
+# already review. DELETE the versioned entries once the pinned releases have
+# aged past the cutoff — they only exist to keep the lockfile installable today.
+# Leaving them in place silently disables the guard for those versions forever.
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - '@tanstack/react-query'
+  - '@tanstack/query-core'
+  - strtok3
+  - token-types
+  # Flagged on 2026-11-05 (published 2026-11-04 16:33Z, i.e. inside the window).
+  - '@babel/core@7.29.13'
+  - '@babel/generator@7.29.13'
+  - '@babel/helper-compilation-targets@7.29.13'
+  - '@babel/helper-module-transforms@7.29.13'
+  - '@babel/helper-string-parser@7.29.13'
+  - '@babel/helpers@7.29.13'
+  - '@babel/parser@7.29.13'
+  - '@babel/runtime@7.29.13'
+  - '@babel/traverse@7.29.13'
+  - bare-url@2.5.6
+  - electron-to-chromium@1.5.477
+  - graphql@16.15.0
+
+# `light-my-request` ships a broken/floating range through Fastify; pinning it
+# keeps the API's inject-based tests deterministic across installs.
+overrides:
+  light-my-request: 6.6.0
+
+# `@hookform/resolvers` declares `zod` only as a *peer* and imports it by bare
+# specifier. pnpm hoists `knip`'s zod 4 into `node_modules/.pnpm/node_modules`,
+# so the resolver's `.d.ts` (`T extends z.Schema<any, any>`) resolved to zod 4's
+# `$ZodType` while the app passes a zod 3 schema — `apps/admin`'s `tsc` failed
+# with "missing def, type, toJSONSchema, check" (AIS-113 build fix). Giving the
+# resolver a real zod 3 dependency makes it see the same instance as the app;
+# knip keeps its own zod 4. Do not "simplify" this into an `overrides` entry:
+# forcing one zod version breaks knip (`ERR_PACKAGE_PATH_NOT_EXPORTED`).
+packageExtensions:
+  '@hookform/resolvers':
+    dependencies:
+      zod: ^3.24.1
+
+# Explicit "known, deliberately not built" list. pnpm 12 treats an *unlisted*
+# dependency with an install script as an error (ERR_PNPM_IGNORED_BUILDS), so
+# every such package has to be named here. `msw` ships a setup helper the test
+# harness does not use — its registry handler is imported directly in
+# `apps/admin/src/test/mocks/server.ts`.
 allowBuilds:
   '@parcel/watcher': false
   esbuild: false
+  msw: false
   unrs-resolver: false

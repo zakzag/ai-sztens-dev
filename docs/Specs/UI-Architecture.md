@@ -1,6 +1,228 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés:** 2026-10-30 (AIS-118: az `src/app/` réteg — route registry, layout, provider-lánc, error boundary)
+**Utolsó frissítés: 2026-11-08 — AIS-174: a doksi a kódot követi ott, ahol a kód indokolhatóan jobb (a
+fejléc-akció `Link` + `buttonVariants`, §4.0), és a kód a doksit ott, ahol a doksi a szabály (route-path
+forrás, standard lista, kivétel-lista — `New-Admin-Page.md` step 11–12 és a _Do not_ szakasz). Előző:
+AIS-173: az `api-keys` törlése a read-only overlay-be költözött, a
+legacy `/api-keys/:identifier` detail oldal (`ApiKeyDetailPage`), az `ApiKeyDeleteDialog` wrapper és a
+`ApiKeyDetailCard` törölve (a `ApiKeyDetailFields` marad: ez a közös mezőlista). A megerősítő ablak a
+view overlay lokális `useState`-je — **nem** route: dokumentált kivétel a „dialógus nyitottsága = URL"
+szabály alól, mert nem navigálható cél. Hiba esetén a `ConfirmDialog` leírása lesz az üzenet, és az
+ablak nyitva marad; siker után a `closeDialog` (`replace`) visz vissza a listára, a `/api-keys/x` URL
+pedig a catch-all „Nem található" oldalra esik — lásd §5. Előző: AIS-171: új `PageShell` primitíve
+(§4). A page-váz (`space-y-6` section, egyetlen `h1`, alcím, opcionális back-link a cím fölött,
+opcionális akció a fejléc jobb végén) egy helyen él, és minden admin oldal ezen megy át (`ApiKeysPage`,
+`PlaceholderPage`, `/calls`, catch-all); a `back`/`actions` **ReactNode slot**, mert a `packages/ui`
+nem importál react-router-t, a `Link`-et a page adja be. A `/calls` és a catch-all saját page-foldert
+kapott, a `route-registry.tsx`-ben nincs többé page-markup, és az `APP_NOT_FOUND_MESSAGE` átköltözött
+a `pages/not-found`-ba. Kivétel: `LoginPage` (layouton kívül renderel, `text-xl` cím) — lásd §4 és §5.
+Előző: a glass család háttere fotó: a négy üveg variáns `--app-backdrop`-je
+egy közös 3840×2160-as képet (`packages/ui/src/styles/assets/app-backdrop-glass.jpg`) tesz a body
+`background-image`-ére, változatonként eltérő sötét scrim-mel (kontraszt) és a korábbi gradiens
+fallbackkel; a body `cover` / `no-repeat` / `center`-t kap, mert a fotónak van saját mérete — lásd
+§3.2.2. Előző: üveg témák hangolása (vastagabb, fényesebb keret: a glass család a
+`2 / 2.5 / 3px` border-létrát írja felül, emeltebb perem-alfák, kétsávos csillanás, új `sheen-glass`
+utility a statikus kártya/táblázat felületekre — blur nélkül; valamint **áttetszőbb panelek és
+9–18px blur**; lásd §3.2.2). Korábbi: AIS-165 / AIS-166 / AIS-167 / AIS-169 (témamotor:
+`data-theme`, `light` / `ambient` + négy üveg variáns token-blokkja, perzisztencia, villogásmentes
+boot, `surface-glass` blur + csillanás a lebegő rétegeken, hét opció a fejléc választójában — lásd
+§3.2.2 és §5).**
+Korábbi: AIS-155 (route-alapú `EntityDialog` szabvány + api-keys lista-első oldal).
+Minden entitás-létrehozó/-módosító felület **route-mountolt overlay** (`EntityDialog`, `size="fit"`,
+opcionális footer submit `form` attribútummal, read-only mód `submit: null`-lal), a lista pedig
+mountolva marad mögötte: a `RouteEntry` új `children` mezőt kapott, az `AppRouter` rekurzívan renderel,
+a flat fogyasztók (breadcrumb-matcher, registry-invariánsok) a `flattenRouteEntries()`-en keresztül
+látják a fát, a bezárás pedig egy helyen dől el (`features/entity-dialog` `useEntityDialog` →
+`navigate(listPath, { replace: true })`). Az `api-keys` oldal alapból csak a listát mutatja („Új API
+kulcs” akció a fejlécben, `PlusIcon`), a `/api-keys/new` create, a `/api-keys/:identifier/view`
+read-only és a `/api-keys/:identifier/edit` szerkesztő overlay külön URL (lásd §4.0, §4.2, §5,
+§6; a szerkesztőt AIS-172 tette overlay-jé).
+
+**AIS-152 (2026-11-07) — `HttpEvent` bővítés és a `details` mapping bekötése.**
+A transport eseménye négy új, `readonly` mezőt hordoz (`requestId`, `query`, `bodyPreview`,
+`responseMeta`), a body csak **maszkolt, csonkolt prefix**, a token/`Authorization` soha; a capture
+mindhárom csatornája (HTTP, query/mutation hiba, runtime crash) kitölti a strukturált `details`
+tömböt, a címkék `DETAIL_LABEL_*` konstansokból jönnek, az `operation` pedig query/mutation esetén a
+`meta.operation`-ból, HTTP esemény esetén az injektált route-olvasóból (`main.tsx`); a `detail`
+egysoros szövege **változatlan** (lásd §4.1.3).
+
+**AIS-151 (2026-11-07) — strukturált log-részletek a `@callback/notifications` core-ban.**
+A `NotificationEntry` opcionális `details: readonly NotificationDetailField[]` mezőt kap: a store a
+`record` és a kész tömb alakot **ugyanazon** a redakciós úton normalizálja (beszúrási sorrend, label
+szerinti redakció, konstans limitek), az üres eredmény `undefined` lesz, a `sessionStorage` guard
+all-or-nothing marad és a séma verzió továbbra is `1` (lásd §5, `packages/notifications core` és
+`sessionStorage mirror`).
+
+**AIS-150 (2026-11-07) — átméretezhető log drawer panel, hover-resize javítással.** A panel bal élén
+`role="separator"` fogantyú: **csak húzásra** méretez át (a saját `pointerId`-ja és
+lenyomott egérgomb mellett), a szélességet a **mutató elmozdulásából** számolja (`toWidthFromDrag`),
+billentyűzettel is állítható (320–720 px, default 416 px), `localStorage`-ban perzisztálva, a
+controllerben tartott állapottal; a `md` alatti teljes szélességet CSS adja, húzás közben a panel
+transform-animációja kimarad (lásd §4 és §5).
+
+**AIS-146 (2026-11-06) — breadcrumb adatmodell + tiszta levezető logika.** A
+`RouteEntry` három breadcrumb mezőt kap (`breadcrumbLabel`, `breadcrumbParentPath`,
+`resolveBreadcrumbLabel`), a lánc a `app/router/breadcrumb.logic.ts` **tiszta** függvényeiből áll elő
+— statikus találat előbb, aztán `:param` minta, a catch-all **soha**; ciklus és hiányzó szülő a láncot
+lezárja, nem dob —, az `AppBreadcrumb` pedig csak összeköt, és a dinamikus szegmens értékét **nem**
+`useParams()`-ból, hanem a mintából kapja (lásd §4.1, §4.2).
+
+**AIS-145 (2026-11-06):** a router-független `Breadcrumb` primitíva. A
+`packages/ui` **nem függhet react-router-től**, ezért a link renderelését a hívó **injektálja**
+(`renderLink`); az utolsó crumb mindig `<span aria-current="page">`, a `to` nélküli crumb szövegként
+jelenik meg, az `n` crumb `n-1` dekoratív elválasztót kap, üres `items` esetén pedig **nincs** `<nav>`
+landmark (lásd §4).
+
+**AIS-144 (2026-11-06):** Öt kézzel beágyazott
+Lucide SVG (`SunIcon`, `MoonIcon`, `SunsetIcon`, `SettingsIcon`, `ChevronRightIcon`) alkotja az
+ikon-vagyont, **új dependency nélkül**; a `RadioGroup` opciója opcionális, kizárólag dekoratív ikont
+kap, ezért az accessible name továbbra is a `label` szövege (lásd §4 és §7).
+
+**AIS-133 (2026-11-05):** az „új admin oldal” checklist egységesítése. A recept egyetlen,
+fájlnév-szintű igazságforrása a [`New-Admin-Page.md`](./New-Admin-Page.md): ez a doksi a §6
+helyett **mindig** azt linkeli, a §5 state-plan marad a state-buckets tábla egyetlen helye, és az új
+`pnpm quality:docs` kapu (§9) pirosra fordítja, ha egy pointer-forrás elveszti a linket vagy egy `§N`
+hivatkozás nem létező szekcióra mutat.
+
+**AIS-85 (2026-11-05):** Az `ApiKeyForm` a
+referencia-implementáció: `useAppForm` + `useNotifier()`, `pageError` state és success `Alert` nélkül,
+`FormActions` pending-gombbal. A form csak a **látható** részt dönti el: siker → `notify.success`
+(egy toast + egy log bejegyzés), `field` hiba → mező + fókusz, toast nélkül, `page` hiba → a capture
+toastja (a form `formError`-ja `null` marad), és csak a `field` hiba **gazdátlan** maradéka kerül a
+form `Alert`-jébe — a `toFormErrorPlan` most a `toErrorSurface` besorolást is megkapja (lásd §4.4).
+A `renderWithProviders` teszt-harness a `NotificationHost`-ot is mountolja, és a valódi capture
+adaptereket köti a store-hoz, így a `ApiKeyForm.test.tsx` a teljes láncot méri (§8).
+
+**AIS-84 (2026-11-05):** a globális notification capture az admin SPA-ban — minden lezárt HTTP
+kísérlet (`HttpEvent`), minden elutasított query/mutation és minden `meta.successMessage`-dzsel
+jelentkező írás **külön kód nélkül** kerül a logba. Egyetlen store-példány
+(`app/notifications/notification.store.ts`) osztozik a cache-callbackeken, az `onEvent` listeneren és a
+`<NotificationProvider>`-en; a `<NotificationHost />` az `AdminLayout`-ban mountol. A láthatóság
+továbbra is a `toErrorSurface` döntése: `silent` → nincs bejegyzés, `field`/`banner` → csak log,
+`page` → log **és** toast. A transport-esemény szándékosan **nem** toastol (D3: nincs benne hibakód,
+így nem tudná a helyes szöveget választani) — a mátrix a §4.1.3-ban.
+
+**AIS-82 (2026-11-04):** a log panel prezentációs primitívei — `LogDrawer` + `LogEntryRow`
+(lásd §4) —: összecsukott oldalszéli fül (`aria-expanded` + `aria-controls`), **nem modális**
+becsúszó panel (nincs overlay, nincs focus trap, `Escape` zár), hat szűrő chip (`Mind` / `Siker` /
+`Hiba` / `Figyelmeztetés` / `Info` / `Rendszer`), injektált `formatTimestamp`, és lapozás **csak
+propon** (`hasMore` / `onLoadMore`). A store, a host és a 20/50-es lap-ablak továbbra is AIS-83.
+
+**AIS-131 (2026-11-04):** a referencia-szelet teljes CRUD — `pages/api-keys/ApiKeyDetailPage`
+(`/api-keys/:identifier`): detail olvasás `useApiDetail`-en, inline `PATCH` szerkesztés `useAppForm`-mal,
+törlés `ConfirmDialog`-gal, `409 STALE_WRITE` → oldalszintű újratöltés. A state-tábla új sora §5-ben, a
+döntések (`updatedAt` minta-token, `key={updatedAt}` remount, `404` külön ág) a
+[`Admin-Data-Flow.md`](./Admin-Data-Flow.md) §3.7-ben. Ugyanennek a szeletnek a záró javítása: a
+`features/forms` bekerült a `SHARED_FEATURES` allow-listbe (§9.1), mert a `useAppForm` közös
+infrastruktúra, nem egy oldal use-case-e; a detail-card teszt pedig a `data-status` selectorral
+címzi a badge-et, mert a „nincs lejárat" szöveg szándékosan kétszer szerepel a kártyán.
+
+**AIS-80 (2026-11-04):** a notification-log `sessionStorage` tükre — `createNotificationStorage`
+(`load` / `save` / `flush` / `clear`), verziózott envelope (`aisztens.notifications.v1`,
+`{ version: 1, entries }`), cap 200, injektált `StorageLike` és injektált írás-ütemező, csendes
+degradáció hiba esetén. A store-hoz **nincs** bekötve: a bekötés az AIS-83 providere. Részletek a
+`packages/notifications` core §-ban lentebb.
+
+**AIS-83 (2026-11-04):** a `@callback/notifications` **React rétege** a `./react` al-exporton —
+`NotificationProvider` (store + `sessionStorage` tükör + `error`/`unhandledrejection` figyelők),
+`useToasts` / `useLogDrawer` / `useLogEntries` / `useToastTimers` hookok (`useSyncExternalStore`),
+`createNotifier` + `useNotifier`, és a `NotificationHost` (toast-időzítők, lapozási ablak). A core
+továbbra sem importál Reactet: a `tsconfig.core.json` a `src/core`-t DOM nélkül fordítja, a
+`tsconfig.json` a React réteget DOM+JSX-szel. Részletek a §4 „React bindings and host" blokkban.
+
+**AIS-153 (2026-11-07):** a `LogEntryRow` **kinyitható** — a sor fejléce egy teljes szélességű
+`<button aria-expanded aria-controls>`, ami a `details` tömböt kulcs–érték listaként (`dl`/`dt`/`dd`)
+mutató `role="region"` régiót nyit, csukva `hidden`-del; bármennyi sor lehet nyitva, alapból minden
+csukva. A nyitottság **komponens-lokális** `useState` (§5), a `LogDrawer` propja nem változott. A
+régióban két copy gomb van (`requestId`, csak ha van ilyen mező; `JSON`, mindig), a vágólap-hívás a
+[`lib/copy-text.ts`](../../packages/ui/src/lib/copy-text.ts:1)-ben izolált, csendes degradációval. A
+csukott sor külseje változatlan (a `detail` egysoros marad). Részletek a §4 primitíva-táblában.
+
+**AIS-163 (2026-11-07):** a részletek-régió **JSON-értékei kibonthatók** — ha egy mezőérték `JSON.parse`
+után objektum vagy tömb (pl. `queryKey`, `mutationKey`, `body`, `responseMeta`), a `dd` megtartja a
+tárolt egysoros stringet, és kap egy kis `JSON kibontása` / `JSON összecsukása` gombot, ami a
+[`lib/json.logic.ts`](../../packages/ui/src/lib/json.logic.ts:1) `toPrettyJson` kimenetét mutatja egy
+`max-h-48 overflow-auto whitespace-pre` blokkban. A primitív érték (`42`, `true`, `"x"`) **nem** JSON,
+ott nincs gomb; a kibontás mezőnként független, komponens-lokális, és a sor becsukásakor visszaáll.
+A tárolt `details`, a `detail` egysoros és a „copy JSON" payload **változatlan**.
+
+**AIS-173 (2026-11-08):** a törlés a **view overlay**-be költözött, és ezzel a legacy detail oldal
+eltűnt. A `ApiKeyViewDialog` footer-e bal oldalán egy `Kulcs törlése` (`variant="danger"`) gomb és a
+`Módosítás` link ül egy csoportban (`footerExtras`), a gomb egy **közvetlenül a fájlban renderelt**
+`ConfirmDialog`-ot nyit. A megerősítés nyitottsága lokális `useState`: nincs `/delete` route, mert a
+megerősítő ablak nem navigációs cél — ez a §5-ben rögzített, tudatos kivétel a „dialógus nyitottsága =
+URL" szabály alól. A hálózat és a cache viselkedés változatlan (`useDeleteApiKeyMutation`:
+invalidate + `onDeleted`), a hiba a `ConfirmDialog` leírásába kerül (az ablak nem záródik be), siker
+esetén a `closeDialog` `replace` navigációja visz a listára. Törölve: `ApiKeyDetailPage` (+ tesztje),
+`ApiKeyDeleteDialog` (a wrapper beolvadt), `ApiKeyDetailCard` (+ tesztje, a `ApiKeyDetailFields`
+marad), a `API_KEY_DETAIL_ROUTE_PATH` registry-entry és négy konstans; a `/api-keys/:identifier`
+paraméter így már csak a `view`/`edit` overlay-child-on él.
+
+**AIS-171 (2026-11-08):** a page-váz primitíve — `PageShell` (§4): `title` (az oldal egyetlen
+`h1`-je), `subtitle?`, `back?`, `actions?`, `children`. A két slot `ReactNode`, így a `packages/ui`
+továbbra sem importál routert: a `Link`-et a page injektálja. Átállt rá az `ApiKeysPage`, a
+`PlaceholderPage`, valamint a két volt registry-markup: `/calls`
+(`pages/calls/CallsPlaceholderPage.tsx`) és a catch-all (`pages/not-found/NotFoundPage.tsx`), saját
+`*.const.ts`-szel — az `APP_NOT_FOUND_MESSAGE` törölve az `app/app.const.ts`-ből. Kivétel:
+`LoginPage` (layouton kívül renderel).
+
+**Utolsó frissítés:** 2026-11-08 (AIS-172: az `api-keys` **szerkesztése is overlay** — `/api-keys/:identifier/edit` registry-child, `ApiKeyEditDialog` (olvasás + négy állapot) és `ApiKeyEditDialogForm` (`useAppForm` + `EntityDialog`, `key={updatedAt}`), az inline `ApiKeyEditForm` törölve, a legacy detail oldal csak töröl; `409 STALE_WRITE` → azonnali újraolvasás + egyetlen capture toast — lásd §5) (AIS-147: sticky, két sávos admin fejléc — `AdminHeader.tsx`, `ui/ThemeSelector.tsx` és `layout.const.ts`, a fejléc `z-30`-on a log drawer, a dialog és a toast **alatt**, full-bleed `<main>`; a témaválasztás lokális `useState`, nincs store és nincs perzisztencia — lásd §4.1 és §5) (AIS-136: a notification alrendszer app-shell lezárása — egy **mindig látható** log-drawer fogantyú (`aria-expanded`/`aria-controls` mindkét állapotban, váltakozó glyph és accessible name, badge mindkét állapotban), a **toast-mátrix** teljessé tétele (`field` → csak log, `banner`/`page` → log **és** toast), a render-crash bekötése `AppErrorBoundary` injektált `onError` portján át, valamint az `ApiKeyEditForm` `notify` portja — lásd §4.1.3, §4 és §5) (AIS-84: globális notification capture — `QueryCache`/`MutationCache` callbackek + HTTP `onEvent` + `<NotificationHost />` az `AdminLayout`-ban, lásd §4.1.3 és §5) (AIS-112: a form-séma a shared kérés-sémából származik, a validációs copy egy kétnyelvű katalógusból jön — lásd §4.3) (AIS-111: **egy** hibakód-katalógus — `lib/api-error-code.const.ts` `ERROR_CODE_CATALOGUE` totális recordja, amiből az `ERROR_CODE_MESSAGE` és a `FIELD_SURFACE_CODES` deriválódik —, valamint a generikus `lib/field-errors.logic.ts` `toFieldErrors(error, target)`, lásd §4.1.1–4.1.2; a **shared-infra feature** kivétel dokumentálva: `features/api` és `features/error-surface` bármely page/feature számára importálható; a `pnpm test:quality` / `test:agents` Node 26-kompatibilis glob-hívást használ; előtte AIS-122: a réteg-, holt-kód-, token- és field-error szabályok **gépi gate-ek** — `pnpm quality`, lásd §9; AIS-119: a lista szűrő/rendezés/oldal állapota az **URL-ben** él — `features/api/use-list-params.ts`; AIS-118: az `src/app/` réteg)
+**AIS-149 (2026-11-06):** a fejléc témaválasztója **egyszerű select box** — új `SelectMenu`
+primitíva (§4): zárt trigger a kiválasztott téma **ikonjával és feliratával** + chevron, kattintásra
+`menuitemradio` listát nyit, **keresés nélkül**, soronként ikonnal. Ez leváltja az AIS-148-as combo
+boxot (szövegmező + szűrés + `onOpen`/`onClose` portok, törölve); a `Combobox` csak a kereshető
+mezőknél marad. A `THEME_OPTION_ICONS` visszakerült, és új `ChevronDownIcon` került az ikonkészletbe.
+Lásd §4, §4.1 és §5.
+
+**AIS-150 (2026-11-07):** a log drawer panelje **átméretezhető** — a bal élén egy `role="separator"`
+fogantyú (egérrel húzható, `pointercapture`-rel; billentyűzettel `ArrowLeft`/`ArrowRight` ±16 px,
+`Shift`-tel ±64 px, `Home`/`End`, dupla klikk → visszaállítás). A szélesség **320–720 px** között
+marad, alapból **416 px**, és `localStorage`-ban (`aisztens.logdrawer.width.v1`) él túl egy reloadot;
+letiltott storage esetén csendben a default-ra esik. Az érték a **controllerben** él (`useLogDrawer`
+`useState`-je), nem globális store-ban, és nem a `packages/ui`-ban — a primitíva továbbra is
+prezentációs. A `md` alatti teljes szélességet CSS oldja meg (`w-full md:w-[var(--log-drawer-width)]`),
+így nincs JS media query; húzás közben a panel `transition-none`-t kap. Részletek §4 és §5.
+
+**AIS-150 follow-up (2026-11-07) — hover-resize hiba javítva.** A fogantyú `pointermove` kezelője
+eddig **minden** mozgásra szélességet jelentett, így a puszta rámutatás is átméretezte a panelt, a
+szélesség pedig `window.innerWidth - clientX`-ből jött — márpedig a `window.innerWidth` a klasszikus
+görgetősávot is tartalmazza, a `fixed right-0` panel jobb éle viszont a
+`document.documentElement.clientWidth`-nél van. A kettő együtt futó viselkedést adott: a lépés
+`~görgetősávnyival` túllőtt, a kurzor kikerült a csíkról, a következő rámutatás újra ugyanabba az
+irányba lépett — `min`-ig, illetve `max`-ig. Javítás: a húzás csak a saját `pointerId`-jával és
+lenyomott gombbal él (a gesztus eredete `LogDrawerDragAnchor` a `useRef`-ben), a szélesség pedig a
+**húzás deltájából** számol (`toWidthFromDrag(startX, currentX, startWidth, range)`), így sem a
+görgetősáv, sem a panel szegélye, sem egy elrendezés-változás nem tud visszacsatolni. Részletek §4.
+
+**AIS-115 (2026-11-04):** a közös form-minta — `features/forms/use-app-form.ts`
+(`useAppForm`) egy helyen fogja össze a zod resolvert, a `toFieldErrors` mezőhiba-leképezést, az
+első hibás mező determinisztikus fókuszát, a `reset → notify → onSuccess` siker-konvenciót és az
+opcionális notification portot (`FormNotifier`, AIS-84 előtt `null`); a tiszta döntés a
+`use-app-form.logic.ts`-ben, a részletek a [`Forms-and-Validation.md`](./Forms-and-Validation.md:1)
+specben (lásd §4.4). Az `ApiKeyForm` átállása **AIS-85**-ben megtörtént.
+**AIS-113 (2026-11-04):** tíz form primitív — `FormField`, `FormSection`, `FormActions`, `Select`,
+`NumberInput`, `DatePicker`, `Checkbox`, `Switch`, `RadioGroup`, `Combobox` (lásd §4) —, a
+`FormField` **render prop** alapú (`ariaProps` a nyers DOM-hoz, `id`/`invalid`/`describedBy` a
+primitívekhez), a logika a `combobox.logic.ts` / `radio-group.logic.ts` tiszta függvényeiben, és
+`vitest-axe` alapú a11y gate a `test/form-a11y.test.tsx`-ben (§7 új sor: `vitest-axe`).
+A `Input`/`Textarea` változatlan — nincs törés a `packages/ui`-ban.
+**AIS-116 (2026-11-03):** hét data-display primitív — `Skeleton`, `Spinner`, `EmptyState`,
+`DescriptionList`, `StatusBadge`, `Pagination`, `DataTable` (lásd §4) —, és a teljes `api-keys`
+oldal rájuk állítva: lap/lapméret/rendezés az URL-ben, működő lapozóval (§5).
+**AIS-117 (2026-11-04):** öt overlay primitív — `Dialog`, `ConfirmDialog`, `Drawer`, `Tooltip`,
+`DropdownMenu` (lásd §4) — **Radix viselkedéssel, saját vizuális réteggel**: a focus trap, az
+`Esc`, az `aria-modal`, a portál és a fókusz-visszaállítás a Radixé, a felület a token-alapú CVA
+recept; Radix CSS-import nélkül. A `Drawer` **nem** `Popover`, hanem `Dialog` + `side` variáns
+(modalitás: focus trap + `Esc` + scroll-lock kell egy űrlapos panelhez) — ezért három Radix csomag
+kell, nem négy. A `ConfirmDialog` csak a döntést adja vissza (`onConfirm`), nem navigál és nem
+zárja be magát. A `packages/ui/package.json` első runtime dependency-jei a Radix csomagok (§7).
+**AIS-130 (2026-11-04):** a page-state szabály **le van zárva**, és a szabály nyer: a sorrend
+**URL → TanStack Query → page-local store → `useState`**
+([`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:139) §6.1). A `zustand`
+**nincs telepítve** — egyetlen oldalnak sincs tranziens UI-állapota, ezért a store-factory a
+szabályban csak **referencia-minta**; aki először használja, ugyanabban a change-ben telepíti,
+`installed`-ra váltja a §7 sort és megírja a store-tesztet. Ez a döntés szünteti meg a §6 és a §5
+eddigi ellentmondását: a §5 a §6-ot **idézi**, nem fordítja.
 **Status:** living document — describes the _current_ state of the React side of the monorepo.
 **Authority:** [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:1) is the
 normative rule set; this document explains how the repo implements it. Where this document and
@@ -14,7 +236,7 @@ the rule set disagree, the rule set wins and this document is the bug.
 | `packages/api-client` | The only place that talks to the backend (typed services + Zod parsing at the boundary). Tested with **jest + ts-jest**.     | `tsc` → `dist`                   |
 | `packages/shared`     | Wire schemas, shared pure helpers used by API, web and admin. Tested with jest.                                              | `tsc` → `dist`                   |
 | `apps/admin`          | Admin SPA. Consumes `@callback/ui` primitives and `@callback/api-client` services. Tested with **vitest + Testing Library**. | `tsc --noEmit` + `vite build`    |
-| `apps/web`            | Public site. Not yet migrated to the token layer — see §2.                                                                   | `tsc --noEmit` + `vite build`    |
+| `apps/web`            | Public site. Consumes `@callback/ui` (`Card` + tokens) since AIS-122; still a flat `App.tsx` + `pages/*`, no layer folders.  | `tsc --noEmit` + `vite build`    |
 
 Why `packages/ui` has no build step (decision **D14** of the AIS-57 plan): its only
 consumer is a Vite bundle, so a `dist` would add a build ordering dependency and
@@ -27,7 +249,10 @@ only build `@callback/shared`.
 app → pages → features → entities → services → lib
 ```
 
-Imports flow downwards only — no page→page, no feature→feature imports.
+Imports flow downwards only — no page→page, no feature→feature imports. The two
+**shared infrastructure features** (`features/api`, `features/error-surface`) are the
+only exception: any page and any feature may import them, because they hold generic
+plumbing (TanStack Query adapters, error surface) and no use-case business logic.
 
 The rule file describes the **target** structure. The table below shows both the target and
 what exists in `apps/admin` today, so nobody mistakes a planned folder for an existing one.
@@ -39,12 +264,18 @@ what exists in `apps/admin` today, so nobody mistakes a planned folder for an ex
 | `features/<use-case>` | query/mutation hooks, pure `*.logic.ts`                          | **exists**: `features/api-keys/` (`api-keys.const.ts`, `.interface.ts`, `.logic.ts`, `use-api-keys.ts`) and `features/error-surface/` (`use-online-status.ts`, `use-app-error-banner.ts`, `query-error.store.ts`)                                                                                                                                                                                     |
 | `entities/<entity>`   | domain types, pure mappers, display components                   | **exists**: `entities/api-key/` (`api-key.interface.ts`, `api-key.mapper.ts`, `api-key.const.ts`) — mappers only, no display components yet                                                                                                                                                                                                                                                           |
 | `services`            | composition root (client instance + token supplier)              | **exists**: `services/api-client.ts` + `services/api-client.const.ts`                                                                                                                                                                                                                                                                                                                                 |
-| `lib`                 | pure helpers and formatters                                      | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts` (+ their `*.const.ts` / `.interface.ts`)                                                                                                                                                                                                                                                                              |
+| `lib`                 | pure helpers and formatters                                      | **exists**: `lib/date.ts`, `lib/error-message.ts`, `lib/error-surface.logic.ts`, `lib/api-error-code.const.ts` (single code→copy catalogue), `lib/field-errors.logic.ts` (generic failure→form mapping) (+ their `*.const.ts` / `.interface.ts`)                                                                                                                                                      |
 | `components`          | generic presentational shells (no data access)                   | **exists**: `components/BuildInfoFooter.tsx`, `components/error/PageErrorState.tsx`, `components/error/AppErrorBanner.tsx` (the latter is a thin container: all decisions live in `features/error-surface` + `lib/error-surface.*`)                                                                                                                                                                   |
-| `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/api-keys.mock.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                                                                                                                                                                               |
+| `test/mocks`          | all fixtures, doubles, wrappers                                  | **exists**: `test/mocks/handlers/` (MSW network doubles: `api-keys.handlers.ts`, `generic.handlers.ts`, `handler-envelope.ts`), `server.ts`, `render-with-providers.tsx`, `request-recorder.ts`, `api-error.mock.ts`, `query-client.mock.tsx`, `online-status.mock.ts`, `query-error.mock.ts`                                                                                                         |
 
-`apps/web` is out of scope for this document's layer map: it has no features/entities
-folders yet and is not migrated to `packages/ui` tokens.
+Besides the per-page use cases, `features/api/` holds the shared TanStack Query adapters
+(`use-api-list.ts`, `use-api-detail.ts`, `use-api-mutation.ts`, `use-list-params.ts`,
+`api-hooks.logic.ts`). `features/api-keys` is a thin adapter over them — that is why
+`features/api` counts as shared infrastructure, not as another page's use case.
+
+`apps/web` is out of scope for this document's **layer map**: it has no features/entities
+folders yet, so `pnpm quality:layers` cruises `apps/admin/src` only. The site _is_ on
+`packages/ui` tokens and primitives since AIS-122, and `pnpm quality:tokens` covers it.
 
 ## 3. Design tokens (`packages/ui/src/styles/theme.css`)
 
@@ -85,6 +316,98 @@ custom `@utility` declarations: Tailwind v4 has no theme namespace for border
 widths or transition durations, so the tokens are plain custom properties
 exposed through those utilities (decision **D15**).
 
+**The thickness ladder is appearance state** (glass family only): the plain `:root` declares
+`1 / 1.5 / 2px`, and the four glass members restate it as `2 / 2.5 / 3px`, because
+a real pane's edge is visibly thicker than a 1px divider. Nothing else overrides
+it — the opaque appearances inherit the ladder. The `theme-tokens` gate accepts
+those three names in an appearance block (`THEME_STATE_TOKENS` in
+`scripts/quality/theme-tokens.const.mjs`), so the override is legal without being
+mandatory.
+
+### 3.2.2 Appearance-state and glass tokens (AIS-165, AIS-166)
+
+Four tokens cannot live in `@theme`: `--color-*` is Tailwind's colour namespace,
+so a token called `--color-scheme` would be emitted as a _colour_ named "scheme".
+They are plain `:root` custom properties, overridden by each appearance block:
+
+| Token                                      | Role                                                                                                                                                                                                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--color-scheme`                           | feeds `color-scheme` on `body`, so native widgets (scrollbars, controls, caret) follow the appearance                                                                                                                                                |
+| `--app-backdrop`                           | body `background-image`; `none` for the opaque appearances, a gradient for `ambient`, and for the four glass members a **dark scrim + photograph** (`assets/app-backdrop-glass.jpg`) + the variant's gradients as the failed-request fallback        |
+| `--blur-glass`, `--saturate-glass`         | the values the `surface-glass` utility reads; `0px` / `100%` outside the glass family, which makes the class a no-op                                                                                                                                 |
+| `--glass-sheen`                            | the diagonal specular streak (two layered gradients), applied as a `background-image` by `surface-glass` on the floating layers and by `sheen-glass` on the static ones; `none` outside the glass family and in both readability fallbacks (AIS-169) |
+| `--border-width-hairline/-default/-strong` | the thickness ladder; only the glass members restate it (`2 / 2.5 / 3px`) so the rim reads as a pane edge                                                                                                                                            |
+
+**`surface-glass` is a property, not a value**, so no appearance block can switch
+it on. The floating-surface recipes therefore carry it unconditionally — dialog,
+drawer, dropdown/select panel, tooltip, toast, banner, log-drawer panel and its
+handle, plus the combobox listbox — and the _tokens_ decide whether it does
+anything. Blur is deliberately **never** applied to the card or the table rows:
+one `backdrop-filter` per scrolling row is the known frame-cost worst case. The
+class name has a single home (`SURFACE_GLASS_CLASS` in
+`packages/ui/src/theme/theme.const.ts`), so a rename cannot miss a recipe.
+
+The static surfaces are not left matte, though: `Card` and the `Table` shell carry
+the companion utility **`sheen-glass`** (`SHEEN_GLASS_CLASS`), which
+applies the very same `--glass-sheen` gradient **without** the filter. A thick glass
+rim with no highlight reads as painted plastic, while a `backdrop-filter` per card
+is exactly the cost the exclusion above avoids — so the gloss is separated from the
+blur instead of both being dropped.
+
+`prefers-reduced-transparency: reduce` and `prefers-contrast: more` re-declare the
+glass surface and border tokens as **opaque** and zero the blur, so the appearance
+degrades instead of becoming unreadable.
+
+**The glass backdrop is a photograph** (`packages/ui/src/styles/assets/app-backdrop-glass.jpg`,
+3840×2160, ~1.7 MB). A blurred gradient is a smooth field, so the panes had nothing
+to refract and read as flat cards; a photographic backdrop gives the `backdrop-filter`
+structure. Three consequences are part of the contract:
+
+1. The reference lives **in the token file** — `url('./assets/app-backdrop-glass.jpg')` —
+   so Vite rewrites it to a hashed `dist/assets/…jpg` at build time. No `public/`
+   copy step, and no path that assumes one app's root. `apps/web` therefore also
+   emits the file (never fetched there: no glass theme is ever applied), which is
+   the accepted cost of the shared token file.
+2. `body` carries `background-size: cover`, `background-repeat: no-repeat` and
+   `background-position: center`, because a photograph has an intrinsic size and
+   would otherwise tile at native resolution. Gradients are sized to the box, so
+   the three properties are invisible for `ambient`.
+3. Every glass member puts a **dark scrim** (`linear-gradient` in its own base hue,
+   0.54–0.78 alpha, darker at the top) over the photograph. The asset is bright, the
+   panes are 3–13 % white, so text really sits on photograph + scrim + fill: without
+   the scrim the near-white text tokens would fall to ~1.5:1 on the brightest areas.
+   The scrim alpha climbs as the fill gets thinner — `glass-crystal` (3–5 % fill)
+   gets the strongest, `glass-smoke` (dense dark fill) the weakest. The variant
+   gradients stay listed _behind_ the photograph as the fallback layer.
+
+**Seven appearances exist since AIS-169: `light`, `dark`, `ambient` and four
+readings of one material.** The glass members are not colour axes — they are the
+same recipe at different strengths, so the choice between them is a product
+decision made in the header selector, not a code change:
+
+| Value           | Label        | Fill (raised / overlay) | Blur / saturate | Rim (border)  | Character                                        |
+| --------------- | ------------ | ----------------------- | --------------- | ------------- | ------------------------------------------------ |
+| `glass`         | Üveg         | `7% / 10%` white        | 12px / 140%     | `0.34 / 0.44` | balanced frost, the default glass                |
+| `glass-frost`   | Fagyott üveg | `13% / 17%` white       | 18px / 120%     | `0.30 / 0.38` | milky: the panel carries the surface             |
+| `glass-crystal` | Kristályüveg | `3% / 5%` white         | 9px / 155%      | `0.55 / 0.62` | almost invisible, brightest rim, strongest sheen |
+| `glass-smoke`   | Füstüveg     | `40% / 45%` dark        | 15px / 130%     | `0.30 / 0.38` | smoked, see-through, calmest                     |
+
+Every member follows the **five-part** contract of real glass: a barely-there fill,
+a **catch-light edge** (borders are white at 30–72%, never a dark hairline), a
+**bevel** in the depth slots (bright inner rim on top, faint dark rim at the
+bottom — that pair is what reads as _thickness_ — plus one large soft drop
+shadow), the **specular sheen** a uniform border cannot produce, and a **thick,
+light-catching frame**: all four restate the thickness ladder as `2 / 2.5 / 3px`,
+twice the opaque `1 / 1.5 / 2px`. Width and brightness together are what make glass
+look thick; a wide but faint rim reads as a shadow and a bright but 1px rim reads
+as a hairline. The fills are calibrated per variant against its own base lightness,
+because text sits on the _composited_ surface: base + fill has to leave
+`text-text-primary` above 4.5:1 — and the **base got deeper wherever the fill got
+lighter**, so a thinner pane keeps the same text contrast while the backdrop shows
+through it. Blur stays inside 9–18px on purpose: past ~24px the backdrop stops
+reading as shapes, the panel turns into fog, and the blur (an averaging filter)
+drains the chroma `saturate()` then has to win back.
+
 ### 3.2.1 Default border colour (**D40**)
 
 Tailwind v4 preflight ships `border-style: solid` with **no border colour**, so
@@ -113,36 +436,341 @@ non-default outline, it must name a border/state token.
    (`grid-cols-[2fr_1fr]`) are allowed.
 4. New visual concepts are built once in `packages/ui` as a primitive or a CVA
    variant — never inline in a page.
+5. Overlays render into a **`document.body` portal** (Radix `Portal`) and stack with
+   the Tailwind scale utilities `z-40` (backdrop) / `z-50` (panel). There is **no
+   z-index token**: overlay depth is layout, not colour, and the palette gate does not
+   cover it (AIS-117 **D5**). The literals live in the primitives' `.const.ts` files,
+   never repeated in JSX.
 
-Definition-of-done check, bash / ripgrep (run from the repo root, must print nothing):
+Definition-of-done check — the gate that enforces §3.3 (it also scans
+`packages/ui/src`, which the old `rg` one-liner did not):
 
 ```bash
-rg "#[0-9a-fA-F]{3,8}|(bg|text|border|ring|from|to|via)-(slate|gray|zinc|neutral|stone|indigo|red|amber|green|emerald|blue)-[0-9]{2,3}" apps/admin/src apps/web/src
+pnpm quality:tokens   # must print "OK quality:tokens (palette): 0 violations"
 ```
 
-The same check without ripgrep, on Windows:
-
-```powershell
-Get-ChildItem -Path 'apps/admin/src' -Recurse -File |
-  Where-Object { $_.Extension -in '.ts','.tsx','.css' } |
-  Select-String -Pattern '#[0-9a-fA-F]{3,8}|(bg|text|border|ring|from|to|via)-(slate|gray|zinc|neutral|stone|indigo|red|amber|green|emerald|blue)-[0-9]{2,3}'
-```
+The gate is dependency-free (no `rg` needed on Windows) and implements exactly the
+three rules above; see §9 for its negative fixture and its exemption list.
 
 ## 4. Primitives (`packages/ui/src/components`)
 
-| Primitive                                                                          | Variants / props                                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                              |
-| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Button`                                                                           | `variant`: `primary` \| `secondary` \| `ghost` \| `danger`; `size`: `sm` \| `md` \| `lg`; `isLoading` | `type` defaults to `button` (**D17**); submitting requires an explicit `type="submit"`. Loading sets `disabled` + `aria-busy`.                                                                                                                                                                                                                                                     |
-| `Input`                                                                            | `label`, `id`, `error`, `hint`, `invalid`                                                             | `id` is required so the label association is deterministic. Error wins over hint; `aria-invalid` + `aria-describedby` are wired. Forwards its ref so react-hook-form can focus the first invalid field.                                                                                                                                                                            |
-| `Textarea`                                                                         | same props as `Input` + `rows` (default `4`)                                                          | Multi-line twin of `Input` — same sunken recipe, `resize-y`, ref forwarded. Added by AIS-41 so a 2000-character description does not live in a one-line field.                                                                                                                                                                                                                     |
-| `Card`                                                                             | `title`, `description`                                                                                | Raised surface; title renders as an `h2`.                                                                                                                                                                                                                                                                                                                                          |
-| `Table` + `TableHead` / `TableBody` / `TableRow` / `TableHeaderCell` / `TableCell` | native attributes                                                                                     | `Table` owns the scroll container; header cells default to `scope="col"`.                                                                                                                                                                                                                                                                                                          |
-| `Badge`                                                                            | `variant`: `neutral` \| `info` \| `success` \| `warning` \| `danger`                                  | Variant names are the shared vocabulary for domain mappers.                                                                                                                                                                                                                                                                                                                        |
-| `Alert`                                                                            | `variant`: `info` \| `success` \| `warning` \| `danger`, `title`                                      | `danger` is announced as `role="alert"`, the others as `role="status"`.                                                                                                                                                                                                                                                                                                            |
-| `Banner`                                                                           | `variant`: `info` \| `warning` \| `danger`, `title`, `action`, `onDismiss` + `dismissLabel`           | App-level, full-width strip for a _persistent condition_ (offline / expired session / 503). `danger` → `role="alert"`, the others → `role="status"`. The props type makes `dismissLabel` mandatory whenever `onDismiss` is given, so the close control always has an accessible name. No timer: the banner disappears only when the condition ends or the user closes it (AIS-96). |
+| Primitive                                                                          | Variants / props                                                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PageShell` (AIS-171)                                                              | `title`, `subtitle?`, `back?`, `actions?`, `children`                                                                 | Az admin page-váz: `space-y-6` section + fejléc-sor + az oldal **egyetlen** `h1`-je. A `back` (a cím fölött) és az `actions` (a fejléc jobb végén) **ReactNode slot**, nem prop-URL: a `Link`-et a page injektálja, így a `packages/ui` nem importál react-router-t (ugyanaz a minta, mint a `Breadcrumb` `renderLink`-je). Hiányzó slot → **nincs** wrapper, különben egy üres flex-gyerek elmozdítaná a címet. |
+| `Button`                                                                           | `variant`: `primary` \| `secondary` \| `ghost` \| `danger`; `size`: `sm` \| `md` \| `lg`; `isLoading`                 | `type` defaults to `button` (**D17**); submitting requires an explicit `type="submit"`. Loading sets `disabled` + `aria-busy`.                                                                                                                                                                                                                                                                                   |
+| `Input`                                                                            | `label`, `id`, `error`, `hint`, `invalid`                                                                             | `id` is required so the label association is deterministic. Error wins over hint; `aria-invalid` + `aria-describedby` are wired. Forwards its ref so react-hook-form can focus the first invalid field.                                                                                                                                                                                                          |
+| `Textarea`                                                                         | same props as `Input` + `rows` (default `4`)                                                                          | Multi-line twin of `Input` — same sunken recipe, `resize-y`, ref forwarded. Added by AIS-41 so a 2000-character description does not live in a one-line field.                                                                                                                                                                                                                                                   |
+| `Card`                                                                             | `title`, `description`                                                                                                | Raised surface; title renders as an `h2`.                                                                                                                                                                                                                                                                                                                                                                        |
+| `Table` + `TableHead` / `TableBody` / `TableRow` / `TableHeaderCell` / `TableCell` | native attributes                                                                                                     | `Table` owns the scroll container; header cells default to `scope="col"`.                                                                                                                                                                                                                                                                                                                                        |
+| `Badge`                                                                            | `variant`: `neutral` \| `info` \| `success` \| `warning` \| `danger`                                                  | Variant names are the shared vocabulary for domain mappers.                                                                                                                                                                                                                                                                                                                                                      |
+| `Alert`                                                                            | `variant`: `info` \| `success` \| `warning` \| `danger`, `title`                                                      | `danger` is announced as `role="alert"`, the others as `role="status"`.                                                                                                                                                                                                                                                                                                                                          |
+| `Banner`                                                                           | `variant`: `info` \| `warning` \| `danger`, `title`, `action`, `onDismiss` + `dismissLabel`                           | App-level, full-width strip for a _persistent condition_ (offline / expired session / 503). `danger` → `role="alert"`, the others → `role="status"`. The props type makes `dismissLabel` mandatory whenever `onDismiss` is given, so the close control always has an accessible name. No timer: the banner disappears only when the condition ends or the user closes it (AIS-96).                               |
+| `Skeleton`                                                                         | `shape`: `line` \| `field` \| `row`; `lines`                                                                          | Static placeholder (**D3**): sunken surface + inset shadow, **no** pulse — `theme.css` carries no motion token for it. The whole tree is `aria-hidden`; the loading sentence belongs to the surrounding region.                                                                                                                                                                                                  |
+| `Spinner`                                                                          | `size`: `sm` \| `md`; `label` (default `Betöltés…`)                                                                   | `role="status"` on the wrapper, the ring is `aria-hidden`, the label is `sr-only`. Ring drawn from border tokens only (`border-border-strong` + `border-t-primary`).                                                                                                                                                                                                                                             |
+| `EmptyState`                                                                       | `title`, `description`, `action?: { label, onAction }`                                                                | The “success, but no rows” state. Root is `role="status" aria-label={title}`; the CTA's `aria-label` is `` `${label} — ${title}` `` so a repeated button text stays unambiguous. Works without a CTA.                                                                                                                                                                                                            |
+| `DescriptionList`                                                                  | `items: { label, value }[]`, `isLoading`, `empty`, `columns`: `1` \| `2`                                              | A real `<dl>`/`<dt>`/`<dd>` (each pair in a `div`, allowed since HTML 5.2). `isLoading` renders skeleton rows and **no** `dd`; empty renders the `empty` slot (or one neutral line).                                                                                                                                                                                                                             |
+| `StatusBadge`                                                                      | `status`, `label`, `variant` (the `Badge` vocabulary)                                                                 | `<Badge variant data-status={status}>`. Adds **no** colour: the `status → variant` mapper stays in `entities/`.                                                                                                                                                                                                                                                                                                  |
+| `Pagination`                                                                       | `meta: PaginationMeta`, `onPageChange`, `onLimitChange?`, `limitOptions?`, `ariaLabel?`                               | Structurally typed (**D1**) so `meta.pagination` from `@callback/shared` is assignable without a mapper — the UI package does not depend on the contract. `<nav>`, `aria-current="page"`, labelled prev/next, `<label>` + `<select>` for the page size. Pure rules in `pagination.logic.ts` (`toVisiblePages`, `toRangeLabel`, `clampLimit`).                                                                    |
+| `DataTable`                                                                        | `rows`, `columns`, `rowKey`, `sort`, `onSortChange`, `isLoading`, `loadingRowCount`, `empty`, `caption`, `rowActions` | Composes the six `Table*` primitives (**Út A**, no `@tanstack/react-table`). It **never sorts locally** (**D2**) — it reports intent, the server owns the order. Sortable header = `<button>` inside the `<th>`, `aria-sort` on the `<th>`. Loading keeps the header and renders placeholders; empty renders the `empty` slot (default `EmptyState`).                                                            |
+
+| `FormField` | `id`, `label`, `hint`, `error`, `required`, `children(field)` | The **only** place `aria-invalid` + `aria-describedby` are wired. The child is a render prop (**D1**), never `cloneElement`: `field` carries `id`/`invalid`/`describedBy` for our primitives and a spread-safe `ariaProps` for raw DOM controls. Error wins over hint; `required` adds an `sr-only` „(kötelező)". |
+| `FormSection` | `legend`, `description?`, `children` | `<fieldset>` + `<legend>` instead of a styled `div` + heading, so the group name is announced when focus enters it. |
+| `FormActions` | `submitLabel?`, `cancelLabel?`, `onCancel?`, `isSubmitting?`, `align?` | Submit is hard-wired to `type="submit"` (`Button` defaults to `button`, so this is the whole point). `isSubmitting` → `isLoading` on submit **and** disables cancel. Defaults live in `form-actions.const.ts`. |
+| `Select` | `id`, `options[]`, `placeholder?`, `invalid?`, `describedBy?` | Native `<select>` reusing `inputVariants` (**D3**). The placeholder is a disabled option with the empty value (`SELECT_PLACEHOLDER_VALUE`), so it can never collide with a domain value. |
+| `NumberInput` | native input attributes + `invalid?`, `describedBy?` | Native `input[type="number"]` (stepper, `min`/`max`/`step`, numeric keyboard), same recipe as `Select`. |
+| `DatePicker` | `id`, `value`, `onChange`, `min?`, `max?`, `invalid?`, `describedBy?` | Controlled native `input[type="date"]` with a `yyyy-mm-dd` **string** contract — no date library, no conversion helper and no `@callback/shared` import in `packages/ui` (**D6**); the caller owns the domain format. |
+| `Checkbox` | `id`, `label`, `description?`, `invalid?`, `describedBy?` | Native checkbox and its `<label>` in one component. `accent-primary` is the only portable way to colour it; `description` sits inside the label, so no second id is needed. |
+| `Switch` | same contract as `Checkbox` | Native checkbox with `role="switch"`: keyboard, form serialisation and react-hook-form keep working with no JS state (**D4**). The visible track is a `peer-*`-styled sibling, the thumb is its `::after`. `aria-checked` follows the controlled `checked`. |
+| `RadioGroup` | `name`, `legend`, `options[]` (`value`, `label`, `description?`, `disabled?`, `icon?`), `value`, `onChange`, `orientation?`, `invalid?`, `describedBy?`, `disabled?` | Controlled `<fieldset>` group. Arrow keys delegate to the pure `nextOptionValue` (wraps at both ends, skips disabled options); the platform still moves focus, so the two never fight. Tests target `role="group"` + the legend. `RadioOption.icon` (AIS-144) renders a **decorative** icon before the label text: the icon wrapper is `aria-hidden`, so the accessible name stays the `label` text and nothing is announced twice, and `description` keeps its own block line under the label. |
+| `Combobox` | `id`, `options[]`, `value`, `inputValue`, `onSelect`, `onInputValueChange`, `emptyMessage?`, `invalid?`, `describedBy?` | Fully controlled (**D5**): the caller owns value _and_ typed text. Filtering and index maths live in `combobox.logic.ts` (`filterOptions`, `nextActiveIndex`, `clampActiveIndex`, `normalizeQuery` — accent-insensitive). WAI-ARIA combobox pattern with `aria-activedescendant`. A pointer press reopens a list dismissed with `Escape`, because `Escape` keeps the focus and a second click fires no `focus` event (AIS-149). Local options only; async search / multi-select are out of scope. |
+| `SelectMenu` (AIS-149) | `label`, `options[]` (`value`, `label`, `icon?`, `disabled?`), `value`, `onValueChange` | Single-choice **select box without a search field**: the trigger is the `Button` `secondary`/`sm` recipe showing the chosen option's icon + label + a chevron that rotates through `group-data-[state=open]`; the panel reuses the `DropdownMenu` surface/item recipes with Radix `RadioGroup`/`RadioItem`, so the options are `menuitemradio` with `aria-checked` and arrow keys/`Escape` come free. The trigger is named `"<label>: <chosen label>"`, so the visible text stays inside the accessible name (label in name). Fully controlled — no open/close state to mirror. |
+| `Toast` (AIS-81) | `level`: `success` \| `error` \| `warning` \| `info` \| `system`, `message`, `detail?`, `repeatCount?`, `onDismiss`, `onPause?`, `onResume?`, `depth?` | One notification card. The accent is the `Alert`/`Banner` border recipe; `error` → `role="alert"`, every other level → `role="status"`. **Stateless by contract**: no timer, no store, no storage — it reports the dismiss intent and forwards `pointerenter`/`pointerleave`, so the auto-dismiss clock belongs to the host (AIS-83). The entry animation is pure CSS through Tailwind's `starting:` variant, and `onPause` is omitted from the DOM attributes so the media event cannot clash with the callback. `detail` renders clamped to two lines with a `title`. |
+| `ToastStack` (AIS-81) | `toasts` (**newest first**), `onDismiss`, `onPause?`, `onResume?` | Fixed bottom-right container and the live region itself (`role="region"`, `aria-live="polite"`, `aria-atomic="false"`, labelled). Renders at most `TOAST_MAX_VISIBLE` (`3`) cards, so the **newest** survive an overflow, and assigns each card its `depth` (`scale`/`opacity`) so older cards read as “behind”. `TOAST_STACK_Z_INDEX` is `z-60` — a toast must stay readable above the dialog/drawer surface (`z-50`). Pure rules in `toast.logic.ts` (`toToastDepth`). |
+| `LogDrawer` (AIS-82, AIS-150) | `entries` (**newest first**, already sliced), `isOpen`, `unseenCount`, `levelFilter`, `hasMore`, `width`, `widthRange`, `isResizing`, `onToggle`, `onClose`, `onFilterChange`, `onLoadMore`, `onClear`, `onWidthChange`, `onResizeStart`, `onResizeEnd`, `onWidthReset`, `formatTimestamp` | Collapsed edge tab (`aria-expanded` + `aria-controls`, count badge only when `unseenCount > 0`) plus a **non-modal** sliding panel: no overlay, no focus trap, page stays scrollable, `Escape` closes. Six chips (`Mind` / `Siker` / `Hiba` / `Figyelmeztetés` / `Info` / `Rendszer`) as `aria-pressed` buttons — `Siker` exists because the store emits `success`. Panel is `role="log"` with `aria-live="off"` (the announcement noise stays on the toasts). `LOG_DRAWER_Z_INDEX` is `z-40`: below the modal overlay and below the toast stack. Paging is **props only**; the 20/50 window belongs to AIS-83. **Resize (AIS-150):** a `role="separator"` / `aria-orientation="vertical"` handle on the panel's left edge with `aria-valuenow`/`aria-valuemin`/`aria-valuemax`, `tabIndex={0}` and `hidden md:flex` (12 px hit target, 6 px visible rail); the width travels as the `--log-drawer-width` custom property (`w-full md:w-[var(--log-drawer-width)]`), and `isResizing` replaces `transition-transform` with `transition-none`. Every gesture is reported (`onWidthChange`, `onResizeStart`, `onResizeEnd`, `onWidthReset`) — the component never stores the width. |
+| `LogEntryRow` (AIS-82, AIS-153, AIS-163) | `entry` (`id`, `level`, `message`, `detail?`, `details?`, `createdAt`), `formatTimestamp` | One row: level glyph chip **+** level text (severity is never colour-only), injected timestamp, `break-words` message, `detail` only when present. Reuses the `Toast` chip recipe and glyph map, so a toast and its log row cannot disagree about a level. **Expandable (AIS-153):** the header band (glyph, level, timestamp, chevron) is one full-width `<button>` with `aria-expanded` + `aria-controls` and a state-dependent accessible name (`toEntryToggleLabel`, includes the fact count); it reveals a `role="region"` detail region — a `dl`/`dt`/`dd` list of `entry.details` in emitter order, `mono` values in the `font-mono` recipe, `max-h-64 overflow-y-auto whitespace-prewrap` — that is `hidden` while collapsed and states `LOG_ENTRY_DETAILS_EMPTY_LABEL` when the entry has no facts. The message and the one-line `detail` stay **outside** the button, so no long sentence becomes pressable. Copy controls: `requestId` (rendered only when `findRequestIdField` hits) and `JSON` (`toEntryJson`, deterministic field order), each with its **own** `Kimásolva` timer (`LOG_ENTRY_COPY_FEEDBACK_MS`); a clipboard failure changes nothing. `isOpen` and the copy flags are component-local (`useState` + a `useRef` timer map), so any number of rows can be open and the state is never lifted — see §5. **JSON values (AIS-163):** a value that parses to an object or an array keeps its stored single-line string and gets a small `JSON kibontása` / `JSON összecsukása` toggle (`aria-expanded` + `aria-controls`) that reveals `toPrettyJson`'s indented output in a bounded `<pre>` (`max-h-48 overflow-auto whitespace-pre`); a primitive (`42`, `true`, `"x"`) is not JSON, so it gets no control, and the expanded set is component-local and cleared when the row closes. |
+| `Breadcrumb` (AIS-145) | `items: { label, to? }[]`, `ariaLabel?`, `renderLink?` | Router-független: a link elemet a hívó **injektálja** (`renderLink` — az adminban react-router `Link`, alapból `<a href>` fallback), így a `packages/ui` sosem importál routert. Az utolsó crumb `<span aria-current="page">`, **nem** link, akkor sem, ha van `to`-ja; a `to` nélküli nem-utolsó crumb szövegként jelenik meg (nincs halott link); `n` crumb → `n-1` elválasztó `<li aria-hidden="true">`-ban; üres `items` → **nincs** `<nav>` landmark. |
 
 Exports are explicit from `packages/ui/src/index.ts` (no `export *`). `cn()` is
 exported too so pages can merge caller classes with the recipe classes.
+The seven data-display primitives above arrived with **AIS-116**; the accessible names the
+pager uses (`PAGINATION_NEXT_LABEL`, …) are exported as well, so a page test asserts against
+the same constant the component renders.
+
+**`LogDrawer` has one persistent arrow handle (AIS-136).** One always-mounted `<button>` toggles the
+panel in **both** directions — it used to render only while collapsed. It exposes `aria-expanded`
+and `aria-controls` in both states, flips its glyph (`‹` collapsed → `›` open) and its accessible
+name (`LOG_DRAWER_OPEN_LABEL` / `LOG_DRAWER_CLOSE_LABEL`), keeps the unseen badge in both states and
+reports the single intent through `onToggle`; `✕` (`LOG_DRAWER_HEADER_CLOSE_LABEL`, a **different**
+name so two controls are never indistinguishable) and `Escape` stay as secondary close paths. The
+element is a sibling **after** the panel, because the collapsed panel is `pointer-events-none` — a
+handle inside it would be unreachable exactly when it is needed. Its position never changes
+(`right-0`): the open panel reserves a right gutter (`LOG_DRAWER_HANDLE_GUTTER`) instead, so there is
+no viewport-dependent offset and no layout shift. The panel stays **non-modal**: no overlay, no focus
+trap, page still scrollable.
+
+**The panel is resizable from its left edge (AIS-150, fixed by the AIS-150 follow-up).** The handle
+is a `role="separator"` element with `aria-orientation="vertical"`,
+`aria-label={LOG_DRAWER_RESIZE_HANDLE_LABEL}`, `aria-valuenow`/`aria-valuemin`/`aria-valuemax` and
+`tabIndex={0}`, and it is `hidden md:flex`: below `md` the panel is full width (`w-full`), so there is
+nothing to drag and the handle must not be a focus stop either. A drag brackets itself with
+`onResizeStart`/`onResizeEnd` (which is what lets the host drop the transform transition through
+`isResizing`) and captures the pointer so the moves keep arriving outside the 12 px target.
+`pointermove` is a **hover** event as well, so it only resizes while the drag _this_ handle started is
+still running: the gesture origin is kept in a `useRef` (`LogDrawerDragAnchor` — `pointerId`,
+`startX`, `startWidth`), a move carrying another pointer id is ignored, a move with `buttons === 0`
+**ends** the drag (the button may be released outside the window, and no `pointerup` would ever
+arrive), and only the primary button starts a drag. `pointercancel` ends the gesture exactly like
+`pointerup`. The reported width is `startWidth - (currentX - startX)` — the pointer's **travel**,
+never a viewport edge: an edge-anchored `window.innerWidth - clientX` counts the classic scrollbar
+that a `fixed right-0` panel does not have inside it, and it lets a layout shift under a stationary
+cursor feed back into the width. Keyboard: `ArrowLeft`/`ArrowRight` = ±`LOG_DRAWER_WIDTH_STEP` (16 px),
+`Shift` = ±`LOG_DRAWER_WIDTH_STEP_LARGE` (64 px), `Home`/`End` = the bounds, anything else is ignored
+(and `preventDefault` only runs when the width actually changes). Double click resets to
+`widthRange.initial`. Geometry is pure (`clampDrawerWidth`, `toWidthFromDrag`, `toWidthFromKey` in
+`log-drawer.logic.ts`), the width is published as the `--log-drawer-width` custom property, and the
+numbers (416 / 320 / 720 / 16 / 64) are declared **once**, in `log-drawer.const.ts`.
+
+The ten form primitives arrived with **AIS-113** and are the mandatory route for new forms:
+a form composes `FormSection` → `FormField` → primitive, and `FormActions` for the buttons.
+`Input`/`Textarea` are intentionally left untouched (they keep their own `label`/`hint`/`error`
+props), so nothing in `packages/ui` broke. The a11y gate for all of them is
+`packages/ui/test/form-a11y.test.tsx` (default / hint / error / disabled / open-listbox / icons).
+
+**The icon set (AIS-144) is hand-embedded, not a dependency.** `packages/ui/src/components/icon/`
+holds five inline SVGs on the Lucide 24×24 stroke grid — `SunIcon`, `MoonIcon`, `SunsetIcon`,
+`SettingsIcon`, `ChevronRightIcon` — copied from the upstream source, with the ISC licence and the
+source URL in each component's JSDoc. Every icon is `fill="none"`, `stroke="currentColor"`,
+`strokeWidth={2}`, `aria-hidden="true"` and `focusable="false"`, so it inherits the surrounding text
+token and never enters the accessibility tree. `IconProps` carries **only** `className`: the shared
+attributes live in one place (`ICON_BASE_PROPS` in `icons.tsx`, constants in `icon.const.ts`) and the
+`h-4 w-4 shrink-0` base class is the default size, because an SVG with only a `viewBox` would stretch
+to the width of its container. A caller overrides the size with a normal utility (`h-6 w-6`) — there
+is no `size` and no `color` prop. The icons are exported explicitly from `packages/ui/src/index.ts`.
+
+The toast layer arrived with **AIS-81** and is only the _presentation_ of the notification
+subsystem. `ToastLevel` is declared in `packages/ui`; the store (`@callback/notifications`, AIS-79)
+declares its own `NotificationLevel` union with the same five literals, because `packages/ui` and
+`packages/notifications` must not import each other (React peer vs. framework-free core). The two
+vocabularies are kept in sync by **pinned tests on both sides** — `NOTIFICATION_LEVELS` in
+`packages/notifications` and the `TOAST_LEVEL_GLYPHS` keys in `packages/ui` — so a change on one side
+without the other fails a suite instead of drifting silently. `ToastStackProps.toasts` is **newest
+first** — the store prepends — and that contract is the only reason the trimming keeps the newest
+cards when the list overflows. The timers, the `notify` facade and the `NotificationHost` belong to
+AIS-83 and must never leak into these two primitives: they hold no `useState`, no `useEffect` and no
+storage access.
+
+The log panel arrived with **AIS-82** and completes the presentational half of the same subsystem.
+`LogEntryItem` is structurally typed, so the store's `NotificationEntry` is assignable with no mapper
+(the extra `source`/`read`/`toast`/`repeatCount` fields are simply ignored) and `packages/ui` stays
+free of `@callback/notifications` imports. The drawer is deliberately **non-modal** — it is a
+diagnostics side view, so `OverlayShell` (focus trap, overlay, scroll lock) must **not** be reused —
+and it owns no state: the filter, the unseen count, `hasMore` and the visible slice all come from the
+host. The panel element stays mounted and only its `translate-x` class changes, which animates both
+directions and keeps the tab's `aria-controls` from dangling, while the panel _content_ renders only
+while open so nothing hidden is focusable. The single side effect in `packages/ui` lives here: a
+`document` `keydown` listener, registered only while open, that closes on `Escape`. Timestamps are
+injected (`formatTimestamp`) so the package stays independent of the app's date helpers.
+
+#### `packages/notifications` core (AIS-79)
+
+Framework-independent store: the single source of truth for notifications **and** system log entries.
+`createNotificationStore(options?)` is a **factory, not a singleton** — the owning app decides the
+lifetime, so two apps (or two tests) never share state. No React, no DOM, no storage, no `zod`; the
+package's `tsconfig` enables only `lib: ES2022`, so a `window`/`document`/`localStorage` reference
+fails the build instead of leaking in.
+
+| Aspect                | Contract                                                                                                                                                                                                                                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API                   | `emit`, `dismiss(id)`, `markAllRead`, `clear`, `subscribe`, `getSnapshot`, `getServerSnapshot`                                                                                                                                                                                                                   |
+| Snapshot              | `{ entries, toasts }`, **both newest first**; referentially stable while nothing changes (what `useSyncExternalStore` requires)                                                                                                                                                                                  |
+| Ring buffer           | `NOTIFICATION_MAX_ENTRIES = 500`, the oldest entry dropped                                                                                                                                                                                                                                                       |
+| Toast ids             | `NOTIFICATION_MAX_VISIBLE_TOASTS = 3` (mirror of `TOAST_MAX_VISIBLE`); a 4th toast drops the oldest **id**, its entry stays in the log                                                                                                                                                                           |
+| Dedupe                | identical `level` + `message` within `NOTIFICATION_DEDUPE_WINDOW_MS = 2000` (inclusive) bumps `repeatCount`, refreshes `createdAt`, moves the toast to the front                                                                                                                                                 |
+| Toast default         | `toast = level !== 'system'`; an explicit `toast` flag wins                                                                                                                                                                                                                                                      |
+| Redaction             | a `detail` record is redacted by the store (`authorization`, `token`, `password`, `apiKey`, `secret`, …) and only then serialised — no emitter can bypass it                                                                                                                                                     |
+| `details` (AIS-151)   | optional `NotificationDetailField[]` (`label`, `value`, optional `mono`) of the expandable log row; `detail` stays the one-line summary for the toast and the collapsed row, `details` never reaches a toast                                                                                                     |
+| Detail normalisation  | `toDetailFields` / `clampDetailFields`: a record keeps the emitter's **insertion order**, **both** branches run `redactValue` (key / label), blank labels are dropped, an empty result becomes `undefined`; a repeat replaces the fields, an emit without fields keeps the previous ones                         |
+| Detail limits         | `NOTIFICATION_DETAIL_MAX_FIELDS = 20`, `NOTIFICATION_DETAIL_LABEL_MAX_LENGTH = 40`, `NOTIFICATION_DETAIL_VALUE_MAX_LENGTH = 2000`; truncation is marked with `NOTIFICATION_DETAIL_TRUNCATION_SUFFIX = '…'`, an unexpressable value becomes `NOTIFICATION_DETAILS_INVALID_PLACEHOLDER` (a log entry never throws) |
+| Restored entries      | `initialEntries` seeds `entries` **only**; `toasts` always starts empty, so a reload never resurrects an expired toast (AIS-80/83)                                                                                                                                                                               |
+| Injected dependencies | `now()` clock, caps, dedupe window; ids come from `createNotificationId(now, sequence)` — deterministic, no `crypto`/`Math.random` in the core                                                                                                                                                                   |
+| Listener errors       | caught **per listener** and forwarded to `onListenerError` (default `console.error`), so one broken subscriber cannot silence the rest                                                                                                                                                                           |
+
+User-facing text is never produced here (no i18n): the emitter supplies the sentence, and
+`notification-event.const.ts` holds only event kinds plus their default `level` / `source` / `toast`
+classification.
+
+#### `sessionStorage` mirror (AIS-80)
+
+`createNotificationStorage({ storage, key, cap, schedule })` is the only part of the subsystem that
+knows a storage exists, and it knows it only through an injected `StorageLike` — the package builds
+with `lib: ["ES2022"]`, so `window`, `sessionStorage` and `requestAnimationFrame` cannot appear in its
+code at all. The adapter is **not** bound to the store: the app restores once with `load()`, seeds
+`createNotificationStore({ initialEntries })` with the result, forwards each `entries` snapshot to
+`save()`, and calls `flush()` from a `pagehide` handler (AIS-83). Nothing throws and nothing is
+reported to the user — losing the mirror is acceptable, breaking the app is not.
+
+| Aspect           | Contract                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Key / envelope   | `aisztens.notifications.v1`, payload `{ version: 1, entries }` — the version lives in the key _and_ in the envelope                                                                                                                                                                                                                                                            |
+| Cap              | `NOTIFICATION_STORAGE_MAX_ENTRIES = 200`, oldest dropped (smaller than the 500-entry memory buffer); the cap is also enforced on restore                                                                                                                                                                                                                                       |
+| Payload          | `entries` only — never `toasts`, never timers, so a reload cannot resurrect an expired card                                                                                                                                                                                                                                                                                    |
+| Validation       | all-or-nothing: version, `entries` array, then every entry field (`id`, `level`, `source`, `message`, `detail?`, `details?`, `createdAt`, `read`, `toast`, `repeatCount`); `details` may be absent, otherwise every element must be `{ label: non-empty string, value: string, mono?: boolean }` — one bad element rejects the whole payload; unknown extra keys are tolerated |
+| Rejection        | `missing` / `malformed-json` / `wrong-version` / `wrong-shape` → the key is removed (except `missing`) and the store starts empty; no migration in phase 1                                                                                                                                                                                                                     |
+| Write coalescing | injected `NotificationWriteScheduler`; default is a microtask, AIS-83 passes `requestAnimationFrame`; the pending write always carries the **latest** entries                                                                                                                                                                                                                  |
+| Duplicate writes | a payload equal to the last written (or restored) one is skipped — a toast dismissal must not cost an `setItem`                                                                                                                                                                                                                                                                |
+| Failure modes    | `setItem` throws → memory-only, the payload is **not** marked written so the next save retries; `getItem` throws → empty list, no `removeItem`                                                                                                                                                                                                                                 |
+| `clear()`        | cancels the pending write **before** `removeItem`, otherwise a queued flush would resurrect the key                                                                                                                                                                                                                                                                            |
+
+#### React bindings and host (AIS-83)
+
+`@callback/notifications/react` is the second export of the package and the only code that knows
+React exists. An app mounts **one** pair:
+
+```tsx
+<NotificationProvider includeDetails={import.meta.env.DEV}>
+  <App />
+  <NotificationHost />
+</NotificationProvider>
+```
+
+| Aspect          | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Restore         | store **and** mirror are built in `useState` lazy initialisers, so `storage.load()` runs once, synchronously, and the first paint already shows the restored log (no flash)                                                                                                                                                                                                                                                                                            |
+| Subscriptions   | every hook is `useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot)`; derivation happens in `useMemo`, never inside `getSnapshot` (that would loop)                                                                                                                                                                                                                                                                                       |
+| Toast lifetimes | `success`/`info` 4 s, `warning` 6 s, `error` **sticky** (`system` sticky too); one timeout per toast id, owned by `NotificationHost` via `useToastTimers`                                                                                                                                                                                                                                                                                                              |
+| Pause           | `pointerenter` clears the timer, `pointerleave` restarts a **full** TTL; `document.hidden` clears every timer and becoming visible restarts the countdown of what is still on screen                                                                                                                                                                                                                                                                                   |
+| Log window      | `20` rows on open, `+50` per „Korábbiak betöltése", `hasMore` derived from the filtered buffer; a filter change resets the window — state lives in `useLogDrawer` (`useState`)                                                                                                                                                                                                                                                                                         |
+| Drawer width    | `width` / `isResizing` live in `useLogDrawer` (`useState`), seeded from `widthStorage.load()` once; the write happens in one effect that runs only while `isResizing === false`, so a drag persists once (`endResize`), a key press or a reset immediately. `localStorage`, **not** `sessionStorage` (a UI preference must survive a restart); storage disabled → silent fallback to `LOG_DRAWER_WIDTH_RANGE.initial`. Never a global store, never `packages/ui` state |
+| Row expansion   | each `LogEntryRow` owns `isOpen`, its per-control copy flags and the set of expanded JSON values in `useState` (plus a `useRef` timer map for the feedback resets) — the 4th tier of the state decision order: not in the URL (nothing to link), not in Query (not server data), not in a store (no second consumer). A row that leaves the filtered list and comes back is closed again with nothing expanded, and that is documented behaviour, not a bug            |
+| Mark read       | opening the drawer calls `markAllRead()` in the toggle handler, not in an effect, so one click = one store write                                                                                                                                                                                                                                                                                                                                                       |
+| Emitters        | `createNotifier(store)` works without React; `useNotifier()` binds the provider store. There is **no** module-level `notify` singleton                                                                                                                                                                                                                                                                                                                                 |
+| Runtime capture | the provider registers `window` `error` + `unhandledrejection` (`source: 'runtime'`, `level: 'error'`) and removes both on unmount; the stack is only recorded with `includeDetails`                                                                                                                                                                                                                                                                                   |
+| Mirror writes   | the provider forwards every `entries` snapshot to `storage.save`, flushes on `pagehide` and once more on unmount; the default scheduler is one flush per animation frame                                                                                                                                                                                                                                                                                               |
+| Timestamps      | `formatTimestamp` is injected (default `toLocaleTimeString('hu-HU')`) and forwarded to `LogDrawer`, so `packages/ui` stays free of app date helpers                                                                                                                                                                                                                                                                                                                    |
+
+`logNavigation` from the base plan is **not** part of AIS-83: router logging needs the app's
+`react-router` callbacks, so it is added in AIS-84 where the router actually lives. **AIS-84 shipped
+without it** (key decision 8 of the ticket): a navigation log is pure noise, so a follow-up ticket
+turns it on behind an explicit flag instead of shipping a permanently disabled logger.
+
+#### 4.1.3 Global capture in the admin app (AIS-84)
+
+Nothing in a page or a form has to call `notify` to report a failure. Three central emitters write
+into the one store the UI renders, and each of them maps through
+[`notification-events.logic.ts`](../../apps/admin/src/app/notifications/notification-events.logic.ts:1)
+(pure, one function per source):
+
+| Source                                  | Condition                                             | Level     | `source`  | Toast               |
+| --------------------------------------- | ----------------------------------------------------- | --------- | --------- | ------------------- |
+| `HttpEvent`                             | `outcome: 'success'`                                  | `system`  | `api`     | no                  |
+| `HttpEvent`                             | `outcome: 'error'` (any status, incl. `status: null`) | `error`   | `api`     | no (**D3**)         |
+| `QueryCache.onError`                    | `surface === 'silent'` (abort)                        | —         | —         | no entry            |
+| `QueryCache.onError`                    | `field` (addressable input)                           | `error`   | `api`     | no (**AIS-136 D1**) |
+| `QueryCache.onError`                    | `banner` (`401`, `503`, `status === null`)            | `error`   | `api`     | **yes** (AIS-136)   |
+| `QueryCache.onError`                    | `page`                                                | `error`   | `api`     | **yes**             |
+| `MutationCache.onError`                 | same four rules as a failed read                      | `error`   | `api`     | see above           |
+| `MutationCache.onSuccess`               | `meta.successMessage` non-empty                       | `success` | `form`    | **yes**             |
+| `MutationCache.onSuccess`               | no meta / blank copy                                  | —         | —         | no entry            |
+| `AppErrorBoundary` (AIS-136)            | a component threw while rendering                     | `error`   | `runtime` | **yes**             |
+| `window` `error` / `unhandledrejection` | always (AIS-83, unchanged)                            | `error`   | `runtime` | yes                 |
+
+**The toast matrix is a total function of the surface** (AIS-136 `D1`): `silent` → no entry,
+`field` → log only, `banner` and `page` → log **and** toast. `toFailureToast(surface)` in the same
+logic module is an exhaustive `switch`, so a new `ErrorSurface` member cannot silently inherit one of
+the two answers. A `banner` failure is toasted **in addition to** `AppErrorBanner`, deliberately
+(`D2`): the banner expresses the persistent **condition** (offline / expired session / 503) and
+survives a dismissed toast, while the toast marks the **moment** the failure happened. A field
+failure stays off the toast, because the input keeps focus and shows the message.
+
+A render crash reaches the user through the same store: `AppErrorBoundary` takes an **injected**
+`onError` port (it is a class component, so no hook — `D3`), and
+[`runtime-error.ts`](../../apps/admin/src/app/notifications/runtime-error.ts:1) turns the report into
+the catalogued `runtime.error` entry (`RUNTIME_ERROR_MESSAGE` + `toRuntimeDetail`, stack only when
+`import.meta.env.DEV`). `App.tsx` builds that emitter once from the single store, so the boundary
+depends on a port rather than on a singleton.
+
+Why the transport event is log-only (**D3**, a deliberate deviation from the ticket's key decision 5):
+`HttpEvent` carries a status but **no code and no `issues[]`**, so it can neither pick the accurate
+Hungarian copy nor respect the classifier that decides where a failure is allowed to appear.
+Toasting there would put two cards on screen for every failed write — one with the status copy, one
+with the code copy. The transport therefore only _records_ the attempt, which is what the log panel
+is for: the detail is `"{durationMs} ms"` and the message is `"{METHOD} {path} — {status|hálózati hiba}"`.
+
+**The structured half (AIS-152).** Every emitted entry now also carries `details`, the key/value rows
+of the expandable row (the row itself is AIS-153). Three pure builders produce them, one per channel:
+`toHttpDetails(event, operation)` → method, path, query, status, duration, outcome, `requestId`,
+response timestamp, total items, masked body prefix, operation, source; `toFailureDetails(error, keyLabel, key, surface)`
+→ code, status, `requestId`, resource key, **one row per field issue** (`path` label, message value),
+url, surface, error name; `toRuntimeDetails(report, includeStack)` → name, message, stack (DEV only),
+React's component trace. A row whose value is unknown is _skipped_, never rendered empty, and the
+order of insertion is preserved. Labels are `DETAIL_LABEL_*` constants in
+[`notification.const.ts`](../../apps/admin/src/app/notifications/notification.const.ts:1); the
+operation label comes from `meta.operation` (query/mutation) or from the injected route reader
+(`() => window.location.pathname`, wired once in `main.tsx`), because the transport only sees a URL
+(AIS-152 `D-E`). `repeatCount` and `createdAt` stay store-owned fields of the entry — they are **not**
+duplicated into `details`.
+
+Wiring, in the order `main.tsx` performs it:
+
+1. `app/notifications/notification.store.ts` creates the **single** store and its `sessionStorage`
+   mirror (an injected store is _not_ seeded by the provider, so the restore happens before the store
+   exists — AIS-83 `D3`);
+2. `setHttpEventListener(createHttpEventEmitter(store, readRouteOperation))` — `services/http-events.ts`
+   is the registry the transport reads, because `services` may not import `app/`
+   (`no-service-to-higher-layer`); `readRouteOperation` is the only place that touches
+   `window.location` (AIS-152);
+3. `createAppQueryClient(store)` builds the one `QueryClient` with
+   `new QueryCache(createQueryCacheHandlers(store))` and the matching `MutationCache`; the retry and
+   refetch defaults are unchanged (`retry: 1`, no refetch on focus);
+4. `AppProviders` mounts `QueryClientProvider → NotificationProvider → SessionProvider`, and
+   `AdminLayout` renders `<NotificationHost />` as a **sibling of `<main>`** — so the stack and the
+   drawer survive navigation and exist on every protected page, while the public login route has no
+   host at all.
+
+`useApiMutation` accepts an optional `mutationKey`, which is what the failure entry puts into
+`detail` (`mutationKey=["api-keys","create"]`) — without it the log would say _that_ a write failed
+but not _which_ one.
+
+### 4.0 Overlay primitives (AIS-117, `EntityDialog` since AIS-155)
+
+| Primitive       | Variants / props                                                                                                                                                                                       | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EntityDialog`  | `title`, `description?`, `onClose`, `submit?`: `{ label, formId, pendingLabel?, isSubmitting? }` \| `null`, `cancelLabel?`, `headerStart?`, `headerEnd?`, `footerExtras?`, `closeLabel?`, `className?` | **The standard window of every create/edit surface** (AIS-155). Presentation only: no router, no entity, every text and handler is a prop. It has **no `open` prop** — the route decides that by mounting it — and `Esc` / backdrop / the header `X` / the dismiss button all call `onClose`. `submit` renders a footer `type="submit" form={formId}` button, so the body's `<form>` (owned by `useAppForm`) stays the only submit path; `submit: null` makes the window read-only. Panel is `size="fit"`, the body scrolls, header and footer stay fixed. |
+| `Dialog`        | `open`, `onOpenChange`, `title`, `description?`, `footer?`, `size`: `sm` \| `md` \| `lg` \| `fit`, `closeLabel?`                                                                                       | Modal card over a dimmed backdrop. **Controlled only** (the page owns "is it open"). Radix supplies focus trap / `Esc` / outside dismiss / focus restoration; `aria-modal="true"` is set explicitly (Radix only hides siblings), `aria-labelledby` comes from the rendered `Title` — no id props. No `Dialog.Trigger` is required, so a dialog can be opened from a table row. `size="fit"` is `w-auto max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)]`, i.e. content-sized and never taller than the viewport.                                          |
+| `ConfirmDialog` | `open`, `onOpenChange`, `title`, `description?`, `confirmLabel`, `cancelLabel?`, `tone`: `danger` \| `primary`, `isPending?`, `onConfirm`                                                              | **Reports the decision only** (**D4**): confirm calls `onConfirm` and the dialog stays open — the caller closes it when the mutation succeeds, otherwise a failure would erase the question. `isPending` disables both buttons, marks confirm `aria-busy` and **blocks `Esc`/cancel dismissal**. `confirmLabel` is required; there is no generic "OK".                                                                                                                                                                                                     |
+| `Drawer`        | `open`, `onOpenChange`, `title`, `description?`, `side`: `right` \| `left`, `footer?`, `closeLabel?`                                                                                                   | Same modal shell as `Dialog` (**D3**) with a full-height edge-pinned panel; the body is the scroll container, so the footer stays reachable. Built on `react-dialog`, **not** `react-popover` — a form panel needs the modal contract.                                                                                                                                                                                                                                                                                                                     |
+| `Tooltip`       | `content`, `children` (trigger), `side?`, `delayMs?`, `disabled?`                                                                                                                                      | Ships **its own** `Tooltip.Provider` (**D6**) so a consumer cannot forget it. The content is `aria-describedby` only — **never** the accessible name (**D7**); the trigger must already be labelled. `disabled` renders the trigger alone.                                                                                                                                                                                                                                                                                                                 |
+| `DropdownMenu`  | `trigger`, `items: DropdownMenuItem[]`, `label?`, `align?`, `emptyLabel?`                                                                                                                              | **Data-driven** (**D8**): `{ id, label, onSelect, tone?, disabled? }`, `tone: 'default' \| 'danger'`. Selecting calls `onSelect(id)` and closes the menu. Empty `items` renders one disabled `DROPDOWN_MENU_EMPTY_LABEL` row instead of an empty box. Keyboard/roving focus is Radix's.                                                                                                                                                                                                                                                                    |
+
+The a11y gate for all five is [`overlay-a11y.test.tsx`](../../packages/ui/test/overlay-a11y.test.tsx:1)
+(`vitest-axe`, WCAG A/AA rule sets, `color-contrast` off in jsdom). Behavioural coverage lives in
+`dialog` / `confirm-dialog` / `drawer` / `tooltip` / `dropdown-menu` test files; the jsdom shims
+(`ResizeObserver`, pointer capture, `scrollIntoView`) and the `pointerEventsCheck: 0` user-event
+instance are shared from `test/mocks/`. The entity window has its own suite,
+[`entity-dialog.test.tsx`](../../packages/ui/test/entity-dialog.test.tsx:1): submit/no-submit, the
+header slots and the three close paths.
+
+#### The list header action is a link, not a button (AIS-174)
+
+The action in a list page's `PageShell.actions` slot that opens a create **overlay** is
+`<Link to={…} className={buttonVariants()}>` plus a decorative icon — never `Button`:
+
+- opening the overlay is a **navigation** to a real URL (`/api-keys/new`), so the browser's own
+  affordances — open in a new tab, copy the link, middle click — must keep working;
+- `buttonVariants()` supplies the primary look, so there is no second, hand-written class recipe;
+- the icon is `aria-hidden` and the label carries the accessible name (WCAG 2.5.3).
+
+The split is the same one §5 draws for dialogs: **navigable → a link; not navigable → a button.** An
+action that only mutates state without changing the URL (a future bulk action, the `ConfirmDialog`
+opener of AIS-173) stays a `Button`. Reference implementation:
+[`ApiKeysPage.tsx`](../../apps/admin/src/pages/api-keys/ApiKeysPage.tsx:76).
+
+The AIS-155 plan's `D9` (`Button` + `Button.icon`) is superseded by this rule; the plan itself is not
+rewritten, it carries an appended note.
+
+Two small vocabulary additions came with AIS-155: `PlusIcon` + `CloseIcon` in the icon set, and the
+`Button` `icon` slot, which renders a decorative icon before the label (the spinner replaces it while
+`isLoading`). The overlay header's close control is `CloseIcon`, not the old `✕` text glyph.
 
 ### 4.1 Error surfaces (AIS-96)
 
@@ -157,7 +785,7 @@ no I/O — so no component inspects `status`, `code` or the server `message`.
 | `status === null` (offline, DNS, CORS)              | `banner`             | `AppErrorBanner`        |
 | `401`                                               | `banner` (login CTA) | `AppErrorBanner`        |
 | `503`                                               | `banner`             | `AppErrorBanner`        |
-| field code with `issues[]`                          | `field`              | RHF `setError` (AIS-95) |
+| field code with `issues[]` (§4.1.1)                 | `field`              | RHF `setError` (AIS-95) |
 | everything else (`400`, `403`, `404`, `409`, `5xx`) | `page`               | `PageErrorState`        |
 
 Banner state is derived, never stored: `useOnlineStatus()` mirrors `navigator.onLine`
@@ -167,18 +795,54 @@ Banner state is derived, never stored: `useOnlineStatus()` mirrors `navigator.on
 condition is ever rendered. The only local state is the dismissal flag, reset when the set
 of cached errors changes. Copy: `lib/error-surface.const.ts`; messages: `toErrorMessage`.
 
+#### 4.1.1 One code catalogue (AIS-111)
+
+`lib/api-error-code.const.ts` holds the **single** `code → copy` table.
+`ERROR_CODE_CATALOGUE` is a **total** `Record<ApiErrorCode, ApiErrorCodeCopy>` over the
+shared `API_ERROR_CODE` catalogue, and both derived artefacts are computed from it — they
+are never written by hand:
+
+| Derived export        | Consumed by                                         | Rule                        |
+| --------------------- | --------------------------------------------------- | --------------------------- |
+| `ERROR_CODE_MESSAGE`  | `toErrorMessage` (page/alert copy)                  | one Hungarian sentence/code |
+| `FIELD_SURFACE_CODES` | `toErrorSurface` (`field` tier) and `toFieldErrors` | `fieldMessage !== null`     |
+
+Consequence: adding a code to `packages/shared` is a **compile error** here until copy and a
+field decision exist for it. That gap is what the old pair of hand-maintained tables (plus a
+feature re-export) silently hid — `STALE_WRITE` and `SEMANTIC_VALIDATION_FAILED` (AIS-108)
+rendered the generic `409`/`422` sentences until AIS-111.
+
+Field-capable today: `VALIDATION_FAILED`, `SEMANTIC_VALIDATION_FAILED`,
+`API_KEY_IDENTIFIER_CONFLICT`. `STALE_WRITE` is deliberately **not** field-capable: it
+blames `updatedAt`, a hidden concurrency token, so it stays page-level with reload copy.
+
+#### 4.1.2 Failure → form (`lib/field-errors.logic.ts`)
+
+`toFieldErrors<F extends string>(error, { fieldPaths, defaultPathByCode })` is the only
+implementation of “which inputs are wrong, with what copy”. The caller passes the paths its
+form owns; the code→path default (`409` → `identifier`) stays in the **feature**, because
+only it knows its own field names. Rules, in order:
+
+1. cancellation → nothing at all (`silent`, same value as `toErrorSurface`);
+2. not an `ApiError`, or a code outside `FIELD_SURFACE_CODES` → page copy only;
+3. `issues[]` present → one message per owned path (first issue per path wins); an
+   unaddressable path adds one page copy;
+4. `issues[]` empty → `defaultPathByCode` when it names an owned path, otherwise page copy.
+
+The server's `issue.message` is English developer text and is never rendered.
+
 ### 4.1 The `app/` layer (`apps/admin/src/app/`)
 
 The application shell: providers, routing, layout, session and the error boundary. It is the
 top of the layer map, so it may import `pages/`, but nothing imports it except `App.tsx`.
 
-| Folder           | Contents                                                                      | Rule                                                                                                                                                                                                             |
-| ---------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/router/`    | `route-registry.tsx` (the route table), `AppRouter.tsx`, `ProtectedRoute.tsx` | The registry is the **only** place a route exists. The `<Routes>` markup and the navigation are both derived from it — there is no second, hand-written link list                                                |
-| `app/layout/`    | `AdminLayout.tsx` (header + nav + `<main>`), `AdminNav.tsx`                   | The layout owns the frame; it never decides whether the user is logged in — that is `ProtectedRoute`'s job                                                                                                       |
-| `app/providers/` | `AppProviders.tsx` (the provider chain), `SessionProvider.tsx`                | The order is `QueryClientProvider → SessionProvider`. The `QueryClient` is **created in `main.tsx`** and handed in as a prop, because the notification store (AIS-84) binds its cache callbacks to that instance |
-| `app/session/`   | `use-require-session.ts`, `session.interface.ts`                              | The `app/` layer reads the session **only** through this hook, so the cookie session (AIS-74) changes one file instead of the layout, the router and the nav                                                     |
-| `app/error/`     | `AppErrorBoundary.tsx`                                                        | The fourth error tier: a render error must not blank the page — it shows `PageErrorState` instead                                                                                                                |
+| Folder           | Contents                                                                                                                                                                                                  | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/router/`    | `route-registry.tsx` (the route table), `AppRouter.tsx`, `ProtectedRoute.tsx`, `breadcrumb.logic.ts` + `breadcrumb.interface.ts`                                                                          | The registry is the **only** place a route exists. The `<Routes>` markup, the navigation and the breadcrumb are all derived from it — there is no second, hand-written link list. `breadcrumb.logic.ts` is pure (no hook, no DOM, no fetch) and derives the params from the matched pattern, so it never needs `useParams()`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `app/layout/`    | `AdminLayout.tsx` (banner + header + `<main>`), `AdminHeader.tsx` (the sticky two-band header), `AdminNav.tsx`, `AppBreadcrumb.tsx`, `ui/ThemeSelector.tsx`, `layout.const.ts`, `theme-selector.logic.ts` | The layout owns the frame; it never decides whether the user is logged in — that is `ProtectedRoute`'s job. `AppBreadcrumb` takes `routes` as a **prop**, reads only `useLocation()` and injects the router `Link` into the `Breadcrumb` primitive. `layout.const.ts` owns the header contract: `ADMIN_HEADER_Z_INDEX` (`z-30`, i.e. **below** the log drawer `z-40`, the dialog `z-50` and the toast `z-60`), the two band heights (`h-14` / `h-10`) and the shared `px-6`, so header and `<main>` are full bleed and aligned (AIS-147). The band heights are constants because the header is `sticky top-0` — a height that came from padding would let the shell shift while scrolling. `ThemeSelector` is a **select box** (AIS-149): the closed trigger shows the chosen appearance's icon and label only, and the panel lists the three appearances — icon per row, no search field. It is UI only: local `useState` (one `ThemeOption`), an `onThemeChange` port that the shell fills with a documented no-op, no `data-theme`, no storage write (AIS-140 `D3`) |
+| `app/providers/` | `AppProviders.tsx` (the provider chain), `SessionProvider.tsx`                                                                                                                                            | The order is `QueryClientProvider → SessionProvider`. The `QueryClient` is **created in `main.tsx`** and handed in as a prop, because the notification store (AIS-84) binds its cache callbacks to that instance                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `app/session/`   | `use-require-session.ts`, `session.interface.ts`                                                                                                                                                          | The `app/` layer reads the session **only** through this hook, so the cookie session (AIS-74) changes one file instead of the layout, the router and the nav                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `app/error/`     | `AppErrorBoundary.tsx`                                                                                                                                                                                    | The fourth error tier: a render error must not blank the page — it shows `PageErrorState` instead                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 The components take the route table as a **prop** (`routes`), never by importing it. That is what
 lets a component test mount the shell with a minimal registry instead of the whole application.
@@ -193,79 +857,308 @@ One entry in `app/router/route-registry.tsx`:
   navLabel: 'Cégadatok',
   element: <CompaniesPage />,
   protected: true,
+  breadcrumbLabel: 'Cégadatok',
+  breadcrumbParentPath: '/',
 }
 ```
 
 - `navLabel: null` → the route exists but is not linked in the navigation.
 - `hidden: true` → the route has a label but stays out of the navigation (the index route).
-- The registry test enforces the invariants: unique paths, a leading slash, and **no path may start
+- `children` → the route is a **layout**: its element renders an `<Outlet/>`, and each child path is
+  absolute (it begins with the parent path). This is how an overlay such as `/api-keys/new` paints a
+  dialog above the still-mounted list (AIS-155 `D2`). A child is reached from its parent's own action,
+  so it may carry `navLabel: null` **without** a `:param` segment. Flat consumers (the breadcrumb
+  matcher, the registry invariants) receive `flattenRouteEntries(routes)` — `ALL_ROUTE_ENTRIES` is
+  already flattened.
+- `breadcrumbLabel: null` → the route has no crumb of its own. It is legal **only** on a public route
+  or on the `*` catch-all; every other entry is in a trail when it has a static label **or** a resolver.
+- `breadcrumbParentPath` → the registry path of the parent route; the trail is built by walking this
+  pointer upwards, so a parent is never re-typed as a list. A pointer that names no entry ends the
+  chain silently, and a cycle stops the walk.
+- A `path` containing `:` **must** carry `resolveBreadcrumbLabel` (e.g.
+  `(params) => params.identifier`). The resolver wins over `breadcrumbLabel` and receives the params
+  derived from the matched URL; `pnpm quality:dead-code` and the registry test both fail without it.
+- Detail and list **labels** come from the same `app.const.ts` constant, so the nav and the breadcrumb
+  can never show two names for one page. The **path** rule is separate and lives in exactly one place:
+  list paths come from `app/app.const.ts`, while every page-owned path (create overlay, detail/overlay
+  templates, the `PageShell` back link) comes from the page const — the full wording is
+  [`New-Admin-Page.md`](./New-Admin-Page.md) §2 step 12.
+- The registry test enforces the invariants: unique paths, a leading slash, **no path may start
   with `/api/`** — the Vite dev proxy forwards `^/api/` to the API, so a colliding route would
-  answer with JSON instead of the app shell (see §8.1).
+  answer with JSON instead of the app shell (see §8.1) —, every breadcrumb parent resolving to an
+  existing entry, and a finite parent chain for every entry.
+
+### 4.3 Form schemas and validation copy (AIS-112)
+
+A form schema is **derived** from the shared request schema, never re-typed:
+
+```ts
+// apps/admin/src/pages/api-keys/api-keys.logic.ts
+export const apiKeyFormSchema = createApiKeySchema
+  .omit({ description: true, expiresAt: true })
+  .extend({
+    description: trimmedStringSchema({ max: API_KEY_DESCRIPTION_MAX_LENGTH }),
+    expiresAt: dateOnlySchema.or(z.literal('')),
+  });
+```
+
+Two overrides, both about the _form_ and not about the rule: an empty description is allowed
+(the mapper omits it) and `expiresAt` holds a calendar day instead of an ISO instant. Everything
+else — limits, patterns, rejection copy — comes from `@callback/shared`.
+
+**No validation sentence lives in the admin app.** The copy is one catalogue
+(`packages/shared/src/contract/common/validation-message.const.ts`, `en` + `hu`), and the language
+is decided in exactly two places:
+
+| Where                                                                                     | Call                                                      | Effect                                                                         |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`apps/admin/src/main.tsx`](../../apps/admin/src/main.tsx:1)                              | `configureValidationLocale('hu')`                         | every schema message resolved after boot is Hungarian                          |
+| [`features/forms/use-app-form.ts`](../../apps/admin/src/features/forms/use-app-form.ts:1) | `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` | the zod-generated issues (`too_small`, `invalid_string`, …) are translated too |
+
+Tests must do the same: [`apps/admin/src/test/setup.ts`](../../apps/admin/src/test/setup.ts:1) calls
+`configureValidationLocale('hu')`, so a missing translation fails a test instead of reaching a user.
+Schema tests that parse without the map are testing the **server** path, i.e. English.
+
+### 4.4 The form pattern (`useAppForm`, AIS-115)
+
+A page never wires `useForm` + `zodResolver` + `setError` itself any more. It declares the schema,
+the ordered field paths and the submit call, and
+[`useAppForm`](../../apps/admin/src/features/forms/use-app-form.ts:1) returns
+`{ register, handleSubmit, errors, formState, formError, reset, setServerError, clearFormError }`:
+
+| Concern              | Where it is decided                                                                                                                                                                                                                                                               |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| validation           | `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` inside the hook (§4.3)                                                                                                                                                                                                  |
+| which input is wrong | `lib/field-errors.logic.ts` `toFieldErrors` (AIS-111), **not** the hook                                                                                                                                                                                                           |
+| focus order          | `use-app-form.logic.ts` `toFormErrorPlan` + declared `fieldPaths`; only the **first** entry focuses                                                                                                                                                                               |
+| page-level message   | the hook's `formError`, rendered as one `Alert` — **only** when the failure was `field`-surface and the mapping left a residue; `page`/`banner`/`silent` failures keep it `null` (AIS-85 `D2`, who-speaks table in [`Forms-and-Validation.md`](./Forms-and-Validation.md:1) §3.1) |
+| success feedback     | `reset(defaultValues)` → `notify.success(successMessage)` → `onSuccess`; the port is `useNotifier()` from `@callback/notifications/react` (structurally a `FormNotifier`), and the mutation carries **no** `meta.successMessage`, so exactly one toast appears (AIS-85 `D1`)      |
+
+`handleSubmit` is the **ready** submit handler (goes straight onto `<form onSubmit={…}>`), not
+react-hook-form's curried function — a page therefore cannot bypass the validate → submit → reset →
+notify order. The hook holds no field name and no sentence, and never branches on `error.code`
+(the field-error gate, §9.3). Full contract and tests: [`Forms-and-Validation.md`](./Forms-and-Validation.md:1).
+
+Since **AIS-155** the reference implementation is split in two, because the submit button moved into the
+overlay footer: [`ApiKeyCreateDialog.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyCreateDialog.tsx:1)
+owns `useAppForm` (schema, field paths, submit, `onSuccess: closeDialog`) and the `<form id>` around
+[`ApiKeyFormFields.tsx`](../../apps/admin/src/pages/api-keys/ui/ApiKeyFormFields.tsx:1), which is the
+presentational field list. `Input`/`Textarea` carry their own `label`/`hint`/`error`/`aria` wiring, so
+they are **not** wrapped in `FormField` (that would render two labels and the primitive overrides
+`aria-describedby` after `...rest`); `FormField` is for controls that bring no label of their own.
 
 ## 5. State plan per page
 
-Three buckets only: server state → TanStack Query, page UI state → that page's
-Zustand store, form state → react-hook-form. Never mix them. A page appears in this table
-even when **two of the three buckets are intentionally empty** — "no store" is a decision, not
-an omission (compare **D9**).
+The bucket order is the one in [`react.coding-standards.md`](../../.roo/rules/react.coding-standards.md:139) §6:
+**list/navigation state → the URL, server state → TanStack Query, transient page UI state → that
+page's Zustand store, local state → `useState`**, and form state → react-hook-form. Never mix them.
+A page appears in this table even when **three of the four buckets are intentionally empty** —
+"no store" is a decision, not an omission (compare **D9**).
 
-| Page                                                                 | Server state                                                                                                                                                                                                                                            | Page UI state                                                                                                                                                                                           | Form state                                                                                                                                         | Notes                                                                                                                                                                                                                                                                                                                                       |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pages/api-keys` (AIS-41, `/api-keys` route)                         | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`). The query hook exposes the raw `error` (keeps `requestId`), `errorMessage` and `errorSurface` | **none** — no Zustand store, no filters/sort/tabs (D9); the only local state is the form's page-level error in `ApiKeyForm`. The app banner keeps only a dismissal flag (`useState`), never server data | react-hook-form + `zodResolver(apiKeyFormSchema)` (`pages/api-keys/api-keys.logic.ts`); `identifier` field carries the 409 via `setError` (D8/D36) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32). Failure routing: `errorSurface === 'page'` → `PageErrorState` + retry; `banner` → only `AppErrorBanner` speaks, the page renders nothing extra (AIS-96) |
-| `pages/LoginPage` (`/login` route)                                   | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | `AuthContext` + `auth/session-token.ts` over `sessionStorage`; no RHF yet                                                                          | The token storage key lives in one module only (D19). The `app/` layer reads the session through `useRequireSession()` only, so the cookie session (AIS-74) changes one file. API-side auth guard is out of scope                                                                                                                           |
-| `pages/PlaceholderPage` (`/` route)                                  | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | none                                                                                                                                               | Static shell for the authenticated landing route; replaced when a real dashboard lands                                                                                                                                                                                                                                                      |
-| `/calls` route (a registry entry in `app/router/route-registry.tsx`) | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                    | none                                                                                                                                               | Placeholder markup carried by the route registry; becomes a page folder when the calls feature starts                                                                                                                                                                                                                                       |
+| Page                                                      | Server state                                                                                                                                                                                                                                            | Page UI state                                                                                                                                                                                                                     | Form state                                                                                                                                                                                                                                   | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pages/api-keys` (AIS-41, `/api-keys` route)              | `useApiKeysQuery` / `useCreateApiKeyMutation` in `features/api-keys`; query keys only from `features/api-keys/api-keys.const.ts` (`API_KEYS_QUERY_KEYS`). The query hook exposes the raw `error` (keeps `requestId`), `errorMessage` and `errorSurface` | **none** — no Zustand store, no filters/sort/tabs (D9), and since AIS-85 no form-level error state either (the hook owns `formError` as residue only). The app banner keeps only a dismissal flag (`useState`), never server data | `useAppForm` + `apiKeyFormSchema` (`pages/api-keys/api-keys.logic.ts`) with `API_KEY_FIELD_PATHS` and `DEFAULT_FIELD_PATH_BY_CODE`; success → `useNotifier()`, `409` → `identifier` field with focus and no toast (D8/D36, AIS-85 `D1`/`D2`) | The table never renders `apiKey` — `entities/api-key/api-key.mapper.ts` drops it (D33); `expiresAt` goes through `lib/date.ts` (D6); the payload omits empty optional fields (D32). Failure routing: `errorSurface === 'page'` → `PageErrorState` + retry **and** the capture toast for the write; `banner` → only `AppErrorBanner` speaks, the page renders nothing extra (AIS-96); `field` → the input, plus the residue `Alert` only when a path has no input (AIS-85) |
+| `pages/LoginPage` (`/login` route)                        | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                                              | `AuthContext` + `auth/session-token.ts` over `sessionStorage`; no RHF yet                                                                                                                                                                    | The token storage key lives in one module only (D19). The `app/` layer reads the session through `useRequireSession()` only, so the cookie session (AIS-74) changes one file. API-side auth guard is out of scope                                                                                                                                                                                                                                                         |
+| `pages/PlaceholderPage` (`/` route)                       | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                                              | none                                                                                                                                                                                                                                         | Static shell for the authenticated landing route; replaced when a real dashboard lands                                                                                                                                                                                                                                                                                                                                                                                    |
+| `pages/calls` (AIS-171, `/calls` route)                   | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                                              | none                                                                                                                                                                                                                                         | `CallsPlaceholderPage` + `PageShell`; a page folder váltotta a registry markup-literálját, a copy a `calls.const.ts`-ben él (a `pages` nem importálhat `app`-ot). A valódi híválista veszi át, amikor az a feature elindul                                                                                                                                                                                                                                                |
+| `pages/not-found` (AIS-171, `*` catch-all)                | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                                              | none                                                                                                                                                                                                                                         | `NotFoundPage` + `PageShell`, az authenticated layouton belül; az `APP_NOT_FOUND_MESSAGE` törlődött az `app/app.const.ts`-ből ugyanezen layer-ok miatt                                                                                                                                                                                                                                                                                                                    |
+| `app/layout` (AIS-147, the shell of every protected page) | none — the header renders no data; the theme choice is not server state                                                                                                                                                                                 | **none** — no Zustand store. The appearance is _document_ state: `app/theme/theme-provider.tsx` keeps one `useState`, an effect writes `data-theme` onto `<html>`, and the choice is mirrored into `localStorage` (AIS-165)       | none                                                                                                                                                                                                                                         | The select box writes through `useTheme().setTheme`; AIS-165 replaced the `onThemeChange` no-op of AIS-140 `D3`/`D11`. The user-settings button stays inert on purpose (AIS-140 `D4`)                                                                                                                                                                                                                                                                                     |
 
-Adding a page means adding a row here in the same change (rule §0.10). If a page needs
-page-wide UI state, it gets a page-local store factory inside its own folder — never a
-global store; the only global store is the session store.
+**Every admin page renders through `PageShell` (AIS-171, §4).** The frame — the `space-y-6` section,
+the header row, the page's single `h1`, the optional subtitle, the optional back link above the title
+and the optional action at the right end — lives in one primitive, so a page file supplies only its
+data and its content. The one documented exception is `pages/LoginPage`: it renders outside
+`AdminLayout` (`ProtectedRoute` centres a `Card`) and its heading is `text-xl`, so it does not take
+the shell. Because `back` and `actions` are slots, the primitive needs no router and the `pages`
+layer keeps owning every `Link`.
+
+**The standard list is `DataTable` + `Pagination` + `EmptyState` — and its gaps are decisions (AIS-174).**
+The list renders the table (skeleton rows while loading), the pager fed by `meta.pagination`, and an
+`EmptyState` with copy only; the create entry point is the header action (a link, see the §4.0 block
+above). The empty state deliberately carries **no** action button, and two capabilities are
+**documented absences**, not defects: there is no search/filter UI (`useListParams` parses `search`, no
+page exposes it) and there is no per-row icon action (the row's name links into the read-only overlay).
+A new page inherits both answers; changing them is a separate ticket, not a page decision. The checklist
+form of the same rule is [`New-Admin-Page.md`](./New-Admin-Page.md) §2 step 11.
+
+Adding a page means adding a row here in the same change (rule §0.10). If a page has **transient** UI
+state that is neither URL- nor server-owned (rule §6.1 step 3 answered yes), it gets a page-local
+store factory inside its own folder — never a global store. Exactly **two** global stores are
+allowed: the session store (`app/providers/session-provider.tsx`) and the notification/log store
+(`app/notifications/notification.store.ts`, AIS-84). Both are global because their consumer exists
+before any page does — the router reads the session, and the cache callbacks plus the HTTP listener
+write into the store before the first render. Any other global store is a defect.
+
+**The appearance is document state, not page state (AIS-165).** `light` and `ambient` (and `glass`
+from AIS-166) are token blocks in [`theme.css`](../../packages/ui/src/styles/theme.css:22) selected by
+`:root[data-theme="…"]`, so one attribute repaints every surface, border, shadow and text colour while
+the 22 recipe files stay untouched. The engine lives in
+[`app/theme/`](../../apps/admin/src/app/theme/theme-provider.tsx:1): `theme.logic.ts` is pure (value
+narrowing plus storage read/write over an injected `ThemeStorage`), `theme-provider.tsx` applies the
+attribute from an effect and persists **only** in the setter, and `use-theme.ts` is the single read
+path. It is deliberately **not** a third global store: the value is a `useState` mirrored into
+`localStorage["aisztens.theme"]`, and the inline boot script in `apps/admin/index.html` applies it
+before the first paint so no page ever flashes the wrong appearance.
+
+**Form state is always react-hook-form, and always through `useAppForm` (AIS-115, §4.4).**
+The page-level failure message a form shows is the hook's own `formError` state, so a form never
+copies server data into a store and never keeps a second `useState` for errors.
+
+**List state lives in the URL (AIS-119), not in a store.** A list's filter, sort and page are
+read from and written back to the URL through [`features/api/use-list-params.ts`](../../apps/admin/src/features/api/use-list-params.ts:1)
+(`useListParams(schema)`), so they are **not** page UI state and never enter a Zustand store.
+The hook is generic and takes the resource's shared list-query schema as a parameter; the
+parsed `params` is what the generic `useApiList` (AIS-114) feeds into a TanStack Query key.
+`zustand` therefore stays **uninstalled** — the decision was closed in **AIS-130** (§7): it is added
+together with the first page that genuinely needs transient UI state (open drawer, selected row,
+column filters), and that change flips the §7 row to `installed`.
+
+**AIS-116 closed the loop on `pages/api-keys`:** the page now _renders_ what the URL says and
+_writes_ back what the user asks for, so the row above still holds “no page store”:
+
+| Interaction                     | URL write                                                                                      | UI                               |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------- |
+| next/previous page, page number | `setParam('page', n)`                                                                          | `Pagination` (`meta.pagination`) |
+| page size                       | `setParam('limit', n)` (`API_KEYS_LIMIT_OPTIONS`: 20 / 50 / 100)                               | `Pagination` limit `<select>`    |
+| sortable header click           | `setParams(toSortParams(sort))` — **one** write for `sort` + `order`, page reset to 1 (**D4**) | `DataTable` `aria-sort`          |
+
+Two `setParam` calls would each rebuild the URL from the same pre-render `params`, so the first
+change would be lost (and two history entries created). That is why `setParams(patch)` exists and
+why `toSortParams` returns a patch instead of writing twice. The same change fixed the write path
+in `useListParams`: the URL builder now compares against the **schema** defaults, not against the
+candidate's own values — otherwise `sort`, `order` and `limit` were silently dropped from the URL.
+The table still owns nothing: the failure stays `PageErrorState` (`D11`), and the sorted column is
+`toTableSort(params)` computed from the URL on every render.
+
+**AIS-155 turned the create/edit surface into a URL as well, and AIS-172 completed it.**
+`/api-keys/new`, `/api-keys/:identifier/view` and `/api-keys/:identifier/edit` are nested registry
+children rendered into the list page's `<Outlet/>`, so:
+
+| Interaction                           | URL write                                                        | UI                                         |
+| ------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------ |
+| “Új API kulcs” in the header          | `<Link to="/api-keys/new">` (a real navigation, linkable)        | `EntityDialog` above the list              |
+| row name                              | `<Link to="/api-keys/:identifier/view">`                         | read-only `EntityDialog` (`submit: null`)  |
+| `Módosítás` in the view footer        | `<Link to="/api-keys/:identifier/edit">` (AIS-172)               | edit `EntityDialog` with a footer submit   |
+| `Kulcs törlése` in the view footer    | **none** — a `useState` flag opens the confirmation (AIS-173)    | `ConfirmDialog` above the read-only window |
+| delete confirmed and succeeded        | `navigate('/api-keys', { replace: true })` via `useEntityDialog` | the list, invalidated by the mutation      |
+| close (`X`, `Esc`, backdrop, dismiss) | `navigate('/api-keys', { replace: true })` via `useEntityDialog` | the list, still mounted, unchanged         |
+
+**One documented exception: the confirmation is not a route (AIS-173).** A _navigable_ dialog — create,
+view, edit — is URL state, because a reload or a copied link has to re-open the same window. A
+**confirmation** is not a destination: nothing links to it, nothing reloads into it, and a `/delete`
+route would cost a registry entry, a breadcrumb rule and a test for a window the user passes through in
+one click. Its open state is therefore a `useState` flag inside the view overlay (`isConfirmOpen`),
+which loses nothing on navigation because the window cannot be navigated to. The rule "a dialog's open
+state lives in the URL" therefore reads: _a dialog that has an address of its own keeps it in the URL;
+a confirmation that only asks a question keeps it in local state._
+
+Two details of the edit overlay are decisions, not implementation accidents. Its route element
+(`ApiKeyEditDialog`) owns only the read and its four states; the form lives in a second component
+(`ApiKeyEditDialogForm`) because react-hook-form seeds `defaultValues` **on mount only**, so a
+re-read row can reach the inputs only through a remount — hence `key={updatedAt}`. And a
+`409 STALE_WRITE` is `page`-tier (the blamed `updatedAt` is a hidden token with no `fieldMessage`),
+so the capture toast is its single surface; the window stays open and re-reads the row explicitly,
+because the cache invalidates only after a **successful** write.
+
+The overlay's open/closed state is therefore **URL state (bucket 1)**, not page UI state: the page gets
+no store, no `useState` for "is the dialog open", and a reload or a copied link re-opens the same
+window. The list is not remounted while the overlay is open, so there is no second fetch and no lost
+scroll position.
 
 ## 6. New page recipe
 
-The rule file's §12 in repo terms. Every step is a review checkpoint.
+The step-by-step, file-name-level, layer-ordered checklist is
+[`New-Admin-Page.md`](./New-Admin-Page.md) (owner AIS-133). It is the **only** place that lists the
+steps — this section and `.roo/rules/react.coding-standards.md` §12 only point at it.
 
-1. Create `apps/admin/src/pages/<page>/` with `<Page>.tsx` (composition only),
-   `<page>.interface.ts`, `<page>.const.ts`; add `<page>.store.ts` **only** if the page owns UI
-   state (page-local `createStore` factory + provider/hook, never exported outside the folder).
-2. Add the server need to `packages/api-client`: interface + implementation + the Zod schema in
-   `packages/shared/src/contract/<resource>/` (the envelope lives in
-   `packages/shared/src/contract/envelope.schema.ts`), then parse at the HTTP boundary. No `fetch`
-   outside this package.
-3. Add `apps/admin/src/features/<use-case>/` — `use-<use-case>.ts` (query/mutation), pure rules in
-   `<use-case>.logic.ts`, query keys in `<use-case>.const.ts`, narrow result interfaces in
-   `<use-case>.interface.ts`.
-4. Compose the page from `packages/ui` primitives and page-only parts under `pages/<page>/ui/`.
-5. Implement loading / empty / error / success explicitly — a bare `null` is a defect.
-6. Register the route in `app/router/route-registry.tsx` — one `RouteEntry` in
-   `PROTECTED_ROUTE_ENTRIES` with a `navLabel` (or `null` for a route that must not be linked) and
-   a `hidden` flag for the index route. The `<Routes>` markup **and** the navigation are both derived
-   from the registry, so there is no second list to update; keep the markup on token classes.
-7. Add tests: `*.logic.ts` (all branches), the store (if any), the hook (success + error +
-   loading), and the page parts. Doubles and fixtures go to `src/test/mocks/**`, never inline.
-8. Add the page row to §5 of this document.
-9. Run the per-app checks from §8, then the palette check from §3.3.
+What stays in this document, because it is a decision rather than a step:
+
+- **§5 is the state plan** — a new page adds **one row** there, even when three of the four buckets
+  are intentionally empty ("no store" is a decision, not an omission);
+- **§4.4 is the form pattern** — every form goes through `useAppForm`, and the plumbing is never
+  re-implemented in a page;
+- **§4.0 `EntityDialog` is the overlay standard** — a create or edit surface is a **nested route**
+  (`children` + `<Outlet/>`) rendered by `EntityDialog`, never an inline form under the list; the form
+  state stays in the overlay that owns `useAppForm`, and the footer submit submits it by `formId`;
+- **§3.3 and §4 are the styling and primitive vocabulary** the checklist refers to.
+
+Route registration is derived: one `RouteEntry` in `app/router/route-registry.tsx` produces both the
+`<Routes>` markup and the navigation, so `AdminNav.tsx` needs **no** edit for a new page.
 
 ## 7. Dependency list (UI side)
 
-| Dependency                                                                                              | Where                                    | Why                                                                                                             | State                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `class-variance-authority`                                                                              | `packages/ui`                            | variant recipes                                                                                                 | installed                                                                                                                                  |
-| `clsx`, `tailwind-merge`                                                                                | `packages/ui`                            | `cn()` class merging                                                                                            | installed                                                                                                                                  |
-| `tailwindcss` + `@tailwindcss/vite`                                                                     | `apps/admin`                             | Tailwind v4 pipeline                                                                                            | installed                                                                                                                                  |
-| `@tanstack/react-query`                                                                                 | `apps/admin`                             | server-state bucket                                                                                             | installed                                                                                                                                  |
-| `react-router-dom`                                                                                      | `apps/admin`                             | routing                                                                                                         | installed                                                                                                                                  |
-| `@callback/shared`, `@callback/ui`, `@callback/api-client`                                              | `apps/admin`                             | workspace packages                                                                                              | installed                                                                                                                                  |
-| `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` | `packages/ui`, `apps/admin`              | component + hook tests                                                                                          | installed                                                                                                                                  |
-| `@vitest/coverage-v8`                                                                                   | `packages/ui`, `apps/admin`              | LCOV coverage for the SonarQube report (`test:cov` → `pnpm sonar:coverage`, see [`SonarQube.md`](SonarQube.md)) | installed (`^3.2.4`)                                                                                                                       |
-| `jest`, `ts-jest`, `@types/jest`                                                                        | `packages/shared`, `packages/api-client` | framework-free package tests (D13)                                                                              | installed                                                                                                                                  |
-| `eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`, `@eslint/js`                                | `apps/admin`                             | lint harness                                                                                                    | installed                                                                                                                                  |
-| `react-hook-form`                                                                                       | `apps/admin`                             | form-state bucket (`ApiKeyForm`)                                                                                | installed (`^7.54.2`, resolved 7.90.0)                                                                                                     |
-| `zod` (direct dependency)                                                                               | `apps/admin`                             | form schema validation                                                                                          | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30) |
-| `@hookform/resolvers`                                                                                   | `apps/admin`                             | `zodResolver` for react-hook-form                                                                               | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3                                                                       |
-| `zustand`                                                                                               | `apps/admin`                             | page-local stores, global session store                                                                         | **planned — added with the first page that needs UI state** (`/api-keys` has none, D9)                                                     |
+| Dependency                                                                                              | Where                                    | Why                                                                                                                              | State                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `class-variance-authority`                                                                              | `packages/ui`                            | variant recipes                                                                                                                  | installed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `clsx`, `tailwind-merge`                                                                                | `packages/ui`                            | `cn()` class merging                                                                                                             | installed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `tailwindcss` + `@tailwindcss/vite`                                                                     | `apps/admin`                             | Tailwind v4 pipeline                                                                                                             | installed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `@tanstack/react-query`                                                                                 | `apps/admin`                             | server-state bucket                                                                                                              | installed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `react-router-dom`                                                                                      | `apps/admin`                             | routing                                                                                                                          | installed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `@callback/shared`, `@callback/ui`, `@callback/api-client`                                              | `apps/admin`                             | workspace packages                                                                                                               | installed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` | `packages/ui`, `apps/admin`              | component + hook tests                                                                                                           | installed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `msw`                                                                                                   | `apps/admin`                             | network-boundary doubles for hook/component tests (service boundary is the mock point, not the service)                          | installed (`^2.15.0`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `@vitest/coverage-v8`                                                                                   | `packages/ui`, `apps/admin`              | LCOV coverage for the SonarQube report (`test:cov` → `pnpm sonar:coverage`, see [`SonarQube.md`](SonarQube.md))                  | installed (`^3.2.4`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `vitest-axe`                                                                                            | `packages/ui`                            | a11y gate for the form primitives (`test/form-a11y.test.tsx`)                                                                    | installed (`^0.1.0`) — dev-only, brings `axe-core`. Its `toHaveNoViolations` matcher has no working Vitest 3 type augmentation, so the suite asserts on `results.violations`; `color-contrast` is off in jsdom (`test/mocks/axe-options.mock.ts`) because jsdom has no canvas                                                                                                                                                                                                                                                |
+| `jest`, `ts-jest`, `@types/jest`                                                                        | `packages/shared`, `packages/api-client` | framework-free package tests (D13)                                                                                               | installed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`, `@eslint/js`                                | `apps/admin`                             | lint harness                                                                                                                     | installed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `react-hook-form`                                                                                       | `apps/admin`                             | form-state bucket (`ApiKeyForm`)                                                                                                 | installed (`^7.54.2`, resolved 7.90.0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `zod` (direct dependency)                                                                               | `apps/admin`                             | form schema validation                                                                                                           | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30). A second zod (4.x) exists only for `knip`; see the `packageExtensions` note below §7.                                                                                                                                                                                                                                                                                            |
+| `@hookform/resolvers`                                                                                   | `apps/admin`                             | `zodResolver` for react-hook-form                                                                                                | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3. It declares `zod` as a **peer only**, so `pnpm-workspace.yaml > packageExtensions` injects a real zod 3 dependency; without that, its `.d.ts` resolved knip's zod 4 and `apps/admin`'s `tsc` failed.                                                                                                                                                                                                                                                   |
+| `zustand`                                                                                               | `apps/admin`                             | page-local stores, global session store                                                                                          | **planned — added with the first page that needs UI state** (`/api-keys` has none, D9)                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `@callback/notifications`                                                                               | `packages/notifications`, `apps/admin`   | notification + log store, framework-free (AIS-79) + React bindings on `./react` (AIS-83), consumed by the admin capture (AIS-84) | **core + React bindings installed, consumed by `apps/admin`** — `react`/`react-dom` are **peer** dependencies, `@callback/ui` is a dependency, `@testing-library/*` and `jsdom` are dev-only. The root export stays React-free; `build` runs `tsconfig.core.json` (no DOM) first, then `tsconfig.json` (DOM + JSX), so a DOM reference in `src/core` cannot compile. The admin app imports both the core (`createNotificationStore`, `createNotificationStorage`) and `./react` (`NotificationProvider`, `NotificationHost`) |
+| `dependency-cruiser`                                                                                    | repo root                                | layer gate: `app → pages → features → entities → services → lib` (§9.1)                                                          | installed (`^16`) — dev-only, never shipped                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `knip`                                                                                                  | repo root                                | dead-code gate: unused files / exports / dependencies (§9.2)                                                                     | installed (`^5`) — dev-only, `apps/api` deliberately out of scope (D8)                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 Adding a dependency requires updating this table in the same change. Rows marked
-_planned_ must not be read as available.
+_planned_ must not be read as available. The `zustand` row's decision was **closed in AIS-130**: it
+stays _planned_ because no page has transient UI state yet; the page that first needs one installs it,
+flips this row to `installed` and ships the store test in the same change (§5, rule §6.4).
+
+**Two zod instances, on purpose (AIS-113 build fix).** `@hookform/resolvers` declares `zod` as a
+_peer_ and imports it by bare specifier, while `knip` (dev-only, repo root) depends on zod **4**.
+pnpm hoists knip's copy into `node_modules/.pnpm/node_modules/zod`, so the resolver's
+`T extends z.Schema<any, any>` type resolved to zod 4's `$ZodType` and `apps/admin`'s `tsc` failed
+("missing `def`, `type`, `toJSONSchema`, `check`") although the runtime was fine. The fix lives in
+[`pnpm-workspace.yaml`](../../pnpm-workspace.yaml:1) → `packageExtensions`:
+`@hookform/resolvers` now gets a real `zod: ^3.24.1` dependency, so it type-checks against the same
+zod 3 instance the app uses. Do **not** replace it with an `overrides: zod: 3.x` entry — forcing a
+single version breaks knip with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+
+**AIS-116 added no dependency at all** (decision **Út A**): the data-display primitives compose the
+existing `Table*` components instead of adopting `@tanstack/react-table`, because both the sorting
+and the paging are **server-side** (`sort`/`order`/`page` are query fields) and the API caps a page
+at 100 rows — a client-side sorting engine and virtualisation would be dead code plus a second
+table implementation to migrate. `packages/ui/package.json` is unchanged.
+
+**AIS-144 added no dependency either.** The icon vocabulary is five inline Lucide SVGs on one shared
+24×24 stroke grid; an icon package would have been bigger than that payload and would have brought
+its own `size`/`color` axes next to the design tokens. No row was added to the table above and
+`packages/ui/package.json` stays unchanged.
+
+**AIS-143 (the log-drawer story) added no dependency at all.** The width preference uses
+`localStorage` through a small, hand-written adapter
+([`log-drawer-width.storage.ts`](../../packages/notifications/src/react/log-drawer-width.storage.ts:1))
+with a `StorageLike` port, the pointer gesture uses `setPointerCapture`/`pointermove` from the DOM, the
+clipboard uses `navigator.clipboard` behind [`lib/copy-text.ts`](../../packages/ui/src/lib/copy-text.ts:1),
+and the pretty-printed JSON is plain `JSON.parse`/`JSON.stringify`
+([`lib/json.logic.ts`](../../packages/ui/src/lib/json.logic.ts:1)). Not one of those needed a package, and
+`zustand` stays _planned_: the drawer's width lives in the `useLogDrawer` controller, the row's open
+state and JSON expansions are component-local `useState`. `package.json` files are unchanged.
+
+**AIS-117 added the first runtime dependencies of `packages/ui`** — behaviour-only Radix
+packages, all three in `dependencies` (`react`/`react-dom` remain `peerDependencies`):
+
+| Dependency                      | Where         | Why                                                                | State     |
+| ------------------------------- | ------------- | ------------------------------------------------------------------ | --------- |
+| `@radix-ui/react-dialog`        | `packages/ui` | focus trap, `Esc`, outside dismiss, portal, focus restoration      | installed |
+| `@radix-ui/react-dropdown-menu` | `packages/ui` | roving focus, typeahead, `Esc`, menu roles for the row-action menu | installed |
+| `@radix-ui/react-tooltip`       | `packages/ui` | hover/focus timing, `aria-describedby` wiring, placement           | installed |
+
+`@radix-ui/react-popover` is deliberately **absent** (**D3**): the `Drawer` is modal, so it is
+built on `@radix-ui/react-dialog` with a `side` variant. Measured effect on
+`apps/admin` at the time of writing: **0 bytes** — nothing imports the overlays yet, so Rollup
+tree-shakes them out of `dist/assets/index-*.js` (`grep radix` on the output: 0 hits). The real
+delta will be measured in **AIS-22**, the first consumer.
 
 ## 8. Verification commands
 
@@ -316,3 +1209,203 @@ Invariant: **no SPA route may collide with the API base path prefix.** Productio
 construction (Caddy `handle /api/*`, nginx `try_files … /index.html`), only the Vite dev server
 needs the regex.
 The palette check in §3.3 is part of the definition of done as well.
+
+## 9. CI quality gates (AIS-122)
+
+The rules in `.roo/rules/react.coding-standards.md` are **machine-enforced**. Five static gates
+run in the `quality-gates` CI job (`.github/workflows/ci.yml`), one step per gate, so the red step
+names the failing rule. A sixth machine check, `pnpm typecheck`, guards the types themselves and
+runs in `build-test` (§9.5). Locally the six gates are one command:
+
+```bash
+pnpm quality          # layers → dead code → tokens → themes → field errors → docs
+pnpm test:quality     # the gates' own tests (negative + positive fixtures)
+```
+
+Nothing here builds or runs tests: every gate is a static file walk plus one
+`dependency-cruiser` run, which is why the whole job reports in about a minute.
+
+The **whole definition of done in one command** — the same set the CI runs across its jobs,
+sequenced fast-gates-first so a cheap rule violation fails before a five-minute test run:
+
+```bash
+pnpm qa:all   # quality → test:quality → sonar:test → test:agents → build → lint → test
+```
+
+It is the command to run before pushing a branch; it is deliberately _not_ wired into
+`prepare`/`pre-commit`, because it takes minutes (the git-hook plan covers the fast subset).
+
+| Command                     | Enforces                                                                                                                                                                                             | Scope                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `pnpm quality:layers`       | `app → pages → features → entities → services → lib`; no page→page, no feature→feature (shared infra excepted), no cycles                                                                            | `apps/admin/src` (the only app with layers)            |
+| `pnpm quality:dead-code`    | no unused file, export, exported type or dependency                                                                                                                                                  | `apps/{admin,web}` + `packages/{ui,api-client,shared}` |
+| `pnpm quality:tokens`       | no colour literal, no Tailwind palette utility, no arbitrary colour value                                                                                                                            | `apps/*/src` **and** `packages/ui/src`                 |
+| `pnpm quality:themes`       | every `:root[data-theme="…"]` block declares exactly the `@theme` token set (AIS-168)                                                                                                                | `packages/ui/src/styles/theme.css`                     |
+| `pnpm quality:field-errors` | no `error.status ===` / `error.code ===` / `instanceof ApiError` outside a pure decision function                                                                                                    | `apps/*/src`                                           |
+| `pnpm quality:docs`         | every relative link resolves, every `§N` reference exists, every `docs/Specs` doc carries a valid `**Utolsó frissítés:**`, and every pointer source links [`New-Admin-Page.md`](./New-Admin-Page.md) | `docs/Specs` (minus `outdated/`) + the pointer sources |
+
+### 9.1 Layer gate (`dependency-cruiser`)
+
+The rules live in **one module**, `.dependency-cruiser.rules.cjs`, imported by two configs so
+"the gate" and "the proof of the gate" cannot drift:
+
+| Config                             | Target                                                |
+| ---------------------------------- | ----------------------------------------------------- |
+| `.dependency-cruiser.cjs`          | `apps/admin/src` (the real tree)                      |
+| `.dependency-cruiser.fixtures.cjs` | `scripts/quality/fixtures/layers/{negative,positive}` |
+
+Element patterns are written **location-agnostically** (`(?:^|/)src/pages/([^/]+)/`), which is
+what lets one rules module match both the real tree and a fixture tree.
+
+The only legal cross-feature edges are the **shared infrastructure features**, defined once
+as `SHARED_FEATURES` in the rules module: `features/api`, `features/error-surface` and
+`features/forms`. A page may import its own feature plus these; a feature may import its own
+modules plus these. Everything else still trips `no-feature-to-feature` or
+`no-feature-to-higher-layer`.
+
+`features/forms` joined the list with the AIS-131 fix: `useAppForm` is the one form pattern
+every page composes (AIS-115), it is a hook and therefore cannot live in `lib` (React + RHF), and
+re-implementing it per page is exactly what AIS-115 removed. The AIS-131 slice was the first
+cross-page consumer (`pages/api-keys/ui/ApiKeyEditForm.tsx`) and the gate was right to complain —
+the missing piece was the allow-list entry, not the import.
+
+Documented grandfathers — visible in the module with a one-line reason each:
+
+| Edge                                  | Why                                                          | Removed by                       |
+| ------------------------------------- | ------------------------------------------------------------ | -------------------------------- |
+| `components → features/error-surface` | `AppErrorBanner` is a deliberate thin container (AIS-96)     | AIS-96 follow-up                 |
+| `auth` as its own element             | three files import it legitimately; it ranks with `services` | AIS-74 (`auth/` → `app/session`) |
+
+The repo imports its own modules with **explicit `.js` specifiers**; `dependency-cruiser` resolves
+them to `.ts`/`.tsx` natively through `enhancedResolveOptions.extensions`. Two options are absent
+on purpose: `extensionAlias` (not in its config schema — it rejects the whole config) and
+`tsConfig` (neither `apps/admin/tsconfig.json` nor its base declares `paths`/`baseUrl`, and an
+`extends`-ing config is resolved from the cwd, which produced `TS5083`/`TS18003`).
+
+### 9.2 Dead-code gate (`knip`)
+
+`knip.json` configures five workspaces and one **exclusion**:
+
+| Entry                                             | Reason                                                                                                                                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ignoreWorkspaces: ["apps/api"]`                  | Nest DI resolves providers at runtime and `apps/api/drizzle/**` is generated — triaging those false positives is its own ticket. A gate that cries wolf gets switched off. |
+| `entry: scripts/lib/agent-artifacts/generate.mjs` | The CLI is invoked from `scripts/init.sh` / `init.ps1`, which `knip` cannot see.                                                                                           |
+| `ignoreDependencies: ["tailwindcss"]`             | Used only from CSS (`@import "tailwindcss"`), never imported from TypeScript.                                                                                              |
+| `ignoreExportsUsedInFile: true`                   | Mock helpers and constants are exported for readability but used in their own file; a real orphan is still reported as an unused **file**.                                 |
+
+Triage happened in the same change: the orphan barrel `packages/shared/src/contract/index.ts` was
+deleted (it duplicated `packages/shared/src/index.ts`), and the `DEFAULT_EMIT` duplicate alias in
+`scripts/lib/agent-artifacts/overrides.mjs` was replaced by `EMITTABLE` at its single call site.
+
+### 9.3 Token gate and field-error gate
+
+Both are dependency-free Node ESM scripts in `scripts/quality/`, sharing a posix-path walker
+(`walk-sources.mjs`) and one reporter (`report.mjs`, printing `file:line: [rule] snippet`).
+
+- **Token gate**: three rules — colour literal (`#…`, `rgb(`, `hsl(`, `oklch(`, …), Tailwind
+  palette utility (incl. `text-white` / `bg-black` and `/50` modifiers), arbitrary colour value.
+  The **only** exemption is `packages/ui/src/styles/theme.css` from the literal rule (it _is_ the
+  palette); a palette utility inside that file still fails.
+- **Theme gate** (AIS-168, `quality:themes`): parses `theme.css` with a brace scanner, takes the
+  variable names declared in `@theme` as the default set, and fails when an appearance block misses
+  one (`theme-token-missing`), invents one (`theme-token-unknown`), declares nothing
+  (`theme-block-empty`), or when the default/an appearance block is absent. Comments are blanked
+  first — the file documents itself by quoting `:root[data-theme="…"]`, and a quote must not become
+  a block — and only **top-level** blocks are compared, so the `prefers-reduced-transparency` /
+  `prefers-contrast` refinements stay legal. The four state tokens (`--color-scheme`,
+  `--app-backdrop`, `--blur-glass`, `--saturate-glass`) may be restated but are not required.
+- **Field-error gate**: the allowlist _is_ the rule — `apps/*/src/lib/error-surface.logic.ts`,
+  `apps/*/src/lib/error-message.ts` and `apps/*/src/**/*.logic.ts`. Test code
+  (`*.test.ts(x)`, `apps/*/src/test/**`) is out of scope, and exclusion wins over the allowlist.
+  Since AIS-111 the decision functions are `error-surface.logic.ts`, `error-message.ts` and
+  `field-errors.logic.ts`; the catalogue (`api-error-code.const.ts`) holds data only, so it
+  needs no allowlist entry.
+
+### 9.4 The proof (negative fixtures)
+
+Every gate is proven to **fire**, not just to be green — a gate that cannot fail is not a gate:
+
+| Gate         | Negative fixture                                                                                                             | Positive fixture                                                                                                             |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Layers       | `fixtures/layers/negative` → exit ≠ 0 and names `no-page-to-page`, `no-feature-to-feature`, `no-lib-to-higher-layer`         | `fixtures/layers/positive` → exit 0 (`no-page-to-foreign-feature` proves a page may import its _own_ feature)                |
+| Dead code    | (no fixture: `knip` is a tool, the gate is its exit code)                                                                    | —                                                                                                                            |
+| Tokens       | `fixtures/palette/negative` (a `bg-slate-800` + `text-white/80` + `bg-[#101010]` component, a `#101010`/`rgb(…)` stylesheet) | `fixtures/palette/positive` (token classes, `grid-cols-[2fr_1fr]`, `#main`)                                                  |
+| Field errors | `fixtures/field-errors/negative` (a component and a hook branching on `status` / `code` / `instanceof ApiError`)             | `fixtures/field-errors/positive` (the allowlisted decision file, a clean component, a `*.test.tsx` asserting on error shape) |
+| Themes       | `fixtures/theme/negative/theme.css` (an appearance missing a token, another inventing one)                                   | `fixtures/theme/positive/theme.css` (complete blocks, state tokens, an at-rule refinement)                                   |
+
+**The one accepted deviation (decision D4 of the AIS-122 plan):** `knip` has no fixture pair. It is
+a third-party tool and the gate _is_ its exit code, so a synthetic dead-code tree would test `knip`,
+not our own rule. The "a gate that cannot fail is not a gate" requirement is met by the other gates,
+each proven red on a real violation **and** green on a legal edge. The theme gate has a second,
+stronger proof: one of its tests runs against the **real** `theme.css`, so the four shipped
+appearances are checked on every `pnpm test:quality`.
+
+`pnpm test:quality` runs both directions plus unit tests for the walker, the reporter and each rule
+(`*.test.mjs` next to the code, `node --test`). The positive fixture deliberately contains a
+`features/alpha → features/api` edge, so the shared-feature exception is proven by the same test
+that proves the gate is red on a real violation.
+
+### 9.5 `pnpm typecheck` and the required checks
+
+Added in the 2026-11-04 close-out. `pnpm typecheck` is a machine check but **not** one of the four
+gates: it runs in `build-test`, immediately after "Build shared".
+
+```json
+"typecheck": "pnpm --filter @callback/shared build && pnpm -r typecheck"
+```
+
+`@callback/shared` is built first because it and `@callback/api-client` are consumed through
+`dist/*.d.ts`, and `tsc --noEmit` emits none — a fresh clone would otherwise fail on unresolved
+types. Every workspace owns its own `typecheck` script, since `pnpm -r` fails outright when a
+selected workspace has none:
+
+| Workspace             | Script                                | Scope               |
+| --------------------- | ------------------------------------- | ------------------- |
+| `packages/shared`     | `tsc --noEmit -p tsconfig.json`       | src + test          |
+| `packages/api-client` | `tsc --noEmit -p tsconfig.json`       | src + test          |
+| `packages/ui`         | `tsc --noEmit -p tsconfig.json`       | src + test          |
+| `apps/admin`          | `tsc --noEmit -p tsconfig.json`       | src + test          |
+| `apps/web`            | `tsc --noEmit -p tsconfig.json`       | src                 |
+| `apps/api`            | `tsc --noEmit -p tsconfig.build.json` | **production only** |
+
+**Known gap — tracked, not silenced.** `apps/api` checks `tsconfig.build.json`, the same file
+`nest build` compiles with, which excludes `**/*spec.ts` and `test/**`. Running it against
+`tsconfig.json` surfaces **20 pre-existing errors in 6 files**: a missing `deletedAt` in
+`test/envelope-contract.e2e-spec.ts`, unchecked `document.paths` in `openapi.registry.spec.ts`,
+`precision` assertions on a Drizzle `PgColumn` that does not expose them, and two overlapping casts
+in `test/lib/envelope.matchers.ts`. `nest build` never type-checked those files, so CI never saw
+them. They are tracked in **AIS-128**; until they are fixed the check covers the production scope
+exactly — no more and no less.
+
+The negative proof for this check: introduce a deliberate type error in any `src/**/*.ts` file —
+`pnpm typecheck` exits non-zero with the `TS####` code and the file:line.
+
+#### 9.5.1 Required status checks
+
+The gates only prevent a merge once the job is **required**. That is a repository setting, not
+repository code — `ci.yml` cannot express it. Require these three job names (`name:` of each job,
+verbatim, including the punctuation):
+
+- `Install, build, lint, unit test` — the `build-test` job, which now runs `pnpm typecheck`
+- `Quality gates (layers, dead code, tokens, field errors)` — the `quality-gates` job
+- `API e2e (envelope + OpenAPI gates, Postgres)` — the `api-e2e` job
+
+```bash
+gh api -X PUT repos/:owner/:repo/branches/main/protection \
+  -F required_status_checks.strict=true \
+  -F 'required_status_checks.contexts[]=Install, build, lint, unit test' \
+  -F 'required_status_checks.contexts[]=Quality gates (layers, dead code, tokens, field errors)' \
+  -F 'required_status_checks.contexts[]=API e2e (envelope + OpenAPI gates, Postgres)' \
+  -F enforce_admins=true \
+  -F 'required_pull_request_reviews.required_approving_review_count=0' \
+  -F restrictions=
+```
+
+Repeat the same call with `dev`. If the repository uses **rulesets** instead of branch protection,
+the manual path is _Settings → Rules → Rulesets → New branch ruleset → Require status checks to
+pass → add the three names above_.
+
+**Prove the requirement once per branch:** open a throwaway PR that adds `bg-slate-800` to any
+`apps/admin/src` component. `quality-gates` must go red on the token step **and** the merge button
+must be disabled; removing the class turns it green again. A required check that never fails is
+indistinguishable from no check at all.

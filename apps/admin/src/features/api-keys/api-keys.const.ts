@@ -3,6 +3,7 @@ import {
   type ApiKey,
   type ApiKeyListQuery,
 } from '@callback/shared';
+import { createEntityQueryKeys } from '../api/create-entity-query-keys.js';
 import type {
   ApiKeyEditFieldName,
   ApiKeyFormFieldName,
@@ -15,23 +16,25 @@ import type {
  * a hook would silently break the cache invalidation after a successful create
  * (TanStack Query matches prefixes, so it only works while the literals agree).
  *
+ * Since AIS-175 they are not retyped: {@link createEntityQueryKeys} receives the
+ * namespace once and derives all three keys from it, so `list`/`detail` always
+ * start with `all` and an invalidation can never stop matching because of a
+ * mistyped literal. The remaining argument is the entity's own knowledge — the
+ * namespace (it mirrors the API resource) and the list-query type.
+ */
+
+/**
+ * Cache keys of the `api-keys` queries.
+ *
  * `all` is the prefix of every `api-keys` query, `list` and `detail` are the
  * concrete queries — invalidating `all` therefore refreshes both without knowing
  * their shape. `list` is a **factory**, because the list response depends on the
  * query (page, sort, filter): a key that ignored those would serve page 1 for
  * page 2.
  */
-
-/** Cache keys of the `api-keys` queries. */
-export const API_KEYS_QUERY_KEYS = {
-  /** Prefix shared by every `api-keys` query; use it for invalidation. */
-  all: ['api-keys'] as const,
-  /** `GET /api/api-keys?page=…&sort=…` — one key per distinct query. */
-  list: (params: ApiKeyListQuery) =>
-    ['api-keys', 'list', { ...params }] as const,
-  /** `GET /api/api-keys/:identifier`. */
-  detail: (identifier: string) => ['api-keys', 'detail', identifier] as const,
-} as const;
+export const API_KEYS_QUERY_KEYS = createEntityQueryKeys<ApiKeyListQuery>(
+  'api-keys',
+);
 
 /**
  * Field-level message for a duplicate identifier (409).

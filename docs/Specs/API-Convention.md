@@ -1,6 +1,6 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-11-07 (AIS-152: a `HttpEvent` négy új mezőt hordoz — `requestId`, `query`, maszkolt `bodyPreview`, `responseMeta` —, a token/`Authorization` továbbra sem kerülhet az eseménybe; lásd §9) (AIS-136: a 3. tier — app-szintű banner — a megjelenítés **mellett** toastol is; a `field` tier az egyetlen, amely toast nélkül marad, lásd §10) (AIS-112: közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3)
+**Utolsó frissítés:** 2026-11-22 (AIS-16: a `customers` erőforrás szerződés-sémái a `packages/shared/src/contract/customers/` alatt; a lista a közös lapozás mellé négy szűrőt kap — `type`, `status`, `source`, `responsibleOperatorId` —, lásd §4.1) 2026-11-07 (AIS-152: a `HttpEvent` négy új mezőt hordoz — `requestId`, `query`, maszkolt `bodyPreview`, `responseMeta` —, a token/`Authorization` továbbra sem kerülhet az eseménybe; lásd §9) (AIS-136: a 3. tier — app-szintű banner — a megjelenítés **mellett** toastol is; a `field` tier az egyetlen, amely toast nélkül marad, lásd §10) (AIS-112: közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3)
 **Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109; client binding of every registered operation + registry ⇄ service coverage gate + resource template: AIS-110; közös formátum-sémák + kétnyelvű validációs üzenetek: AIS-112
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
@@ -171,9 +171,18 @@ const params = toListQueryParams(query); // → '?page=3&limit=50' — never '?p
 
 **Per-resource sort allow-list (as of today).**
 
-| Resource   | `sort` values                                               | Default     | `q` matches                        |
-| ---------- | ----------------------------------------------------------- | ----------- | ---------------------------------- |
-| `api-keys` | `name`, `identifier`, `createdAt`, `updatedAt`, `expiresAt` | `createdAt` | `name` **or** `identifier` (ILIKE) |
+| Resource    | `sort` values                                                                                     | Default     | `q` matches                                                     |
+| ----------- | ------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------- |
+| `api-keys`  | `name`, `identifier`, `createdAt`, `updatedAt`, `expiresAt`                                       | `createdAt` | `name` **or** `identifier` (ILIKE)                              |
+| `customers` | `customerNumber`, `legalName`, `shortName`, `status`, `createdAt`, `updatedAt`, `lastActivityAt`  | `createdAt` | `legalName` **or** `taxNumber` **or** `customerNumber` (ILIKE)  |
+
+**Resource-specific filters (AIS-16).** A resource may extend the shared query with **optional**
+filters; they are plain optional fields on its own schema (`listQuerySchema.extend({ … })`), never a
+change to the shared one, and an absent filter means “no filter”. `customers` is the first resource
+that uses this: `type`, `status`, `source` (each an enum over the contract's value set) and
+`responsibleOperatorId` (uuid). `lastActivityAt` is sortable although it is **derived**
+(`max(activities.created_at)`) — derived values are allowed in `sort` and in the response, never as
+stored columns.
 
 **The response.** The wire format does **not** change: `data` stays an array and `meta.pagination`
 carries the paging block (see §2). What the client gets is a **type**: `ApiResult<TRows>` pairs

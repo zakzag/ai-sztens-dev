@@ -1313,7 +1313,7 @@ on purpose: `extensionAlias` (not in its config schema — it rejects the whole 
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ignoreWorkspaces: ["apps/api"]`                  | Nest DI resolves providers at runtime and `apps/api/drizzle/**` is generated — triaging those false positives is its own ticket. A gate that cries wolf gets switched off. |
 | `entry: scripts/lib/agent-artifacts/generate.mjs` | The CLI is invoked from `scripts/init.sh` / `init.ps1`, which `knip` cannot see.                                                                                           |
-| `ignoreDependencies: ["tailwindcss"]`             | Used only from CSS (`@import "tailwindcss"`), never imported from TypeScript.                                                                                              |
+| `ignoreDependencies: ["tailwindcss", "drizzle-orm"]` | `tailwindcss` is used only from CSS (`@import "tailwindcss"`), never imported from TypeScript. `drizzle-orm` is imported **only** by `apps/api/src/db/schema.ts`, whose workspace is excluded from knip — the import is therefore resolved against the root `package.json` and would always read as unlisted. |
 | `ignoreExportsUsedInFile: true`                   | Mock helpers and constants are exported for readability but used in their own file; a real orphan is still reported as an unused **file**.                                 |
 
 Triage happened in the same change: the orphan barrel `packages/shared/src/contract/index.ts` was

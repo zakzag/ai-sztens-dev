@@ -21,6 +21,9 @@ import { API_ERROR_CODE, type ApiErrorCode } from '@callback/shared';
 import {
   API_KEY_IDENTIFIER_FIELD_MESSAGE,
   CONFLICT_MESSAGE,
+  CUSTOMER_NUMBER_CONFLICT_MESSAGE,
+  CUSTOMER_TAX_NUMBER_CONFLICT_MESSAGE,
+  CUSTOMER_TAX_NUMBER_FIELD_MESSAGE,
   FIELD_INVALID_MESSAGE,
   FORBIDDEN_MESSAGE,
   IDENTIFIER_CONFLICT_MESSAGE,
@@ -101,6 +104,16 @@ export const ERROR_CODE_CATALOGUE: Readonly<
   [API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT]: {
     message: IDENTIFIER_CONFLICT_MESSAGE,
     fieldMessage: API_KEY_IDENTIFIER_FIELD_MESSAGE,
+  },
+  [API_ERROR_CODE.CUSTOMER_NUMBER_CONFLICT]: {
+    message: CUSTOMER_NUMBER_CONFLICT_MESSAGE,
+    // The number is server-generated: there is no input for the user to fix.
+    fieldMessage: null,
+  },
+  [API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT]: {
+    message: CUSTOMER_TAX_NUMBER_CONFLICT_MESSAGE,
+    // The tax number IS an input, so this one may land on the field (AIS-95).
+    fieldMessage: CUSTOMER_TAX_NUMBER_FIELD_MESSAGE,
   },
 });
 

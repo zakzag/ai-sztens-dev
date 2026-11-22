@@ -7,7 +7,11 @@ import {
   ENVELOPE_EXEMPTIONS,
   VALID_API_KEY,
   VALID_API_KEY_LIST,
+  VALID_CUSTOMER,
+  VALID_CUSTOMER_DETAIL,
+  VALID_CUSTOMER_LIST,
   VALID_UPDATE_API_KEY_REQUEST,
+  VALID_UPDATE_CUSTOMER_REQUEST,
   apiKeySchema,
   findEndpoint,
   successEnvelopeSchema,
@@ -56,6 +60,14 @@ const SAMPLE_PAYLOADS: Readonly<Record<string, unknown>> = {
   // A `DELETE` returns nothing, so its payload is `null` — a value, not an
   // absent field (see `no-payload.schema.ts`).
   'apiKeys.remove': null,
+  // AIS-178 — the customers aggregate. `updateStatus` answers with the whole
+  // customer, so the same fixture proves both schemas.
+  'customers.list': VALID_CUSTOMER_LIST,
+  'customers.findById': VALID_CUSTOMER_DETAIL,
+  'customers.create': VALID_CUSTOMER,
+  'customers.update': VALID_CUSTOMER,
+  'customers.updateStatus': VALID_CUSTOMER,
+  'customers.remove': null,
 };
 
 /** Minimal envelope `meta`; the registry only cares about the payload. */

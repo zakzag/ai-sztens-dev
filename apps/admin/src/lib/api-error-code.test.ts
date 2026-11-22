@@ -50,6 +50,8 @@ describe('FIELD_SURFACE_CODES — derived from the catalogue', () => {
         API_ERROR_CODE.VALIDATION_FAILED,
         API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
         API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT,
+        // AIS-178: a duplicate tax number lands on the `taxNumber` field.
+        API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT,
       ].sort(),
     );
   });

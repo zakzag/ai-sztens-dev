@@ -296,6 +296,22 @@ Errors        ApiExceptionFilter (@Catch(), registered as APP_FILTER in HttpModu
 - `ApiExceptionFilter` normalises **anything** (`AppError`, `ZodError`, Nest `HttpException`, unknown `Error`) into the error envelope, sanitises 5xx, echoes `X-Request-Id` and logs one structured line per failure.
 - There is **no success interceptor** that wraps bodies implicitly; `RequestIdInterceptor` only sets the `X-Request-Id` header.
 
+### 7.1 Admin authentication is deferred — the audit actor is `system`
+
+A `customers` erőforrás (AIS-178) az első `/api/admin/*` végpontcsalád, amely tartósan ír a saját
+adatbázisba, és minden írás audit sort kap. Az admin hitelesítés (AIS-71/72/73 + AIS-74) ezen a
+ágon **még nincs meg**, ezért a következő állapot tudatos és ideiglenes:
+
+| Kérdés | Jelenlegi állapot |
+| ------ | ----------------- |
+| Ki érheti el a `/api/admin/*` végpontokat? | **Bárki, aki eléri az API-t.** A program egyelőre csak a fejlesztő gépén fut; publikálás előtt az AIS-73/74 session guard **és** a Caddy-szintű allow-list kötelező. |
+| Ki szerepel elkövetőként az audit naplóban? | `actor_type = 'system'`, `actor_id = null`, `actor_name = 'system'` — ezt adja vissza az `apps/api/src/audit/audit-actor.provider.ts`, amíg nincs session. |
+| Javítható ez utólag? | **Nem.** Az `audit.audit_logs` append-only (lásd [`Database-Local.md`](Database-Local.md) §4.2), a már beírt `system` sorok visszamenőleg nem attribútálhatók. |
+| Mi a teendő az auth bemergelésekor? | Egyetlen osztály: session-alapú `AuditActorProvider`, és az `AUDIT_ACTOR_PROVIDER` token átkötése az `AuditModule`-ban. A séma és az `AuditWriter` nem változik. |
+
+Ez ugyanaz a minta, mint az `api-keys` végpontoknál (§13): a `401` kód és a banner-viselkedés
+előkészítve van, a login flow viszont hiányzik.
+
 ---
 
 ## 8. Request correlation
@@ -453,6 +469,7 @@ service method fails `packages/api-client/test/service-coverage.test.ts` (§12).
 - The admin's tier-1 field mapping (§10.1) still only accepts `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT`, so a `422` / `409 STALE_WRITE` currently surfaces as a page `Alert`. Extending the gate (`expiresAt` / `updatedAt`) belongs to the admin edit UI (AIS-109 and later).
 - API-key value masking (**show-once**) is a separate security task (AIS-75); these endpoints still return the token.
 - The `api-keys` routes are unauthenticated until AIS-73/74; the `401` code and banner behaviour are prepared but the login flow is not.
+- A `/api/admin/customers` (AIS-178) ugyanígy hitelesítés nélkül fut, és amíg nincs session, **minden audit sora `system` aktorral** íródik (§7.1). A napló append-only, tehát ez az időszak visszamenőleg nem javítható — az auth bemergelése ezért nem csak biztonsági, hanem adatminőségi határidő is.
 - `/api/openapi.json` is generated from the registry (AIS-98) and served in every env; the Swagger UI at `/api/docs` is mounted only when `isOpenApiDocsEnabled()` (never in prod). The committed baseline + CI drift gate is AIS-99.
 - The dev response validator (`ResponseAssertInterceptor`) only runs outside prod, and only for routes present in `API_ENDPOINTS`; an exempt route or a plugin-served asset is passed through untouched.
 - e2e suites self-skip on Node < 24.9 (CommonJS `@nestjs/config` + Jest ESM); run `pnpm start` + curl for a manual verification in that case.

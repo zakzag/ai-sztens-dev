@@ -31,8 +31,9 @@ export const CUSTOMERS_ID_PARAM = ':id';
  *
  * Six year-month digits (`202609`) and a three-digit sequence, so one month can
  * hold 999 new customers before the format has to grow. The number is generated
- * by the server (AIS-18 counter table); this pattern only guards the wire
- * contract against a malformed value.
+ * by the server (AIS-178: `max()` of the month inside the write transaction,
+ * with one retry on a `23505`), and this pattern only guards the wire contract
+ * against a malformed value.
  */
 export const CUSTOMER_NUMBER_PATTERN = /^AIS-\d{6}-\d{3}$/;
 

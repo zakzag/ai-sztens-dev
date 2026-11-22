@@ -51,6 +51,20 @@ export const API_ERROR_CODE = {
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
   /** Domain specific: the `identifier` of an API key is already taken. */
   API_KEY_IDENTIFIER_CONFLICT: 'API_KEY_IDENTIFIER_CONFLICT',
+  /**
+   * Domain specific (AIS-178): the generated `customer_number` collided.
+   *
+   * The number is produced inside the write transaction, so a collision is
+   * answered by retrying once; the code is only emitted when the retry fails
+   * too, which means concurrent creates are racing on the same month.
+   */
+  CUSTOMER_NUMBER_CONFLICT: 'CUSTOMER_NUMBER_CONFLICT',
+  /**
+   * Domain specific (AIS-178): another **live** customer already carries this
+   * tax number. A soft-deleted row does not block reuse, because the unique
+   * index is partial (`WHERE deleted_at IS NULL`).
+   */
+  CUSTOMER_TAX_NUMBER_CONFLICT: 'CUSTOMER_TAX_NUMBER_CONFLICT',
 } as const;
 
 /** Union of the catalogue values. */
@@ -76,6 +90,8 @@ export const API_ERROR_CODE_STATUS: Readonly<Record<ApiErrorCode, number>> = {
   [API_ERROR_CODE.INTERNAL_ERROR]: HTTP_STATUS.INTERNAL_SERVER_ERROR,
   [API_ERROR_CODE.SERVICE_UNAVAILABLE]: HTTP_STATUS.SERVICE_UNAVAILABLE,
   [API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.CUSTOMER_NUMBER_CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT]: HTTP_STATUS.CONFLICT,
 };
 
 /**

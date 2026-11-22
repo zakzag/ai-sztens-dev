@@ -52,6 +52,23 @@ export const IDENTIFIER_CONFLICT_MESSAGE =
 export const API_KEY_IDENTIFIER_FIELD_MESSAGE =
   'Ez az identifier már foglalt. Adj meg egyedit.';
 
+/** `CUSTOMER_NUMBER_CONFLICT` (AIS-178) — the generated number collided. */
+export const CUSTOMER_NUMBER_CONFLICT_MESSAGE =
+  'Az ügyfélszám generálása ütközött. Próbáld újra.';
+
+/** `CUSTOMER_TAX_NUMBER_CONFLICT` (AIS-178) — one live customer per tax number. */
+export const CUSTOMER_TAX_NUMBER_CONFLICT_MESSAGE =
+  'Ezzel az adószámmal már létezik élő ügyfél.';
+
+/**
+ * Field-level copy of a duplicate tax number (AIS-178, tier 1).
+ *
+ * The tax number is a form input, so the message is rendered under it — the
+ * generic sentence above stays for the page-level alert.
+ */
+export const CUSTOMER_TAX_NUMBER_FIELD_MESSAGE =
+  'Ez az adószám már egy másik ügyfélnél szerepel.';
+
 /**
  * `VALIDATION_FAILED` on an identified field (plan `D11`, tier 1).
  *

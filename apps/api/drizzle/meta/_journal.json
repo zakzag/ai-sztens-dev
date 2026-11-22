@@ -36,6 +36,13 @@
       "when": 1793663990555,
       "tag": "0004_numerous_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795356236497,
+      "tag": "0005_colossal_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

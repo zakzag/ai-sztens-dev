@@ -3,11 +3,12 @@
 
   "ignoreWorkspaces": ["apps/api"],
   "ignoreExportsUsedInFile": true,
-  "ignoreDependencies": ["tailwindcss"],
+  "ignoreDependencies": ["tailwindcss", "drizzle-orm"],
 
   "workspaces": {
     ".": {
       "entry": ["scripts/lib/agent-artifacts/generate.mjs"],
+      "ignore": ["scripts/db/fixtures/**"],
       "project": "scripts/**/*.mjs"
     },
     "apps/admin": { "project": "src/**/*.{ts,tsx}" },

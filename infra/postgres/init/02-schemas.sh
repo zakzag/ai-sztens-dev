@@ -26,12 +26,19 @@
 #   schema      aisztens (app)        tkovari (owner)   krak (operator)
 #   platform    USAGE + CREATE        USAGE             USAGE
 #   email       USAGE                 USAGE             USAGE
+#   customer    USAGE + CREATE        USAGE             USAGE
+#   iam         USAGE + CREATE        USAGE             USAGE
 #
-# Only the application role may create objects, and only in `platform`:
+# Only the application role may create objects, and only in the schemas that
+# hold application tables:
 #   - `platform` — the Drizzle migration runner keeps its bookkeeping table
 #     there (`platform.__drizzle_migrations`, configured in drizzle.config.ts)
-#     and hosts the application tables created by migrations (AIS-39:
-#     `platform.api_keys`).
+#     plus the operations tables (AIS-39: `platform.api_keys`);
+#   - `customer` — the customer aggregate (AIS-18: `customers`, `tags`,
+#     `customer_tags`, `contacts`, `contact_roles`);
+#   - `iam` — identities (AIS-18: `operators`, `customer_users`).
+# `email` stays USAGE-only here: its tables are created outside migrations, so
+# the app role never needs CREATE on it.
 # The two human operator roles keep USAGE so they can inspect data
 # (`\dt`, `SELECT`) without being able to alter schemas.
 #
@@ -55,24 +62,30 @@ psql -v ON_ERROR_STOP=1 \
 -- which is what lets the grants below stay coarse and stable.
 CREATE SCHEMA IF NOT EXISTS platform;
 CREATE SCHEMA IF NOT EXISTS email;
+-- AIS-18: the customer aggregate and the IAM context. Created here (and not
+-- only by the migration) so a fresh volume and an existing one end up with the
+-- same owner and the same grants.
+CREATE SCHEMA IF NOT EXISTS customer;
+CREATE SCHEMA IF NOT EXISTS iam;
 
 -- USAGE for the app role and both operator roles on every context schema.
 -- The join on pg_namespace keeps the statement a no-op if a schema is missing
 -- (e.g. when a single CREATE above is removed), so the file stays idempotent.
 SELECT format('GRANT USAGE ON SCHEMA %I TO %I', s.nspname, r.rolname)
-  FROM (VALUES ('platform'), ('email')) AS s(nspname)
+  FROM (VALUES ('platform'), ('email'), ('customer'), ('iam')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
   CROSS JOIN (VALUES (:'aisztens_db_user'), ('tkovari'), ('krak')) AS r(rolname)
 \gexec
 
--- Object creation stays with the application role: `platform` holds the
--- Drizzle bookkeeping table (`platform.__drizzle_migrations`) and the
--- application tables created by migrations. Without this the migrator fails
--- with `permission denied for schema platform` on the first `db:migrate`.
+-- Object creation stays with the application role. Without CREATE on the
+-- schema that hosts them, the migrator fails with `permission denied for
+-- schema <name>` on the first `db:migrate`: `platform` holds the Drizzle
+-- bookkeeping table (`platform.__drizzle_migrations`) and, since AIS-18,
+-- `customer` and `iam` hold the application tables themselves.
 SELECT format('GRANT CREATE ON SCHEMA %I TO %I', s.nspname, :'aisztens_db_user')
-  FROM (VALUES ('platform')) AS s(nspname)
+  FROM (VALUES ('platform'), ('customer'), ('iam')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
 \gexec
 
-\echo '[02-schemas] platform and email schemas and grants are in place.'
+\echo '[02-schemas] platform, email, customer and iam schemas and grants are in place.'
 EOSQL

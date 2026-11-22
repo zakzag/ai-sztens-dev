@@ -2,7 +2,7 @@
 
 **Státusz:** Élő
 
-**Utolsó frissítés:** 2026-10-19 (AIS-35: per-kontext Postgres sémák — `platform`, `callback`, `email` — és a hozzájuk tartozó grantok, új `02-schemas.sh` init script; lásd §6.2)
+**Utolsó frissítés:** 2026-11-22 (AIS-18: a `customer` és `iam` Postgres séma — 7 tábla, 8 enum — a `0005` migrációval; a grant-mátrix így 4 séma / 12 USAGE / 3 CREATE, a `customer` és `iam` sémán az app role `USAGE + CREATE`-ot kap. AIS-35: per-kontext Postgres sémák — `platform`, `callback`, `email` — és a hozzájuk tartozó grantok, új `02-schemas.sh` init script; lásd §6.2)
 
 **Korábbi frissítés:** 2026-10-12 (deploy metadata: az `images.yml` három új build-argot ad át — `COMMIT_HASH` / `DEPLOY_DATE` az api képnek, `VITE_COMMIT_HASH` / `VITE_DEPLOY_DATE` a `web`/`admin` képnek —, így a futó image egy konkrét revízióhoz köthető; lásd §6.1)
 
@@ -169,25 +169,38 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml \
 | Script                                                     | Felelősség                                                                                                                                                                                           |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh)     | `aisztens` (app), `tkovari` (owner) és `krak` (operátor) role; a database tulajdonosa az `aisztens`; séma-szintű grantok `\gexec`-guarddal — friss initen no-op, mert a sémák ekkor még nem léteznek |
-| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform` és `email` sémákra, majd a grant-mátrix                                                                                                                   |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform`, `email`, `customer` és `iam` sémákra, majd a grant-mátrix                                                                                                |
 
 Séma ↔ bounded context: `platform` (üzemeltetési adatok + az alkalmazás táblái,
-pl. `platform.api_keys`), `email` (email engine). A sémahatár egyben modulhatár,
-ezért a grantok is ezt követik:
+pl. `platform.api_keys`), `email` (email engine), `customer` (az ügyfél-aggregátum,
+AIS-18) és `iam` (a saját munkatársak és az ügyfél-belépők, AIS-18). A sémahatár
+egyben modulhatár, ezért a grantok is ezt követik:
 
 | Séma       | `aisztens` (app)   | `tkovari` (owner) | `krak` (operátor) |
 | ---------- | ------------------ | ----------------- | ----------------- |
 | `platform` | USAGE + **CREATE** | USAGE             | USAGE             |
 | `email`    | USAGE              | USAGE             | USAGE             |
+| `customer` | USAGE + **CREATE** | USAGE             | USAGE             |
+| `iam`      | USAGE + **CREATE** | USAGE             | USAGE             |
+
+> **AIS-18 (2026-11-22):** a `customer` és `iam` séma (7 tábla, 8 enum) a `0005`
+> migrációval jön létre, ezért az app role itt is `CREATE`-ot kap. A migráció
+> `CREATE SCHEMA IF NOT EXISTS`-t futtat, tehát egy már inicializált volume-on is
+> lefut; a `02-schemas.sh` újrafuttatása viszont azért kell, hogy a séma tulajdonosa
+> és a grant-mátrix a friss initével egyezzen (részletek:
+> [`Database-Local.md`](Database-Local.md) §8).
 
 > **AIS-64 (2026-10-21):** a `callback` séma megszűnt (a teljes visszahívás-funkció
-> törlése). A korábbi mátrixban szereplő `callback | USAGE + CREATE` sor eltűnt;
-> a smoke-checkek várt értékei ennek megfelelően 2 séma / 6 USAGE / 1 CREATE.
+> törlése). A korábbi mátrixban szereplő `callback | USAGE + CREATE` sor eltűnt; a
+> smoke-checkek várt értékei akkor 2 séma / 6 USAGE / 1 CREATE voltak, az AIS-18-cal
+> **4 séma / 12 USAGE / 3 CREATE**.
 
-A `CREATE` jog kizárólag az app role-é, és kizárólag a `platform` sémában: a Drizzle
-migrációs runner ott tartja a könyvelő tábláját (`platform.__drizzle_migrations`)
-és ott hozza létre az alkalmazás tábláit. Enélkül a `db:migrate` `permission denied
-for schema platform` hibával állna meg. A sémák tulajdonosa a bootstrap superuser
+A `CREATE` jog kizárólag az app role-é, és kizárólag azokban a sémákban, amelyek
+alkalmazás-táblákat hordoznak: a Drizzle migrációs runner a `platform` sémában
+tartja a könyvelő tábláját (`platform.__drizzle_migrations`) és ott hozza létre a
+`platform.api_keys` táblát, a `customer` és `iam` séma pedig az AIS-18 tábláit
+kapja. Enélkül a `db:migrate` `permission denied for schema platform` (illetve
+`… customer`) hibával állna meg. A sémák tulajdonosa a bootstrap superuser
 (`POSTGRES_USER`) marad — nincs ownership-átírás.
 
 A grant-mátrixot a [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh)

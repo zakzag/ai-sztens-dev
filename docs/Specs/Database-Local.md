@@ -2,9 +2,15 @@
 
 **Státusz:** Élő
 
-**Utolsó frissítés:** 2026-11-07 (AIS-108: a `DELETE` **soft delete** — a `platform.api_keys` tábla nullable `deleted_at` oszlopot és `api_keys_deleted_at_idx` indexet kapott a `0003` migrációban; minden olvasás és írás `deleted_at IS NULL`-ra szűr, ezért a törölt sor `404`-et ad, a `PATCH` pedig az `updated_at`-et használja optimistic concurrency tokenként (`409 STALE_WRITE`). AIS-40: a `platform.api_keys` tábla **első fogyasztója** elkészült — `api-keys` modul (`DrizzleApiKeysRepository` a `API_KEYS_REPOSITORY` tokenen, service, controller, DTO), `GET /api/api-keys`, `GET /api/api-keys/:identifier`, `POST /api/api-keys`; duplikált `identifier` → `409`, ismeretlen azonosító → `404`, érvénytelen payload → `400`. A duplikátum-detektálás a `23505` + `api_keys_identifier_key` párost használja a Drizzle `cause`-láncában. AIS-39: elkészült az első valódi domain tábla, a `platform.api_keys` — `0002` migráció, uuid PK, `api_keys_identifier_key` egyedi constraint az `identifier`-en, `timestamptz` időbélyegek, `getTableConfig()`-alapú egységtesztek. AIS-56: elkészült a `DatabaseModule` — `DATABASE` provider a Drizzle handle-hez, `DATABASE_URL` a `ConfigService`-ből, hangos boot-hiba hiányzó URL-re, `client.end()` leállításkor. AIS-64: a teljes callback kontextus törölve — `callback.callback_requests`, `callback.call_status` **és** a `callback` Postgres séma; a `0001` migráció a táblát és az enumot dobja el, a sémát meglevő volume-on egyszeri superuser lépés viszi el. AIS-37: a repository szerződés + unit tesztek elkészültek, de a repository az AIS-64-gyel törlődött. AIS-36: a `db:migrate` létrehozta a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
+**Utolsó frissítés:** 2026-11-22 (AIS-18: a cég-aggregátum saját `customer` sémát kapott, az identitás-kezelés pedig `iam` sémát — összesen 8 Postgres enum típus és 7 tábla (`iam.operators`, `customer.customers`, `customer.tags`, `customer.customer_tags`, `iam.customer_users`, `customer.contacts`, `customer.contact_roles`), `0005` migrációval; a két új sémán az app role `USAGE + CREATE`-ot kap, az `email` marad `USAGE`-only, ezért a grant-mátrix és a smoke-várható értékek 4 séma / 12 USAGE / 3 CREATE lettek. AIS-108: a `DELETE` **soft delete** — a `platform.api_keys` tábla nullable `deleted_at` oszlopot és `api_keys_deleted_at_idx` indexet kapott a `0003` migrációban; minden olvasás és írás `deleted_at IS NULL`-ra szűr, ezért a törölt sor `404`-et ad, a `PATCH` pedig az `updated_at`-et használja optimistic concurrency tokenként (`409 STALE_WRITE`). AIS-40: a `platform.api_keys` tábla **első fogyasztója** elkészült — `api-keys` modul (`DrizzleApiKeysRepository` a `API_KEYS_REPOSITORY` tokenen, service, controller, DTO), `GET /api/api-keys`, `GET /api/api-keys/:identifier`, `POST /api/api-keys`; duplikált `identifier` → `409`, ismeretlen azonosító → `404`, érvénytelen payload → `400`. A duplikátum-detektálás a `23505` + `api_keys_identifier_key` párost használja a Drizzle `cause`-láncában. AIS-39: elkészült az első valódi domain tábla, a `platform.api_keys` — `0002` migráció, uuid PK, `api_keys_identifier_key` egyedi constraint az `identifier`-en, `timestamptz` időbélyegek, `getTableConfig()`-alapú egységtesztek. AIS-56: elkészült a `DatabaseModule` — `DATABASE` provider a Drizzle handle-hez, `DATABASE_URL` a `ConfigService`-ből, hangos boot-hiba hiányzó URL-re, `client.end()` leállításkor. AIS-64: a teljes callback kontextus törölve — `callback.callback_requests`, `callback.call_status` **és** a `callback` Postgres séma; a `0001` migráció a táblát és az enumot dobja el, a sémát meglevő volume-on egyszeri superuser lépés viszi el. AIS-37: a repository szerződés + unit tesztek elkészültek, de a repository az AIS-64-gyel törlődött. AIS-36: a `db:migrate` létrehozta a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
 
-**Kapcsolódik:** [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2, [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml), [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml), [`infra/postgres/init/`](../../infra/postgres/init/), [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh), [`scripts/README.md`](../../scripts/README.md)
+> **2026-11-22 — a táblák és a relációk külön, generált doksiban.** A teljes ER-diagram
+> (8 tábla, 8 reláció, 8 enum típus) a [`Database-Schema.md`](Database-Schema.md)-ban él, és a
+> `pnpm db:diagram` generálja közvetlenül az [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts)-ből.
+> Ez a doksi továbbra is a **bootstrap, a grant-mátrix és a verifikáció** forrása; a séma
+> tartalmának leírását nem ismétli meg.
+
+**Kapcsolódik:** [`docs/Specs/Local-Development.md`](Local-Development.md), [`docs/Specs/Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2, [`Database-Schema.md`](Database-Schema.md), [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml), [`infra/docker-compose.local.yml`](../../infra/docker-compose.local.yml), [`infra/postgres/init/`](../../infra/postgres/init/), [`scripts/test/_postgres-init-schemas-test.sh`](../../scripts/test/_postgres-init-schemas-test.sh), [`scripts/README.md`](../../scripts/README.md)
 
 > **Hatókör.** Ez a doksi a **fejlesztői gépen** futó PostgreSQL-ről szól: hogyan
 > bootstrappeled, ellenőrzöd, reseteled, és mi az, ami még _nincs_ benne. A droplet
@@ -132,7 +138,7 @@ sorrendben**:
 | Script                                                     | Mit hoz létre                                                                                                                                                                                                                     |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh)     | `aisztens` (app), `tkovari` (owner), `krak` (operátor) role; a database tulajdonosa `aisztens`; `GRANT CONNECT` az operátoroknak; séma-szintű grantok `\gexec`-guarddal (friss initen no-op, mert a sémák ekkor még nem léteznek) |
-| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `platform`, `callback`, `email` sémák (`CREATE SCHEMA IF NOT EXISTS`) + a grant-mátrix                                                                                                                                            |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `platform`, `email`, `customer`, `iam` sémák (`CREATE SCHEMA IF NOT EXISTS`) + a grant-mátrix                                                                                                                                      |
 
 Grant-mátrix (a két script és az [`Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2
 ugyanezt írja le):
@@ -141,10 +147,17 @@ ugyanezt írja le):
 | ---------- | ------------------ | ----------------- | ----------------- |
 | `platform` | USAGE + **CREATE** | USAGE             | USAGE             |
 | `email`    | USAGE              | USAGE             | USAGE             |
+| `customer` | USAGE + **CREATE** | USAGE             | USAGE             |
+| `iam`      | USAGE + **CREATE** | USAGE             | USAGE             |
 
 - A `CREATE` jog azért kell, mert a Drizzle migrációs runner (`aisztens` kapcsolattal)
   a `platform` sémában tartja a könyvelő tábláját (`platform.__drizzle_migrations`) és
   ott hozza létre az alkalmazás tábláit (AIS-39: `platform.api_keys`).
+- **AIS-18:** a `customer` és az `iam` séma is alkalmazás-táblákat hordoz
+  (`customer.customers`, `customer.contacts`, `iam.operators`, `iam.customer_users`, …),
+  ezért ezekre is `USAGE + CREATE` kell — enélkül a `0005` migráció
+  `permission denied for schema customer` hibával áll meg. Az `email` szándékosan
+  `USAGE`-only marad: ott nem migráció hozza létre a táblákat.
 - **AIS-64:** a `callback` séma megszűnt (a korábbi `callback | USAGE + CREATE` sor ezért
   tűnt el), a séma a migrációval nem dobható el — a tulajdonos a bootstrap superuser.
 - Az operátorok szándékosan **nem** kapnak `CREATE`-ot: olvasásra (`\dt`, `SELECT`)
@@ -159,6 +172,46 @@ ugyanezt írja le):
 
 Mindkét script **idempotens**: újrafuttatható, és kétszeri futás után sem változik a
 végeredmény.
+
+### 4.1 A `customer` és `iam` séma (AIS-18)
+
+Két új séma, hét táblával. A séma-határ itt is modulhatár: a `customer` az
+ügyfél-aggregátum, az `iam` az identitás (saját munkatársak **és** ügyfél-belépők).
+A `platform.api_keys` mintáját követi: minden oszlopnév kiírva (`snake_case`),
+`timestamptz(3)` időbélyegek, soft delete `deleted_at`-tel.
+
+| Séma       | Tábla           | Mire való                                                                          |
+| ---------- | --------------- | ---------------------------------------------------------------------------------- |
+| `iam`      | `operators`     | a szolgáltató munkatársai (`superadmin` / `operator`) — nem ügyfél-felhasználók     |
+| `customer` | `customers`     | a cég törzsadatai (22 oszlop; **nincs** `note` és **nincs** számlázási oszlop)      |
+| `customer` | `tags`          | újrahasználható címke-katalógus (`premium`, `vip`, …)                               |
+| `customer` | `customer_tags` | cégenként mely címkék (összetett PK: `customer_id` + `tag_id`)                      |
+| `iam`      | `customer_users`| cégenkénti belépő felhasználók, `ON DELETE CASCADE` a cégről                        |
+| `customer` | `contacts`      | kapcsolattartók, opcionális `customer_user_id` hivatkozással                        |
+| `customer` | `contact_roles` | `primary` / `technical` / `alerting`; cégenként egy `primary`                       |
+
+A kényszerek, amiket érdemes ismerni (mind a `0005` migrációban):
+
+| Kényszer                                                                  | Miért így                                                                                                                                                    |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `customers_customer_number_key` (UNIQUE)                                  | a generált `AIS-ÉÉÉÉHH-NNN` egyedi; a `23505` → `409` mappelés ezt a **nevet** használja                                                                     |
+| `customers_tax_number_key` (UNIQUE INDEX, `WHERE tax_number IS NOT NULL AND deleted_at IS NULL`) | az adószám csak az **élő** sorok között egyedi; a hiányzó (`NULL`) érték legális, ezért nem sima `UNIQUE`                                    |
+| `customers_tax_number_format_check` (`^\d{8}-[1-5]-\d{2}$`)               | a shared `huTaxNumberSchema` szabálya a tárhelyen is érvényes                                                                                                |
+| `contact_roles_primary_key` (UNIQUE INDEX, `WHERE role = 'primary'`)      | cégenként egy elsődleges kapcsolattartó — a `customer_id` ezért van denormalizálva a szerep-táblába, trigger nélkül                                          |
+| `customer_users_customer_owner_key` (UNIQUE INDEX, `WHERE role = 'owner' AND status = 'active'`) | cégenként egy aktív tulajdonos                                                                                                        |
+| `customer_users_email_key` (UNIQUE INDEX `lower(email)`)                  | a belépés e-mail alapú, ezért a kis/nagybetűtől függetlenül egyedi                                                                                           |
+| `contacts_customer_user_id_fkey`: (`customer_id`,`customer_user_id`) → `iam.customer_users` | `CHECK` nem tud másik táblát olvasni, ezért összetett FK; `customer_user_id IS NULL` esetén a MATCH SIMPLE miatt nem ellenőriz („nem belépő felhasználó”) |
+| `contact_roles_contact_id_fkey`: (`contact_id`,`customer_id`) → `customer.contacts (id, customer_id)` | ugyanaz a trükk: a szerep sora nem hivatkozhat más cégre, mint a szülő kontakt                                                              |
+| `contacts_customer_id_customers_id_fk`, a `customer_tags_*` FK-k, `customer_users_customer_id_customers_id_fk` (`ON DELETE CASCADE`) | a cég törlésével a gyerek sorok is mennek                                                                |
+| `customers_responsible_operator_id_operators_id_fk`, `customer_users_invited_by_operator_id_operators_id_fk` (`ON DELETE SET NULL`) | a kilépő munkatárs nem viszi magával a céget és a felhasználót                                                            |
+
+> A `contact_roles` szándékosan **nem** visz `deleted_at`-et: a szerepek nem
+> történet. Kontakt soft delete esetén a szerep-sorok törlődnek (AIS-178),
+> különben a `primary` hely örökre foglalt maradna.
+
+> A `customer_number` **generálása** nem ennek a ticketnek a része: az oszlop
+> `text NOT NULL` + nevesített `UNIQUE`, a számot a `POST /api/admin/customers`
+> (AIS-178) állítja elő.
 
 ---
 
@@ -204,26 +257,28 @@ Psql a konténeren belül (host `psql` nem kell):
 DC="docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml"
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -c '\dn'
-# Elvárt: public, platform, email  (+ information_schema, pg_catalog, pg_toast)
+# Elvárt: public, platform, email, customer, iam  (+ information_schema, pg_catalog, pg_toast)
 #   A `callback` séma az AIS-64-gyel megszűnt. Meglévő volume-on egyszeri lépés kell:
 #   psql -U postgres -d aisztens_db -c "DROP SCHEMA IF EXISTS callback"
+#   A `customer` és `iam` séma az AIS-18-cal jött; meglévő volume-on a §8 szerint kell
+#   újrafuttatni a 02-schemas.sh-t.
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
   -c "SELECT rolname FROM pg_roles WHERE rolname IN ('aisztens','tkovari','krak') ORDER BY 1"
 # Elvárt: aisztens, krak, tkovari
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
-  -c "SELECT count(*) FROM (VALUES ('platform'),('email')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
-# Elvárt: 6  (2 séma × 3 role)
+  -c "SELECT count(*) FROM (VALUES ('platform'),('email'),('customer'),('iam')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')"
+# Elvárt: 12  (4 séma × 3 role)
 
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
-  -c "SELECT count(*) FROM (VALUES ('platform')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
-# Elvárt: 1   (CREATE csak az aisztens role-nak, csak a platform sémában)
+  -c "SELECT count(*) FROM (VALUES ('platform'),('customer'),('iam')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')"
+# Elvárt: 3   (CREATE csak az aisztens role-nak; platform, customer, iam — nem az email)
 
 # A migrációk után: a könyvelő tábla, a callback tábla pedig már nem létezik
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
   -c "SELECT count(*) FROM platform.__drizzle_migrations"
-# Elvárt: 3  (0000 + 0001 + 0002; újrafuttatás után sem nő)
+# Elvárt: 6  (0000 … 0005; újrafuttatás után sem nő)
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
   -c "SELECT to_regclass('callback.callback_requests') IS NULL"
 # Elvárt: t  (a tábla az AIS-64-gyel törlődött)
@@ -235,14 +290,25 @@ $DC exec -T postgres psql -U postgres -d aisztens_db -At \
 $DC exec -T postgres psql -U postgres -d aisztens_db -At \
   -c "SELECT conname FROM pg_constraint WHERE conrelid = 'platform.api_keys'::regclass AND contype = 'u'"
 # Elvárt: api_keys_identifier_key
+
+# AIS-18: a hét új tábla sémánként
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT count(*) FROM pg_tables WHERE schemaname = 'customer'"
+# Elvárt: 5  (customers, tags, customer_tags, contacts, contact_roles)
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT count(*) FROM pg_tables WHERE schemaname = 'iam'"
+# Elvárt: 2  (operators, customer_users)
+$DC exec -T postgres psql -U postgres -d aisztens_db -At \
+  -c "SELECT indexname FROM pg_indexes WHERE schemaname = 'customer' AND indexname IN ('customers_tax_number_key','contact_roles_primary_key') ORDER BY 1"
+# Elvárt: contact_roles_primary_key, customers_tax_number_key  (partial unique indexek)
 ```
 
 Automatizált ellenőrzés (nem kell hozzá futó stack, saját eldobható konténert indít):
 
 ```bash
-bash scripts/test/_postgres-init-schemas-test.sh     # elvárt: PASS: 23  FAIL: 0
-#   (kevesebb, mint a korábbi 32: a `callback` séma kivételével kevesebb
-#    séma/USAGE/CREATE assertion fut — AIS-64)
+bash scripts/test/_postgres-init-schemas-test.sh     # elvárt: FAIL: 0
+#   A PASS-szám a sémák számával nő: AIS-64 után 23 volt, AIS-18-cal a négy
+#   séma miatt több USAGE/CREATE assertion fut. Csak a FAIL: 0 a fontos.
 ```
 
 Ugyanezt a mátrixot ellenőrzi a `pnpm test:stack` is a `postgres-schemas`,
@@ -297,19 +363,21 @@ admin oldal, a publikus web űrlap, a `callback.callback_requests` tábla, a
 
 | Dolog                                                                                                      | Hol / hogyan                                                                                                                                                                                                                        |
 | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform` és `email` séma                                                                                 | [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh), első initkor                                                                                                                                                            |
+| `platform`, `email`, `customer`, `iam` séma                                                                | [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh), első initkor (AIS-18: `customer` + `iam`)                                                                                                                               |
 | `platform.__drizzle_migrations` könyvelő tábla                                                             | `drizzle.config.ts` `migrations` beállítás + a runner                                                                                                                                                                               |
 | `0000` migráció (callback tábla — történeti)                                                               | [`drizzle/0000_pretty_bromley.sql`](../../apps/api/drizzle/0000_pretty_bromley.sql)                                                                                                                                                 |
 | `0001` migráció (drop table + drop enum)                                                                   | [`drizzle/0001_square_kat_farrell.sql`](../../apps/api/drizzle/0001_square_kat_farrell.sql)                                                                                                                                         |
 | `0002` migráció (`platform.api_keys` tábla + `api_keys_identifier_key`)                                    | [`drizzle/0002_minor_domino.sql`](../../apps/api/drizzle/0002_minor_domino.sql)                                                                                                                                                     |
 | `0003` migráció (**soft delete**: nullable `deleted_at` + `api_keys_deleted_at_idx`, AIS-108)              | [`drizzle/0003_organic_firedrake.sql`](../../apps/api/drizzle/0003_organic_firedrake.sql)                                                                                                                                           |
 | `0004` migráció (**ezredmásodperc-pontosságú** időbélyegek: `timestamp(3)`, AIS-108)                       | [`drizzle/0004_numerous_gunslinger.sql`](../../apps/api/drizzle/0004_numerous_gunslinger.sql)                                                                                                                                       |
+| `0005` migráció (**`customer` + `iam` séma, 8 enum, 7 tábla**, AIS-18)                                     | [`drizzle/0005_colossal_hobgoblin.sql`](../../apps/api/drizzle/0005_colossal_hobgoblin.sql)                                                                                                                                         |
 | működő `db:migrate`                                                                                        | [`apps/api/src/migrate.ts`](../../apps/api/src/migrate.ts) (lock nélkül)                                                                                                                                                            |
 | `DATABASE` / `DATABASE_CLIENT` token + `Database` típus                                                    | [`database.const.ts`](../../apps/api/src/db/database.const.ts), [`database.interface.ts`](../../apps/api/src/db/database.interface.ts)                                                                                              |
 | **`DatabaseModule`** — Drizzle handle a `DATABASE` tokenhez, `DATABASE_URL` a `ConfigService`-ből (AIS-56) | [`database.module.ts`](../../apps/api/src/db/database.module.ts), factory-k: [`database.factory.ts`](../../apps/api/src/db/database.factory.ts), providerek: [`database.providers.ts`](../../apps/api/src/db/database.providers.ts) |
 | Kliens-lezárás leállításkor (`client.end({ timeout: 5 })`)                                                 | [`database-lifecycle.service.ts`](../../apps/api/src/db/database-lifecycle.service.ts)                                                                                                                                              |
 | `isUuid()` guard (az `api-keys` fogja használni)                                                           | [`uuid.ts`](../../apps/api/src/db/uuid.ts) + [`uuid.spec.ts`](../../apps/api/src/db/uuid.spec.ts)                                                                                                                                   |
 | **`platform.api_keys`** tábla + `api_keys_identifier_key` egyedi constraint (AIS-39)                       | [`schema.ts`](../../apps/api/src/db/schema.ts), [`schema.spec.ts`](../../apps/api/src/db/schema.spec.ts)                                                                                                                            |
+| **`customer` és `iam` séma 7 táblája** + a partial unique indexek és összetett FK-k (AIS-18, lásd §4.1)    | [`schema.ts`](../../apps/api/src/db/schema.ts), [`schema.spec.ts`](../../apps/api/src/db/schema.spec.ts)                                                                                                                            |
 
 > **AIS-56 (2026-10-21):** az API **nem indul el** `DATABASE_URL` nélkül — a
 > `DatabaseModule` provider-factory-ja `DatabaseConfigurationError`-t dob
@@ -331,8 +399,15 @@ docker exec infra-postgres-1 psql -U postgres -d aisztens_db \
   -c "DROP SCHEMA IF EXISTS callback"
 ```
 
-Friss volume-on erre nincs szükség: a `02-schemas.sh` már csak `platform`-ot és
-`email`-t hoz létre.
+Friss volume-on erre nincs szükség: a `02-schemas.sh` már csak `platform`, `email`,
+`customer` és `iam` sémát hoz létre.
+
+**AIS-18: a `customer` és `iam` séma ugyanígy viselkedik.** Meglévő volume-on a
+`02-schemas.sh` újrafuttatása hozza létre őket (és a `CREATE` grantot), különben a
+`0005` migráció `permission denied for schema customer` / `… iam` hibával áll meg.
+A migráció `CREATE SCHEMA IF NOT EXISTS`-t futtat, tehát friss volume-on önmagában is
+átmegy — de akkor a séma tulajdonosa az `aisztens` app role lesz a bootstrap superuser
+helyett, ezért a doksi a script-újrafuttatást írja elő.
 
 **Még nincs** — ezeket ne keresd:
 
@@ -341,9 +416,9 @@ Friss volume-on erre nincs szükség: a `02-schemas.sh` már csak `platform`-ot 
 | tábla-szintű grantok (`SELECT`/`INSERT`) az operátoroknak | a táblákat az `aisztens` hozza létre, tehát ő a tulajdonos; a `tkovari`/`krak` csak séma-szintű `USAGE`-ot kapott | későbbi read-only operátori hozzáférés |
 | migrációs lock, `lock_timeout`, `statement_timeout`       | a runner egyelőre lock nélkül fut                                                                                 | Story 3                                |
 
-Ebből következik, hogy a lokális DB-ben **ma** a `platform.api_keys` tábla (és a
-vele járó egyedi constraint) az, amit érdemes ellenőrizni a séma-szintű eredmények
-mellett (§6).
+Ebből következik, hogy a lokális DB-ben **ma** a `platform.api_keys` tábla, valamint
+a `customer` és `iam` séma hét táblája (AIS-18, §4.1) az, amit érdemes ellenőrizni a
+séma-szintű eredmények mellett (§6).
 
 A táblát az **AIS-40** óta az API használja: írás/olvasás a
 [`api-keys` modulon](../../apps/api/src/api-keys/api-keys.module.ts) keresztül
@@ -368,7 +443,7 @@ Két ismert korlát tartozik ide:
 | `FATAL: password authentication failed for user "aisztens"`             | az `AISZTENS_DB_PASSWORD` az `infra/.env.local`-ban más, mint amivel kapcsolódsz — vagy a role-t egy korábbi, más jelszóval inicializált volume hozta létre                                                                   | `$DC exec -T postgres bash /docker-entrypoint-initdb.d/01-roles.sh` (a script `ALTER ROLE … PASSWORD`-öt is futtat), vagy `down -v` + `pnpm db:up` |
 | `FATAL: role "aisztens" does not exist`                                 | az init nem futott le (nem üres volume), vagy `01-roles.sh` hibával elhalt                                                                                                                                                    | nézd a `logs postgres`-t; futtasd kézzel a `01-roles.sh`-t                                                                                         |
 | `Skipping initialization` a logban                                      | a volume már inicializált                                                                                                                                                                                                     | ez nem hiba; új scripthez lásd §8                                                                                                                  |
-| `permission denied for schema callback`                                 | hiányzik a `CREATE` grant (AIS-35 előtt inicializált volume)                                                                                                                                                                  | §8 a) vagy b)                                                                                                                                      |
+| `permission denied for schema <név>`                                    | hiányzik a `CREATE` grant — `callback` esetén AIS-35 előtt, `customer`/`iam` esetén AIS-18 előtt inicializált volume                                                                                                         | §8 a) vagy b)                                                                                                                                      |
 | `FATAL: the database system is shutting down`                           | az entrypoint **ideiglenes** init-szervere áll le, miközben te már kérdezel                                                                                                                                                   | várj a `PostgreSQL init process complete` markerre, utána kérdezz                                                                                  |
 | a `db:migrate` „lefut”, de a tábla nem jelenik meg                      | a runner a `drizzle/` mappát a **cwd**-hez képest keresi, tehát `pnpm --filter @callback/api db:migrate`-tel (cwd = `apps/api`) kell futtatni; közvetlen `node dist/migrate.js` máshonnan a repó gyökeréből nézve nem találja | futtasd `pnpm --filter @callback/api db:migrate`-tel                                                                                               |
 | `password authentication failed for user "aisztens"` a `db:migrate`-nél | a `DATABASE_URL` nem oldható fel, és a config az `infra/.env.local`-ból komponál — de az `AISZTENS_DB_PASSWORD` más, mint amivel a volume inicializálódott                                                                    | lásd a fenti sort: `01-roles.sh` újrafuttatás vagy `down -v`                                                                                       |
@@ -385,7 +460,9 @@ Ez a dokumentum **élő**. Frissíteni kell, ha változik:
   sémák, grantok),
 - a lokális DB-t érintő `package.json` script (`db:up` / `db:down` / `db:migrate`),
 - az [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts) vagy a generált
-  `apps/api/drizzle/` tartalma (új tábla/oszlop → új szakasz a §9 „megvan” táblájában),
+  `apps/api/drizzle/` tartalma (új tábla/oszlop → új szakasz a §9 „megvan” táblájában) —
+  ilyenkor a [`Database-Schema.md`](Database-Schema.md)-t is újra kell generálni
+  (`pnpm db:diagram`), különben a diagram elavul a migrációhoz képest,
 - vagy amikor a §9 „még nincs” tábla egy sora megvalósul (AIS-38 / Story 3).
 
 A frissítési kötelezettséget a [`.roo/rules/instructions.md`](../../.roo/rules/instructions.md)

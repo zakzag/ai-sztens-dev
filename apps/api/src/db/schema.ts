@@ -52,7 +52,27 @@
  *    the FK legal.
  * 4. **Partial unique indexes carry the invariants**: one live tax number, one
  *    `primary` contact per customer, one active `owner` per customer.
- * *
+ *
+ * AIS-177 (2026-11-22) added the `activity` context (`activities`) and the
+ * `audit` context (`audit_logs`). Four rules shaped it:
+ *
+ * 1. **`audit_logs` has no foreign keys on purpose.** `customer_id`, `record_id`
+ *    and `actor_id` are references by *value* only, so the log stays readable
+ *    after the customer is anonymised, the record is deleted or the staff
+ *    member is gone. A FK here would delete the evidence together with the row.
+ * 2. **Append-only is enforced by a trigger, not by grants.** Migrations run as
+ *    the app role, which *owns* the table and therefore keeps `UPDATE`/`DELETE`
+ *    no matter what is granted. `0007_audit_immutability.sql` adds the
+ *    `BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers.
+ * 3. **`audit.audit_logs.actor_type` reuses `activity.author_type`.** One
+ *    Postgres type carries the "who" vocabulary for both tables, so the two can
+ *    never drift; the migration therefore creates that type first.
+ * 4. **The author foreign keys use the default `NO ACTION`.** `SET NULL` would
+ *    violate `activities_author_reference_check`, and `RESTRICT` is checked
+ *    row-by-row — it would break the `customers → customer_users` cascade.
+ *    `NO ACTION` is checked at end-of-statement, which is exactly what a
+ *    multi-path cascade needs.
+ *
  * Workflow (AIS-36): edit this file, run
  * `pnpm --filter @callback/api db:generate`, review the generated SQL under
  * `apps/api/drizzle/`, then `db:migrate`. The generated migration and its
@@ -61,10 +81,13 @@
 
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   check,
   foreignKey,
   index,
+  inet,
+  jsonb,
   pgSchema,
   primaryKey,
   text,
@@ -82,6 +105,12 @@ export const customerSchema = pgSchema('customer');
 
 /** Identity context: our own staff and the customers' login users. */
 export const iamSchema = pgSchema('iam');
+
+/** The activity feed of a customer: notes, calls, mails, meetings. */
+export const activitySchema = pgSchema('activity');
+
+/** The immutable ledger: one row per audited write, append-only. */
+export const auditSchema = pgSchema('audit');
 
 /**
  * Every timestamp is stored with **millisecond** precision (AIS-108).
@@ -120,6 +149,21 @@ function updatedAt() {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date());
+}
+
+/**
+ * The **nullable** edit marker (AIS-177).
+ *
+ * `activitySchema.updatedAt` is `isoDateTimeSchema.nullable()` in the shared
+ * contract — an activity is usually written once and never edited, so "never
+ * edited" has to be representable. The `updatedAt()` factory above cannot do
+ * that: it is `NOT NULL DEFAULT now()`.
+ */
+function nullableUpdatedAt() {
+  return timestamp('updated_at', {
+    withTimezone: true,
+    precision: TIMESTAMP_PRECISION,
+  });
 }
 
 /**
@@ -288,6 +332,76 @@ export const customerUserStatusEnum = iamSchema.enum(
 export const operatorRoleEnum = iamSchema.enum(
   'operator_role',
   OPERATOR_ROLE_DB_VALUES,
+);
+
+/** Kind of an activity entry. Mirrors `ACTIVITY_TYPE_VALUES` (AIS-177). */
+export const ACTIVITY_TYPE_DB_VALUES = [
+  'note',
+  'call',
+  'email',
+  'meeting',
+  'status_change',
+  'system',
+] as const;
+
+/**
+ * Who wrote an activity or performed an audited change (AIS-177).
+ *
+ * Mirrors `AUTHOR_TYPE_VALUES` — **four** values. The Jira ticket lists only
+ * three; `api_key` is in the frozen AIS-16 contract, so the `CHECK` below has a
+ * fourth branch for it. A machine caller has no operator row, which is why it
+ * cannot be folded into `system`.
+ */
+export const AUTHOR_TYPE_DB_VALUES = [
+  'operator',
+  'customer_user',
+  'system',
+  'api_key',
+] as const;
+
+/** Operation recorded by the audit log. Mirrors `AUDIT_OPERATION_VALUES`. */
+export const AUDIT_OPERATION_DB_VALUES = [
+  'insert',
+  'update',
+  'delete',
+  'soft_delete',
+] as const;
+
+/** Entry point that produced an audited change. Mirrors `AUDIT_SOURCE_VALUES`. */
+export const AUDIT_SOURCE_DB_VALUES = [
+  'admin_api',
+  'web',
+  'worker',
+  'cron',
+] as const;
+
+/** `activity.activity_type`. */
+export const activityTypeEnum = activitySchema.enum(
+  'activity_type',
+  ACTIVITY_TYPE_DB_VALUES,
+);
+
+/**
+ * `activity.author_type` — **shared** by both tables (header note 3).
+ *
+ * `audit.audit_logs.actor_type` uses this same type, so "operator" cannot mean
+ * one thing in the feed and another in the ledger.
+ */
+export const authorTypeEnum = activitySchema.enum(
+  'author_type',
+  AUTHOR_TYPE_DB_VALUES,
+);
+
+/** `audit.audit_operation`. */
+export const auditOperationEnum = auditSchema.enum(
+  'audit_operation',
+  AUDIT_OPERATION_DB_VALUES,
+);
+
+/** `audit.audit_source`. */
+export const auditSourceEnum = auditSchema.enum(
+  'audit_source',
+  AUDIT_SOURCE_DB_VALUES,
 );
 
 // ---------------------------------------------------------------------------
@@ -611,3 +725,158 @@ export type ContactRoleRow = typeof contactRoles.$inferSelect;
 
 /** Shape accepted by an insert into `customer.contact_roles`. */
 export type NewContactRoleRow = typeof contactRoles.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// activity.activities
+// ---------------------------------------------------------------------------
+
+/**
+ * One entry of a customer's activity feed (AIS-177).
+ *
+ * There is no `customers.note` column in this model: **every** free-form
+ * remark is a row here with `type = 'note'` (AIS-16 `D9`), so a remark never
+ * has two possible homes.
+ *
+ * Exactly one author reference is filled, and the author's *name* is stored as
+ * a snapshot: deactivating an operator later must not make old entries
+ * authorless. `metadata` is the escape hatch for type-specific payload (a call
+ * duration, a status transition pair) — never a second copy of the columns.
+ */
+export const activities = activitySchema.table(
+  'activities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    type: activityTypeEnum('type').notNull(),
+    body: text('body').notNull(),
+    authorType: authorTypeEnum('author_type').notNull(),
+    /**
+     * `NO ACTION` (the default) and **not** `set null`: the `CHECK` below
+     * requires this column exactly when `author_type = 'operator'`, so a
+     * `SET NULL` action could never succeed.
+     */
+    operatorId: uuid('operator_id').references(() => operators.id),
+    /**
+     * `NO ACTION` as well, and deliberately **not** `restrict`: deleting a
+     * customer cascades to its `customer_users` in the same statement, and
+     * `restrict` is checked row-by-row, so it would abort that cascade.
+     */
+    customerUserId: uuid('customer_user_id').references(() => customerUsers.id),
+    /** Snapshot of the author's display name at write time. */
+    authorName: text('author_name').notNull(),
+    metadata: jsonb('metadata'),
+    createdAt: createdAt(),
+    updatedAt: nullableUpdatedAt(),
+    deletedAt: deletedAt(),
+  },
+  (table) => [
+    // One actor, exactly: four branches, one per `author_type` value. Written
+    // as a single disjunction so an impossible combination cannot slip through
+    // a "mostly correct" set of separate checks.
+    check(
+      'activities_author_reference_check',
+      sql`(
+            (${table.authorType} = 'system'
+              AND ${table.operatorId} IS NULL AND ${table.customerUserId} IS NULL)
+         OR (${table.authorType} = 'operator'
+              AND ${table.operatorId} IS NOT NULL AND ${table.customerUserId} IS NULL)
+         OR (${table.authorType} = 'customer_user'
+              AND ${table.operatorId} IS NULL AND ${table.customerUserId} IS NOT NULL)
+         OR (${table.authorType} = 'api_key'
+              AND ${table.operatorId} IS NULL AND ${table.customerUserId} IS NULL)
+      )`,
+    ),
+    // The feed query is always "live rows of one customer, newest first"; the
+    // partial predicate keeps soft-deleted rows out of the index entirely.
+    index('activities_customer_created_idx')
+      .on(table.customerId, table.createdAt.desc())
+      .where(sql`${table.deletedAt} IS NULL`),
+  ],
+);
+
+/** Shape of a row read from `activity.activities`. */
+export type ActivityRow = typeof activities.$inferSelect;
+
+/** Shape accepted by an insert into `activity.activities`. */
+export type NewActivityRow = typeof activities.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// audit.audit_logs
+// ---------------------------------------------------------------------------
+
+/**
+ * The append-only ledger of every audited write (AIS-177).
+ *
+ * Written by `AuditWriter` only, inside the **same transaction** as the business
+ * write it describes. There is no request schema for it: reads are the
+ * `GET /:id/audit-logs` endpoint (AIS-178) and nothing else.
+ *
+ * No foreign keys (header note 1): `customer_id` becomes `NULL` on
+ * anonymisation, and the row must survive the deletion of everything it points
+ * at. `before_data`/`after_data` carry only the **changed** keys — see
+ * `apps/api/src/audit/audit-diff.logic.ts`.
+ */
+export const auditLogs = auditSchema.table(
+  'audit_logs',
+  {
+    /**
+     * `bigint` identity and not `uuid`: the log is append-only and
+     * monotonically ordered, so a sequence is the natural key. `mode: 'number'`
+     * keeps the row type a plain `number` for the JSON contract.
+     */
+    id: bigint('id', { mode: 'number' })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    /** `NULL` after anonymisation — that is the whole point of having no FK. */
+    customerId: uuid('customer_id'),
+    tableName: text('table_name').notNull(),
+    /**
+     * `NULL` for rows without a uuid identity: `customer_tags` has a composite
+     * primary key, so a join-row audit carries the pair in `after_data`
+     * instead of inventing an id.
+     */
+    recordId: uuid('record_id'),
+    operation: auditOperationEnum('operation').notNull(),
+    beforeData: jsonb('before_data'),
+    afterData: jsonb('after_data'),
+    /** Reuses `activity.author_type` — header note 3. */
+    actorType: authorTypeEnum('actor_type').notNull(),
+    actorId: uuid('actor_id'),
+    /** Snapshot: the log must stay readable after the actor is gone. */
+    actorName: text('actor_name').notNull(),
+    /**
+     * When the change happened — `occurred_at`, not the generic `created_at`
+     * pair: the ledger has no edit lifecycle of its own, so "created" and
+     * "occurred" would be the same fact under two names, and the contract calls
+     * it `occurredAt`.
+     */
+    occurredAt: timestamp('occurred_at', {
+      withTimezone: true,
+      precision: TIMESTAMP_PRECISION,
+    })
+      .notNull()
+      .defaultNow(),
+    ipAddress: inet('ip_address'),
+    userAgent: text('user_agent'),
+    /** The envelope's correlation id, so a log row maps to one request. */
+    requestId: text('request_id'),
+    source: auditSourceEnum('source'),
+  },
+  (table) => [
+    index('audit_logs_customer_occurred_idx').on(
+      table.customerId,
+      table.occurredAt.desc(),
+    ),
+    // "What happened to this record over time" — the per-record history view.
+    index('audit_logs_table_record_idx').on(table.tableName, table.recordId),
+    index('audit_logs_request_id_idx').on(table.requestId),
+  ],
+);
+
+/** Shape of a row read from `audit.audit_logs`. */
+export type AuditLogRow = typeof auditLogs.$inferSelect;
+
+/** Shape accepted by an insert into `audit.audit_logs`. */
+export type NewAuditLogRow = typeof auditLogs.$inferInsert;

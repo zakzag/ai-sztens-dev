@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
+  ACTIVITY_TYPE_VALUES,
+  AUDIT_OPERATION_VALUES,
+  AUDIT_SOURCE_VALUES,
+  AUTHOR_TYPE_VALUES,
   CONTACT_ROLE_VALUES,
   CUSTOMER_SOURCE_VALUES,
   CUSTOMER_STATUS_VALUES,
@@ -12,7 +16,15 @@ import {
 } from '@callback/shared';
 import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core';
 import {
+  activities,
+  activitySchema,
+  activityTypeEnum,
   apiKeys,
+  auditLogs,
+  auditOperationEnum,
+  auditSchema,
+  auditSourceEnum,
+  authorTypeEnum,
   contactRoleEnum,
   contactRoles,
   contacts,
@@ -314,11 +326,27 @@ const ENUM_PARITY = [
   ['contact_role', contactRoleEnum, CONTACT_ROLE_VALUES],
   ['customer_user_role', customerUserRoleEnum, CUSTOMER_USER_ROLE_VALUES],
   ['customer_user_status', customerUserStatusEnum, CUSTOMER_USER_STATUS_VALUES],
-  ['operator_role', operatorRoleEnum, OPERATOR_ROLE_VALUES],] as const;
+  ['operator_role', operatorRoleEnum, OPERATOR_ROLE_VALUES],
+  // AIS-177 — the activity feed and the audit ledger.
+  ['activity_type', activityTypeEnum, ACTIVITY_TYPE_VALUES],
+  ['author_type', authorTypeEnum, AUTHOR_TYPE_VALUES],
+  ['audit_operation', auditOperationEnum, AUDIT_OPERATION_VALUES],
+  ['audit_source', auditSourceEnum, AUDIT_SOURCE_VALUES],
+] as const;
 
 const MIGRATION_FILE_0005 = fileURLToPath(
   new URL('../../drizzle/0005_colossal_hobgoblin.sql', import.meta.url),
 );
+
+const MIGRATION_FILE_0006 = fileURLToPath(
+  new URL('../../drizzle/0006_magenta_chameleon.sql', import.meta.url),
+);
+
+/** The hand-written migration that makes the ledger append-only (AIS-177). */
+const MIGRATION_FILE_0007 = fileURLToPath(
+  new URL('../../drizzle/0007_audit_immutability.sql', import.meta.url),
+);
+
 const OPERATORS_COLUMNS: readonly ColumnExpectation[] = [
   ['id', 'PgUUID', true],
   ['name', 'PgText', true],
@@ -399,6 +427,46 @@ const CONTACT_ROLES_COLUMNS: readonly ColumnExpectation[] = [
   ['customer_id', 'PgUUID', true],
 ];
 
+/** AIS-177 — the feed. `updated_at` is nullable on purpose. */
+const ACTIVITIES_COLUMNS: readonly ColumnExpectation[] = [
+  ['id', 'PgUUID', true],
+  ['customer_id', 'PgUUID', true],
+  ['type', 'PgEnumColumn', true],
+  ['body', 'PgText', true],
+  ['author_type', 'PgEnumColumn', true],
+  ['operator_id', 'PgUUID', false],
+  ['customer_user_id', 'PgUUID', false],
+  ['author_name', 'PgText', true],
+  ['metadata', 'PgJsonb', false],
+  ['created_at', 'PgTimestamp', true],
+  ['updated_at', 'PgTimestamp', false],
+  ['deleted_at', 'PgTimestamp', false],
+];
+
+/**
+ * AIS-177 — the ledger.
+ *
+ * Three column types are new to this repo and are pinned here so a Drizzle
+ * upgrade cannot silently change them: `bigint` (identity), `jsonb` and `inet`.
+ */
+const AUDIT_LOGS_COLUMNS: readonly ColumnExpectation[] = [
+  ['id', 'PgBigInt53', true],
+  ['customer_id', 'PgUUID', false],
+  ['table_name', 'PgText', true],
+  ['record_id', 'PgUUID', false],
+  ['operation', 'PgEnumColumn', true],
+  ['before_data', 'PgJsonb', false],
+  ['after_data', 'PgJsonb', false],
+  ['actor_type', 'PgEnumColumn', true],
+  ['actor_id', 'PgUUID', false],
+  ['actor_name', 'PgText', true],
+  ['occurred_at', 'PgTimestamp', true],
+  ['ip_address', 'PgInet', false],
+  ['user_agent', 'PgText', false],
+  ['request_id', 'PgText', false],
+  ['source', 'PgEnumColumn', false],
+];
+
 /** Asserts the column list and the mapped types of one table. */
 function assertColumnMapping(
   label: string,
@@ -446,6 +514,9 @@ assertColumnMapping(
   contactRoles,
   CONTACT_ROLES_COLUMNS,
 );
+assertColumnMapping('activity.activities', activities, ACTIVITIES_COLUMNS);
+assertColumnMapping('audit.audit_logs', auditLogs, AUDIT_LOGS_COLUMNS);
+
 describe('AIS-18 schema objects', () => {
   it('declares the two new contexts next to platform', () => {
     expect(customerSchema.schemaName).toBe('customer');
@@ -736,5 +807,215 @@ describe('generated migration 0005', () => {
   it('adds no note, billing or subscription column', () => {
     expect(migration).not.toContain('"note"');
     expect(migration).not.toMatch(/"(iban|billing|currency|price|plan)"/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AIS-177 — activity feed + audit ledger
+// ---------------------------------------------------------------------------
+
+describe('AIS-177 schema objects', () => {
+  it('declares the two new contexts', () => {
+    expect(activitySchema.schemaName).toBe('activity');
+    expect(auditSchema.schemaName).toBe('audit');
+  });
+
+  it('places both tables in their own context schema', () => {
+    expect(getTableConfig(activities).schema).toBe('activity');
+    expect(getTableConfig(auditLogs).schema).toBe('audit');
+  });
+
+  it('declares every enum inside its schema', () => {
+    expect(activityTypeEnum.schema).toBe('activity');
+    expect(authorTypeEnum.schema).toBe('activity');
+    expect(auditOperationEnum.schema).toBe('audit');
+    expect(auditSourceEnum.schema).toBe('audit');
+  });
+
+  it('uses the single author_type enum for both tables', () => {
+    const actorColumn = getTableConfig(auditLogs).columns.find(
+      (column) => column.name === 'actor_type',
+    ) as unknown as { enumValues?: readonly string[]; columnType?: string };
+
+    expect(actorColumn.columnType).toBe('PgEnumColumn');
+    expect(actorColumn.enumValues).toEqual([...AUTHOR_TYPE_VALUES]);
+    expect(authorTypeEnum.enumValues).toEqual([...AUTHOR_TYPE_VALUES]);
+  });
+});
+
+describe('AIS-177 defaults', () => {
+  it('generates the activity uuid on the database side', () => {
+    expect(readSqlExpression(activities.id.default)).toBe('gen_random_uuid()');
+  });
+
+  it('stamps created_at and occurred_at with now()', () => {
+    expect(readSqlExpression(activities.createdAt.default)).toBe('now()');
+    expect(readSqlExpression(auditLogs.occurredAt.default)).toBe('now()');
+    expect(auditLogs.occurredAt.notNull).toBe(true);
+  });
+
+  it('leaves the edit marker of an activity nullable and defaultless', () => {
+    expect(activities.updatedAt.notNull).toBe(false);
+    expect(activities.updatedAt.hasDefault).toBe(false);
+    expect(activities.deletedAt.notNull).toBe(false);
+    expect(activities.deletedAt.hasDefault).toBe(false);
+  });
+});
+
+describe('activities constraints', () => {
+  const config = getTableConfig(activities);
+
+  it('enforces exactly one author reference through a single named check', () => {
+    expect(config.checks.map((entry) => entry.name)).toEqual([
+      'activities_author_reference_check',
+    ]);
+
+    const sql = readSqlExpression(config.checks[0]?.value);
+
+    // One branch per `author_type` value — `api_key` included, because the
+    // frozen AIS-16 contract has four values even though the ticket named three.
+    for (const authorType of AUTHOR_TYPE_VALUES) {
+      expect(sql).toContain(`'${authorType}'`);
+    }
+  });
+
+  it('indexes the live feed of one customer, newest first', () => {
+    expect(config.indexes.map((entry) => entry.config.name)).toEqual([
+      'activities_customer_created_idx',
+    ]);
+
+    expect(config.indexes[0]?.config.where).toBeDefined();
+  });
+
+  it('cascades from the customer and never nulls an author reference', () => {
+    expect(config.foreignKeys.map((fk) => fk.onDelete)).toEqual([
+      'cascade',
+      // `NO ACTION` is the only correct choice here: `set null` would violate
+      // the author check, `restrict` would break the customer cascade because it
+      // is checked row-by-row instead of at end-of-statement.
+      'no action',
+      'no action',
+    ]);
+  });
+});
+
+describe('audit_logs constraints', () => {
+  const config = getTableConfig(auditLogs);
+
+  it('declares no foreign key at all, so the ledger outlives its referents', () => {
+    expect(config.foreignKeys).toHaveLength(0);
+    expect(config.uniqueConstraints).toHaveLength(0);
+  });
+
+  it('indexes the customer timeline, the record history and the request id', () => {
+    expect(config.indexes.map((entry) => entry.config.name)).toEqual([
+      'audit_logs_customer_occurred_idx',
+      'audit_logs_table_record_idx',
+      'audit_logs_request_id_idx',
+    ]);
+  });
+});
+
+describe('generated migration 0006', () => {
+  const migration = readFileSync(MIGRATION_FILE_0006, 'utf8');
+
+  it('creates both schemas idempotently, because they already exist on live volumes', () => {
+    expect(migration).toContain('CREATE SCHEMA IF NOT EXISTS "activity"');
+    expect(migration).toContain('CREATE SCHEMA IF NOT EXISTS "audit"');
+    expect(migration).not.toMatch(/^CREATE SCHEMA "(activity|audit)"/m);
+  });
+
+  it('creates the four enum types in the right schemas', () => {
+    expect(migration.match(/CREATE TYPE /g) ?? []).toHaveLength(4);
+    expect(migration).toContain(
+      'CREATE TYPE "activity"."activity_type" AS ENUM(',
+    );
+    expect(migration).toContain(
+      'CREATE TYPE "activity"."author_type" AS ENUM(',
+    );
+    expect(migration).toContain(
+      'CREATE TYPE "audit"."audit_operation" AS ENUM(',
+    );
+    expect(migration).toContain('CREATE TYPE "audit"."audit_source" AS ENUM(');
+  });
+
+  it('lets the ledger id be an identity column', () => {
+    expect(migration).toContain('"id" bigint PRIMARY KEY GENERATED ALWAYS');
+  });
+
+  it('stores the client ip as inet and the payloads as jsonb', () => {
+    expect(migration).toContain('"ip_address" "inet"');
+    expect(migration).toContain('"metadata" jsonb');
+    expect(migration).toContain('"before_data" jsonb');
+    expect(migration).toContain('"after_data" jsonb');
+  });
+
+  it('carries the author-reference check with all four branches', () => {
+    expect(migration).toContain(
+      'CONSTRAINT "activities_author_reference_check" CHECK',
+    );
+
+    for (const authorType of [
+      'system',
+      'operator',
+      'customer_user',
+      'api_key',
+    ]) {
+      expect(migration).toContain(`= '${authorType}'`);
+    }
+  });
+
+  it('keeps the feed index partial', () => {
+    expect(migration).toContain(
+      'WHERE "activity"."activities"."deleted_at" IS NULL',
+    );
+  });
+
+  it('stores every new timestamp with millisecond precision', () => {
+    expect(migration).not.toMatch(/timestamp with time zone/);
+    expect(
+      migration.match(/timestamp \(3\) with time zone/g) ?? [],
+    ).toHaveLength(4);
+  });
+
+  it('adds no foreign key to the ledger', () => {
+    expect(migration).not.toContain(
+      'ALTER TABLE "audit"."audit_logs" ADD CONSTRAINT',
+    );
+  });
+});
+
+describe('hand-written migration 0007 (append-only ledger)', () => {
+  const migration = readFileSync(MIGRATION_FILE_0007, 'utf8');
+
+  it('defines the rejecting function inside the audit schema', () => {
+    expect(migration).toContain(
+      'CREATE OR REPLACE FUNCTION audit.reject_audit_mutation()',
+    );
+    expect(migration).toContain('RAISE EXCEPTION');
+  });
+
+  it('blocks update and delete row by row', () => {
+    expect(migration).toContain('BEFORE UPDATE OR DELETE ON audit.audit_logs');
+    expect(migration).toContain('FOR EACH ROW');
+  });
+
+  it('blocks truncate with a statement trigger, which row triggers cannot catch', () => {
+    expect(migration).toContain('BEFORE TRUNCATE ON audit.audit_logs');
+    expect(migration).toContain('FOR EACH STATEMENT');
+  });
+
+  it('grants select and insert without hard-coding a role name', () => {
+    expect(migration).toContain(
+      'GRANT SELECT, INSERT ON audit.audit_logs TO CURRENT_USER',
+    );
+    expect(migration).toContain('REVOKE ALL ON audit.audit_logs FROM PUBLIC');
+  });
+
+  it('documents that the trigger, not the grant, is the enforcement', () => {
+    expect(migration).toContain('append-only');
+    expect(migration).toContain(
+      'db:generate --custom --name=audit_immutability',
+    );
   });
 });

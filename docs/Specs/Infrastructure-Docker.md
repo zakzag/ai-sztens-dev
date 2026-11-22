@@ -2,7 +2,7 @@
 
 **Státusz:** Élő
 
-**Utolsó frissítés:** 2026-11-22 (AIS-18: a `customer` és `iam` Postgres séma — 7 tábla, 8 enum — a `0005` migrációval; a grant-mátrix így 4 séma / 12 USAGE / 3 CREATE, a `customer` és `iam` sémán az app role `USAGE + CREATE`-ot kap. AIS-35: per-kontext Postgres sémák — `platform`, `callback`, `email` — és a hozzájuk tartozó grantok, új `02-schemas.sh` init script; lásd §6.2)
+**Utolsó frissítés:** 2026-11-22 (AIS-177: az `activity` és `audit` Postgres séma — 2 tábla, 4 enum — a `0006` migrációval, a napló írásvédelme pedig a `0007` kézi migráció triggereivel; a grant-mátrix így 6 séma / 18 USAGE / 5 CREATE. AIS-18: a `customer` és `iam` Postgres séma — 7 tábla, 8 enum — a `0005` migrációval; a grant-mátrix így 4 séma / 12 USAGE / 3 CREATE, a `customer` és `iam` sémán az app role `USAGE + CREATE`-ot kap. AIS-35: per-kontext Postgres sémák — `platform`, `callback`, `email` — és a hozzájuk tartozó grantok, új `02-schemas.sh` init script; lásd §6.2)
 
 **Korábbi frissítés:** 2026-10-12 (deploy metadata: az `images.yml` három új build-argot ad át — `COMMIT_HASH` / `DEPLOY_DATE` az api képnek, `VITE_COMMIT_HASH` / `VITE_DEPLOY_DATE` a `web`/`admin` képnek —, így a futó image egy konkrét revízióhoz köthető; lásd §6.1)
 
@@ -169,12 +169,13 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml \
 | Script                                                     | Felelősség                                                                                                                                                                                           |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh)     | `aisztens` (app), `tkovari` (owner) és `krak` (operátor) role; a database tulajdonosa az `aisztens`; séma-szintű grantok `\gexec`-guarddal — friss initen no-op, mert a sémák ekkor még nem léteznek |
-| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform`, `email`, `customer` és `iam` sémákra, majd a grant-mátrix                                                                                                |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `CREATE SCHEMA IF NOT EXISTS` a `platform`, `email`, `customer`, `iam`, `activity` és `audit` sémákra, majd a grant-mátrix                                                                                |
 
 Séma ↔ bounded context: `platform` (üzemeltetési adatok + az alkalmazás táblái,
 pl. `platform.api_keys`), `email` (email engine), `customer` (az ügyfél-aggregátum,
-AIS-18) és `iam` (a saját munkatársak és az ügyfél-belépők, AIS-18). A sémahatár
-egyben modulhatár, ezért a grantok is ezt követik:
+AIS-18), `iam` (a saját munkatársak és az ügyfél-belépők, AIS-18), `activity`
+(a cég tevékenység-feedje, AIS-177) és `audit` (a csak hozzáfűzhető változás-napló,
+AIS-177). A sémahatár egyben modulhatár, ezért a grantok is ezt követik:
 
 | Séma       | `aisztens` (app)   | `tkovari` (owner) | `krak` (operátor) |
 | ---------- | ------------------ | ----------------- | ----------------- |
@@ -182,6 +183,17 @@ egyben modulhatár, ezért a grantok is ezt követik:
 | `email`    | USAGE              | USAGE             | USAGE             |
 | `customer` | USAGE + **CREATE** | USAGE             | USAGE             |
 | `iam`      | USAGE + **CREATE** | USAGE             | USAGE             |
+| `activity` | USAGE + **CREATE** | USAGE             | USAGE             |
+| `audit`    | USAGE + **CREATE** | USAGE             | USAGE             |
+
+> **AIS-177 (2026-11-22):** az `activity` és `audit` séma (2 tábla, 4 enum) a
+> `0006` migrációval jön létre, a napló írásvédelmét pedig a `0007` kézi migráció
+> két triggere adja (`BEFORE UPDATE OR DELETE`, illetve `BEFORE TRUNCATE`). Az
+> `audit` séma `CREATE` joga ezért nem lazítás: a migrációnak létre kell tudnia
+> hozni a táblát, a tiltást nem a grant, hanem a trigger kényszeríti ki — a
+> migrációt futtató app role ugyanis a tábla tulajdonosa. A smoke-checkek várt
+> értékei így **6 séma / 18 USAGE / 5 CREATE**. Részletek:
+> [`Database-Local.md`](Database-Local.md) §4.2.
 
 > **AIS-18 (2026-11-22):** a `customer` és `iam` séma (7 tábla, 8 enum) a `0005`
 > migrációval jön létre, ezért az app role itt is `CREATE`-ot kap. A migráció
@@ -193,7 +205,7 @@ egyben modulhatár, ezért a grantok is ezt követik:
 > **AIS-64 (2026-10-21):** a `callback` séma megszűnt (a teljes visszahívás-funkció
 > törlése). A korábbi mátrixban szereplő `callback | USAGE + CREATE` sor eltűnt; a
 > smoke-checkek várt értékei akkor 2 séma / 6 USAGE / 1 CREATE voltak, az AIS-18-cal
-> **4 séma / 12 USAGE / 3 CREATE**.
+> **4 séma / 12 USAGE / 3 CREATE**, az AIS-177-tel **6 séma / 18 USAGE / 5 CREATE**.
 
 A `CREATE` jog kizárólag az app role-é, és kizárólag azokban a sémákban, amelyek
 alkalmazás-táblákat hordoznak: a Drizzle migrációs runner a `platform` sémában

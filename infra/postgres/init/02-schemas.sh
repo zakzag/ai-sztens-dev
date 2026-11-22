@@ -28,6 +28,8 @@
 #   email       USAGE                 USAGE             USAGE
 #   customer    USAGE + CREATE        USAGE             USAGE
 #   iam         USAGE + CREATE        USAGE             USAGE
+#   activity    USAGE + CREATE        USAGE             USAGE
+#   audit       USAGE + CREATE        USAGE             USAGE
 #
 # Only the application role may create objects, and only in the schemas that
 # hold application tables:
@@ -36,7 +38,12 @@
 #     plus the operations tables (AIS-39: `platform.api_keys`);
 #   - `customer` — the customer aggregate (AIS-18: `customers`, `tags`,
 #     `customer_tags`, `contacts`, `contact_roles`);
-#   - `iam` — identities (AIS-18: `operators`, `customer_users`).
+#   - `iam` — identities (AIS-18: `operators`, `customer_users`);
+#   - `activity` — the per-customer activity feed (AIS-177: `activities`);
+#   - `audit` — the append-only change ledger (AIS-177: `audit_logs`). The
+#     schema needs CREATE for the same reason as the others: the migration
+#     creates the table. `UPDATE`/`DELETE` on that table are blocked by a
+#     trigger, not by a grant, because the app role owns it.
 # `email` stays USAGE-only here: its tables are created outside migrations, so
 # the app role never needs CREATE on it.
 # The two human operator roles keep USAGE so they can inspect data
@@ -67,12 +74,16 @@ CREATE SCHEMA IF NOT EXISTS email;
 -- same owner and the same grants.
 CREATE SCHEMA IF NOT EXISTS customer;
 CREATE SCHEMA IF NOT EXISTS iam;
+-- AIS-177: the activity feed and the append-only audit ledger.
+CREATE SCHEMA IF NOT EXISTS activity;
+CREATE SCHEMA IF NOT EXISTS audit;
 
 -- USAGE for the app role and both operator roles on every context schema.
 -- The join on pg_namespace keeps the statement a no-op if a schema is missing
 -- (e.g. when a single CREATE above is removed), so the file stays idempotent.
 SELECT format('GRANT USAGE ON SCHEMA %I TO %I', s.nspname, r.rolname)
-  FROM (VALUES ('platform'), ('email'), ('customer'), ('iam')) AS s(nspname)
+  FROM (VALUES ('platform'), ('email'), ('customer'), ('iam'),
+               ('activity'), ('audit')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
   CROSS JOIN (VALUES (:'aisztens_db_user'), ('tkovari'), ('krak')) AS r(rolname)
 \gexec
@@ -83,9 +94,10 @@ SELECT format('GRANT USAGE ON SCHEMA %I TO %I', s.nspname, r.rolname)
 -- bookkeeping table (`platform.__drizzle_migrations`) and, since AIS-18,
 -- `customer` and `iam` hold the application tables themselves.
 SELECT format('GRANT CREATE ON SCHEMA %I TO %I', s.nspname, :'aisztens_db_user')
-  FROM (VALUES ('platform'), ('customer'), ('iam')) AS s(nspname)
+  FROM (VALUES ('platform'), ('customer'), ('iam'),
+               ('activity'), ('audit')) AS s(nspname)
   JOIN pg_namespace n ON n.nspname = s.nspname
 \gexec
 
-\echo '[02-schemas] platform, email, customer and iam schemas and grants are in place.'
+\echo '[02-schemas] platform, email, customer, iam, activity and audit schemas and grants are in place.'
 EOSQL

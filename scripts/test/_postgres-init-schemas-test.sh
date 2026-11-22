@@ -118,29 +118,31 @@ psql_q() {
 
 assert_schemas_present() {
   local label="$1" got
-  # AIS-64 removed the `callback` context; AIS-18 added `customer` and `iam`.
-  got="$(psql_q "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','email','customer','iam')")"
-  [ "$got" = "4" ] && ok "$label: platform, email, customer and iam schemas exist" \
-    || bad "$label: four schemas exist" "count=$got (expected 4)"
+  # AIS-64 removed the `callback` context; AIS-18 added `customer` and `iam`;
+  # AIS-177 added `activity` and `audit`.
+  got="$(psql_q "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','email','customer','iam','activity','audit')")"
+  [ "$got" = "6" ] && ok "$label: all six context schemas exist" \
+    || bad "$label: six schemas exist" "count=$got (expected 6)"
 }
 
 assert_usage() {
   local label="$1"
   local role got
   for role in aisztens tkovari krak; do
-    got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('email'),('customer'),('iam')) AS s(nspname) WHERE has_schema_privilege('$role', s.nspname, 'USAGE')")"
-    [ "$got" = "4" ] && ok "$label: $role has USAGE on all four schemas" \
-      || bad "$label: $role has USAGE on all four schemas" "count=$got (expected 4)"
+    got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('email'),('customer'),('iam'),('activity'),('audit')) AS s(nspname) WHERE has_schema_privilege('$role', s.nspname, 'USAGE')")"
+    [ "$got" = "6" ] && ok "$label: $role has USAGE on all six schemas" \
+      || bad "$label: $role has USAGE on all six schemas" "count=$got (expected 6)"
   done
 }
 
 # Expected: CREATE only for the app role, and only in the schemas that host
 # application tables — `platform` (the Drizzle bookkeeping table
-# `platform.__drizzle_migrations` plus `platform.api_keys`) and, since AIS-18,
-# `customer` and `iam`. `email` keeps USAGE only. AIS-64 removed `callback`.
+# `platform.__drizzle_migrations` plus `platform.api_keys`), `customer` and
+# `iam` (AIS-18), and `activity` + `audit` (AIS-177; the ledger's append-only
+# rule is a trigger, not a missing grant). `email` keeps USAGE only.
 assert_create_privileges() {
   local label="$1" got schema role
-  for schema in platform customer iam; do
+  for schema in platform customer iam activity audit; do
     got="$(psql_q "SELECT has_schema_privilege('aisztens','$schema','CREATE')")"
     [ "$got" = "t" ] && ok "$label: aisztens may CREATE objects in $schema" \
       || bad "$label: aisztens may CREATE objects in $schema" "got=$got (expected t)"
@@ -170,13 +172,13 @@ assert_roles_present() {
 # a live `pnpm test:stack` run.
 assert_smoke_queries() {
   local label="$1" got
-  got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('email'),('customer'),('iam')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')")"
-  [ "$got" = "12" ] && ok "$label: smoke USAGE query returns 12" \
-    || bad "$label: smoke USAGE query returns 12" "count=$got (expected 12)"
+  got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('email'),('customer'),('iam'),('activity'),('audit')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'USAGE')")"
+  [ "$got" = "18" ] && ok "$label: smoke USAGE query returns 18" \
+    || bad "$label: smoke USAGE query returns 18" "count=$got (expected 18)"
 
-  got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('customer'),('iam')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')")"
-  [ "$got" = "3" ] && ok "$label: smoke CREATE query returns 3" \
-    || bad "$label: smoke CREATE query returns 3" "count=$got (expected 3)"
+  got="$(psql_q "SELECT count(*) FROM (VALUES ('platform'),('customer'),('iam'),('activity'),('audit')) AS s(nspname) CROSS JOIN (VALUES ('aisztens'),('tkovari'),('krak')) AS r(rolname) WHERE has_schema_privilege(r.rolname, s.nspname, 'CREATE')")"
+  [ "$got" = "5" ] && ok "$label: smoke CREATE query returns 5" \
+    || bad "$label: smoke CREATE query returns 5" "count=$got (expected 5)"
 }
 
 echo "--- fresh init (entrypoint) ---"

@@ -109,15 +109,15 @@ run_cross_service_checks() {
   # the idempotent re-run path is covered by
   # scripts/test/_postgres-init-schemas-test.sh instead. Same -U/-d ordering
   # rule as the role check above.
-  # AIS-64 removed the `callback` context; AIS-18 added `customer` and `iam`,
-  # so four schemas remain.
+  # AIS-64 removed the `callback` context; AIS-18 added `customer` and `iam`;
+  # AIS-177 added `activity` and `audit`, so six schemas exist.
   assert_service_out "postgres-schemas" \
-    "schemas platform, email, customer and iam exist" \
-    "4" \
+    "schemas platform, email, customer, iam, activity and audit exist" \
+    "6" \
     dc_exec postgres psql \
       -U "$(resolve_env_value POSTGRES_USER postgres)" \
       -d "$(resolve_env_value POSTGRES_DB aisztens_db)" \
-      -At -c "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','email','customer','iam')"
+      -At -c "SELECT count(*) FROM pg_namespace WHERE nspname IN ('platform','email','customer','iam','activity','audit')"
 
   # -----------------------------------------------------------------------
   # 5c. postgres — schema privileges (AIS-35).

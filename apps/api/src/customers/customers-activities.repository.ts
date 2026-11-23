@@ -148,7 +148,15 @@ export class DrizzleCustomerActivitiesRepository implements CustomerActivitiesRe
           isNull(activities.deletedAt),
           // `updated_at ?? created_at`, in SQL: the token of a never-edited row
           // is its creation instant (`F4`).
-          sql`coalesce(${activities.updatedAt}, ${activities.createdAt}) = ${expectedLastWrite}`,
+          //
+          // The token is bound as an ISO string, **not** as a `Date`. A raw `sql`
+          // parameter bypasses the column encoder that `eq()` uses (which maps a
+          // `Date` to its ISO text), and the driver cannot bind a `Date` in a
+          // prepared statement — it rejected the whole `PATCH` with
+          // `ERR_INVALID_ARG_TYPE: The "string" argument must be of type string …
+          // Received an instance of Date` (AIS-14 R1). The explicit
+          // `::timestamptz` cast keeps the comparison typed.
+          sql`coalesce(${activities.updatedAt}, ${activities.createdAt}) = ${expectedLastWrite.toISOString()}::timestamptz`,
         ),
       )
       .returning();

@@ -90,6 +90,20 @@ export const customerCountrySchema = z
   .regex(CUSTOMER_COUNTRY_PATTERN);
 
 /**
+ * The `:id` path parameter of every single-customer route (AIS-178 `D8`).
+ *
+ * A malformed uuid must never reach Postgres: `'abc'::uuid` raises SQLSTATE
+ * `22P02`, which the driver reports as an unknown failure and the filter turns
+ * into a `500`. Validating the parameter with the **existing** generic
+ * `ZodValidationPipe` makes it a `400 VALIDATION_FAILED` with the offending
+ * `path`, exactly like a bad body or query does.
+ *
+ * Declared here (not in `apps/api`) so the OpenAPI parameter descriptor, the
+ * server pipe and a future client-side pre-check share one definition.
+ */
+export const customerIdSchema = z.string().uuid();
+
+/**
  * JSON object column (`metadata`).
  *
  * `z.record(z.unknown())` instead of `z.any()`: the keys are known to be
@@ -101,10 +115,12 @@ const jsonRecordSchema = z.record(z.unknown());
 /**
  * A customer as it appears in the list and as the base of the detail response.
  *
- * `lastActivityAt` and `hasMissingData` are **derived**, not stored: the first
- * is `max(activities.created_at)`, the second is “tax number or registered
- * postal code is missing”. Storing them would create a second truth that drifts
- * the moment an activity is written — see the plan (AIS-14) §2.4.
+ * `lastActivityAt`, `hasMissingData` and `primaryContactName` are **derived**,
+ * not stored: the first is `max(activities.created_at)`, the second is “tax
+ * number or registered postal code is missing”, the third is the name of the
+ * live contact carrying the `primary` role. Storing them would create a second
+ * truth that drifts the moment an activity or a contact changes — see the plan
+ * (AIS-14) §2.4 and AIS-17 `D9` (the list column needs the primary contact).
  */
 export const customerSchema = z.object({
   id: z.string().uuid(),
@@ -139,6 +155,13 @@ export const customerSchema = z.object({
   updatedAt: isoDateTimeSchema,
   lastActivityAt: isoDateTimeSchema.nullable(),
   hasMissingData: z.boolean(),
+  /**
+   * Name of the live contact with the `primary` role; `null` when none is set.
+   *
+   * `null` and not `''`: “no primary contact” is a real state the admin list
+   * renders as a missing-data marker (AIS-17 `D9`).
+   */
+  primaryContactName: z.string().nullable(),
 });
 
 /** Body of `GET /api/admin/customers` — an array, empty when nothing matches. */

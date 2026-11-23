@@ -252,6 +252,7 @@ export {
   createCustomerTagSchema,
   customerCountrySchema,
   customerDetailSchema,
+  customerIdSchema,
   customerListSchema,
   customerNumberSchema,
   customerSchema,

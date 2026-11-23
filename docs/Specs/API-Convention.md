@@ -1,6 +1,6 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-11-22 (AIS-16: a `customers` erőforrás szerződés-sémái a `packages/shared/src/contract/customers/` alatt; a lista a közös lapozás mellé négy szűrőt kap — `type`, `status`, `source`, `responsibleOperatorId` —, lásd §4.1) 2026-11-07 (AIS-152: a `HttpEvent` négy új mezőt hordoz — `requestId`, `query`, maszkolt `bodyPreview`, `responseMeta` —, a token/`Authorization` továbbra sem kerülhet az eseménybe; lásd §9) (AIS-136: a 3. tier — app-szintű banner — a megjelenítés **mellett** toastol is; a `field` tier az egyetlen, amely toast nélkül marad, lásd §10) (AIS-112: közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3)
+**Utolsó frissítés:** 2026-11-22 (AIS-178/b: a `customers` végpontok élnek — hat route a `/api/admin/*` alatt, `CUSTOMER_NUMBER_CONFLICT` / `CUSTOMER_TAX_NUMBER_CONFLICT`, `primaryContactName` a wire-en, malformed uuid → `400`, lásd §4.3) 2026-11-22 (AIS-16: a `customers` erőforrás szerződés-sémái a `packages/shared/src/contract/customers/` alatt; a lista a közös lapozás mellé négy szűrőt kap — `type`, `status`, `source`, `responsibleOperatorId` —, lásd §4.1) 2026-11-07 (AIS-152: a `HttpEvent` négy új mezőt hordoz — `requestId`, `query`, maszkolt `bodyPreview`, `responseMeta` —, a token/`Authorization` továbbra sem kerülhet az eseménybe; lásd §9) (AIS-136: a 3. tier — app-szintű banner — a megjelenítés **mellett** toastol is; a `field` tier az egyetlen, amely toast nélkül marad, lásd §10) (AIS-112: közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3)
 **Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109; client binding of every registered operation + registry ⇄ service coverage gate + resource template: AIS-110; közös formátum-sémák + kétnyelvű validációs üzenetek: AIS-112
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
@@ -252,6 +252,55 @@ Every mutable resource follows **one** convention. `api-keys` is the reference i
 enough. The two schemas the mutation needs are named components: `UpdateApiKey` (request) and
 `NoPayload` (`data` of the delete). `envelopeOf()` can only describe a payload with a component name,
 which is why `noPayloadSchema` exists at all.
+
+### 4.3 The `customers` resource (AIS-178) — the first `/api/admin/*` family
+
+Six operations, all mounted under `/api/admin/customers` and implemented by
+[`CustomersController`](../../apps/api/src/customers/customers.controller.ts:1). The prefix carries the
+`admin` segment on purpose: customer data is back-office data and must not be reachable under a
+shorter path.
+
+| operationId             | method   | path                       | success | notes                                                    |
+| ----------------------- | -------- | -------------------------- | ------- | -------------------------------------------------------- |
+| `customers.list`        | `GET`    | `/api/admin/customers`     | `200`   | `meta.pagination`; `q` over legal name / tax no. / number |
+| `customers.findById`    | `GET`    | `/api/admin/customers/:id` | `200`   | parent + tags + live contacts (+roles) + users             |
+| `customers.create`      | `POST`   | `/api/admin/customers`     | `201`   | `customer_number` and the timestamps are server values    |
+| `customers.update`      | `PATCH`  | `/api/admin/customers/:id` | `200`   | `updatedAt` required and never written                    |
+| `customers.updateStatus`| `PATCH`  | `/api/admin/customers/:id/status` | `200` | also writes `status_changed_at`                     |
+| `customers.remove`      | `DELETE` | `/api/admin/customers/:id` | `200`   | soft delete; `data: null`                                 |
+
+**Two `409` codes, both from constraint names** (never a pre-check):
+
+| Code                          | Raised by                                          | `details[0].path` |
+| ----------------------------- | -------------------------------------------------- | ----------------- |
+| `CUSTOMER_NUMBER_CONFLICT`    | `customers_customer_number_key` (or a full month)   | `customerNumber`  |
+| `CUSTOMER_TAX_NUMBER_CONFLICT`| `customers_tax_number_key` (partial: live rows only)| `taxNumber`       |
+
+A `23505` from **any other** constraint stays a `500` — a fabricated business conflict would hide a
+real bug. Classification happens on the error's structured fields (`code` + `constraint_name`), never
+on message text.
+
+**`primaryContactName` is on the wire.** The list and the detail both carry it (plus
+`lastActivityAt` and `hasMissingData`), and all three are **derived, never stored**:
+`max(activities.created_at)` and the name of the live contact holding the `primary` role. They are
+projected by the same round trip as the row, so the list costs the same two queries it did before
+(page + count) and the detail at most four.
+
+**`:id` is validated before it reaches Postgres.** `customerIdSchema` (`z.string().uuid()`) runs in the
+route's `ZodValidationPipe`, so `/api/admin/customers/not-a-uuid` is a `400 VALIDATION_FAILED`. Without
+it, `'not-a-uuid'::uuid` raises SQLSTATE `22P02` and the envelope would answer `500` (plan `D8`).
+A **well-formed but unknown** uuid is still `404 NOT_FOUND`.
+
+**`DELETE` never answers `STALE_WRITE`.** The route carries no body, so there is no token to compare;
+a repeat delete is a `404`, and the archived row keeps its data while freeing its tax number (the
+partial unique index excludes `deleted_at IS NOT NULL`).
+
+**The audience is `admin`, and the audit actor is `system`.** Every mutation writes exactly one
+`audit.audit_logs` row **on the caller's transaction**, with only the changed keys in
+`before_data`/`after_data`. Until the admin auth lands (AIS-73/74), the ledger honestly says
+`actor_type = 'system'` (§7.1); the mutating handlers are the only ones that read the raw request
+(`@Req()` + `toAuditRequestFacts()`), because `ip`, `user-agent` and `source` are not part of the
+envelope context.
 
 ---
 

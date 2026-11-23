@@ -53,6 +53,8 @@ export const VALID_CUSTOMER: Customer = {
   updatedAt: '2026-11-15T09:00:00.000Z',
   lastActivityAt: '2026-11-17T14:30:00.000Z',
   hasMissingData: false,
+  // Derived from {@link VALID_CONTACT}'s `primary` role (AIS-178 `D4`).
+  primaryContactName: 'Nagy Anna',
 };
 
 /**
@@ -86,6 +88,8 @@ export const SECOND_CUSTOMER: Customer = {
   updatedAt: '2026-11-18T10:15:00.000Z',
   lastActivityAt: null,
   hasMissingData: true,
+  // No contact at all yet — the “no primary contact” state (AIS-17 `D9`).
+  primaryContactName: null,
 };
 
 /** Payload example of `GET /api/admin/customers` (a two-element list). */

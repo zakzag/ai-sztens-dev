@@ -30,11 +30,17 @@ import {
   apiKeyListSchema,
   apiKeySchema,
   createApiKeySchema,
+  createCustomerSchema,
+  customerDetailSchema,
+  customerListSchema,
+  customerSchema,
   noPayloadSchema,
   paginationMetaSchema,
   responseMetaSchema,
   resolveApiErrorStatus,
   updateApiKeySchema,
+  updateCustomerSchema,
+  updateCustomerStatusSchema,
 } from '@callback/shared';
 import type { ApiEndpointContract, ApiErrorCode } from '@callback/shared';
 import { UnregisteredPayloadSchemaError } from './openapi.errors.js';
@@ -96,6 +102,14 @@ const PAYLOAD_COMPONENTS: ReadonlyMap<z.ZodTypeAny, string> = new Map<
   [apiKeySchema, 'ApiKey'],
   [apiKeyListSchema, 'ApiKeyList'],
   [createApiKeySchema, 'CreateApiKey'],
+  // The `customers` aggregate (AIS-178): one component per published schema, so
+  // the list, the detail and the three request bodies each have their own name.
+  [customerSchema, 'Customer'],
+  [customerListSchema, 'CustomerList'],
+  [customerDetailSchema, 'CustomerDetail'],
+  [createCustomerSchema, 'CreateCustomer'],
+  [updateCustomerSchema, 'UpdateCustomer'],
+  [updateCustomerStatusSchema, 'UpdateCustomerStatus'],
   // `UpdateApiKey` is a **request** component (AIS-108): `envelopeOf()` never
   // wraps it, but `payloadComponentName()` resolves the request body's `$ref`
   // through this same table, so it has to be named here.

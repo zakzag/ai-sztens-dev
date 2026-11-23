@@ -175,11 +175,10 @@ export const CUSTOMERS_ENDPOINTS = [
     // `null` is the published sample: a `DELETE` has nothing to return, and the
     // envelope still carries `meta.requestId`.
     example: null,
-    errors: [
-      API_ERROR_CODE.NOT_FOUND,
-      API_ERROR_CODE.STALE_WRITE,
-      ...COMMON_ERRORS,
-    ],
+    // No `STALE_WRITE`: a `DELETE` carries no body, so there is no token to
+    // compare, and a soft delete loses no field value (AIS-178 `D5`). The only
+    // documented failure is `404` — a repeat delete finds nothing to hide.
+    errors: [API_ERROR_CODE.NOT_FOUND, ...COMMON_ERRORS],
     envelope: true,
   },
 ] as const satisfies readonly ApiEndpointContract[];

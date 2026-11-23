@@ -139,10 +139,16 @@ describe('component registration', () => {
       'ApiKey',
       'ApiKeyList',
       'CreateApiKey',
+      'CreateCustomer',
+      'Customer',
+      'CustomerDetail',
+      'CustomerList',
       'NoPayload',
       'PaginationMeta',
       'ResponseMeta',
       'UpdateApiKey',
+      'UpdateCustomer',
+      'UpdateCustomerStatus',
     ]);
   });
 

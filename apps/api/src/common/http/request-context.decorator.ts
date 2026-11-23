@@ -48,8 +48,14 @@ export function resolveRequestContext(
  * Parameter decorator that hands the controller its {@link RequestContext}.
  *
  * The controller passes the context straight to `responses.ok(result, ctx)`, so
- * `meta.requestId` can never be forgotten, and the controller never touches the
+ * `meta.requestId` can never be forgotten, and a read handler never touches the
  * raw request object (which keeps it mockable in unit tests).
+ *
+ * **One documented exception (AIS-178 `D9`):** a handler that writes an audit row
+ * also takes `@Req()`. The audit facts (`ip`, `user-agent`, `source`) live on the
+ * raw request and are genuinely absent from this context, so the mutating
+ * `customers` handlers read it through `toAuditRequestFacts()` — the seam
+ * AIS-177 `D7` designed. Read-only handlers keep the original rule.
  *
  * @returns the resolved context of the current HTTP request.
  */

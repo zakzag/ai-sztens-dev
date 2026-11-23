@@ -51,9 +51,7 @@ import { createCustomersDatabaseMock } from './test/mocks/database.mock.js';
  */
 describe('CUSTOMER_PROJECTION', () => {
   it('qualifies every reference of the lastActivityAt subquery', () => {
-    const expression = readSqlExpression(
-      CUSTOMER_PROJECTION.lastActivityAt,
-    );
+    const expression = readSqlExpression(CUSTOMER_PROJECTION.lastActivityAt);
 
     expect(expression).toContain('"activity"."activities"."created_at"');
     expect(expression).toContain('"activity"."activities"."customer_id"');
@@ -69,9 +67,7 @@ describe('CUSTOMER_PROJECTION', () => {
 
     expect(expression).toContain('"customer"."contacts"."name"');
     expect(expression).toContain('"customer"."contacts"."customer_id"');
-    expect(expression).toContain(
-      '"customer"."contact_roles"."contact_id"',
-    );
+    expect(expression).toContain('"customer"."contact_roles"."contact_id"');
     expect(expression).toContain('"customer"."customers"."id"');
   });
 });

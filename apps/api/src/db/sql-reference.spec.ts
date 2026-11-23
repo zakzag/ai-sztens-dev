@@ -1,12 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { PgDialect, pgTable, uuid } from 'drizzle-orm/pg-core';
 
-import {
-  activities,
-  contactRoles,
-  contacts,
-  customers,
-} from './schema.js';
+import { activities, contactRoles, contacts, customers } from './schema.js';
 import { qualifiedColumn } from './sql-reference.js';
 
 /**

@@ -1,5 +1,9 @@
 import { getTableName, sql, type SQL } from 'drizzle-orm';
-import { getTableConfig, type PgColumn, type PgTable } from 'drizzle-orm/pg-core';
+import {
+  getTableConfig,
+  type PgColumn,
+  type PgTable,
+} from 'drizzle-orm/pg-core';
 
 /**
  * Renders a schema-qualified column reference (`"schema"."table"."column"`).

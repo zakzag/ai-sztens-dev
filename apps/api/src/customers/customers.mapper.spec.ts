@@ -181,10 +181,7 @@ describe('toContactsWithRoles', () => {
 
 describe('toNewCustomerRow', () => {
   it('fills the server-owned values and the contract defaults', () => {
-    const row = toNewCustomerRow(
-      buildCreateCustomerInput(),
-      'AIS-202611-007',
-    );
+    const row = toNewCustomerRow(buildCreateCustomerInput(), 'AIS-202611-007');
 
     expect(row.customerNumber).toBe('AIS-202611-007');
     expect(row.status).toBe('prospect');
@@ -193,10 +190,7 @@ describe('toNewCustomerRow', () => {
   });
 
   it('leaves statusChangedAt to the database so it matches createdAt', () => {
-    const row = toNewCustomerRow(
-      buildCreateCustomerInput(),
-      'AIS-202611-007',
-    );
+    const row = toNewCustomerRow(buildCreateCustomerInput(), 'AIS-202611-007');
 
     expect(row.statusChangedAt).toBeUndefined();
   });

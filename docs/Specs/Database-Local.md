@@ -2,6 +2,8 @@
 
 **Státusz:** Élő
 
+**Utolsó frissítés:** 2026-11-23 (AIS-178/f: a napló olvasása él — `GET /api/admin/customers/:id/audit-logs` —, és mivel az `audit.audit_logs` append-only, az e2e suite-ok által hagyott sorok kitakarításának receptje a §10.1-ben van)
+
 **Utolsó frissítés:** 2026-11-22 (AIS-177: a tevékenység- és audit-napló — `activity` és `audit` séma, 2 tábla (`activity.activities`, `audit.audit_logs`), 4 enum típus, `0006` generált migráció + `0007` kézi migráció (append-only trigger és grant); a két új sémán az app role `USAGE + CREATE`-ot kap, ezért a grant-mátrix és a smoke-várható értékek 6 séma / 18 USAGE / 5 CREATE lettek. **Korábban:** AIS-18: a cég-aggregátum saját `customer` sémát kapott, az identitás-kezelés pedig `iam` sémát — összesen 8 Postgres enum típus és 7 tábla (`iam.operators`, `customer.customers`, `customer.tags`, `customer.customer_tags`, `iam.customer_users`, `customer.contacts`, `customer.contact_roles`), `0005` migrációval; a két új sémán az app role `USAGE + CREATE`-ot kap, az `email` marad `USAGE`-only, ezért a grant-mátrix és a smoke-várható értékek 4 séma / 12 USAGE / 3 CREATE lettek. AIS-108: a `DELETE` **soft delete** — a `platform.api_keys` tábla nullable `deleted_at` oszlopot és `api_keys_deleted_at_idx` indexet kapott a `0003` migrációban; minden olvasás és írás `deleted_at IS NULL`-ra szűr, ezért a törölt sor `404`-et ad, a `PATCH` pedig az `updated_at`-et használja optimistic concurrency tokenként (`409 STALE_WRITE`). AIS-40: a `platform.api_keys` tábla **első fogyasztója** elkészült — `api-keys` modul (`DrizzleApiKeysRepository` a `API_KEYS_REPOSITORY` tokenen, service, controller, DTO), `GET /api/api-keys`, `GET /api/api-keys/:identifier`, `POST /api/api-keys`; duplikált `identifier` → `409`, ismeretlen azonosító → `404`, érvénytelen payload → `400`. A duplikátum-detektálás a `23505` + `api_keys_identifier_key` párost használja a Drizzle `cause`-láncában. AIS-39: elkészült az első valódi domain tábla, a `platform.api_keys` — `0002` migráció, uuid PK, `api_keys_identifier_key` egyedi constraint az `identifier`-en, `timestamptz` időbélyegek, `getTableConfig()`-alapú egységtesztek. AIS-56: elkészült a `DatabaseModule` — `DATABASE` provider a Drizzle handle-hez, `DATABASE_URL` a `ConfigService`-ből, hangos boot-hiba hiányzó URL-re, `client.end()` leállításkor. AIS-64: a teljes callback kontextus törölve — `callback.callback_requests`, `callback.call_status` **és** a `callback` Postgres séma; a `0001` migráció a táblát és az enumot dobja el, a sémát meglevő volume-on egyszeri superuser lépés viszi el. AIS-37: a repository szerződés + unit tesztek elkészültek, de a repository az AIS-64-gyel törlődött. AIS-36: a `db:migrate` létrehozta a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
 
 > **2026-11-22 — a táblák és a relációk külön, generált doksiban.** A teljes ER-diagram
@@ -524,6 +526,44 @@ Két ismert korlát tartozik ide:
 | `FATAL: the database system is shutting down`                           | az entrypoint **ideiglenes** init-szervere áll le, miközben te már kérdezel                                                                                                                                                   | várj a `PostgreSQL init process complete` markerre, utána kérdezz                                                                                  |
 | a `db:migrate` „lefut”, de a tábla nem jelenik meg                      | a runner a `drizzle/` mappát a **cwd**-hez képest keresi, tehát `pnpm --filter @callback/api db:migrate`-tel (cwd = `apps/api`) kell futtatni; közvetlen `node dist/migrate.js` máshonnan a repó gyökeréből nézve nem találja | futtasd `pnpm --filter @callback/api db:migrate`-tel                                                                                               |
 | `password authentication failed for user "aisztens"` a `db:migrate`-nél | a `DATABASE_URL` nem oldható fel, és a config az `infra/.env.local`-ból komponál — de az `AISZTENS_DB_PASSWORD` más, mint amivel a volume inicializálódott                                                                    | lásd a fenti sort: `01-roles.sh` újrafuttatás vagy `down -v`                                                                                       |
+
+---
+
+## 10.1 Az audit-napló sorainak kitakarítása (e2e után)
+
+Az `audit.audit_logs` **append-only**: a `0007_audit_immutability.sql` `BEFORE UPDATE` /
+`BEFORE DELETE` / `BEFORE TRUNCATE` triggerei elutasítják a módosítást, az app role pedig csak
+`SELECT` + `INSERT` jogot kap. Az e2e suite-ok ezért **nem** takarítják el a napló soraikat: a
+business sorok `afterAll`-ben törlődnek (a customer cascade viszi a gyerekeket), a napló sorok
+megmaradnak, és a suite fix `user-agent`-jével vannak megjelölve
+(`customer-contacts-e2e/1.0 (AIS-178 d)`, `customer-activity-e2e/1.0 (AIS-178 f)`,
+`customer-audit-logs-e2e/1.0 (AIS-178 f)`).
+
+Takarításhoz **superuser** session kell (nem az app role), amelyben a triggerek ki vannak kapcsolva:
+
+```bash
+$DC exec -T postgres psql -U postgres -d aisztens -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+SET LOCAL session_replication_role = replica;   -- triggerek kikapcsolása
+DELETE FROM audit.audit_logs
+ WHERE user_agent LIKE '%e2e%';
+COMMIT;
+SQL
+```
+
+`session_replication_role` csak superusernek állítható, és `SET LOCAL`-lal a tranzakció idejére
+érvényes — enélkül a `DELETE` a trigger miatt elszáll. **Soha** ne futtasd produkciós adatbázison:
+ott a napló az egyetlen bizonyítéka annak, ki mit változtatott.
+
+Ha csak meg akarod nézni, mit hagyott maga után egy e2e futás (törlés nélkül):
+
+```sql
+SELECT id, table_name, operation, actor_name, occurred_at, user_agent
+  FROM audit.audit_logs
+ WHERE user_agent LIKE '%e2e%'
+ ORDER BY id DESC
+ LIMIT 50;
+```
 
 ---
 

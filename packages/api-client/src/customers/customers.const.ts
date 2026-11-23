@@ -92,3 +92,23 @@ export const CUSTOMERS_USERS_PATH = clientPathOf('customers.inviteCustomerUser')
  * `:customerUserId`; both are substituted by `toCustomerUserPath()`.
  */
 export const CUSTOMERS_USER_PATH = clientPathOf('customers.updateCustomerUser');
+
+/**
+ * Path of the activity feed of one customer (AIS-178, slice f), still carrying
+ * `:id`. `GET` and `POST` share it: the feed is both read and appended to.
+ */
+export const CUSTOMERS_ACTIVITIES_PATH = clientPathOf('customers.listActivities');
+
+/**
+ * Path of one activity inside its customer, still carrying `:id` and
+ * `:activityId`; both are substituted by `toCustomerActivityPath()`.
+ */
+export const CUSTOMERS_ACTIVITY_PATH = clientPathOf('customers.updateActivity');
+
+/**
+ * Path of the read-only audit log of one customer, still carrying `:id`.
+ *
+ * Derived from the registry as well, so the client cannot address a route the
+ * server does not publish — and the ledger has no other route to address.
+ */
+export const CUSTOMERS_AUDIT_LOGS_PATH = clientPathOf('customers.listAuditLogs');

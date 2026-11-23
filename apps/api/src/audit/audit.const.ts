@@ -7,6 +7,8 @@
  * and the response schema can never disagree about them.
  */
 
+import { AUDIT_LOG_TABLE_VALUES } from '@callback/shared';
+
 /**
  * DI token of the {@link AuditWriter} implementation.
  *
@@ -29,16 +31,12 @@ export const AUDIT_ACTOR_PROVIDER = 'AUDIT_ACTOR_PROVIDER';
  * database (the ledger has no FK), so the compile-time narrowing here is what
  * keeps a typo out of the log. `customer_tags` has a composite primary key and
  * therefore no uuid `record_id` — its audit rows carry the pair in the payload.
+ *
+ * The tuple itself lives in `@callback/shared` (`AUDIT_LOG_TABLE_VALUES`), because
+ * the ledger **read** endpoint (AIS-178/f) publishes the same set as the
+ * `?tableName=` enum. Re-exporting it here keeps one list and one type.
  */
-export const AUDIT_TABLE_NAMES = [
-  'customers',
-  'contacts',
-  'contact_roles',
-  'customer_tags',
-  'customer_users',
-  'activities',
-  'tags',
-] as const;
+export const AUDIT_TABLE_NAMES = AUDIT_LOG_TABLE_VALUES;
 
 /** The entry point an admin HTTP write comes from. */
 export const AUDIT_SOURCE_ADMIN_API = 'admin_api';

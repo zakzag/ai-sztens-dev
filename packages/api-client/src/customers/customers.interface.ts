@@ -40,9 +40,14 @@
  */
 
 import type {
+  Activity,
+  ActivityListQuery,
   ApiResult,
   AttachCustomerTagInput,
+  AuditLog,
+  AuditLogListQuery,
   Contact,
+  CreateActivityInput,
   CreateContactInput,
   CreateCustomerInput,
   CreateCustomerTagInput,
@@ -53,6 +58,7 @@ import type {
   CustomerUser,
   InviteCustomerUserInput,
   ListQuery,
+  UpdateActivityInput,
   UpdateContactInput,
   UpdateCustomerInput,
   UpdateCustomerUserInput,
@@ -337,4 +343,95 @@ export interface CustomersService {
     customerUserId: string,
     options?: RequestOptions,
   ): Promise<null>;
+
+  /**
+   * `GET /api/admin/customers/:id/activities` — one page of the activity feed
+   * (AIS-178, slice f).
+   *
+   * The feed has exactly one meaningful order (`createdAt`), so the query carries
+   * `page`, `limit` and `order` only — there is no `q` and no `sort`.
+   *
+   * @param customerId - the customer's uuid.
+   * @param query - paging and direction.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404` when no live customer owns
+   *   the id.
+   */
+  listActivities(
+    customerId: string,
+    query: ActivityListQuery,
+    options?: RequestOptions,
+  ): Promise<ApiResult<readonly Activity[]>>;
+
+  /**
+   * `POST /api/admin/customers/:id/activities` — records one entry.
+   *
+   * The author is **not** part of the body: the server resolves it from the
+   * request context, so a client cannot write in someone else's name.
+   *
+   * @param customerId - the customer's uuid.
+   * @param input - kind, text and optional metadata.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `400 VALIDATION_FAILED`.
+   */
+  createActivity(
+    customerId: string,
+    input: CreateActivityInput,
+    options?: RequestOptions,
+  ): Promise<Activity>;
+
+  /**
+   * `PATCH /api/admin/customers/:id/activities/:activityId` — edits the text or
+   * the metadata of one entry.
+   *
+   * `updatedAt` is the row's **last write instant** (`updatedAt ?? createdAt`), so
+   * the first edit of a never-edited entry is accepted with its `createdAt`.
+   *
+   * @param customerId - the customer's uuid.
+   * @param activityId - the entry's uuid.
+   * @param input - the changed fields plus the required token.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `409 STALE_WRITE`.
+   */
+  updateActivity(
+    customerId: string,
+    activityId: string,
+    input: UpdateActivityInput,
+    options?: RequestOptions,
+  ): Promise<Activity>;
+
+  /**
+   * `DELETE /api/admin/customers/:id/activities/:activityId` — soft-deletes one
+   * entry; the feed and `lastActivityAt` fall back to the previous live entry.
+   *
+   * @param customerId - the customer's uuid.
+   * @param activityId - the entry's uuid.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404` on a repeat delete.
+   */
+  removeActivity(
+    customerId: string,
+    activityId: string,
+    options?: RequestOptions,
+  ): Promise<null>;
+
+  /**
+   * `GET /api/admin/customers/:id/audit-logs` — one page of the append-only
+   * ledger of one customer (AIS-178, slice f).
+   *
+   * **Read-only by construction**: the server exposes no write path, and the
+   * table refuses `UPDATE`/`DELETE`. The four filters (`tableName`, `operation`,
+   * `actorId`, `from`/`to`) are applied server-side; an inverted window is
+   * `422 SEMANTIC_VALIDATION_FAILED`.
+   *
+   * @param customerId - the customer's uuid.
+   * @param query - paging, direction and the four optional filters.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `422`.
+   */
+  listAuditLogs(
+    customerId: string,
+    query: AuditLogListQuery,
+    options?: RequestOptions,
+  ): Promise<ApiResult<readonly AuditLog[]>>;
 }

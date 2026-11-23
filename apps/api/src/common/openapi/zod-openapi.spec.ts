@@ -133,14 +133,19 @@ describe('component registration', () => {
 
   it('registers the envelope, meta and error components once', () => {
     expect(Object.keys(components.components?.schemas ?? {}).sort()).toEqual([
+      'Activity',
+      'ActivityList',
       'ApiEnvelope',
       'ApiErrorDetail',
       'ApiErrorEnvelope',
       'ApiKey',
       'ApiKeyList',
       'AttachCustomerTag',
+      'AuditLog',
+      'AuditLogList',
       'Contact',
       'ContactList',
+      'CreateActivity',
       'CreateApiKey',
       'CreateContact',
       'CreateCustomer',
@@ -154,6 +159,7 @@ describe('component registration', () => {
       'NoPayload',
       'PaginationMeta',
       'ResponseMeta',
+      'UpdateActivity',
       'UpdateApiKey',
       'UpdateContact',
       'UpdateCustomer',

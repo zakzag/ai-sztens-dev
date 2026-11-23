@@ -1,9 +1,18 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-11-23 (AIS-178/e: a `customers` **címke-** és **belépő-felhasználó** végpontjai élnek — `POST`/`PATCH /api/admin/customers/:id/tags`, `DELETE …/:tagId`, `POST`/`PATCH`/`DELETE …/customer-users[/:customerUserId]`; címke create-or-attach név alapján, egy aktív `owner` → `409 CUSTOMER_OWNER_CONFLICT`, globális e-mail → `409 CUSTOMER_USER_EMAIL_CONFLICT`, hivatkozott felhasználó → `409 CUSTOMER_USER_IN_USE_CONFLICT`, lásd §12.2)
-**Utolsó frissítés:** 2026-11-23 (AIS-178/d: a `customers` **kapcsolattartó** végpontjai élnek — `GET`/`POST /api/admin/customers/:id/contacts`, `PATCH`/`DELETE …/:contactId`, a szerepkör-készlet egy kérésben cserélődik, második `primary` → `409 CUSTOMER_PRIMARY_CONTACT_CONFLICT`, idegen `customerUserId` → `422 SEMANTIC_VALIDATION_FAILED`, lásd §12.1)
-**Utolsó frissítés:** 2026-11-22 (AIS-178/b: a `customers` végpontok élnek — hat route a `/api/admin/*` alatt, `CUSTOMER_NUMBER_CONFLICT` / `CUSTOMER_TAX_NUMBER_CONFLICT`, `primaryContactName` a wire-en, malformed uuid → `400`, lásd §4.3) 2026-11-22 (AIS-16: a `customers` erőforrás szerződés-sémái a `packages/shared/src/contract/customers/` alatt; a lista a közös lapozás mellé négy szűrőt kap — `type`, `status`, `source`, `responsibleOperatorId` —, lásd §4.1) 2026-11-07 (AIS-152: a `HttpEvent` négy új mezőt hordoz — `requestId`, `query`, maszkolt `bodyPreview`, `responseMeta` —, a token/`Authorization` továbbra sem kerülhet az eseménybe; lásd §9) (AIS-136: a 3. tier — app-szintű banner — a megjelenítés **mellett** toastol is; a `field` tier az egyetlen, amely toast nélkül marad, lásd §10) (AIS-112: közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3)
+**Frissítések**:
+
+- **2026-11-23 - AIS-178/f:** a `customers` **aktivitás** végpontjai és a **napló** olvasása élnek — `GET`/`POST /api/admin/customers/:id/activities`, `PATCH`/`DELETE …/:activityId`, `GET …/audit-logs`; az aktivitás szerzője a szerveroldali `AUDIT_ACTOR_PROVIDER`-ből jön, a token az `updatedAt ?? createdAt`, a napló **írhatatlan**, `from > to` → `422`, lásd §12.3)
+- **2026-11-23 — AIS-178/e:** a `customers` **címke-** és **belépő-felhasználó** végpontjai élnek — `POST`/`PATCH /api/admin/customers/:id/tags`, `DELETE …/:tagId`, `POST`/`PATCH`/`DELETE …/customer-users[/:customerUserId]`; címke create-or-attach név alapján, egy aktív `owner` → `409 CUSTOMER_OWNER_CONFLICT`, globális e-mail → `409 CUSTOMER_USER_EMAIL_CONFLICT`, hivatkozott felhasználó → `409 CUSTOMER_USER_IN_USE_CONFLICT`, lásd §12.2
+- **2026-11-23 — AIS-178/d:** a `customers` **kapcsolattartó** végpontjai élnek — `GET`/`POST /api/admin/customers/:id/contacts`, `PATCH`/`DELETE …/:contactId`, a szerepkör-készlet egy kérésben cserélődik, második `primary` → `409 CUSTOMER_PRIMARY_CONTACT_CONFLICT`, idegen `customerUserId` → `422 SEMANTIC_VALIDATION_FAILED`, lásd §12.1
+- **2026-11-22 — AIS-178/b:** a `customers` végpontok élnek — hat route a `/api/admin/*` alatt, `CUSTOMER_NUMBER_CONFLICT` / `CUSTOMER_TAX_NUMBER_CONFLICT`, `primaryContactName` a wire-en, malformed uuid → `400`, lásd §4.3
+- **2026-11-22 — AIS-16:** a `customers` erőforrás szerződés-sémái a `packages/shared/src/contract/customers/` alatt; a lista a közös lapozás mellé négy szűrőt kap — `type`, `status`, `source`, `responsibleOperatorId` —, lásd §4.1
+- **2026-11-07 — AIS-152:** a `HttpEvent` négy új mezőt hordoz — `requestId`, `query`, maszkolt `bodyPreview`, `responseMeta` —, a token/`Authorization` továbbra sem kerülhet az eseménybe; lásd §9
+- **AIS-136:** a 3. tier — app-szintű banner — a megjelenítés **mellett** toastol is; a `field` tier az egyetlen, amely toast nélkül marad, lásd §10
+- **AIS-112:** közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3
+ 
 **Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109; client binding of every registered operation + registry ⇄ service coverage gate + resource template: AIS-110; közös formátum-sémák + kétnyelvű validációs üzenetek: AIS-112
+
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
 ---
@@ -585,9 +594,52 @@ Rules a reader should not have to rediscover:
 
 ---
 
+## 12.3 Activity feed and the audit-log read (AIS-178/f)
+
+Two child resources, two very different natures: the feed is a normal, writable child collection, the
+ledger is **append-only and read-only** through the API.
+
+| operationId                  | verb   | path                                                       | success | notes                                                                 |
+| ---------------------------- | ------ | ---------------------------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `customers.listActivities`   | GET    | `/api/admin/customers/:id/activities`                       | `200`   | `created_at` order + `id` tie-breaker; **no `q`, no `sort`**           |
+| `customers.createActivity`   | POST   | `/api/admin/customers/:id/activities`                       | `201`   | the **author is server-side**, `.strict()` rejects one in the body     |
+| `customers.updateActivity`   | PATCH  | `/api/admin/customers/:id/activities/:activityId`            | `200`   | token = `updatedAt ?? createdAt`; an empty patch writes nothing        |
+| `customers.removeActivity`   | DELETE | `/api/admin/customers/:id/activities/:activityId`            | `200`, `data: null` | soft delete; `lastActivityAt` falls back to the previous entry |
+| `customers.listAuditLogs`    | GET    | `/api/admin/customers/:id/audit-logs`                        | `200`   | four filters + `occurred_at` order; **there is no write route at all** |
+
+Rules a reader should not have to rediscover:
+
+- **The author never comes from the request.** `createActivity` writes `authorType` / `authorName` /
+  `operatorId` / `customerUserId` from `AUDIT_ACTOR_PROVIDER` — the same seam the ledger uses. Today that
+  is `system`/`system`/`null`/`null`; AIS-73/74 swaps one binding and both the feed and the ledger follow.
+- **The concurrency token is the last write instant.** `activity.activities.updated_at` is **nullable**
+  ("never edited"), so the guard compares `coalesce(updated_at, created_at) = $token` and the write sets
+  `updated_at = now`. A plain `updated_at` compare would reject the *first* edit of every entry.
+- **A token-only `PATCH` is a no-op.** `200` with the current row, no `UPDATE`, **no** ledger row (§4.2.1).
+- **`metadata` keeps `undefined` and `null` apart**: absent leaves the column alone, `null` clears it.
+- **The feed has exactly one meaningful order**, so `q` and `sort` are *removed* from its query schema
+  rather than accepted and ignored; the page and the `count(*)` share one `WHERE`, so `meta.pagination`
+  can never count rows the page does not show.
+- **The ledger is read-only by construction.** `apps/api/src/customers/customers-audit-logs.repository.ts`
+  exposes `findPage` and nothing else, and `audit.audit_logs` refuses `UPDATE`/`DELETE`/`TRUNCATE` by
+  trigger (`0007`). The read is scoped by `customer_id` and has **no** soft-delete branch — the ledger has
+  no `deleted_at`.
+- **Filters:** `tableName` (closed enum = `AUDIT_LOG_TABLE_VALUES`), `operation`
+  (`AUDIT_OPERATION_VALUES`), `actorId` (uuid), and `from`/`to` bounding `occurredAt` inclusively. An
+  unknown enum value is `400 VALIDATION_FAILED`; a well-formed but inverted window is
+  `422 SEMANTIC_VALIDATION_FAILED` with `details[0].path = "from"`.
+- **Order is `occurred_at` + `id`**, and the tie-breaker follows the requested direction: `id` is the
+  identity sequence, so in `desc` it *is* the append order and two rows of the same millisecond stay
+  stable across pages.
+- **Reading the ledger is not an audited event.** No `AuditWriter` call, no transaction — and no way to
+  add one by accident.
+
+---
+
 ## 13. Known gaps / follow-ups
 
 - The transport is complete (`PUT`/`PATCH`/`DELETE`, `getList`, `toQueryString`, `RequestBodyOf`, `onEvent` — AIS-109) and `ApiKeysService` now covers **every** registered operation (`list`, `findByIdentifier`, `create`, `update`, `remove` — AIS-110), kept in sync by the coverage gate (§12). What is still missing is the **consumer**: the admin has no edit/delete UI yet, so `update`/`remove` are bound and tested at the service layer only. `ETag`/`If-Match`, bulk mutations and idempotency keys are deliberately not part of the `updatedAt` convention.
+- A `customers` gyerek-erőforrásai mind a szerződésben és a kliensben élnek (§12.1–§12.3), de az admin **felülete** még nem fogyasztja őket: az `activity` és a `Napló` fül az AIS-181 dolga. A naplónak szándékosan nincs írási végponta, ezért a felület csak olvashatja.
 - Soft-deleted rows have no undelete endpoint and no purge job; they stay in `platform.api_keys` with a `deleted_at` stamp.
 - The admin's tier-1 field mapping (§10.1) still only accepts `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT`, so a `422` / `409 STALE_WRITE` currently surfaces as a page `Alert`. Extending the gate (`expiresAt` / `updatedAt`) belongs to the admin edit UI (AIS-109 and later).
 - API-key value masking (**show-once**) is a separate security task (AIS-75); these endpoints still return the token.

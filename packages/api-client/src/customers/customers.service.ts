@@ -22,8 +22,12 @@
 
 import {
   LIST_QUERY_DEFAULTS,
+  activityListSchema,
+  activitySchema,
+  auditLogListSchema,
   contactListSchema,
   contactSchema,
+  createActivitySchema,
   createContactSchema,
   customerDetailSchema,
   customerListSchema,
@@ -31,10 +35,16 @@ import {
   customerTagSchema,
   customerUserSchema,
   noPayloadSchema,
+  updateActivitySchema,
   updateContactSchema,
+  type Activity,
+  type ActivityListQuery,
   type ApiResult,
   type AttachCustomerTagInput,
+  type AuditLog,
+  type AuditLogListQuery,
   type Contact,
+  type CreateActivityInput,
   type CreateContactInput,
   type CreateCustomerInput,
   type CreateCustomerTagInput,
@@ -45,6 +55,7 @@ import {
   type CustomerUser,
   type InviteCustomerUserInput,
   type ListQuery,
+  type UpdateActivityInput,
   type UpdateContactInput,
   type UpdateCustomerInput,
   type UpdateCustomerUserInput,
@@ -56,6 +67,9 @@ import {
 } from './customers.const.js';
 import type { CustomersService } from './customers.interface.js';
 import {
+  toCustomerActivitiesPath,
+  toCustomerActivityPath,
+  toCustomerAuditLogsPath,
   toCustomerContactPath,
   toCustomerContactsPath,
   toCustomerDetailPath,
@@ -259,6 +273,74 @@ export function createCustomersService(client: HttpClient): CustomersService {
       client.delete(
         toCustomerUserPath(customerId, customerUserId),
         noPayloadSchema,
+        options,
+      ),
+
+    // ---- activity feed and audit log (AIS-178, slice f) --------------------
+    // Both are paginated reads, so both go through `getList`: the `activity` and
+    // `audit` tabs read `meta.pagination` and nothing else.
+    listActivities: async (
+      customerId: string,
+      query: ActivityListQuery,
+      options?: RequestOptions,
+    ): Promise<ApiResult<readonly Activity[]>> =>
+      client.getList(
+        toCustomerActivitiesPath(customerId),
+        activityListSchema,
+        { query, defaults: LIST_QUERY_DEFAULTS },
+        options,
+      ),
+
+    // The author (`authorType`, `authorName`) is a server-side decision: the
+    // request schema is `.strict()`, so sending it is a `400`, not a silent
+    // override.
+    createActivity: async (
+      customerId: string,
+      input: CreateActivityInput,
+      options?: RequestOptions,
+    ): Promise<Activity> =>
+      client.post(
+        toCustomerActivitiesPath(customerId),
+        input,
+        activitySchema,
+        options,
+      ),
+
+    updateActivity: async (
+      customerId: string,
+      activityId: string,
+      input: UpdateActivityInput,
+      options?: RequestOptions,
+    ): Promise<Activity> =>
+      client.patch(
+        toCustomerActivityPath(customerId, activityId),
+        input,
+        activitySchema,
+        options,
+      ),
+
+    removeActivity: async (
+      customerId: string,
+      activityId: string,
+      options?: RequestOptions,
+    ): Promise<null> =>
+      client.delete(
+        toCustomerActivityPath(customerId, activityId),
+        noPayloadSchema,
+        options,
+      ),
+
+    // The ledger has no write counterpart on purpose: `auditLogListSchema` is the
+    // only schema this package knows for it.
+    listAuditLogs: async (
+      customerId: string,
+      query: AuditLogListQuery,
+      options?: RequestOptions,
+    ): Promise<ApiResult<readonly AuditLog[]>> =>
+      client.getList(
+        toCustomerAuditLogsPath(customerId),
+        auditLogListSchema,
+        { query, defaults: LIST_QUERY_DEFAULTS },
         options,
       ),
   };

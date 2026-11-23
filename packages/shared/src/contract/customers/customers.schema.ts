@@ -128,6 +128,13 @@ export const customerTagIdSchema = z.string().uuid();
 export const customerUserIdSchema = z.string().uuid();
 
 /**
+ * The `:activityId` path parameter of the activity routes (AIS-178, slice f).
+ *
+ * Same reasoning as {@link customerIdSchema}.
+ */
+export const activityIdSchema = z.string().uuid();
+
+/**
  * JSON object column (`metadata`).
  *
  * `z.record(z.unknown())` instead of `z.any()`: the keys are known to be
@@ -280,6 +287,15 @@ export const activitySchema = z.object({
 });
 
 /**
+ * Body of `GET /api/admin/customers/:id/activities` (AIS-178, slice f).
+ *
+ * An array and never `null`: an empty feed is `[]`, exactly like the contact and
+ * tag lists. The rows are the same `activitySchema` the create/update routes
+ * answer with, so a consumer parses one shape everywhere.
+ */
+export const activityListSchema = z.array(activitySchema);
+
+/**
  * One entry of the audit log — **read-only by construction**.
  *
  * There is no request schema for it: the table is written by `AuditWriter` only
@@ -304,6 +320,15 @@ export const auditLogSchema = z.object({
   requestId: z.string().max(AUDIT_REQUEST_ID_MAX_LENGTH).nullable(),
   source: auditSourceSchema.nullable(),
 });
+
+/**
+ * Body of `GET /api/admin/customers/:id/audit-logs` (AIS-178, slice f).
+ *
+ * Read-only by construction: there is no request schema for the ledger, because
+ * nothing but `AuditWriter` may append to it and the append-only triggers refuse
+ * every other write.
+ */
+export const auditLogListSchema = z.array(auditLogSchema);
 
 /**
  * Body of `POST /api/admin/customers`.

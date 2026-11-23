@@ -93,6 +93,9 @@ export { createApiKeysService } from './api-keys/api-keys.service.js';
 export type { ApiKeysService } from './api-keys/api-keys.interface.js';
 
 export {
+  CUSTOMERS_ACTIVITIES_PATH,
+  CUSTOMERS_ACTIVITY_PATH,
+  CUSTOMERS_AUDIT_LOGS_PATH,
   CUSTOMERS_CONTACTS_PATH,
   CUSTOMERS_CONTACT_PATH,
   CUSTOMERS_DETAIL_PATH,
@@ -106,6 +109,9 @@ export {
 } from './customers/customers.const.js';
 
 export {
+  toCustomerActivitiesPath,
+  toCustomerActivityPath,
+  toCustomerAuditLogsPath,
   toCustomerContactPath,
   toCustomerContactsPath,
   toCustomerDetailPath,

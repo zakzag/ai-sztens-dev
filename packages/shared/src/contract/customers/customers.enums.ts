@@ -197,6 +197,29 @@ export const auditOperationSchema = z.enum(AUDIT_OPERATION_VALUES);
 export type AuditOperation = (typeof AUDIT_OPERATION_VALUES)[number];
 
 /**
+ * The audited tables, as the wire vocabulary of the ledger filter (AIS-178/f).
+ *
+ * The API's `AUDIT_TABLE_NAMES` **is** this tuple (it re-exports it), so the
+ * server-side `table_name` allow-list and the `?tableName=` filter cannot drift
+ * apart: adding a table means adding it here once.
+ */
+export const AUDIT_LOG_TABLE_VALUES = [
+  'customers',
+  'contacts',
+  'contact_roles',
+  'customer_tags',
+  'customer_users',
+  'activities',
+  'tags',
+] as const;
+
+/** `audit_logs.table_name` values. */
+export const auditLogTableSchema = z.enum(AUDIT_LOG_TABLE_VALUES);
+
+/** One audited table. */
+export type AuditLogTable = (typeof AUDIT_LOG_TABLE_VALUES)[number];
+
+/**
  * Entry point that produced an audited change (`audit_source`).
  *
  * Optional in the contract: a worker or a migration may not know its edge, and

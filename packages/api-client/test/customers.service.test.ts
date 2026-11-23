@@ -17,6 +17,9 @@
 
 import type { CustomerListQuery, ListQuery } from '@callback/shared';
 import {
+  CUSTOMERS_ACTIVITIES_PATH,
+  CUSTOMERS_ACTIVITY_PATH,
+  CUSTOMERS_AUDIT_LOGS_PATH,
   CUSTOMERS_CONTACTS_PATH,
   CUSTOMERS_CONTACT_PATH,
   CUSTOMERS_DETAIL_PATH,
@@ -28,6 +31,9 @@ import {
   CUSTOMERS_USER_PATH,
   clientPathOf,
   createCustomersService,
+  toCustomerActivitiesPath,
+  toCustomerActivityPath,
+  toCustomerAuditLogsPath,
   toCustomerContactPath,
   toCustomerContactsPath,
   toCustomerDetailPath,
@@ -50,11 +56,16 @@ import {
 import {
   ACTIVATED_CUSTOMER_USER,
   INVITED_CUSTOMER_USER,
+  RETURNED_ACTIVITY,
   RETURNED_TAG,
   UPDATED_CUSTOMER,
+  VALID_ACTIVITY,
+  VALID_ACTIVITY_LIST,
   VALID_ATTACH_TAG_INPUT,
+  VALID_AUDIT_LOG_LIST,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
+  VALID_CREATE_ACTIVITY_INPUT,
   VALID_CREATE_CONTACT_INPUT,
   VALID_CREATE_INPUT,
   VALID_CREATE_TAG_INPUT,
@@ -63,6 +74,7 @@ import {
   VALID_CUSTOMER_LIST,
   VALID_CUSTOMER_TAG,
   VALID_INVITE_USER_INPUT,
+  VALID_UPDATE_ACTIVITY_INPUT,
   VALID_UPDATE_CONTACT_INPUT,
   VALID_UPDATE_INPUT,
   VALID_UPDATE_USER_INPUT,
@@ -880,5 +892,298 @@ describe('createCustomersService — removeCustomerUser', () => {
 
     expect(error.status).toBe(422);
     expect(error.issues[0]?.path).toBe('status');
+  });
+});
+
+describe('the activity and audit-log paths (AIS-178, slice f)', () => {
+  it('derive the feed and the single-activity routes from the registry', () => {
+    expect(clientPathOf('customers.listActivities')).toBe(
+      CUSTOMERS_ACTIVITIES_PATH,
+    );
+    expect(clientPathOf('customers.createActivity')).toBe(
+      CUSTOMERS_ACTIVITIES_PATH,
+    );
+    expect(clientPathOf('customers.updateActivity')).toBe(
+      CUSTOMERS_ACTIVITY_PATH,
+    );
+    expect(clientPathOf('customers.removeActivity')).toBe(
+      CUSTOMERS_ACTIVITY_PATH,
+    );
+  });
+
+  it('derive the audit-log route from the registry', () => {
+    expect(clientPathOf('customers.listAuditLogs')).toBe(
+      CUSTOMERS_AUDIT_LOGS_PATH,
+    );
+  });
+
+  it('substitute and encode both ids', () => {
+    expect(toCustomerActivitiesPath('a/b')).toBe(
+      '/admin/customers/a%2Fb/activities',
+    );
+    expect(toCustomerActivityPath('customer', 'activity')).toBe(
+      '/admin/customers/customer/activities/activity',
+    );
+    expect(toCustomerAuditLogsPath('a/b')).toBe(
+      '/admin/customers/a%2Fb/audit-logs',
+    );
+  });
+});
+
+describe('createCustomersService — listActivities', () => {
+  const ACTIVITY_QUERY = { page: 1, limit: 20, order: 'desc' } as const;
+
+  it('calls GET …/activities without a query when everything is default', async () => {
+    const { service, fetchMock } = setup([
+      paginatedResponse(VALID_ACTIVITY_LIST),
+    ]);
+
+    await service.listActivities(VALID_CUSTOMER.id, ACTIVITY_QUERY);
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/activities`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('GET');
+  });
+
+  it('encodes only the paging fields the caller changed', async () => {
+    const { service, fetchMock } = setup([
+      paginatedResponse(VALID_ACTIVITY_LIST),
+    ]);
+
+    await service.listActivities(VALID_CUSTOMER.id, {
+      page: 2,
+      limit: 5,
+      order: 'asc',
+    });
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/activities?page=2&limit=5&order=asc`,
+    );
+  });
+
+  it('returns the feed with the pager block', async () => {
+    const { service } = setup([paginatedResponse(VALID_ACTIVITY_LIST)]);
+
+    const result = await service.listActivities(
+      VALID_CUSTOMER.id,
+      ACTIVITY_QUERY,
+    );
+
+    expect(result.data).toHaveLength(VALID_ACTIVITY_LIST.length);
+    expect(result.data[0]?.id).toBe(VALID_ACTIVITY.id);
+    expect(result.meta.pagination.total).toBe(1);
+  });
+
+  it('surfaces an unknown customer as not found', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'No customer with that id was found.',
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.listActivities(VALID_CUSTOMER.id, ACTIVITY_QUERY),
+    );
+
+    expect(isNotFoundError(error)).toBe(true);
+  });
+});
+
+describe('createCustomersService — createActivity', () => {
+  it('posts the payload and parses the created entry', async () => {
+    const { service, fetchMock } = setup([
+      successResponse(RETURNED_ACTIVITY, 201),
+    ]);
+
+    const created = await service.createActivity(
+      VALID_CUSTOMER.id,
+      VALID_CREATE_ACTIVITY_INPUT,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/activities`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('POST');
+    expect(readBody(fetchMock.calls[0])).toEqual(VALID_CREATE_ACTIVITY_INPUT);
+    expect(created.id).toBe(VALID_ACTIVITY.id);
+  });
+
+  it('never sends an author with the body', async () => {
+    const { service, fetchMock } = setup([successResponse(RETURNED_ACTIVITY, 201)]);
+
+    await service.createActivity(VALID_CUSTOMER.id, VALID_CREATE_ACTIVITY_INPUT);
+
+    expect(readBody(fetchMock.calls[0])).not.toHaveProperty('authorType');
+    expect(readBody(fetchMock.calls[0])).not.toHaveProperty('authorName');
+  });
+
+  it('surfaces an unknown customer as not found', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'No customer with that id was found.',
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.createActivity(VALID_CUSTOMER.id, VALID_CREATE_ACTIVITY_INPUT),
+    );
+
+    expect(error.status).toBe(404);
+  });
+});
+
+describe('createCustomersService — updateActivity', () => {
+  it('patches the entry route with the last write instant', async () => {
+    const { service, fetchMock } = setup([successResponse(RETURNED_ACTIVITY)]);
+
+    const updated = await service.updateActivity(
+      VALID_CUSTOMER.id,
+      VALID_ACTIVITY.id,
+      VALID_UPDATE_ACTIVITY_INPUT,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/activities/${VALID_ACTIVITY.id}`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('PATCH');
+    expect(readBody(fetchMock.calls[0])).toEqual(VALID_UPDATE_ACTIVITY_INPUT);
+    expect(updated.updatedAt).toBe(VALID_ACTIVITY.updatedAt);
+  });
+
+  it('surfaces a stale token as 409 STALE_WRITE', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'STALE_WRITE',
+        status: 409,
+        message: 'The activity was updated by someone else.',
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.updateActivity(
+        VALID_CUSTOMER.id,
+        VALID_ACTIVITY.id,
+        VALID_UPDATE_ACTIVITY_INPUT,
+      ),
+    );
+
+    expect(error.status).toBe(409);
+    expect(error.code).toBe('STALE_WRITE');
+  });
+});
+
+describe('createCustomersService — removeActivity', () => {
+  it('deletes the entry route and resolves the null payload', async () => {
+    const { service, fetchMock } = setup([successResponse(null)]);
+
+    const result = await service.removeActivity(
+      VALID_CUSTOMER.id,
+      VALID_ACTIVITY.id,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/activities/${VALID_ACTIVITY.id}`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('DELETE');
+    expect(result).toBeNull();
+  });
+
+  it('treats a repeat delete as a 404', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'No activity with that id was found.',
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.removeActivity(VALID_CUSTOMER.id, VALID_ACTIVITY.id),
+    );
+
+    expect(isNotFoundError(error)).toBe(true);
+  });
+});
+
+describe('createCustomersService — listAuditLogs', () => {
+  const AUDIT_QUERY = { page: 1, limit: 20, order: 'desc' } as const;
+
+  it('calls GET …/audit-logs without a query when no filter is set', async () => {
+    const { service, fetchMock } = setup([
+      paginatedResponse(VALID_AUDIT_LOG_LIST),
+    ]);
+
+    await service.listAuditLogs(VALID_CUSTOMER.id, AUDIT_QUERY);
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/audit-logs`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('GET');
+  });
+
+  it('sends the four filters', async () => {
+    const { service, fetchMock } = setup([
+      paginatedResponse(VALID_AUDIT_LOG_LIST),
+    ]);
+    const actorId = '6b7c8d9e-0f1a-4b2c-8d3e-5f6a7b8c9d0e';
+
+    await service.listAuditLogs(VALID_CUSTOMER.id, {
+      ...AUDIT_QUERY,
+      tableName: 'customers',
+      operation: 'update',
+      actorId,
+      from: '2026-11-01T00:00:00.000Z',
+      to: '2026-11-30T23:59:59.000Z',
+    });
+
+    const url = fetchMock.calls[0]?.url ?? '';
+
+    expect(url).toContain('tableName=customers');
+    expect(url).toContain('operation=update');
+    expect(url).toContain(`actorId=${actorId}`);
+    expect(url).toContain('from=2026-11-01T00%3A00%3A00.000Z');
+    expect(url).toContain('to=2026-11-30T23%3A59%3A59.000Z');
+  });
+
+  it('returns the ledger rows with the pager block', async () => {
+    const { service } = setup([paginatedResponse(VALID_AUDIT_LOG_LIST)]);
+
+    const result = await service.listAuditLogs(
+      VALID_CUSTOMER.id,
+      AUDIT_QUERY,
+    );
+
+    expect(result.data).toHaveLength(VALID_AUDIT_LOG_LIST.length);
+    expect(result.data[0]?.id).toBe(VALID_AUDIT_LOG_LIST[0]?.id);
+    expect(result.meta.pagination.total).toBe(1);
+  });
+
+  it('keeps the 422 code of an inverted window', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'SEMANTIC_VALIDATION_FAILED',
+        status: 422,
+        message: 'The requested time window ends before it starts.',
+        details: [
+          {
+            path: 'from',
+            message: 'The "from" bound must not be later than the "to" bound.',
+          },
+        ],
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.listAuditLogs(VALID_CUSTOMER.id, AUDIT_QUERY),
+    );
+
+    expect(error.status).toBe(422);
+    expect(error.code).toBe('SEMANTIC_VALIDATION_FAILED');
+    expect(error.issues[0]?.path).toBe('from');
   });
 });

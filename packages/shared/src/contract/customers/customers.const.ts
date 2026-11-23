@@ -46,6 +46,14 @@ export const CUSTOMERS_CONTACT_ID_PARAM = ':contactId';
 export const CUSTOMERS_TAG_ID_PARAM = ':tagId';
 
 /**
+ * Nest path-parameter placeholder of the activity routes (AIS-178, slice f).
+ *
+ * `…/:id/activities/:activityId` — like a contact, an activity is addressable
+ * only inside its own customer.
+ */
+export const CUSTOMERS_ACTIVITY_ID_PARAM = ':activityId';
+
+/**
  * Nest path-parameter placeholder of the customer-user routes (AIS-178, slice e).
  *
  * Same nesting rule as the contact id: a login user is addressable only inside

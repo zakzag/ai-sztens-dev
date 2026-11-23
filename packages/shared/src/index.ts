@@ -177,6 +177,7 @@ export {
   AUDIT_USER_AGENT_MAX_LENGTH,
   CONTACT_NAME_MAX_LENGTH,
   CONTACT_POSITION_MAX_LENGTH,
+  CUSTOMERS_ACTIVITY_ID_PARAM,
   CUSTOMERS_CONTACT_ID_PARAM,
   CUSTOMERS_CUSTOMER_USER_ID_PARAM,
   CUSTOMERS_ID_PARAM,
@@ -205,6 +206,7 @@ export type { CustomerSortField } from './contract/customers/customers.const.js'
 
 export {
   ACTIVITY_TYPE_VALUES,
+  AUDIT_LOG_TABLE_VALUES,
   AUDIT_OPERATION_VALUES,
   AUDIT_SOURCE_VALUES,
   AUTHOR_TYPE_VALUES,
@@ -217,6 +219,7 @@ export {
   HEADCOUNT_RANGE_VALUES,
   OPERATOR_ROLE_VALUES,
   activityTypeSchema,
+  auditLogTableSchema,
   auditOperationSchema,
   auditSourceSchema,
   authorTypeSchema,
@@ -231,6 +234,7 @@ export {
 } from './contract/customers/customers.enums.js';
 export type {
   ActivityType,
+  AuditLogTable,
   AuditOperation,
   AuditSource,
   AuthorType,
@@ -246,8 +250,11 @@ export type {
 
 export {
   CUSTOMER_UPDATE_FORBIDDEN_FIELDS,
+  activityIdSchema,
+  activityListSchema,
   activitySchema,
   attachCustomerTagSchema,
+  auditLogListSchema,
   auditLogSchema,
   contactIdSchema,
   contactListSchema,
@@ -276,15 +283,28 @@ export {
 } from './contract/customers/customers.schema.js';
 
 export {
+  ACTIVITY_LIST_QUERY_PARAMETERS,
+  AUDIT_LOG_ACTOR_PARAMETER,
+  AUDIT_LOG_FROM_PARAMETER,
+  AUDIT_LOG_LIST_QUERY_PARAMETERS,
+  AUDIT_LOG_OPERATION_PARAMETER,
+  AUDIT_LOG_TABLE_PARAMETER,
+  AUDIT_LOG_TO_PARAMETER,
   CUSTOMER_LIST_QUERY_PARAMETERS,
   CUSTOMER_RESPONSIBLE_OPERATOR_PARAMETER,
   CUSTOMER_SORT_PARAMETER,
   CUSTOMER_SOURCE_PARAMETER,
   CUSTOMER_STATUS_PARAMETER,
   CUSTOMER_TYPE_PARAMETER,
+  activityListQuerySchema,
+  auditLogListQuerySchema,
   customerListQuerySchema,
 } from './contract/customers/customers.list-query.js';
-export type { CustomerListQuery } from './contract/customers/customers.list-query.js';
+export type {
+  ActivityListQuery,
+  AuditLogListQuery,
+  CustomerListQuery,
+} from './contract/customers/customers.list-query.js';
 
 export {
   INVITED_CUSTOMER_USER,
@@ -293,8 +313,10 @@ export {
   SECOND_CUSTOMER_TAG,
   SYSTEM_ACTIVITY,
   VALID_ACTIVITY,
+  VALID_ACTIVITY_LIST,
   VALID_ATTACH_CUSTOMER_TAG_REQUEST,
   VALID_AUDIT_LOG,
+  VALID_AUDIT_LOG_LIST,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
   VALID_CREATE_CONTACT_REQUEST,

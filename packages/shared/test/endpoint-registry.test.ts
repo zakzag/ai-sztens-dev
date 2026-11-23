@@ -5,8 +5,11 @@ import {
   API_KEYS_PATH,
   API_PATH_PREFIX,
   ENVELOPE_EXEMPTIONS,
+  VALID_ACTIVITY,
+  VALID_ACTIVITY_LIST,
   VALID_API_KEY,
   VALID_API_KEY_LIST,
+  VALID_AUDIT_LOG_LIST,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
   VALID_CUSTOMER,
@@ -86,6 +89,13 @@ const SAMPLE_PAYLOADS: Readonly<Record<string, unknown>> = {
   'customers.inviteCustomerUser': VALID_CUSTOMER_USER,
   'customers.updateCustomerUser': VALID_CUSTOMER_USER,
   'customers.removeCustomerUser': null,
+  // The activity log and the audit read (AIS-178, slice f): the two mutation
+  // routes answer with the row, the list with a page, and the delete `null`.
+  'customers.listActivities': VALID_ACTIVITY_LIST,
+  'customers.createActivity': VALID_ACTIVITY,
+  'customers.updateActivity': VALID_ACTIVITY,
+  'customers.removeActivity': null,
+  'customers.listAuditLogs': VALID_AUDIT_LOG_LIST,
 };
 
 /** Minimal envelope `meta`; the registry only cares about the payload. */

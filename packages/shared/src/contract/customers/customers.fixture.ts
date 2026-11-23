@@ -352,3 +352,22 @@ export const VALID_UPDATE_CUSTOMER_USER_REQUEST: UpdateCustomerUserInput = {
   status: 'active',
   updatedAt: INVITED_CUSTOMER_USER.updatedAt,
 };
+
+/**
+ * Payload example of `GET /api/admin/customers/:id/activities` (AIS-178, slice f).
+ *
+ * Two rows, newest first: an operator note and a machine entry — exactly the pair
+ * the feed must be able to render side by side.
+ */
+export const VALID_ACTIVITY_LIST: readonly Activity[] = [
+  VALID_ACTIVITY,
+  SYSTEM_ACTIVITY,
+];
+
+/**
+ * Payload example of `GET /api/admin/customers/:id/audit-logs` (AIS-178, f).
+ *
+ * One row is enough: the ledger is uniform by construction (every row carries the
+ * same columns), so a second sample would only repeat the first with other values.
+ */
+export const VALID_AUDIT_LOG_LIST: readonly AuditLog[] = [VALID_AUDIT_LOG];

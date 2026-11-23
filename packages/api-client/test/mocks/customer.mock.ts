@@ -15,7 +15,10 @@ import {
   INVITED_CUSTOMER_USER,
   SECOND_CONTACT,
   SECOND_CUSTOMER,
+  VALID_ACTIVITY,
+  VALID_ACTIVITY_LIST,
   VALID_ATTACH_CUSTOMER_TAG_REQUEST,
+  VALID_AUDIT_LOG_LIST,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
   VALID_CREATE_CONTACT_REQUEST,
@@ -29,7 +32,9 @@ import {
   VALID_UPDATE_CONTACT_REQUEST,
   VALID_UPDATE_CUSTOMER_REQUEST,
   VALID_UPDATE_CUSTOMER_USER_REQUEST,
+  type Activity,
   type AttachCustomerTagInput,
+  type CreateActivityInput,
   type CreateContactInput,
   type CreateCustomerInput,
   type CreateCustomerTagInput,
@@ -37,6 +42,7 @@ import {
   type CustomerTag,
   type CustomerUser,
   type InviteCustomerUserInput,
+  type UpdateActivityInput,
   type UpdateContactInput,
   type UpdateCustomerInput,
   type UpdateCustomerUserInput,
@@ -46,6 +52,9 @@ export {
   INVITED_CUSTOMER_USER,
   SECOND_CONTACT,
   SECOND_CUSTOMER,
+  VALID_ACTIVITY,
+  VALID_ACTIVITY_LIST,
+  VALID_AUDIT_LOG_LIST,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
   VALID_CUSTOMER,
@@ -113,3 +122,23 @@ export const ACTIVATED_CUSTOMER_USER: CustomerUser = {
 
 /** The tag payload the endpoints return (the reused `premium` label). */
 export const RETURNED_TAG: CustomerTag = VALID_CUSTOMER_TAG;
+
+/** The activity payload the create/update routes answer with (AIS-178/f). */
+export const RETURNED_ACTIVITY: Activity = VALID_ACTIVITY;
+
+/** A valid `POST /api/admin/customers/:id/activities` body. */
+export const VALID_CREATE_ACTIVITY_INPUT: CreateActivityInput = {
+  type: 'note',
+  body: 'Called the owner about the missing invoice.',
+};
+
+/**
+ * A valid `PATCH …/activities/:activityId` body.
+ *
+ * The token is the row's **last write instant**; for a never-edited entry that is
+ * its `createdAt` (`F4`).
+ */
+export const VALID_UPDATE_ACTIVITY_INPUT: UpdateActivityInput = {
+  body: 'Called again; the invoice was sent.',
+  updatedAt: VALID_ACTIVITY.createdAt,
+};

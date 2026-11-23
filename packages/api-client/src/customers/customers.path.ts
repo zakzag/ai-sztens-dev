@@ -14,12 +14,16 @@
  */
 
 import {
+  CUSTOMERS_ACTIVITY_ID_PARAM,
   CUSTOMERS_CONTACT_ID_PARAM,
   CUSTOMERS_CUSTOMER_USER_ID_PARAM,
   CUSTOMERS_ID_PARAM,
   CUSTOMERS_TAG_ID_PARAM,
 } from '@callback/shared';
 import {
+  CUSTOMERS_ACTIVITIES_PATH,
+  CUSTOMERS_ACTIVITY_PATH,
+  CUSTOMERS_AUDIT_LOGS_PATH,
   CUSTOMERS_CONTACTS_PATH,
   CUSTOMERS_CONTACT_PATH,
   CUSTOMERS_DETAIL_PATH,
@@ -158,5 +162,53 @@ export function toCustomerUserPath(
   ).replace(
     CUSTOMERS_CUSTOMER_USER_ID_PARAM,
     encodeURIComponent(customerUserId),
+  );
+}
+
+/**
+ * Substitutes the customer id into the activity feed path (AIS-178, slice f).
+ *
+ * @param customerId - the customer's uuid.
+ * @returns the path relative to the injected base URL, e.g.
+ *   `/admin/customers/<id>/activities`.
+ */
+export function toCustomerActivitiesPath(customerId: string): string {
+  return CUSTOMERS_ACTIVITIES_PATH.replace(
+    CUSTOMERS_ID_PARAM,
+    encodeURIComponent(customerId),
+  );
+}
+
+/**
+ * Substitutes both ids into the single-activity path.
+ *
+ * `:id` and `:activityId` cannot interfere: the transport's placeholder regex is
+ * anchored to a segment start, and `:activityId` does not contain `:id`.
+ *
+ * @param customerId - the customer's uuid.
+ * @param activityId - the activity's uuid.
+ * @returns the path relative to the injected base URL.
+ */
+export function toCustomerActivityPath(
+  customerId: string,
+  activityId: string,
+): string {
+  return CUSTOMERS_ACTIVITY_PATH.replace(
+    CUSTOMERS_ID_PARAM,
+    encodeURIComponent(customerId),
+  ).replace(CUSTOMERS_ACTIVITY_ID_PARAM, encodeURIComponent(activityId));
+}
+
+/**
+ * Substitutes the customer id into the audit-log path.
+ *
+ * @param customerId - the customer's uuid.
+ * @returns the path relative to the injected base URL, e.g.
+ *   `/admin/customers/<id>/audit-logs`.
+ */
+export function toCustomerAuditLogsPath(customerId: string): string {
+  return CUSTOMERS_AUDIT_LOGS_PATH.replace(
+    CUSTOMERS_ID_PARAM,
+    encodeURIComponent(customerId),
   );
 }

@@ -22,6 +22,7 @@ import type { ApiEndpointContract } from '../endpoint.interface.js';
 import { LIST_QUERY_PARAMETERS } from '../list-query.parameters.js';
 import { noPayloadSchema } from '../no-payload.schema.js';
 import {
+  CUSTOMERS_ACTIVITY_ID_PARAM,
   CUSTOMERS_CONTACT_ID_PARAM,
   CUSTOMERS_CUSTOMER_USER_ID_PARAM,
   CUSTOMERS_ID_PARAM,
@@ -31,7 +32,10 @@ import {
 import {
   INVITED_CUSTOMER_USER,
   SECOND_CUSTOMER_TAG,
+  VALID_ACTIVITY,
+  VALID_ACTIVITY_LIST,
   VALID_ATTACH_CUSTOMER_TAG_REQUEST,
+  VALID_AUDIT_LOG_LIST,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
   VALID_CREATE_CONTACT_REQUEST,
@@ -47,11 +51,19 @@ import {
   VALID_UPDATE_CUSTOMER_REQUEST,
   VALID_UPDATE_CUSTOMER_USER_REQUEST,
 } from './customers.fixture.js';
-import { CUSTOMER_LIST_QUERY_PARAMETERS } from './customers.list-query.js';
 import {
+  ACTIVITY_LIST_QUERY_PARAMETERS,
+  AUDIT_LOG_LIST_QUERY_PARAMETERS,
+  CUSTOMER_LIST_QUERY_PARAMETERS,
+} from './customers.list-query.js';
+import {
+  activityListSchema,
+  activitySchema,
   attachCustomerTagSchema,
+  auditLogListSchema,
   contactListSchema,
   contactSchema,
+  createActivitySchema,
   createContactSchema,
   createCustomerSchema,
   createCustomerTagSchema,
@@ -61,6 +73,7 @@ import {
   customerTagSchema,
   customerUserSchema,
   inviteCustomerUserSchema,
+  updateActivitySchema,
   updateContactSchema,
   updateCustomerSchema,
   updateCustomerUserSchema,
@@ -90,6 +103,15 @@ const CUSTOMER_USERS_PATH = `${CUSTOMER_PATH}/customer-users`;
 
 /** Path of one login user inside its customer. */
 const CUSTOMER_USER_PATH = `${CUSTOMER_USERS_PATH}/${CUSTOMERS_CUSTOMER_USER_ID_PARAM}`;
+
+/** Path of the activity feed of one customer (AIS-178, slice f). */
+const CUSTOMER_ACTIVITIES_PATH = `${CUSTOMER_PATH}/activities`;
+
+/** Path of one activity inside its customer. */
+const CUSTOMER_ACTIVITY_PATH = `${CUSTOMER_ACTIVITIES_PATH}/${CUSTOMERS_ACTIVITY_ID_PARAM}`;
+
+/** Path of the read-only ledger view of one customer. */
+const CUSTOMER_AUDIT_LOGS_PATH = `${CUSTOMER_PATH}/audit-logs`;
 
 /** Failures every route can produce, regardless of what it does. */
 const COMMON_ERRORS = [
@@ -409,6 +431,109 @@ export const CUSTOMERS_ENDPOINTS = [
       API_ERROR_CODE.NOT_FOUND,
       API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
       API_ERROR_CODE.CUSTOMER_USER_IN_USE_CONFLICT,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.listActivities',
+    method: 'GET',
+    path: CUSTOMER_ACTIVITIES_PATH,
+    summary:
+      'List the activity feed of one customer, newest first and paged',
+    tag: 'customers',
+    successStatus: 200,
+    dataSchema: activityListSchema,
+    example: VALID_ACTIVITY_LIST,
+    queryParameters: ACTIVITY_LIST_QUERY_PARAMETERS,
+    examplePagination: {
+      page: 1,
+      limit: 20,
+      total: VALID_ACTIVITY_LIST.length,
+      totalPages: 1,
+    },
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.createActivity',
+    method: 'POST',
+    path: CUSTOMER_ACTIVITIES_PATH,
+    summary:
+      'Record an activity (a note, a call, a mail, a meeting) for one customer',
+    tag: 'customers',
+    successStatus: 201,
+    dataSchema: activitySchema,
+    requestSchema: createActivitySchema,
+    example: VALID_ACTIVITY,
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.updateActivity',
+    method: 'PATCH',
+    path: CUSTOMER_ACTIVITY_PATH,
+    summary:
+      'Edit the body or the metadata of an activity (guarded by the last known write instant)',
+    tag: 'customers',
+    successStatus: 200,
+    dataSchema: activitySchema,
+    requestSchema: updateActivitySchema,
+    example: VALID_ACTIVITY,
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      API_ERROR_CODE.STALE_WRITE,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.removeActivity',
+    method: 'DELETE',
+    path: CUSTOMER_ACTIVITY_PATH,
+    summary:
+      'Soft-delete an activity; the feed and lastActivityAt both fall back to the previous entry',
+    tag: 'customers',
+    successStatus: 200,
+    dataSchema: noPayloadSchema,
+    example: null,
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.listAuditLogs',
+    method: 'GET',
+    path: CUSTOMER_AUDIT_LOGS_PATH,
+    summary:
+      'Read the append-only audit ledger of one customer (no write path exists)',
+    tag: 'customers',
+    successStatus: 200,
+    dataSchema: auditLogListSchema,
+    example: VALID_AUDIT_LOG_LIST,
+    queryParameters: AUDIT_LOG_LIST_QUERY_PARAMETERS,
+    examplePagination: {
+      page: 1,
+      limit: 20,
+      total: VALID_AUDIT_LOG_LIST.length,
+      totalPages: 1,
+    },
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
       ...COMMON_ERRORS,
     ],
     envelope: true,

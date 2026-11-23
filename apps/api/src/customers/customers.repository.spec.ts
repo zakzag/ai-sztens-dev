@@ -11,7 +11,10 @@ import {
   CustomerRowMissingError,
   CustomerTaxNumberConflictError,
 } from './customers.errors.js';
-import { DrizzleCustomersRepository } from './customers.repository.js';
+import {
+  CUSTOMER_PROJECTION,
+  DrizzleCustomersRepository,
+} from './customers.repository.js';
 import {
   CUSTOMER_DELETED_AT,
   CUSTOMER_UPDATED_AT,
@@ -37,6 +40,41 @@ import { createCustomersDatabaseMock } from './test/mocks/database.mock.js';
  * payload, which `WHERE` expression the two list queries share, and which error
  * is surfaced. Drizzle's internal call order is not part of the contract.
  */
+
+/**
+ * A derived column is only usable if every reference inside its correlated
+ * subquery names its schema, table and column. Drizzle renders a bare column
+ * name when the expression becomes a `select()` field, and
+ * `customer.contacts` / `customer.contact_roles` share `customer_id`, so the
+ * unqualified form made the whole list endpoint answer `500` with
+ * `42702 ambiguous column reference` (AIS-14 R1).
+ */
+describe('CUSTOMER_PROJECTION', () => {
+  it('qualifies every reference of the lastActivityAt subquery', () => {
+    const expression = readSqlExpression(
+      CUSTOMER_PROJECTION.lastActivityAt,
+    );
+
+    expect(expression).toContain('"activity"."activities"."created_at"');
+    expect(expression).toContain('"activity"."activities"."customer_id"');
+    expect(expression).toContain('"customer"."customers"."id"');
+  });
+
+  it('qualifies every reference of the primaryContactName subquery', () => {
+    // Table objects are not part of the rendered text, so the assertions cover
+    // the column references — the ones that were ambiguous.
+    const expression = readSqlExpression(
+      CUSTOMER_PROJECTION.primaryContactName,
+    );
+
+    expect(expression).toContain('"customer"."contacts"."name"');
+    expect(expression).toContain('"customer"."contacts"."customer_id"');
+    expect(expression).toContain(
+      '"customer"."contact_roles"."contact_id"',
+    );
+    expect(expression).toContain('"customer"."customers"."id"');
+  });
+});
 
 describe('DrizzleCustomersRepository', () => {
   describe('findPage', () => {

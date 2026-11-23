@@ -43,6 +43,7 @@ import {
 import type { DatabaseTransaction } from '../audit/audit-transaction.interface.js';
 import { DATABASE } from '../db/database.const.js';
 import type { Database } from '../db/database.interface.js';
+import { qualifiedColumn } from '../db/sql-reference.js';
 import {
   activities,
   contactRoles,
@@ -83,12 +84,17 @@ import type {
  *
  * A customer without activities yields `null`, which is the contract's “nothing
  * recorded yet” — and it is also what `NULLS LAST` sorts on.
+ *
+ * Every reference is schema-qualified through {@link qualifiedColumn}: as a
+ * `select()` field, a bare Drizzle `Column` renders without its table, and the
+ * correlated subquery then reads `"customer_id" = "id"` against its own
+ * `FROM` — `42702 ambiguous column reference` (AIS-14 R1).
  */
 const LAST_ACTIVITY_AT = sql<Date | null>`(
-  select max(${activities.createdAt})
+  select max(${qualifiedColumn(activities, activities.createdAt)})
   from ${activities}
-  where ${activities.customerId} = ${customers.id}
-    and ${activities.deletedAt} is null
+  where ${qualifiedColumn(activities, activities.customerId)} = ${qualifiedColumn(customers, customers.id)}
+    and ${qualifiedColumn(activities, activities.deletedAt)} is null
 )`;
 
 /**
@@ -97,14 +103,18 @@ const LAST_ACTIVITY_AT = sql<Date | null>`(
  * `contact_roles_primary_key` is a partial **unique** index on
  * (`customer_id`) `WHERE role = 'primary'`, so `LIMIT 1` cannot hide a second
  * row: there is at most one by construction.
+ *
+ * Both `customer.contacts` and `customer.contact_roles` carry `customer_id`, so
+ * this subquery is the one that actually hit the ambiguity — see
+ * {@link LAST_ACTIVITY_AT} for the qualification rule.
  */
 const PRIMARY_CONTACT_NAME = sql<string | null>`(
-  select ${contacts.name}
+  select ${qualifiedColumn(contacts, contacts.name)}
   from ${contacts}
-  inner join ${contactRoles} on ${contactRoles.contactId} = ${contacts.id}
-  where ${contacts.customerId} = ${customers.id}
-    and ${contacts.deletedAt} is null
-    and ${contactRoles.role} = 'primary'
+  inner join ${contactRoles} on ${qualifiedColumn(contactRoles, contactRoles.contactId)} = ${qualifiedColumn(contacts, contacts.id)}
+  where ${qualifiedColumn(contacts, contacts.customerId)} = ${qualifiedColumn(customers, customers.id)}
+    and ${qualifiedColumn(contacts, contacts.deletedAt)} is null
+    and ${qualifiedColumn(contactRoles, contactRoles.role)} = 'primary'
   limit 1
 )`;
 
@@ -113,8 +123,11 @@ const PRIMARY_CONTACT_NAME = sql<string | null>`(
  *
  * Typed by Drizzle from the subqueries, so a driver that returns a string
  * timestamp is a compile-time surprise rather than a silent `undefined`.
+ *
+ * Exported for the regression test that renders both subqueries and proves the
+ * references stayed schema-qualified (`customers.repository.spec.ts`).
  */
-const CUSTOMER_PROJECTION = {
+export const CUSTOMER_PROJECTION = {
   ...getTableColumns(customers),
   lastActivityAt: LAST_ACTIVITY_AT,
   primaryContactName: PRIMARY_CONTACT_NAME,

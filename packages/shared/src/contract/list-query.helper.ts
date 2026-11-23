@@ -38,6 +38,21 @@ export interface ListQueryDefaults {
   readonly sort?: string;
 }
 
+/**
+ * The paging fields, written first and in a fixed order.
+ *
+ * A `Set` and not an array: the membership test runs once per query key, and the
+ * order of the paging block is guaranteed by the explicit `if` blocks below, not
+ * by this collection.
+ */
+const PAGING_KEYS: ReadonlySet<string> = new Set([
+  'page',
+  'limit',
+  'order',
+  'q',
+  'sort',
+]);
+
 /** The defaults of the base list query. */
 export const LIST_QUERY_DEFAULTS: ListQueryDefaults = {
   limit: LIST_QUERY_DEFAULT_LIMIT,
@@ -106,12 +121,25 @@ export function toPaginationMeta(
  * back button behaves the way the user expects. A field whose value is
  * `undefined` is left out for the same reason.
  *
- * @param query - the list query.
+ * The five paging fields are written first, in a fixed order; **every other key**
+ * of the query is treated as a resource filter and appended after them (the
+ * `customers` list has `type`, `status`, `source` and `responsibleOperatorId`).
+ * Without that pass-through a filter would be silently dropped on its way to the
+ * server — a lie the client could not see.
+ *
+ * The type parameter is what keeps every caller's own query type assignable: a
+ * resource filter cannot be described by an index signature without forcing an
+ * `interface`-shaped query to add one, so the extra keys are accepted through the
+ * caller's type and narrowed at runtime.
+ *
+ * @param query - the list query, optionally carrying resource-specific filters.
  * @param defaults - the values that count as "unchanged".
  * @returns the URL parameters.
  */
-export function toListQueryParams(
-  query: ListQuery & { readonly sort?: string },
+export function toListQueryParams<
+  TQuery extends ListQuery & { readonly sort?: string },
+>(
+  query: TQuery,
   defaults: ListQueryDefaults = LIST_QUERY_DEFAULTS,
 ): URLSearchParams {
   const params = new URLSearchParams();
@@ -140,5 +168,45 @@ export function toListQueryParams(
     params.set('sort', query.sort);
   }
 
+  appendExtraFilters(params, query);
+
   return params;
+}
+
+/**
+ * Appends the resource-specific filters of a query.
+ *
+ * Skips the paging fields (already written) and the three "no filter" values
+ * (absent, `null`, empty string). Numbers and booleans are stringified, because
+ * `URLSearchParams` only stores text.
+ *
+ * `query` is typed `object` on purpose: the caller's own query type is a generic
+ * type parameter (see {@link toListQueryParams}), and requiring an index
+ * signature here would reject it. Each value is narrowed by
+ * {@link isFilterValue} before it is written.
+ *
+ * @param params - the parameter bag to extend.
+ * @param query - the list query, possibly carrying extra filters.
+ */
+function appendExtraFilters(params: URLSearchParams, query: object): void {
+  for (const [key, value] of Object.entries(query)) {
+    if (PAGING_KEYS.has(key) || !isFilterValue(value)) {
+      continue;
+    }
+
+    params.set(key, String(value));
+  }
+}
+
+/**
+ * @param value - one entry of a query object.
+ * @returns `true` for a value the URL should carry: a non-empty string, a number
+ *   or a boolean.
+ */
+function isFilterValue(value: unknown): value is string | number | boolean {
+  if (typeof value === 'string') {
+    return value.length > 0;
+  }
+
+  return typeof value === 'number' || typeof value === 'boolean';
 }

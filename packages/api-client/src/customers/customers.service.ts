@@ -1,0 +1,106 @@
+/**
+ * Implementation of {@link CustomersService} (AIS-178/c).
+ *
+ * The service contains no logic of its own: it names the endpoints, binds them to
+ * the shared zod schemas and passes the caller's options through. Validating a
+ * request payload is the backend's job (and the form's, for UX); parsing of the
+ * *response* is this layer's, so a contract drift surfaces here — as an
+ * `ApiError` — instead of inside a component as `undefined`.
+ *
+ * `list` goes through `getList` and not `get`: the pager block
+ * (`meta.pagination`) only exists on the list response, and dropping it here
+ * would make it unobservable for every consumer above. The resource filters
+ * (`type`, `status`, `source`, `responsibleOperatorId`) travel because
+ * `toListQueryParams` appends them (AIS-178/c `D3`) — before that they were
+ * silently dropped, which is the one defect this slice had to fix outside the
+ * package.
+ *
+ * `update` and `remove` address the **same** detail route as `findById`, so they
+ * reuse `toCustomerDetailPath` instead of declaring a second path constant: one
+ * route, one place that knows how `:id` looks.
+ */
+
+import {
+  customerDetailSchema,
+  customerListSchema,
+  customerSchema,
+  noPayloadSchema,
+  type ApiResult,
+  type CreateCustomerInput,
+  type Customer,
+  type CustomerDetail,
+  type CustomerListQuery,
+  type UpdateCustomerInput,
+  type UpdateCustomerStatusInput,
+} from '@callback/shared';
+import {
+  CUSTOMERS_PATH,
+  CUSTOMER_LIST_QUERY_DEFAULTS,
+} from './customers.const.js';
+import type { CustomersService } from './customers.interface.js';
+import { toCustomerDetailPath, toCustomerStatusPath } from './customers.path.js';
+import type { HttpClient, RequestOptions } from '../http-client.interface.js';
+
+/**
+ * Creates the service on top of an injected transport.
+ *
+ * @param client - HTTP transport (base URL and token supplier already bound).
+ * @returns the service consumed by the query hooks.
+ *
+ * @example
+ * ```ts
+ * const customers = createCustomersService(httpClient);
+ * const page = await customers.list({ page: 1, limit: 20, sort: 'createdAt', order: 'desc' });
+ * ```
+ */
+export function createCustomersService(client: HttpClient): CustomersService {
+  return {
+    list: async (
+      query: CustomerListQuery,
+      options?: RequestOptions,
+    ): Promise<ApiResult<readonly Customer[]>> =>
+      client.getList(
+        CUSTOMERS_PATH,
+        customerListSchema,
+        { query, defaults: CUSTOMER_LIST_QUERY_DEFAULTS },
+        options,
+      ),
+
+    findById: async (
+      id: string,
+      options?: RequestOptions,
+    ): Promise<CustomerDetail> =>
+      client.get(toCustomerDetailPath(id), customerDetailSchema, options),
+
+    create: async (
+      input: CreateCustomerInput,
+      options?: RequestOptions,
+    ): Promise<Customer> =>
+      client.post(CUSTOMERS_PATH, input, customerSchema, options),
+
+    // `PATCH`, not `PUT`: the convention is a partial update guarded by
+    // `updatedAt`, and the transport validates the response with the same schema
+    // as the reads, so a drift in the updated row surfaces here.
+    update: async (
+      id: string,
+      input: UpdateCustomerInput,
+      options?: RequestOptions,
+    ): Promise<Customer> =>
+      client.patch(toCustomerDetailPath(id), input, customerSchema, options),
+
+    // The status route is separate from the detail route: the server writes
+    // `statusChangedAt` and audits the change on its own.
+    updateStatus: async (
+      id: string,
+      input: UpdateCustomerStatusInput,
+      options?: RequestOptions,
+    ): Promise<Customer> =>
+      client.patch(toCustomerStatusPath(id), input, customerSchema, options),
+
+    // `noPayloadSchema` is `z.null()`: the transport re-validates `data` with the
+    // bare schema, so a `204`, a missing `data` key or an object payload is a
+    // contract violation instead of a silent success.
+    remove: async (id: string, options?: RequestOptions): Promise<null> =>
+      client.delete(toCustomerDetailPath(id), noPayloadSchema, options),
+  };
+}

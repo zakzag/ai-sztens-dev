@@ -91,3 +91,19 @@ export { toApiKeyDetailPath } from './api-keys/api-keys.path.js';
 export { createApiKeysService } from './api-keys/api-keys.service.js';
 
 export type { ApiKeysService } from './api-keys/api-keys.interface.js';
+
+export {
+  CUSTOMERS_DETAIL_PATH,
+  CUSTOMERS_PATH,
+  CUSTOMERS_STATUS_PATH,
+  CUSTOMER_LIST_QUERY_DEFAULTS,
+} from './customers/customers.const.js';
+
+export {
+  toCustomerDetailPath,
+  toCustomerStatusPath,
+} from './customers/customers.path.js';
+
+export { createCustomersService } from './customers/customers.service.js';
+
+export type { CustomersService } from './customers/customers.interface.js';

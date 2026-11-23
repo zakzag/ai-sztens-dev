@@ -1,0 +1,148 @@
+/**
+ * Contract of the `customers` service (AIS-178/c).
+ *
+ * The interface is what React hooks depend on; the implementation
+ * (`createCustomersService`) is only referenced by the composition root and by
+ * the test that builds it over a doubled `fetch`. That keeps every consumer
+ * testable with a plain object double.
+ *
+ * The reads follow the transport convention (AIS-109):
+ *
+ * - `list` returns the shared `ApiResult`, because a paginated list is the only
+ *   call where `meta.pagination` is meaningful — the generic hook layer reads
+ *   exactly that block;
+ * - `findById` returns the detail payload, because a single resource never needs
+ *   a pager.
+ *
+ * The writes follow `docs/Specs/API-Convention.md` §4.2 (AIS-108/110):
+ *
+ * - `update` and `updateStatus` send only the fields that change plus the
+ *   **required** `updatedAt` concurrency token, so a stale edit can never
+ *   silently overwrite a newer one — a mismatch is `409 STALE_WRITE`;
+ * - `remove` is a **soft** delete that answers `200` with `data: null`, never
+ *   `204`, so the envelope (and `meta.requestId`) survives. `null` is therefore
+ *   the honest return type, not `void`.
+ *
+ * Failures are not translated here. The transport throws `ApiError`, and the
+ * caller can rely on:
+ *
+ * - `404 NOT_FOUND` — no live customer owns the id (`findById`, `update`,
+ *   `updateStatus`, `remove`);
+ * - `409 STALE_WRITE` — the `updatedAt` the caller sent is no longer current;
+ * - `409 CUSTOMER_NUMBER_CONFLICT` — the monthly number sequence could not be
+ *   allocated (`create`);
+ * - `409 CUSTOMER_TAX_NUMBER_CONFLICT` — another live customer owns the tax
+ *   number (`create`, `update`), with `details[0].path === 'taxNumber'`.
+ *
+ * Every method accepts optional `RequestOptions` so the caller can pass an abort
+ * `signal` (a TanStack Query cancellation) without the service having to know
+ * about React.
+ */
+
+import type {
+  ApiResult,
+  CreateCustomerInput,
+  Customer,
+  CustomerDetail,
+  CustomerListQuery,
+  UpdateCustomerInput,
+  UpdateCustomerStatusInput,
+} from '@callback/shared';
+import type { RequestOptions } from '../http-client.interface.js';
+
+/** Reads, creates, updates, changes the status of and archives customers. */
+export interface CustomersService {
+  /**
+   * `GET /api/admin/customers` — one page of customers, plus `meta.pagination`.
+   *
+   * Every filter of the query travels in the URL (`type`, `status`, `source`,
+   * `responsibleOperatorId`, `q`); a field still at its default is omitted, so
+   * the URL only carries what the operator actually changed.
+   *
+   * @param query - the validated list query.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `400 VALIDATION_FAILED` for an
+   *   unknown sort column or an invalid filter value.
+   */
+  list(
+    query: CustomerListQuery,
+    options?: RequestOptions,
+  ): Promise<ApiResult<readonly Customer[]>>;
+
+  /**
+   * `GET /api/admin/customers/:id` — one customer with its tags, contacts and
+   * login users in a single round trip.
+   *
+   * @param id - the customer's uuid.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404 NOT_FOUND` when no live
+   *   row owns the id.
+   */
+  findById(id: string, options?: RequestOptions): Promise<CustomerDetail>;
+
+  /**
+   * `POST /api/admin/customers` — persists a customer.
+   *
+   * `customerNumber`, `statusChangedAt`, `createdAt` and `updatedAt` are
+   * server-managed and are rejected by the request schema, not by this layer.
+   *
+   * @param input - the create payload.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} the two `409` conflicts above.
+   */
+  create(input: CreateCustomerInput, options?: RequestOptions): Promise<Customer>;
+
+  /**
+   * `PATCH /api/admin/customers/:id` — partial, version-guarded update.
+   *
+   * `undefined` means “leave the value alone”, `null` means “clear it”, and
+   * `updatedAt` is the version the caller last read.
+   *
+   * @param id - the customer's uuid.
+   * @param input - the changed fields plus the required `updatedAt` token.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `409 STALE_WRITE` or
+   *   `409 CUSTOMER_TAX_NUMBER_CONFLICT`.
+   */
+  update(
+    id: string,
+    input: UpdateCustomerInput,
+    options?: RequestOptions,
+  ): Promise<Customer>;
+
+  /**
+   * `PATCH /api/admin/customers/:id/status` — the dedicated status change.
+   *
+   * A route of its own: the server also writes `statusChangedAt` and records the
+   * change as its own audit entry, which a generic field edit must not do.
+   *
+   * @param id - the customer's uuid.
+   * @param input - the new status plus the required `updatedAt` token.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404` or `409 STALE_WRITE`.
+   */
+  updateStatus(
+    id: string,
+    input: UpdateCustomerStatusInput,
+    options?: RequestOptions,
+  ): Promise<Customer>;
+
+  /**
+   * `DELETE /api/admin/customers/:id` — archives the customer (soft delete).
+   *
+   * The row disappears from every read and frees its tax number, but keeps its
+   * customer number and its ledger rows. A repeat delete answers `404`: the row
+   * is already invisible, so reporting success would claim an effect the call
+   * did not have.
+   *
+   * There is no body parameter — the convention has no body-carrying delete —
+   * and the resolved value is `null` because the success envelope carries
+   * `data: null`. The transport validates that shape, so a `204` or a non-`null`
+   * payload is a contract violation instead of a silent success.
+   *
+   * @param id - the customer's uuid.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404 NOT_FOUND`.
+   */
+  remove(id: string, options?: RequestOptions): Promise<null>;
+}

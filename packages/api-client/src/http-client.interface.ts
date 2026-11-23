@@ -191,10 +191,22 @@ export interface HttpClientConfig {
  * `sort` is optional because not every resource is sortable; `defaults` carries
  * the resource's own default sort so the URL only contains what the user
  * actually changed (the omission rule lives in `toListQueryParams`).
+ *
+ * `TQuery` is the caller's own query type — the contract's list query, resource
+ * filters included (`status`, `type`, …). A generic instead of an index signature
+ * because a filter set is described by the resource, and requiring an index
+ * signature would reject every `interface`-shaped query. The transport forwards
+ * whatever the type accepts, so nothing is dropped on the way out.
+ *
+ * @typeParam TQuery - the list query to encode; defaults to the plain list query.
  */
-export interface ListRequest {
-  /** The list query to encode. */
-  readonly query: ListQuery & { readonly sort?: string };
+export interface ListRequest<
+  TQuery extends ListQuery & { readonly sort?: string } = ListQuery & {
+    readonly sort?: string;
+  },
+> {
+  /** The list query to encode, resource filters included. */
+  readonly query: TQuery;
   /** Values that count as “unchanged”; defaults to the shared list defaults. */
   readonly defaults?: ListQueryDefaults;
 }

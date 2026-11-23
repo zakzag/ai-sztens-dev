@@ -1,5 +1,8 @@
 # API Convention — unified request/response contract
 
+**Utolsó frissítés:** 2026-11-23 (AIS-178/f: a customer **aktivitás-** és **napló-olvasó**
+végpontjai élnek, a napló írhatatlan, a szerző a szerveroldali `AUDIT_ACTOR_PROVIDER`-ből jön)
+
 **Frissítések**:
 
 - **2026-11-23 - AIS-178/f:** a `customers` **aktivitás** végpontjai és a **napló** olvasása élnek — `GET`/`POST /api/admin/customers/:id/activities`, `PATCH`/`DELETE …/:activityId`, `GET …/audit-logs`; az aktivitás szerzője a szerveroldali `AUDIT_ACTOR_PROVIDER`-ből jön, a token az `updatedAt ?? createdAt`, a napló **írhatatlan**, `from > to` → `422`, lásd §12.3)

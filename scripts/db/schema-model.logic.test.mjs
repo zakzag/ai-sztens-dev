@@ -311,10 +311,16 @@ test('findColumnByProperty resolves a property to its database column', () => {
 test('the real schema parses completely (regression guard)', () => {
   const model = buildSchemaModel(REAL_SOURCE);
 
-  assert.deepEqual(model.schemas, ['platform', 'customer', 'iam']);
-  assert.equal(model.tables.length, 8);
-  assert.equal(model.relationships.length, 8);
-  assert.equal(model.enums.length, 8);
+  assert.deepEqual(model.schemas, [
+    'platform',
+    'customer',
+    'iam',
+    'activity',
+    'audit',
+  ]);
+  assert.equal(model.tables.length, 10);
+  assert.equal(model.relationships.length, 11);
+  assert.equal(model.enums.length, 12);
 
   assert.deepEqual(
     model.tables.map((table) => `${table.schema}.${table.name}`),
@@ -327,6 +333,8 @@ test('the real schema parses completely (regression guard)', () => {
       'iam.customer_users',
       'customer.contacts',
       'customer.contact_roles',
+      'activity.activities',
+      'audit.audit_logs',
     ],
   );
 
@@ -348,6 +356,9 @@ test('the real schema parses completely (regression guard)', () => {
       'contacts_customer_id_customers_id_fk',
       'contacts_customer_user_id_fkey',
       'contact_roles_contact_id_fkey',
+      'activities_customer_id_customers_id_fk',
+      'activities_operator_id_operators_id_fk',
+      'activities_customer_user_id_customer_users_id_fk',
     ],
   );
 

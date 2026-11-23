@@ -64,9 +64,10 @@ second primary would have been a `500` instead of the `409` the AIS-14 DoD requi
 | `pnpm --filter @callback/api test` | 797 → **815 passed** / 57 suites |
 | `pnpm --filter @callback/api-client test` | 248 → **261 passed** / 11 suites (coverage gate green) |
 | `pnpm typecheck` | every workspace `Done` |
-| `pnpm lint` | clean |
+| `pnpm lint` | clean (`api`, `admin`; `web` has no eslint config yet) |
 | `pnpm quality` | layers, knip, palette, themes, field-errors, docs — 0 violations |
-| `pnpm --filter @callback/api test:e2e` | self-skips without a reachable Postgres (`[database-gate]`); run `pnpm db:up` to exercise it |
+| `pnpm build` | every workspace `Done` (`nest build`, `tsc`, two `vite build`s) |
+| `pnpm --filter @callback/api test:e2e` | 14 suites / 93 passed, `customer-contacts.e2e-spec.ts` among them — but the persistence cases **self-skip** without a reachable Postgres (`[database-gate]`, `DATABASE_URL` unset locally), so the compile and boot path is verified and the SQL assertions are not. Run `pnpm db:up` and re-run to exercise them. |
 
 ## Known limitations / follow-ups
 

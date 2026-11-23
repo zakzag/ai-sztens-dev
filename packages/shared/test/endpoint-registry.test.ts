@@ -12,6 +12,8 @@ import {
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
+  VALID_CUSTOMER_TAG,
+  VALID_CUSTOMER_USER,
   VALID_UPDATE_API_KEY_REQUEST,
   VALID_UPDATE_CUSTOMER_REQUEST,
   apiKeySchema,
@@ -76,6 +78,14 @@ const SAMPLE_PAYLOADS: Readonly<Record<string, unknown>> = {
   'customers.createContact': VALID_CONTACT,
   'customers.updateContact': VALID_CONTACT,
   'customers.removeContact': null,
+  // The tag and customer-user resources (AIS-178, slice e): a tag answers with
+  // the catalogue row, a login user with its row, and both deletes `null`.
+  'customers.createTag': VALID_CUSTOMER_TAG,
+  'customers.attachTag': VALID_CUSTOMER_TAG,
+  'customers.detachTag': null,
+  'customers.inviteCustomerUser': VALID_CUSTOMER_USER,
+  'customers.updateCustomerUser': VALID_CUSTOMER_USER,
+  'customers.removeCustomerUser': null,
 };
 
 /** Minimal envelope `meta`; the registry only cares about the payload. */

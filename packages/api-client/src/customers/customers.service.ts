@@ -28,18 +28,26 @@ import {
   customerDetailSchema,
   customerListSchema,
   customerSchema,
+  customerTagSchema,
+  customerUserSchema,
   noPayloadSchema,
   updateContactSchema,
   type ApiResult,
+  type AttachCustomerTagInput,
   type Contact,
   type CreateContactInput,
   type CreateCustomerInput,
+  type CreateCustomerTagInput,
   type Customer,
   type CustomerDetail,
   type CustomerListQuery,
+  type CustomerTag,
+  type CustomerUser,
+  type InviteCustomerUserInput,
   type ListQuery,
   type UpdateContactInput,
   type UpdateCustomerInput,
+  type UpdateCustomerUserInput,
   type UpdateCustomerStatusInput,
 } from '@callback/shared';
 import {
@@ -52,6 +60,10 @@ import {
   toCustomerContactsPath,
   toCustomerDetailPath,
   toCustomerStatusPath,
+  toCustomerTagPath,
+  toCustomerTagsPath,
+  toCustomerUserPath,
+  toCustomerUsersPath,
 } from './customers.path.js';
 import type { HttpClient, RequestOptions } from '../http-client.interface.js';
 
@@ -166,6 +178,86 @@ export function createCustomersService(client: HttpClient): CustomersService {
     ): Promise<null> =>
       client.delete(
         toCustomerContactPath(customerId, contactId),
+        noPayloadSchema,
+        options,
+      ),
+
+    // ---- tags (AIS-178, slice e) ------------------------------------------
+    // `POST` is create-or-attach: the server reuses an existing label of the same
+    // name, so a retry cannot turn into a `409`.
+    createTag: async (
+      customerId: string,
+      input: CreateCustomerTagInput,
+      options?: RequestOptions,
+    ): Promise<CustomerTag> =>
+      client.post(
+        toCustomerTagsPath(customerId),
+        input,
+        customerTagSchema,
+        options,
+      ),
+
+    attachTag: async (
+      customerId: string,
+      input: AttachCustomerTagInput,
+      options?: RequestOptions,
+    ): Promise<CustomerTag> =>
+      client.patch(
+        toCustomerTagsPath(customerId),
+        input,
+        customerTagSchema,
+        options,
+      ),
+
+    // The tag id is a **path** parameter here (and a body field above): the two
+    // routes address different resources — one link, versus the customer's tag
+    // collection.
+    detachTag: async (
+      customerId: string,
+      tagId: string,
+      options?: RequestOptions,
+    ): Promise<null> =>
+      client.delete(
+        toCustomerTagPath(customerId, tagId),
+        noPayloadSchema,
+        options,
+      ),
+
+    // ---- customer users (AIS-178, slice e) --------------------------------
+    inviteCustomerUser: async (
+      customerId: string,
+      input: InviteCustomerUserInput,
+      options?: RequestOptions,
+    ): Promise<CustomerUser> =>
+      client.post(
+        toCustomerUsersPath(customerId),
+        input,
+        customerUserSchema,
+        options,
+      ),
+
+    // `PATCH` accepts `active` / `inactive` only; a second active owner is refused
+    // by the server with `409 CUSTOMER_OWNER_CONFLICT`, not by the client.
+    updateCustomerUser: async (
+      customerId: string,
+      customerUserId: string,
+      input: UpdateCustomerUserInput,
+      options?: RequestOptions,
+    ): Promise<CustomerUser> =>
+      client.patch(
+        toCustomerUserPath(customerId, customerUserId),
+        input,
+        customerUserSchema,
+        options,
+      ),
+
+    removeCustomerUser: async (
+      customerId: string,
+      customerUserId: string,
+      options?: RequestOptions,
+    ): Promise<null> =>
+      client.delete(
+        toCustomerUserPath(customerId, customerUserId),
         noPayloadSchema,
         options,
       ),

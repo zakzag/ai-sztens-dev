@@ -10,6 +10,14 @@ import { CUSTOMERS_REPOSITORY } from './customers.const.js';
 import { CustomersController } from './customers.controller.js';
 import { DrizzleCustomersRepository } from './customers.repository.js';
 import { CustomersService } from './customers.service.js';
+import { CUSTOMER_TAGS_REPOSITORY } from './customers-tags.const.js';
+import { CustomerTagsController } from './customers-tags.controller.js';
+import { DrizzleCustomerTagsRepository } from './customers-tags.repository.js';
+import { CustomerTagsService } from './customers-tags.service.js';
+import { CUSTOMER_USERS_REPOSITORY } from './customers-users.const.js';
+import { CustomerUsersController } from './customers-users.controller.js';
+import { DrizzleCustomerUsersRepository } from './customers-users.repository.js';
+import { CustomerUsersService } from './customers-users.service.js';
 import { createCustomersDatabaseMock } from './test/mocks/database.mock.js';
 import { createAuditWriterMock } from './test/mocks/customers.mock.js';
 
@@ -54,18 +62,32 @@ async function loadCustomersModule(): Promise<
 }
 
 describe('CustomersModule', () => {
-  it('resolves the repository and the audit writer through their tokens', async () => {
+  it('resolves every repository, controller and the audit writer through their tokens', async () => {
     const database = createCustomersDatabaseMock();
     const audit = createAuditWriterMock();
 
     const moduleRef = await Test.createTestingModule({
-      controllers: [CustomersController],
+      controllers: [
+        CustomersController,
+        CustomerTagsController,
+        CustomerUsersController,
+      ],
       providers: [
         CustomersService,
-        // The controller wraps its payload, so it needs the envelope service —
+        CustomerTagsService,
+        CustomerUsersService,
+        // The controllers wrap their payload, so they need the envelope service —
         // provided by the global `HttpModule` in the real graph.
         ApiResponseService,
         { provide: CUSTOMERS_REPOSITORY, useClass: DrizzleCustomersRepository },
+        {
+          provide: CUSTOMER_TAGS_REPOSITORY,
+          useClass: DrizzleCustomerTagsRepository,
+        },
+        {
+          provide: CUSTOMER_USERS_REPOSITORY,
+          useClass: DrizzleCustomerUsersRepository,
+        },
         { provide: AUDIT_WRITER, useValue: audit.writer },
         { provide: DATABASE, useValue: database.db },
       ],
@@ -74,9 +96,27 @@ describe('CustomersModule', () => {
     expect(moduleRef.get(CustomersController)).toBeInstanceOf(
       CustomersController,
     );
+    expect(moduleRef.get(CustomerTagsController)).toBeInstanceOf(
+      CustomerTagsController,
+    );
+    expect(moduleRef.get(CustomerUsersController)).toBeInstanceOf(
+      CustomerUsersController,
+    );
     expect(moduleRef.get(CustomersService)).toBeInstanceOf(CustomersService);
+    expect(moduleRef.get(CustomerTagsService)).toBeInstanceOf(
+      CustomerTagsService,
+    );
+    expect(moduleRef.get(CustomerUsersService)).toBeInstanceOf(
+      CustomerUsersService,
+    );
     expect(moduleRef.get(CUSTOMERS_REPOSITORY)).toBeInstanceOf(
       DrizzleCustomersRepository,
+    );
+    expect(moduleRef.get(CUSTOMER_TAGS_REPOSITORY)).toBeInstanceOf(
+      DrizzleCustomerTagsRepository,
+    );
+    expect(moduleRef.get(CUSTOMER_USERS_REPOSITORY)).toBeInstanceOf(
+      DrizzleCustomerUsersRepository,
     );
     expect(moduleRef.get(AUDIT_WRITER)).toBe(audit.writer);
 

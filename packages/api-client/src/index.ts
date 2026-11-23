@@ -98,6 +98,10 @@ export {
   CUSTOMERS_DETAIL_PATH,
   CUSTOMERS_PATH,
   CUSTOMERS_STATUS_PATH,
+  CUSTOMERS_TAGS_PATH,
+  CUSTOMERS_TAG_PATH,
+  CUSTOMERS_USERS_PATH,
+  CUSTOMERS_USER_PATH,
   CUSTOMER_LIST_QUERY_DEFAULTS,
 } from './customers/customers.const.js';
 
@@ -106,6 +110,10 @@ export {
   toCustomerContactsPath,
   toCustomerDetailPath,
   toCustomerStatusPath,
+  toCustomerTagPath,
+  toCustomerTagsPath,
+  toCustomerUserPath,
+  toCustomerUsersPath,
 } from './customers/customers.path.js';
 
 export { createCustomersService } from './customers/customers.service.js';

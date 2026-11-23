@@ -22,12 +22,20 @@ import {
   CUSTOMERS_DETAIL_PATH,
   CUSTOMERS_PATH,
   CUSTOMERS_STATUS_PATH,
+  CUSTOMERS_TAGS_PATH,
+  CUSTOMERS_TAG_PATH,
+  CUSTOMERS_USERS_PATH,
+  CUSTOMERS_USER_PATH,
   clientPathOf,
   createCustomersService,
   toCustomerContactPath,
   toCustomerContactsPath,
   toCustomerDetailPath,
   toCustomerStatusPath,
+  toCustomerTagPath,
+  toCustomerTagsPath,
+  toCustomerUserPath,
+  toCustomerUsersPath,
   UNEXPECTED_PAYLOAD_CODE,
 } from '../src/index.js';
 import { ApiError, isNotFoundError } from '../src/api-error.js';
@@ -40,16 +48,24 @@ import {
   successResponse,
 } from './mocks/fetch.mock.js';
 import {
+  ACTIVATED_CUSTOMER_USER,
+  INVITED_CUSTOMER_USER,
+  RETURNED_TAG,
   UPDATED_CUSTOMER,
+  VALID_ATTACH_TAG_INPUT,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
   VALID_CREATE_CONTACT_INPUT,
   VALID_CREATE_INPUT,
+  VALID_CREATE_TAG_INPUT,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
+  VALID_CUSTOMER_TAG,
+  VALID_INVITE_USER_INPUT,
   VALID_UPDATE_CONTACT_INPUT,
   VALID_UPDATE_INPUT,
+  VALID_UPDATE_USER_INPUT,
 } from './mocks/customer.mock.js';
 
 const BASE_URL = 'http://api.test/api';
@@ -593,5 +609,276 @@ describe('createCustomersService — removeContact', () => {
     );
 
     expect(isNotFoundError(error)).toBe(true);
+  });
+});
+
+describe('the tag and customer-user paths (AIS-178, slice e)', () => {
+  it('derives both tag routes from the registry', () => {
+    expect(CUSTOMERS_TAGS_PATH).toBe('/admin/customers/:id/tags');
+    expect(CUSTOMERS_TAG_PATH).toBe('/admin/customers/:id/tags/:tagId');
+  });
+
+  it('derives both customer-user routes from the registry', () => {
+    expect(CUSTOMERS_USERS_PATH).toBe('/admin/customers/:id/customer-users');
+    expect(CUSTOMERS_USER_PATH).toBe(
+      '/admin/customers/:id/customer-users/:customerUserId',
+    );
+  });
+
+  it('substitutes the tag ids and encodes them', () => {
+    expect(toCustomerTagsPath(VALID_CUSTOMER.id)).toBe(
+      `/admin/customers/${VALID_CUSTOMER.id}/tags`,
+    );
+    expect(toCustomerTagPath(VALID_CUSTOMER.id, VALID_CUSTOMER_TAG.id)).toBe(
+      `/admin/customers/${VALID_CUSTOMER.id}/tags/${VALID_CUSTOMER_TAG.id}`,
+    );
+    expect(toCustomerTagPath('a/b', 'c/d')).toBe(
+      '/admin/customers/a%2Fb/tags/c%2Fd',
+    );
+  });
+
+  it('substitutes the customer-user ids and encodes them', () => {
+    expect(toCustomerUsersPath(VALID_CUSTOMER.id)).toBe(
+      `/admin/customers/${VALID_CUSTOMER.id}/customer-users`,
+    );
+    expect(
+      toCustomerUserPath(VALID_CUSTOMER.id, INVITED_CUSTOMER_USER.id),
+    ).toBe(
+      `/admin/customers/${VALID_CUSTOMER.id}/customer-users/${INVITED_CUSTOMER_USER.id}`,
+    );
+  });
+});
+
+describe('createCustomersService — createTag', () => {
+  it('posts the name and parses the attached label', async () => {
+    const { service, fetchMock } = setup([successResponse(RETURNED_TAG, 201)]);
+
+    const tag = await service.createTag(VALID_CUSTOMER.id, VALID_CREATE_TAG_INPUT);
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/tags`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('POST');
+    expect(readBody(fetchMock.calls[0])).toEqual(VALID_CREATE_TAG_INPUT);
+    expect(tag).toEqual(RETURNED_TAG);
+  });
+
+  it('answers the same payload for a repeated request (reused label)', async () => {
+    // Two responses, because a `Response` body can only be read once.
+    const { service } = setup([
+      successResponse(RETURNED_TAG, 201),
+      successResponse(RETURNED_TAG, 201),
+    ]);
+
+    const first = await service.createTag(VALID_CUSTOMER.id, VALID_CREATE_TAG_INPUT);
+    const second = await service.createTag(VALID_CUSTOMER.id, VALID_CREATE_TAG_INPUT);
+
+    expect(second).toEqual(first);
+  });
+
+  it('surfaces an unknown customer as not found', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'No customer with that id was found.',
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.createTag(VALID_CUSTOMER.id, VALID_CREATE_TAG_INPUT),
+    );
+
+    expect(isNotFoundError(error)).toBe(true);
+  });
+});
+
+describe('createCustomersService — attachTag', () => {
+  it('patches the tag collection with the label id', async () => {
+    const { service, fetchMock } = setup([successResponse(RETURNED_TAG)]);
+
+    await service.attachTag(VALID_CUSTOMER.id, VALID_ATTACH_TAG_INPUT);
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/tags`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('PATCH');
+    expect(readBody(fetchMock.calls[0])).toEqual(VALID_ATTACH_TAG_INPUT);
+  });
+
+  it('keeps the 422 code for an unknown or inactive label', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'SEMANTIC_VALIDATION_FAILED',
+        status: 422,
+        message: 'No tag with that id exists in the catalogue.',
+        details: [
+          { path: 'tagId', message: 'No tag with that id exists in the catalogue.' },
+        ],
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.attachTag(VALID_CUSTOMER.id, VALID_ATTACH_TAG_INPUT),
+    );
+
+    expect(error.status).toBe(422);
+    expect(error.issues[0]?.path).toBe('tagId');
+  });
+});
+
+describe('createCustomersService — detachTag', () => {
+  it('deletes the tag link and resolves the null payload', async () => {
+    const { service, fetchMock } = setup([successResponse(null)]);
+
+    const result = await service.detachTag(VALID_CUSTOMER.id, VALID_CUSTOMER_TAG.id);
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/tags/${VALID_CUSTOMER_TAG.id}`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('DELETE');
+    expect(result).toBeNull();
+  });
+
+  it('treats a repeat detach as a 404', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'The tag is not attached to this customer.',
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.detachTag(VALID_CUSTOMER.id, VALID_CUSTOMER_TAG.id),
+    );
+
+    expect(isNotFoundError(error)).toBe(true);
+  });
+});
+
+describe('createCustomersService — inviteCustomerUser', () => {
+  it('posts the invitation and parses the invited row', async () => {
+    const { service, fetchMock } = setup([
+      successResponse(INVITED_CUSTOMER_USER, 201),
+    ]);
+
+    const invited = await service.inviteCustomerUser(
+      VALID_CUSTOMER.id,
+      VALID_INVITE_USER_INPUT,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/customer-users`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('POST');
+    expect(readBody(fetchMock.calls[0])).toEqual(VALID_INVITE_USER_INPUT);
+    expect(invited.status).toBe('invited');
+    expect(invited.invitedAt).toBe(INVITED_CUSTOMER_USER.invitedAt);
+  });
+
+  it('keeps the e-mail conflict code and its field detail', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'CUSTOMER_USER_EMAIL_CONFLICT',
+        status: 409,
+        message: 'A customer user with this e-mail already exists.',
+        details: [
+          {
+            path: 'email',
+            message: 'A customer user with this e-mail already exists.',
+          },
+        ],
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.inviteCustomerUser(VALID_CUSTOMER.id, VALID_INVITE_USER_INPUT),
+    );
+
+    expect(error.code).toBe('CUSTOMER_USER_EMAIL_CONFLICT');
+    expect(error.issues[0]?.path).toBe('email');
+  });
+});
+
+describe('createCustomersService — updateCustomerUser', () => {
+  it('patches the user route with the version token', async () => {
+    const { service, fetchMock } = setup([
+      successResponse(ACTIVATED_CUSTOMER_USER),
+    ]);
+
+    const updated = await service.updateCustomerUser(
+      VALID_CUSTOMER.id,
+      INVITED_CUSTOMER_USER.id,
+      VALID_UPDATE_USER_INPUT,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/customer-users/${INVITED_CUSTOMER_USER.id}`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('PATCH');
+    expect(readBody(fetchMock.calls[0])).toEqual(VALID_UPDATE_USER_INPUT);
+    expect(updated.status).toBe('active');
+  });
+
+  it('keeps the owner conflict code and its field detail', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'CUSTOMER_OWNER_CONFLICT',
+        status: 409,
+        message: 'This customer already has an active owner.',
+        details: [
+          { path: 'role', message: 'This customer already has an active owner.' },
+        ],
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.updateCustomerUser(
+        VALID_CUSTOMER.id,
+        INVITED_CUSTOMER_USER.id,
+        VALID_UPDATE_USER_INPUT,
+      ),
+    );
+
+    expect(error.code).toBe('CUSTOMER_OWNER_CONFLICT');
+    expect(error.issues[0]?.path).toBe('role');
+  });
+});
+
+describe('createCustomersService — removeCustomerUser', () => {
+  it('deletes the user route and resolves the null payload', async () => {
+    const { service, fetchMock } = setup([successResponse(null)]);
+
+    const result = await service.removeCustomerUser(
+      VALID_CUSTOMER.id,
+      INVITED_CUSTOMER_USER.id,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/customer-users/${INVITED_CUSTOMER_USER.id}`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('DELETE');
+    expect(result).toBeNull();
+  });
+
+  it('keeps the 422 code for an activated user', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'SEMANTIC_VALIDATION_FAILED',
+        status: 422,
+        message: 'Only a pending invitation can be revoked.',
+        details: [
+          { path: 'status', message: 'Only a pending invitation can be revoked.' },
+        ],
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.removeCustomerUser(VALID_CUSTOMER.id, INVITED_CUSTOMER_USER.id),
+    );
+
+    expect(error.status).toBe(422);
+    expect(error.issues[0]?.path).toBe('status');
   });
 });

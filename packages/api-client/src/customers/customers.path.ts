@@ -13,12 +13,21 @@
  * `api-keys.path.ts` made).
  */
 
-import { CUSTOMERS_CONTACT_ID_PARAM, CUSTOMERS_ID_PARAM } from '@callback/shared';
+import {
+  CUSTOMERS_CONTACT_ID_PARAM,
+  CUSTOMERS_CUSTOMER_USER_ID_PARAM,
+  CUSTOMERS_ID_PARAM,
+  CUSTOMERS_TAG_ID_PARAM,
+} from '@callback/shared';
 import {
   CUSTOMERS_CONTACTS_PATH,
   CUSTOMERS_CONTACT_PATH,
   CUSTOMERS_DETAIL_PATH,
   CUSTOMERS_STATUS_PATH,
+  CUSTOMERS_TAGS_PATH,
+  CUSTOMERS_TAG_PATH,
+  CUSTOMERS_USER_PATH,
+  CUSTOMERS_USERS_PATH,
 } from './customers.const.js';
 
 /**
@@ -82,4 +91,72 @@ export function toCustomerContactPath(
     CUSTOMERS_ID_PARAM,
     encodeURIComponent(customerId),
   ).replace(CUSTOMERS_CONTACT_ID_PARAM, encodeURIComponent(contactId));
+}
+
+/**
+ * Substitutes the customer id into the tag collection path.
+ *
+ * @param customerId - the customer's uuid.
+ * @returns the path relative to the injected base URL, e.g.
+ *   `/admin/customers/<id>/tags`.
+ */
+export function toCustomerTagsPath(customerId: string): string {
+  return CUSTOMERS_TAGS_PATH.replace(
+    CUSTOMERS_ID_PARAM,
+    encodeURIComponent(customerId),
+  );
+}
+
+/**
+ * Substitutes both ids into the single tag-link path.
+ *
+ * `:id` and `:tagId` cannot interfere: the placeholder regex of the transport is
+ * anchored to a segment start, and `:tagId` does not contain `:id`.
+ *
+ * @param customerId - the customer's uuid.
+ * @param tagId - the tag's uuid.
+ * @returns the path relative to the injected base URL.
+ */
+export function toCustomerTagPath(
+  customerId: string,
+  tagId: string,
+): string {
+  return CUSTOMERS_TAG_PATH.replace(
+    CUSTOMERS_ID_PARAM,
+    encodeURIComponent(customerId),
+  ).replace(CUSTOMERS_TAG_ID_PARAM, encodeURIComponent(tagId));
+}
+
+/**
+ * Substitutes the customer id into the login-user collection path.
+ *
+ * @param customerId - the customer's uuid.
+ * @returns the path relative to the injected base URL, e.g.
+ *   `/admin/customers/<id>/customer-users`.
+ */
+export function toCustomerUsersPath(customerId: string): string {
+  return CUSTOMERS_USERS_PATH.replace(
+    CUSTOMERS_ID_PARAM,
+    encodeURIComponent(customerId),
+  );
+}
+
+/**
+ * Substitutes both ids into the single login-user path.
+ *
+ * @param customerId - the customer's uuid.
+ * @param customerUserId - the login user's uuid.
+ * @returns the path relative to the injected base URL.
+ */
+export function toCustomerUserPath(
+  customerId: string,
+  customerUserId: string,
+): string {
+  return CUSTOMERS_USER_PATH.replace(
+    CUSTOMERS_ID_PARAM,
+    encodeURIComponent(customerId),
+  ).replace(
+    CUSTOMERS_CUSTOMER_USER_ID_PARAM,
+    encodeURIComponent(customerUserId),
+  );
 }

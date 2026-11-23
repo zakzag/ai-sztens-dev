@@ -178,8 +178,10 @@ export {
   CONTACT_NAME_MAX_LENGTH,
   CONTACT_POSITION_MAX_LENGTH,
   CUSTOMERS_CONTACT_ID_PARAM,
+  CUSTOMERS_CUSTOMER_USER_ID_PARAM,
   CUSTOMERS_ID_PARAM,
   CUSTOMERS_PATH,
+  CUSTOMERS_TAG_ID_PARAM,
   CUSTOMER_ADDRESS_CITY_MAX_LENGTH,
   CUSTOMER_ADDRESS_LINE_MAX_LENGTH,
   CUSTOMER_COUNTRY_PATTERN,
@@ -196,6 +198,7 @@ export {
   CUSTOMER_SHORT_NAME_MAX_LENGTH,
   CUSTOMER_SORT_FIELDS,
   CUSTOMER_TAG_NAME_MAX_LENGTH,
+  CUSTOMER_USER_MANAGED_STATUS_VALUES,
   CUSTOMER_USER_NAME_MAX_LENGTH,
 } from './contract/customers/customers.const.js';
 export type { CustomerSortField } from './contract/customers/customers.const.js';
@@ -259,12 +262,16 @@ export {
   customerListSchema,
   customerNumberSchema,
   customerSchema,
+  customerTagIdSchema,
   customerTagSchema,
+  customerUserManagedStatusSchema,
+  customerUserIdSchema,
   customerUserSchema,
   inviteCustomerUserSchema,
   updateActivitySchema,
   updateContactSchema,
   updateCustomerSchema,
+  updateCustomerUserSchema,
   updateCustomerStatusSchema,
 } from './contract/customers/customers.schema.js';
 
@@ -283,20 +290,25 @@ export {
   INVITED_CUSTOMER_USER,
   SECOND_CONTACT,
   SECOND_CUSTOMER,
+  SECOND_CUSTOMER_TAG,
   SYSTEM_ACTIVITY,
   VALID_ACTIVITY,
+  VALID_ATTACH_CUSTOMER_TAG_REQUEST,
   VALID_AUDIT_LOG,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
   VALID_CREATE_CONTACT_REQUEST,
   VALID_CREATE_CUSTOMER_REQUEST,
+  VALID_CREATE_CUSTOMER_TAG_REQUEST,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
   VALID_CUSTOMER_TAG,
   VALID_CUSTOMER_USER,
+  VALID_INVITE_CUSTOMER_USER_REQUEST,
   VALID_UPDATE_CONTACT_REQUEST,
   VALID_UPDATE_CUSTOMER_REQUEST,
+  VALID_UPDATE_CUSTOMER_USER_REQUEST,
 } from './contract/customers/customers.fixture.js';
 
 export type {
@@ -316,6 +328,7 @@ export type {
   UpdateActivityInput,
   UpdateContactInput,
   UpdateCustomerInput,
+  UpdateCustomerUserInput,
   UpdateCustomerStatusInput,
 } from './contract/customers/customers.interface.js';
 

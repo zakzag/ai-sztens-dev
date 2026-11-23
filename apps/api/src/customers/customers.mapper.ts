@@ -22,6 +22,8 @@ import {
 import type { CustomerRow, NewCustomerRow } from '../db/schema.js';
 import { toIsoString, toNullableIsoString } from '../common/date/iso-date.js';
 import { hasMissingData } from './customers.logic.js';
+import { toCustomerTag } from './customers-tags.mapper.js';
+import { toCustomerUser } from './customers-users.mapper.js';
 import type {
   ContactRoleJoinRow,
   ContactWithRoles,
@@ -83,11 +85,10 @@ export function toCustomer(row: CustomerListRow): Customer {
 export function toCustomerDetail(rows: CustomerDetailRows): CustomerDetail {
   return {
     ...toCustomer(rows.customer),
-    tags: rows.tags.map((tag) => ({
-      id: tag.id,
-      name: tag.name,
-      isActive: tag.isActive,
-    })),
+    // The tag and login-user projections are shared with the slice-e endpoints
+    // (`customers-tags.mapper.ts` / `customers-users.mapper.ts`): one mapper per
+    // child shape, so the detail and the dedicated routes cannot drift apart.
+    tags: rows.tags.map(toCustomerTag),
     contacts: rows.contacts.map((entry) => ({
       id: entry.contact.id,
       customerId: entry.contact.customerId,
@@ -101,20 +102,7 @@ export function toCustomerDetail(rows: CustomerDetailRows): CustomerDetail {
       createdAt: toIsoString(entry.contact.createdAt),
       updatedAt: toIsoString(entry.contact.updatedAt),
     })),
-    customerUsers: rows.customerUsers.map((user) => ({
-      id: user.id,
-      customerId: user.customerId,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      invitedByOperatorId: user.invitedByOperatorId,
-      invitedAt: toNullableIsoString(user.invitedAt),
-      acceptedAt: toNullableIsoString(user.acceptedAt),
-      lastLoginAt: toNullableIsoString(user.lastLoginAt),
-      createdAt: toIsoString(user.createdAt),
-      updatedAt: toIsoString(user.updatedAt),
-    })),
+    customerUsers: rows.customerUsers.map(toCustomerUser),
   };
 }
 

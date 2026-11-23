@@ -41,15 +41,21 @@
 
 import type {
   ApiResult,
+  AttachCustomerTagInput,
   Contact,
   CreateContactInput,
   CreateCustomerInput,
+  CreateCustomerTagInput,
   Customer,
   CustomerDetail,
   CustomerListQuery,
+  CustomerTag,
+  CustomerUser,
+  InviteCustomerUserInput,
   ListQuery,
   UpdateContactInput,
   UpdateCustomerInput,
+  UpdateCustomerUserInput,
   UpdateCustomerStatusInput,
 } from '@callback/shared';
 import type { RequestOptions } from '../http-client.interface.js';
@@ -218,6 +224,117 @@ export interface CustomersService {
   removeContact(
     customerId: string,
     contactId: string,
+    options?: RequestOptions,
+  ): Promise<null>;
+
+  /**
+   * `POST /api/admin/customers/:id/tags` — **create-or-attach** a label by name.
+   *
+   * A name that already exists in the catalogue is reused, so the call is safe to
+   * retry: the second attempt attaches the same label instead of failing. The
+   * answer is `201` with the label either way.
+   *
+   * @param customerId - the customer's uuid.
+   * @param input - the label name.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404 NOT_FOUND` when the customer
+   *   is not live.
+   */
+  createTag(
+    customerId: string,
+    input: CreateCustomerTagInput,
+    options?: RequestOptions,
+  ): Promise<CustomerTag>;
+
+  /**
+   * `PATCH /api/admin/customers/:id/tags` — attaches an existing catalogue label.
+   *
+   * An already attached label is a no-op (`200`, same payload, no ledger row).
+   *
+   * @param customerId - the customer's uuid.
+   * @param input - the label id to attach.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `422
+   *   SEMANTIC_VALIDATION_FAILED` for an unknown or inactive label.
+   */
+  attachTag(
+    customerId: string,
+    input: AttachCustomerTagInput,
+    options?: RequestOptions,
+  ): Promise<CustomerTag>;
+
+  /**
+   * `DELETE /api/admin/customers/:id/tags/:tagId` — detaches the label from **this**
+   * customer. The catalogue row survives, so other customers keep their label.
+   *
+   * @param customerId - the customer's uuid.
+   * @param tagId - the label's uuid.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404 NOT_FOUND` when the link
+   *   does not exist (including a repeat detach).
+   */
+  detachTag(
+    customerId: string,
+    tagId: string,
+    options?: RequestOptions,
+  ): Promise<null>;
+
+  /**
+   * `POST /api/admin/customers/:id/customer-users` — invites a login user.
+   *
+   * The created row starts in the `invited` state; `invitedByOperatorId` is `null`
+   * until the admin authentication lands, and no e-mail is sent by this API.
+   *
+   * @param customerId - the customer's uuid.
+   * @param input - name, e-mail and (optionally) role.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `409
+   *   CUSTOMER_USER_EMAIL_CONFLICT` (the address is taken **globally**).
+   */
+  inviteCustomerUser(
+    customerId: string,
+    input: InviteCustomerUserInput,
+    options?: RequestOptions,
+  ): Promise<CustomerUser>;
+
+  /**
+   * `PATCH /api/admin/customers/:id/customer-users/:customerUserId` — name, role
+   * and status of one login user.
+   *
+   * `status` accepts `active` / `inactive` only: `invited` is a server-written
+   * state. `updatedAt` is required and never written.
+   *
+   * @param customerId - the customer's uuid.
+   * @param customerUserId - the login user's uuid.
+   * @param input - the changed fields plus the required `updatedAt` token.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `409 STALE_WRITE`, `409
+   *   CUSTOMER_OWNER_CONFLICT` when a second active owner would be created.
+   */
+  updateCustomerUser(
+    customerId: string,
+    customerUserId: string,
+    input: UpdateCustomerUserInput,
+    options?: RequestOptions,
+  ): Promise<CustomerUser>;
+
+  /**
+   * `DELETE /api/admin/customers/:id/customer-users/:customerUserId` — revokes a
+   * **pending invitation**.
+   *
+   * Anything that has ever been activated cannot be deleted; deactivating it is
+   * `updateCustomerUser` with `status: 'inactive'`.
+   *
+   * @param customerId - the customer's uuid.
+   * @param customerUserId - the login user's uuid.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `422
+   *   SEMANTIC_VALIDATION_FAILED` when the user is not `invited`, `409
+   *   CUSTOMER_USER_IN_USE_CONFLICT` when a contact or an activity references it.
+   */
+  removeCustomerUser(
+    customerId: string,
+    customerUserId: string,
     options?: RequestOptions,
   ): Promise<null>;
 }

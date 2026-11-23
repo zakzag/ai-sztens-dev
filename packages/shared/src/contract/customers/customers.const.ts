@@ -37,6 +37,23 @@ export const CUSTOMERS_ID_PARAM = ':id';
 export const CUSTOMERS_CONTACT_ID_PARAM = ':contactId';
 
 /**
+ * Nest path-parameter placeholder of the tag detach route (AIS-178, slice e).
+ *
+ * `…/:id/tags/:tagId` — the tag id is a path parameter only on `DELETE`; the
+ * attach route carries it in the body, because there the addressed resource is
+ * the customer's tag collection, not one link.
+ */
+export const CUSTOMERS_TAG_ID_PARAM = ':tagId';
+
+/**
+ * Nest path-parameter placeholder of the customer-user routes (AIS-178, slice e).
+ *
+ * Same nesting rule as the contact id: a login user is addressable only inside
+ * its own customer (`…/:id/customer-users/:customerUserId`).
+ */
+export const CUSTOMERS_CUSTOMER_USER_ID_PARAM = ':customerUserId';
+
+/**
  * Shape of the generated customer number: `AIS-YYYYMM-NNN`.
  *
  * Six year-month digits (`202609`) and a three-digit sequence, so one month can
@@ -106,6 +123,17 @@ export const CUSTOMER_TAG_NAME_MAX_LENGTH = SHORT_TEXT_MAX_LENGTH;
 
 /** Max length of a customer user name. */
 export const CUSTOMER_USER_NAME_MAX_LENGTH = SHORT_TEXT_MAX_LENGTH;
+
+/**
+ * Statuses an operator may set on a login user (AIS-178, slice e).
+ *
+ * `invited` is deliberately absent: an invitation is created by
+ * `POST /:id/customer-users` and `invited` is therefore a server-written state.
+ * A client that could patch it back would be able to resurrect an invitation
+ * whose `invitedAt` is already history — the same reasoning that keeps `status`
+ * out of the customer `PATCH` (AIS-16 `D2`).
+ */
+export const CUSTOMER_USER_MANAGED_STATUS_VALUES = ['active', 'inactive'] as const;
 
 /** Max length of an activity body. */
 export const ACTIVITY_BODY_MAX_LENGTH = LONG_TEXT_MAX_LENGTH;

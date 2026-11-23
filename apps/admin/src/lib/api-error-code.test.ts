@@ -52,6 +52,12 @@ describe('FIELD_SURFACE_CODES — derived from the catalogue', () => {
         API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT,
         // AIS-178: a duplicate tax number lands on the `taxNumber` field.
         API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT,
+        // AIS-178/d: the role picker is an input, so the second `primary`
+        // contact may be reported under it.
+        API_ERROR_CODE.CUSTOMER_PRIMARY_CONTACT_CONFLICT,
+        // AIS-178/e: the invitation e-mail and the role/status pair are inputs.
+        API_ERROR_CODE.CUSTOMER_USER_EMAIL_CONFLICT,
+        API_ERROR_CODE.CUSTOMER_OWNER_CONFLICT,
       ].sort(),
     );
   });

@@ -22,10 +22,15 @@ import {
   API_KEY_IDENTIFIER_FIELD_MESSAGE,
   CONFLICT_MESSAGE,
   CUSTOMER_NUMBER_CONFLICT_MESSAGE,
+  CUSTOMER_OWNER_CONFLICT_MESSAGE,
+  CUSTOMER_OWNER_FIELD_MESSAGE,
   CUSTOMER_PRIMARY_CONTACT_CONFLICT_MESSAGE,
   CUSTOMER_PRIMARY_CONTACT_FIELD_MESSAGE,
   CUSTOMER_TAX_NUMBER_CONFLICT_MESSAGE,
   CUSTOMER_TAX_NUMBER_FIELD_MESSAGE,
+  CUSTOMER_USER_EMAIL_CONFLICT_MESSAGE,
+  CUSTOMER_USER_EMAIL_FIELD_MESSAGE,
+  CUSTOMER_USER_IN_USE_CONFLICT_MESSAGE,
   FIELD_INVALID_MESSAGE,
   FORBIDDEN_MESSAGE,
   IDENTIFIER_CONFLICT_MESSAGE,
@@ -121,6 +126,22 @@ export const ERROR_CODE_CATALOGUE: Readonly<
     message: CUSTOMER_PRIMARY_CONTACT_CONFLICT_MESSAGE,
     // The role picker is an input, so this one may land on the field too.
     fieldMessage: CUSTOMER_PRIMARY_CONTACT_FIELD_MESSAGE,
+  },
+  [API_ERROR_CODE.CUSTOMER_USER_EMAIL_CONFLICT]: {
+    message: CUSTOMER_USER_EMAIL_CONFLICT_MESSAGE,
+    // The address is a form input, so the message may be rendered under it.
+    fieldMessage: CUSTOMER_USER_EMAIL_FIELD_MESSAGE,
+  },
+  [API_ERROR_CODE.CUSTOMER_OWNER_CONFLICT]: {
+    message: CUSTOMER_OWNER_CONFLICT_MESSAGE,
+    // The role/status pair is an input; this one may land on the field.
+    fieldMessage: CUSTOMER_OWNER_FIELD_MESSAGE,
+  },
+  [API_ERROR_CODE.CUSTOMER_USER_IN_USE_CONFLICT]: {
+    message: CUSTOMER_USER_IN_USE_CONFLICT_MESSAGE,
+    // The row is referenced elsewhere: there is no input to correct, so the
+    // sentence stays on the page-level alert.
+    fieldMessage: null,
   },
 });
 

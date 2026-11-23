@@ -138,14 +138,19 @@ describe('component registration', () => {
       'ApiErrorEnvelope',
       'ApiKey',
       'ApiKeyList',
+      'AttachCustomerTag',
       'Contact',
       'ContactList',
       'CreateApiKey',
       'CreateContact',
       'CreateCustomer',
+      'CreateCustomerTag',
       'Customer',
       'CustomerDetail',
       'CustomerList',
+      'CustomerTag',
+      'CustomerUser',
+      'InviteCustomerUser',
       'NoPayload',
       'PaginationMeta',
       'ResponseMeta',
@@ -153,6 +158,7 @@ describe('component registration', () => {
       'UpdateContact',
       'UpdateCustomer',
       'UpdateCustomerStatus',
+      'UpdateCustomerUser',
     ]);
   });
 

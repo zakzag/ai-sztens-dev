@@ -29,14 +29,19 @@ import {
   apiErrorEnvelopeSchema,
   apiKeyListSchema,
   apiKeySchema,
+  attachCustomerTagSchema,
   createApiKeySchema,
   createCustomerSchema,
+  createCustomerTagSchema,
   contactListSchema,
   contactSchema,
   createContactSchema,
   customerDetailSchema,
   customerListSchema,
   customerSchema,
+  customerTagSchema,
+  customerUserSchema,
+  inviteCustomerUserSchema,
   noPayloadSchema,
   paginationMetaSchema,
   updateContactSchema,
@@ -44,6 +49,7 @@ import {
   resolveApiErrorStatus,
   updateApiKeySchema,
   updateCustomerSchema,
+  updateCustomerUserSchema,
   updateCustomerStatusSchema,
 } from '@callback/shared';
 import type { ApiEndpointContract, ApiErrorCode } from '@callback/shared';
@@ -117,6 +123,15 @@ const PAYLOAD_COMPONENTS: ReadonlyMap<z.ZodTypeAny, string> = new Map<
   [contactListSchema, 'ContactList'],
   [createContactSchema, 'CreateContact'],
   [updateContactSchema, 'UpdateContact'],
+  // The tag and customer-user resources (AIS-178, slice e): two payload rows and
+  // the four request bodies. `createTag` and `attachTag` share the row component
+  // because both answer with the catalogue row.
+  [customerTagSchema, 'CustomerTag'],
+  [customerUserSchema, 'CustomerUser'],
+  [createCustomerTagSchema, 'CreateCustomerTag'],
+  [attachCustomerTagSchema, 'AttachCustomerTag'],
+  [inviteCustomerUserSchema, 'InviteCustomerUser'],
+  [updateCustomerUserSchema, 'UpdateCustomerUser'],
   [createCustomerSchema, 'CreateCustomer'],
   [updateCustomerSchema, 'UpdateCustomer'],
   [updateCustomerStatusSchema, 'UpdateCustomerStatus'],

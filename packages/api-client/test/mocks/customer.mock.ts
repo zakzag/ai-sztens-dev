@@ -12,25 +12,38 @@
  */
 
 import {
+  INVITED_CUSTOMER_USER,
   SECOND_CONTACT,
   SECOND_CUSTOMER,
+  VALID_ATTACH_CUSTOMER_TAG_REQUEST,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
   VALID_CREATE_CONTACT_REQUEST,
   VALID_CREATE_CUSTOMER_REQUEST,
+  VALID_CREATE_CUSTOMER_TAG_REQUEST,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
+  VALID_CUSTOMER_TAG,
+  VALID_INVITE_CUSTOMER_USER_REQUEST,
   VALID_UPDATE_CONTACT_REQUEST,
   VALID_UPDATE_CUSTOMER_REQUEST,
+  VALID_UPDATE_CUSTOMER_USER_REQUEST,
+  type AttachCustomerTagInput,
   type CreateContactInput,
   type CreateCustomerInput,
+  type CreateCustomerTagInput,
   type Customer,
+  type CustomerTag,
+  type CustomerUser,
+  type InviteCustomerUserInput,
   type UpdateContactInput,
   type UpdateCustomerInput,
+  type UpdateCustomerUserInput,
 } from '@callback/shared';
 
 export {
+  INVITED_CUSTOMER_USER,
   SECOND_CONTACT,
   SECOND_CUSTOMER,
   VALID_CONTACT,
@@ -38,6 +51,7 @@ export {
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
+  VALID_CUSTOMER_TAG,
 };
 
 /** A minimal, valid `POST /api/admin/customers` body. */
@@ -73,3 +87,29 @@ export const VALID_CREATE_CONTACT_INPUT: CreateContactInput =
 /** A valid `PATCH /api/admin/customers/:id/contacts/:contactId` body. */
 export const VALID_UPDATE_CONTACT_INPUT: UpdateContactInput =
   VALID_UPDATE_CONTACT_REQUEST;
+
+/** A valid `POST /api/admin/customers/:id/tags` body (create-or-attach). */
+export const VALID_CREATE_TAG_INPUT: CreateCustomerTagInput =
+  VALID_CREATE_CUSTOMER_TAG_REQUEST;
+
+/** A valid `PATCH /api/admin/customers/:id/tags` body (attach existing). */
+export const VALID_ATTACH_TAG_INPUT: AttachCustomerTagInput =
+  VALID_ATTACH_CUSTOMER_TAG_REQUEST;
+
+/** A valid `POST /api/admin/customers/:id/customer-users` body. */
+export const VALID_INVITE_USER_INPUT: InviteCustomerUserInput =
+  VALID_INVITE_CUSTOMER_USER_REQUEST;
+
+/** A valid `PATCH …/customer-users/:customerUserId` body (activation). */
+export const VALID_UPDATE_USER_INPUT: UpdateCustomerUserInput =
+  VALID_UPDATE_CUSTOMER_USER_REQUEST;
+
+/** The version the server reports after a successful activation. */
+export const ACTIVATED_CUSTOMER_USER: CustomerUser = {
+  ...INVITED_CUSTOMER_USER,
+  status: 'active',
+  updatedAt: '2026-11-20T11:00:00.000Z',
+};
+
+/** The tag payload the endpoints return (the reused `premium` label). */
+export const RETURNED_TAG: CustomerTag = VALID_CUSTOMER_TAG;

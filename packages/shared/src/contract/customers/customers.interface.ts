@@ -32,6 +32,7 @@ import type {
   updateActivitySchema,
   updateContactSchema,
   updateCustomerSchema,
+  updateCustomerUserSchema,
   updateCustomerStatusSchema,
 } from './customers.schema.js';
 
@@ -79,6 +80,9 @@ export type UpdateContactInput = z.infer<typeof updateContactSchema>;
 
 /** Caller-side body of `POST /api/admin/customers/:id/customer-users`. */
 export type InviteCustomerUserInput = z.input<typeof inviteCustomerUserSchema>;
+
+/** Body of `PATCH /api/admin/customers/:id/customer-users/:customerUserId`. */
+export type UpdateCustomerUserInput = z.infer<typeof updateCustomerUserSchema>;
 
 /** Body of `POST /api/admin/customers/:id/tags`. */
 export type CreateCustomerTagInput = z.infer<typeof createCustomerTagSchema>;

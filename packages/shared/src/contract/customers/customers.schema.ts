@@ -59,6 +59,7 @@ import {
   CUSTOMER_REGISTRATION_NUMBER_MAX_LENGTH,
   CUSTOMER_SHORT_NAME_MAX_LENGTH,
   CUSTOMER_TAG_NAME_MAX_LENGTH,
+  CUSTOMER_USER_MANAGED_STATUS_VALUES,
   CUSTOMER_USER_NAME_MAX_LENGTH,
 } from './customers.const.js';
 import {
@@ -110,6 +111,21 @@ export const customerIdSchema = z.string().uuid();
  * with a field path, not a Postgres `22P02` that the filter turns into a `500`.
  */
 export const contactIdSchema = z.string().uuid();
+
+/**
+ * The `:tagId` path parameter of the tag detach route (AIS-178, slice e).
+ *
+ * Same reasoning as {@link customerIdSchema} — and the detach route is the only
+ * one that addresses a tag by path, so this is the only place it is needed.
+ */
+export const customerTagIdSchema = z.string().uuid();
+
+/**
+ * The `:customerUserId` path parameter of the customer-user routes (AIS-178, e).
+ *
+ * Same reasoning as {@link customerIdSchema}.
+ */
+export const customerUserIdSchema = z.string().uuid();
 
 /**
  * JSON object column (`metadata`).
@@ -501,5 +517,35 @@ export const createCustomerTagSchema = z
 export const attachCustomerTagSchema = z
   .object({
     tagId: z.string().uuid(),
+  })
+  .strict();
+
+/**
+ * Statuses an operator may set on a login user — the `invited` state excluded.
+ *
+ * Derived from {@link CUSTOMER_USER_MANAGED_STATUS_VALUES}, so the schema and
+ * the documented enum cannot disagree (AIS-178/e `E4`).
+ */
+export const customerUserManagedStatusSchema = z.enum(
+  CUSTOMER_USER_MANAGED_STATUS_VALUES,
+);
+
+/**
+ * Body of `PATCH /api/admin/customers/:id/customer-users/:customerUserId`.
+ *
+ * `updatedAt` is required and is **never written**: it is the optimistic
+ * concurrency token, exactly as on the customer and contact `PATCH` routes.
+ *
+ * `status` accepts only `active` / `inactive`: `invited` is a server-written
+ * state (see {@link customerUserManagedStatusSchema}), and the auth-owned
+ * columns (`passwordHash`, `acceptedAt`, `lastLoginAt`) are not writable here at
+ * all — accepting an invitation belongs to AIS-73/74.
+ */
+export const updateCustomerUserSchema = z
+  .object({
+    name: nonEmptyTextSchema({ max: CUSTOMER_USER_NAME_MAX_LENGTH }).optional(),
+    role: customerUserRoleSchema.optional(),
+    status: customerUserManagedStatusSchema.optional(),
+    updatedAt: isoDateTimeSchema,
   })
   .strict();

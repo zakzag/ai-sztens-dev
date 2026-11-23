@@ -23,31 +23,47 @@ import { LIST_QUERY_PARAMETERS } from '../list-query.parameters.js';
 import { noPayloadSchema } from '../no-payload.schema.js';
 import {
   CUSTOMERS_CONTACT_ID_PARAM,
+  CUSTOMERS_CUSTOMER_USER_ID_PARAM,
   CUSTOMERS_ID_PARAM,
   CUSTOMERS_PATH,
+  CUSTOMERS_TAG_ID_PARAM,
 } from './customers.const.js';
 import {
+  INVITED_CUSTOMER_USER,
+  SECOND_CUSTOMER_TAG,
+  VALID_ATTACH_CUSTOMER_TAG_REQUEST,
   VALID_CONTACT,
   VALID_CONTACT_LIST,
   VALID_CREATE_CONTACT_REQUEST,
   VALID_CREATE_CUSTOMER_REQUEST,
+  VALID_CREATE_CUSTOMER_TAG_REQUEST,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
+  VALID_CUSTOMER_TAG,
+  VALID_CUSTOMER_USER,
+  VALID_INVITE_CUSTOMER_USER_REQUEST,
   VALID_UPDATE_CONTACT_REQUEST,
   VALID_UPDATE_CUSTOMER_REQUEST,
+  VALID_UPDATE_CUSTOMER_USER_REQUEST,
 } from './customers.fixture.js';
 import { CUSTOMER_LIST_QUERY_PARAMETERS } from './customers.list-query.js';
 import {
+  attachCustomerTagSchema,
   contactListSchema,
   contactSchema,
   createContactSchema,
   createCustomerSchema,
+  createCustomerTagSchema,
   customerDetailSchema,
   customerListSchema,
   customerSchema,
+  customerTagSchema,
+  customerUserSchema,
+  inviteCustomerUserSchema,
   updateContactSchema,
   updateCustomerSchema,
+  updateCustomerUserSchema,
   updateCustomerStatusSchema,
 } from './customers.schema.js';
 
@@ -62,6 +78,18 @@ const CUSTOMER_CONTACTS_PATH = `${CUSTOMER_PATH}/contacts`;
 
 /** Path of one contact inside its customer. */
 const CUSTOMER_CONTACT_PATH = `${CUSTOMER_CONTACTS_PATH}/${CUSTOMERS_CONTACT_ID_PARAM}`;
+
+/** Path of the tag collection of one customer (AIS-178, slice e). */
+const CUSTOMER_TAGS_PATH = `${CUSTOMER_PATH}/tags`;
+
+/** Path of one tag **link** inside its customer — detach addresses it by id. */
+const CUSTOMER_TAG_PATH = `${CUSTOMER_TAGS_PATH}/${CUSTOMERS_TAG_ID_PARAM}`;
+
+/** Path of the login-user collection of one customer. */
+const CUSTOMER_USERS_PATH = `${CUSTOMER_PATH}/customer-users`;
+
+/** Path of one login user inside its customer. */
+const CUSTOMER_USER_PATH = `${CUSTOMER_USERS_PATH}/${CUSTOMERS_CUSTOMER_USER_ID_PARAM}`;
 
 /** Failures every route can produce, regardless of what it does. */
 const COMMON_ERRORS = [
@@ -273,6 +301,116 @@ export const CUSTOMERS_ENDPOINTS = [
     dataSchema: noPayloadSchema,
     example: null,
     errors: [API_ERROR_CODE.NOT_FOUND, ...COMMON_ERRORS],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.createTag',
+    method: 'POST',
+    path: CUSTOMER_TAGS_PATH,
+    summary:
+      'Attach a tag by name to a customer, creating the label only when it does not exist yet',
+    tag: 'customers',
+    successStatus: 201,
+    dataSchema: customerTagSchema,
+    requestSchema: createCustomerTagSchema,
+    example: SECOND_CUSTOMER_TAG,
+    // No conflict code: a name that already exists is **reused**, so the
+    // catalogue's `tags_name_key` can never surface as a client error (AIS-178/e
+    // `E7`).
+    errors: [API_ERROR_CODE.VALIDATION_FAILED, API_ERROR_CODE.NOT_FOUND, ...COMMON_ERRORS],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.attachTag',
+    method: 'PATCH',
+    path: CUSTOMER_TAGS_PATH,
+    summary: 'Attach an already existing tag of the catalogue to a customer',
+    tag: 'customers',
+    successStatus: 200,
+    dataSchema: customerTagSchema,
+    requestSchema: attachCustomerTagSchema,
+    example: VALID_CUSTOMER_TAG,
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.detachTag',
+    method: 'DELETE',
+    path: CUSTOMER_TAG_PATH,
+    summary:
+      'Detach a tag from a customer; the catalogue label itself is never deleted',
+    tag: 'customers',
+    successStatus: 200,
+    dataSchema: noPayloadSchema,
+    example: null,
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.inviteCustomerUser',
+    method: 'POST',
+    path: CUSTOMER_USERS_PATH,
+    summary:
+      'Invite a login user to a customer; the row starts in the invited state',
+    tag: 'customers',
+    successStatus: 201,
+    dataSchema: customerUserSchema,
+    requestSchema: inviteCustomerUserSchema,
+    example: VALID_CUSTOMER_USER,
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      API_ERROR_CODE.CUSTOMER_USER_EMAIL_CONFLICT,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.updateCustomerUser',
+    method: 'PATCH',
+    path: CUSTOMER_USER_PATH,
+    summary:
+      'Update a login user (name, role, status) — guarded by the last known updatedAt',
+    tag: 'customers',
+    successStatus: 200,
+    dataSchema: customerUserSchema,
+    requestSchema: updateCustomerUserSchema,
+    example: VALID_UPDATE_CUSTOMER_USER_REQUEST,
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      API_ERROR_CODE.STALE_WRITE,
+      API_ERROR_CODE.CUSTOMER_OWNER_CONFLICT,
+      ...COMMON_ERRORS,
+    ],
+    envelope: true,
+  },
+  {
+    operationId: 'customers.removeCustomerUser',
+    method: 'DELETE',
+    path: CUSTOMER_USER_PATH,
+    summary:
+      'Revoke a still pending invitation; a user that has ever been activated cannot be deleted',
+    tag: 'customers',
+    successStatus: 200,
+    dataSchema: noPayloadSchema,
+    example: null,
+    errors: [
+      API_ERROR_CODE.VALIDATION_FAILED,
+      API_ERROR_CODE.NOT_FOUND,
+      API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
+      API_ERROR_CODE.CUSTOMER_USER_IN_USE_CONFLICT,
+      ...COMMON_ERRORS,
+    ],
     envelope: true,
   },
 ] as const satisfies readonly ApiEndpointContract[];

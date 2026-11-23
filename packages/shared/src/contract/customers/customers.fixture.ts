@@ -18,16 +18,20 @@
 
 import type {
   Activity,
+  AttachCustomerTagInput,
   AuditLog,
   Contact,
   CreateContactInput,
   CreateCustomerInput,
+  CreateCustomerTagInput,
   Customer,
   CustomerDetail,
   CustomerTag,
   CustomerUser,
+  InviteCustomerUserInput,
   UpdateContactInput,
   UpdateCustomerInput,
+  UpdateCustomerUserInput,
 } from './customers.interface.js';
 
 /** A fully filled customer; every optional field is present. */
@@ -104,6 +108,19 @@ export const VALID_CUSTOMER_LIST: readonly Customer[] = [
 export const VALID_CUSTOMER_TAG: CustomerTag = {
   id: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d',
   name: 'premium',
+  isActive: true,
+};
+
+/**
+ * A second tag — the “new label” branch of `POST /:id/tags` (AIS-178, slice e).
+ *
+ * {@link VALID_CUSTOMER_TAG} is the reused label: it is already attached to
+ * {@link VALID_CUSTOMER_DETAIL}, so an attach of it is the idempotent no-op
+ * case, while this row is what a genuinely *new* catalogue entry looks like.
+ */
+export const SECOND_CUSTOMER_TAG: CustomerTag = {
+  id: 'a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d',
+  name: 'vip',
   isActive: true,
 };
 
@@ -294,3 +311,44 @@ export const VALID_CONTACT_LIST: readonly Contact[] = [
   VALID_CONTACT,
   SECOND_CONTACT,
 ];
+
+/**
+ * A valid `POST /api/admin/customers/:id/tags` body (AIS-178, slice e).
+ *
+ * Create-or-attach by **name**: a name that already exists in the catalogue is
+ * reused instead of failing, so this body is valid whether or not `vip` is a
+ * known label yet.
+ */
+export const VALID_CREATE_CUSTOMER_TAG_REQUEST: CreateCustomerTagInput = {
+  name: SECOND_CUSTOMER_TAG.name,
+};
+
+/** A valid `PATCH /api/admin/customers/:id/tags` body — attach an existing tag. */
+export const VALID_ATTACH_CUSTOMER_TAG_REQUEST: AttachCustomerTagInput = {
+  tagId: VALID_CUSTOMER_TAG.id,
+};
+
+/**
+ * A valid `POST /api/admin/customers/:id/customer-users` body.
+ *
+ * The `role` is present on purpose: it is the one field whose absence would be
+ * silently defaulted to `member`, and an example should show what a filled-in
+ * invitation looks like.
+ */
+export const VALID_INVITE_CUSTOMER_USER_REQUEST: InviteCustomerUserInput = {
+  name: 'Szabó Judit',
+  email: 'judit.szabo@pelda.hu',
+  role: 'member',
+};
+
+/**
+ * A valid `PATCH /:id/customer-users/:customerUserId` body — the activation.
+ *
+ * Activates the pending invitation of {@link INVITED_CUSTOMER_USER}; `invited`
+ * itself is not writable (AIS-178/e `E4`), so this is the shape the admin uses
+ * to turn an invitation into a live login.
+ */
+export const VALID_UPDATE_CUSTOMER_USER_REQUEST: UpdateCustomerUserInput = {
+  status: 'active',
+  updatedAt: INVITED_CUSTOMER_USER.updatedAt,
+};

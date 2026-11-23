@@ -89,6 +89,43 @@ export const CUSTOMER_PRIMARY_CONTACT_FIELD_MESSAGE =
   'Már van elsődleges kapcsolattartó ennél az ügyfélnél.';
 
 /**
+ * `CUSTOMER_USER_EMAIL_CONFLICT` (AIS-178, slice e) — the address is taken.
+ *
+ * `customer_users_email_key` is a **global**, case-insensitive unique index, so
+ * one address can hold at most one login across **every** customer. The sentence
+ * says that, because "already exists at this customer" would send the operator
+ * looking in the wrong place.
+ */
+export const CUSTOMER_USER_EMAIL_CONFLICT_MESSAGE =
+  'Ezzel az e-mail-címmel már létezik belépő felhasználó. Egy cím csak egy belépéshez tartozhat.';
+
+/** Field-level copy of the duplicate login e-mail (AIS-178, slice e, tier 1). */
+export const CUSTOMER_USER_EMAIL_FIELD_MESSAGE =
+  'Ez az e-mail-cím már foglalt.';
+
+/**
+ * `CUSTOMER_OWNER_CONFLICT` (AIS-178, slice e) — one active owner per customer.
+ *
+ * Raised when a second login user is **activated** as `owner`; the message names
+ * the action that resolves it instead of only the rule that was violated.
+ */
+export const CUSTOMER_OWNER_CONFLICT_MESSAGE =
+  'Ennél az ügyfélnél már van aktív tulajdonos. Előbb a jelenlegi tulajdonost kell lefokozni.';
+
+/** Field-level copy of the owner conflict (AIS-178, slice e, tier 1). */
+export const CUSTOMER_OWNER_FIELD_MESSAGE =
+  'Már van aktív tulajdonos ennél az ügyfélnél.';
+
+/**
+ * `CUSTOMER_USER_IN_USE_CONFLICT` (AIS-178, slice e) — still referenced.
+ *
+ * A login user referenced by a contact or an activity cannot be deleted without
+ * destroying that history, so the row must be deactivated instead.
+ */
+export const CUSTOMER_USER_IN_USE_CONFLICT_MESSAGE =
+  'A felhasználóhoz még kapcsolattartó vagy tevékenység tartozik, ezért nem törölhető. Előbb szüntesd meg a hivatkozást, vagy állítsd inaktívra.';
+
+/**
  * `VALIDATION_FAILED` on an identified field (plan `D11`, tier 1).
  *
  * Deliberately generic: the server's per-issue text (`issue.message`) is a

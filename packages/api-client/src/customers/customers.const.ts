@@ -66,3 +66,29 @@ export const CUSTOMERS_CONTACTS_PATH = clientPathOf('customers.listContacts');
  * `:contactId`; both are substituted by `toCustomerContactPath()`.
  */
 export const CUSTOMERS_CONTACT_PATH = clientPathOf('customers.updateContact');
+
+/**
+ * Path of the tag collection of one customer (AIS-178, slice e).
+ *
+ * Still carrying `:id`. `POST` and `PATCH` share it — the difference between
+ * "create the label if needed" and "attach an existing one" is the body, not the
+ * address.
+ */
+export const CUSTOMERS_TAGS_PATH = clientPathOf('customers.createTag');
+
+/**
+ * Path of one tag **link** inside its customer, still carrying `:id` and
+ * `:tagId`; both are substituted by `toCustomerTagPath()`.
+ */
+export const CUSTOMERS_TAG_PATH = clientPathOf('customers.detachTag');
+
+/**
+ * Path of the login-user collection of one customer, still carrying `:id`.
+ */
+export const CUSTOMERS_USERS_PATH = clientPathOf('customers.inviteCustomerUser');
+
+/**
+ * Path of one login user inside its customer, still carrying `:id` and
+ * `:customerUserId`; both are substituted by `toCustomerUserPath()`.
+ */
+export const CUSTOMERS_USER_PATH = clientPathOf('customers.updateCustomerUser');

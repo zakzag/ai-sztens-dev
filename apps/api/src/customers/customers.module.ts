@@ -7,8 +7,10 @@
  * `AUDIT_WRITER` resolvable — a write without a ledger row must not be
  * expressible, so the dependency is declared rather than optional.
  *
- * Both collaborators are bound to string tokens, so the service depends on
- * *interfaces* and a spec can substitute plain objects.
+ * Four sub-resources live here, one controller and one repository token each:
+ * the customer itself (slice b), its contacts (d), its tags and its login users
+ * (e). Every repository is bound to a string token, so a service depends on an
+ * *interface* and a spec can substitute a plain object.
  */
 
 import { Module } from '@nestjs/common';
@@ -23,17 +25,40 @@ import { CUSTOMER_CONTACTS_REPOSITORY } from './customers-contacts.const.js';
 import { CustomerContactsController } from './customers-contacts.controller.js';
 import { DrizzleCustomerContactsRepository } from './customers-contacts.repository.js';
 import { CustomerContactsService } from './customers-contacts.service.js';
+import { CUSTOMER_TAGS_REPOSITORY } from './customers-tags.const.js';
+import { CustomerTagsController } from './customers-tags.controller.js';
+import { DrizzleCustomerTagsRepository } from './customers-tags.repository.js';
+import { CustomerTagsService } from './customers-tags.service.js';
+import { CUSTOMER_USERS_REPOSITORY } from './customers-users.const.js';
+import { CustomerUsersController } from './customers-users.controller.js';
+import { DrizzleCustomerUsersRepository } from './customers-users.repository.js';
+import { CustomerUsersService } from './customers-users.service.js';
 
 @Module({
   imports: [DatabaseModule, HttpModule, AuditModule],
-  controllers: [CustomersController, CustomerContactsController],
+  controllers: [
+    CustomersController,
+    CustomerContactsController,
+    CustomerTagsController,
+    CustomerUsersController,
+  ],
   providers: [
     CustomersService,
     CustomerContactsService,
+    CustomerTagsService,
+    CustomerUsersService,
     { provide: CUSTOMERS_REPOSITORY, useClass: DrizzleCustomersRepository },
     {
       provide: CUSTOMER_CONTACTS_REPOSITORY,
       useClass: DrizzleCustomerContactsRepository,
+    },
+    {
+      provide: CUSTOMER_TAGS_REPOSITORY,
+      useClass: DrizzleCustomerTagsRepository,
+    },
+    {
+      provide: CUSTOMER_USERS_REPOSITORY,
+      useClass: DrizzleCustomerUsersRepository,
     },
   ],
   exports: [CustomersService],

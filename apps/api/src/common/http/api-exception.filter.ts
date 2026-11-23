@@ -222,7 +222,10 @@ export class ApiExceptionFilter implements ExceptionFilter<unknown> {
     const line = `${ctx.method} ${ctx.path} -> ${status} (requestId=${ctx.requestId})`;
 
     if (status >= HTTP_STATUS.INTERNAL_SERVER_ERROR) {
-      this.logger.error(`${line}: ${describe(exception)}`, stackOf(exception));
+      this.logger.error(
+        `${line}: ${describe(exception)}${describeCauseChain(exception)}`,
+        stackOf(exception),
+      );
       return;
     }
 
@@ -240,4 +243,64 @@ function describe(exception: unknown): string {
 /** @returns the stack of an unknown throwable, or `undefined`. */
 function stackOf(exception: unknown): string | undefined {
   return exception instanceof Error ? exception.stack : undefined;
+}
+
+/** How many `cause` levels are printed before the chain is cut. */
+const MAX_CAUSE_DEPTH = 3;
+
+/** The shape any error-like value must satisfy to be printable. */
+interface ErrorLike {
+  readonly name?: unknown;
+  readonly message?: unknown;
+  readonly code?: unknown;
+  readonly cause?: unknown;
+}
+
+/**
+ * @param value - an unknown throwable or `cause`.
+ * @returns the value as an {@link ErrorLike} when it carries a `message`.
+ *
+ * `instanceof Error` is deliberately **not** required: a driver error crossing a
+ * module or realm boundary (or a plain object thrown by a client library) fails
+ * the `instanceof` check while still being the only place the server's answer
+ * lives.
+ */
+function asErrorLike(value: unknown): ErrorLike | undefined {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+
+  const candidate = value as ErrorLike;
+
+  return typeof candidate.message === 'string' ? candidate : undefined;
+}
+
+/**
+ * @param exception - an unknown throwable.
+ * @returns the `cause` chain as ` <- Name: message (CODE)`, or an empty string.
+ *
+ * A wrapped driver error (`DrizzleQueryError` around a `PostgresError`) keeps
+ * the actual server answer in `cause`, so a 5xx line without it names the
+ * statement but not the reason — which is exactly how the activity `PATCH`
+ * failure of AIS-14 R1 became undiagnosable from the log alone.
+ */
+function describeCauseChain(exception: unknown): string {
+  const parts: string[] = [];
+  let current = asErrorLike(exception)?.cause;
+
+  while (parts.length < MAX_CAUSE_DEPTH) {
+    const cause = asErrorLike(current);
+
+    if (cause === undefined) {
+      break;
+    }
+
+    const name = typeof cause.name === 'string' ? cause.name : 'Error';
+    const code = typeof cause.code === 'string' ? ` (${cause.code})` : '';
+
+    parts.push(`${name}: ${String(cause.message)}${code}`);
+    current = cause.cause;
+  }
+
+  return parts.length === 0 ? '' : ` <- ${parts.join(' <- ')}`;
 }

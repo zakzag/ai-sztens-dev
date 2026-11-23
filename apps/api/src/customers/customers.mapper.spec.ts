@@ -180,27 +180,31 @@ describe('toContactsWithRoles', () => {
 });
 
 describe('toNewCustomerRow', () => {
-  const NOW = new Date('2026-11-22T21:00:00.000Z');
-
   it('fills the server-owned values and the contract defaults', () => {
     const row = toNewCustomerRow(
       buildCreateCustomerInput(),
       'AIS-202611-007',
-      NOW,
     );
 
     expect(row.customerNumber).toBe('AIS-202611-007');
     expect(row.status).toBe('prospect');
     expect(row.registeredAddressCountry).toBe('HU');
-    expect(row.statusChangedAt).toBe(NOW);
     expect(row.legalName).toBe('Új Ügyfél Kft.');
+  });
+
+  it('leaves statusChangedAt to the database so it matches createdAt', () => {
+    const row = toNewCustomerRow(
+      buildCreateCustomerInput(),
+      'AIS-202611-007',
+    );
+
+    expect(row.statusChangedAt).toBeUndefined();
   });
 
   it('honours a status sent by the client', () => {
     const row = toNewCustomerRow(
       buildCreateCustomerInput({ status: 'registered' }),
       'AIS-202611-007',
-      NOW,
     );
 
     expect(row.status).toBe('registered');
@@ -210,7 +214,6 @@ describe('toNewCustomerRow', () => {
     const row = toNewCustomerRow(
       { type: 'sole_proprietor', legalName: 'Kiss Péter e.v.' },
       'AIS-202611-008',
-      NOW,
     );
 
     expect(row.shortName).toBeNull();

@@ -124,12 +124,17 @@ export function toCreatedListRow(row: CustomerRow): CustomerListRow {
 /**
  * Maps a validated `POST` body to an insert payload.
  *
- * Three groups of values are **not** the body's:
+ * Two groups of values are **not** the body's:
  *
  * - `customerNumber`, written by the service from the allocated sequence;
- * - `statusChangedAt`, set to the creation instant — a fresh row entered its
- *   status now, not “whenever the column default ran”;
- * - `createdAt` / `updatedAt` / `deletedAt`, owned by the database.
+ * - `statusChangedAt`, `createdAt` / `updatedAt` / `deletedAt`, owned by the
+ *   database.
+ *
+ * `statusChangedAt` is deliberately **not** set here. It has a `now()` default,
+ * and letting the statement fill both it and `created_at` is what keeps the two
+ * identical: a value written by the application clock differs from the DB's
+ * `now()` by a millisecond or two, and the AIS-14 e2e asserts the equality
+ * (`statusChangedAt === createdAt` for a brand-new row).
  *
  * `status` **is** taken from the body (plan `D3`): the contract publishes it with
  * a `prospect` default, and the parsed value already carries that default. The
@@ -141,13 +146,11 @@ export function toCreatedListRow(row: CustomerRow): CustomerListRow {
  *
  * @param input - validated body of `POST /api/admin/customers`.
  * @param customerNumber - the number allocated for this insert.
- * @param now - creation instant, injected so the caller owns the clock.
  * @returns insert payload for `customer.customers`.
  */
 export function toNewCustomerRow(
   input: CreateCustomerInput,
   customerNumber: string,
-  now: Date,
 ): NewCustomerRow {
   return {
     customerNumber,
@@ -168,7 +171,6 @@ export function toNewCustomerRow(
     source: input.source ?? null,
     responsibleOperatorId: input.responsibleOperatorId ?? null,
     status: input.status ?? CUSTOMER_INITIAL_STATUS,
-    statusChangedAt: now,
   };
 }
 

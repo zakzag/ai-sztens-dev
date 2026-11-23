@@ -156,7 +156,7 @@ export class CustomersService {
           const customerNumber = toNextCustomerNumber(prefix, currentMax);
           const row = await this.repository.create(
             tx,
-            toNewCustomerRow(input, customerNumber, now),
+            toNewCustomerRow(input, customerNumber),
           );
 
           await this.audit.write(

@@ -137,8 +137,12 @@ describe('CustomersService', () => {
       expect(mocks.create.mock.calls[0]?.[1]).toMatchObject({
         customerNumber: 'AIS-202611-002',
         status: 'prospect',
-        statusChangedAt: NOW,
       });
+      // `statusChangedAt` is the database's `now()`, not the service clock: that
+      // is what keeps it identical to `created_at` on a fresh row.
+      expect(mocks.create.mock.calls[0]?.[1]).not.toHaveProperty(
+        'statusChangedAt',
+      );
 
       // Exactly one audit row, on the same transaction handle as the write.
       expect(audit.calls).toHaveLength(1);

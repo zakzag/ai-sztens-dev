@@ -4,8 +4,10 @@
  * Imports `DatabaseModule` explicitly instead of relying on a global: the
  * dependency on Postgres stays visible in the module graph (see the docblock of
  * `DatabaseModule`). It also imports `AuditModule`, which is what makes
- * `AUDIT_WRITER` resolvable — a write without a ledger row must not be
- * expressible, so the dependency is declared rather than optional.
+ * `AUDIT_WRITER` **and** `AUDIT_ACTOR_PROVIDER` resolvable — a write without a
+ * ledger row must not be expressible, so the dependency is declared rather than
+ * optional, and the activity feed stamps its author from that same actor seam
+ * (slice f `F3`).
  *
  * Six sub-resources live here, one controller and one repository token each:
  * the customer itself (slice b), its contacts (d), its tags and its login users

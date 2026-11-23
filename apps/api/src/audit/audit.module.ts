@@ -9,9 +9,19 @@
  * stops being a compile error.
  *
  * Everything is bound to a string token, so a consumer depends on the interface
- * and a spec can substitute a plain object. Only `AUDIT_WRITER` is exported: the
- * repository and the actor provider stay private, so nothing can append a row
- * without a diff, without an actor, or outside the business transaction.
+ * and a spec can substitute a plain object.
+ *
+ * Exactly **two** tokens are exported:
+ *
+ * - `AUDIT_WRITER` — the single append path. It takes the caller's transaction
+ *   handle, so a ledger row can never land outside the write it describes.
+ * - `AUDIT_ACTOR_PROVIDER` — the read-only actor seam. Exported because a consumer
+ *   that writes its **own** business row still has to stamp its `author_*`
+ *   columns from the same actor (the activity feed, AIS-178/f `F3`); injecting it
+ *   appends nothing.
+ *
+ * `AUDIT_REPOSITORY` stays private: with it in reach, appending a ledger row
+ * would stop being the writer's exclusive job.
  */
 
 import { Module } from '@nestjs/common';
@@ -30,6 +40,6 @@ import { AuditWriterService } from './audit-writer.service.js';
     { provide: AUDIT_ACTOR_PROVIDER, useClass: SystemAuditActorProvider },
     { provide: AUDIT_WRITER, useClass: AuditWriterService },
   ],
-  exports: [AUDIT_WRITER],
+  exports: [AUDIT_WRITER, AUDIT_ACTOR_PROVIDER],
 })
 export class AuditModule {}

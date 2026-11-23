@@ -60,7 +60,7 @@ describe('AuditModule', () => {
     await moduleRef.close();
   });
 
-  it('resolves the same three providers from the real module', async () => {
+  it('resolves both exported tokens from the real module', async () => {
     const AuditModule = await loadAuditModule();
     if (AuditModule === null) {
       return;
@@ -71,6 +71,12 @@ describe('AuditModule', () => {
     }).compile();
 
     expect(moduleRef.get(AUDIT_WRITER)).toBeInstanceOf(AuditWriterService);
+    // The actor provider is exported too: the activity feed stamps its author
+    // columns from the same seam (AIS-178/f `F3`). Forgetting this export is
+    // exactly what made `CustomersModule` fail to bootstrap.
+    expect(moduleRef.get(AUDIT_ACTOR_PROVIDER)).toBeInstanceOf(
+      SystemAuditActorProvider,
+    );
 
     await moduleRef.close();
   });

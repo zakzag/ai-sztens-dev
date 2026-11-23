@@ -166,14 +166,16 @@ describe('CustomersModule', () => {
     await moduleRef.close();
   });
 
-  it('binds AUDIT_WRITER through the real AuditModule', async () => {
+  it('binds AUDIT_WRITER and AUDIT_ACTOR_PROVIDER through the real AuditModule', async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AuditModule],
     }).compile();
 
-    // The writer is the module's only export: nothing can append a ledger row
-    // without a diff, without an actor, or outside the business transaction.
+    // Two exports, and both are required here: the writer appends the ledger row,
+    // and the activity feed stamps its `author_*` columns from the same actor.
+    // The repository stays private, so appending remains the writer's own job.
     expect(moduleRef.get(AUDIT_WRITER)).toBeInstanceOf(AuditWriterService);
+    expect(moduleRef.get(AUDIT_ACTOR_PROVIDER)).toBeDefined();
 
     await moduleRef.close();
   });

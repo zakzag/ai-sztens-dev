@@ -41,10 +41,14 @@
 
 import type {
   ApiResult,
+  Contact,
+  CreateContactInput,
   CreateCustomerInput,
   Customer,
   CustomerDetail,
   CustomerListQuery,
+  ListQuery,
+  UpdateContactInput,
   UpdateCustomerInput,
   UpdateCustomerStatusInput,
 } from '@callback/shared';
@@ -145,4 +149,75 @@ export interface CustomersService {
    * @throws {import('../api-error.js').ApiError} `404 NOT_FOUND`.
    */
   remove(id: string, options?: RequestOptions): Promise<null>;
+
+  /**
+   * `GET /api/admin/customers/:id/contacts` — one page of the customer's
+   * contacts, each with its role set.
+   *
+   * @param customerId - the customer's uuid.
+   * @param query - the validated list query (`page`, `limit`, `order`, `q`).
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404 NOT_FOUND` when the
+   *   customer is not live, `400 VALIDATION_FAILED` for a bad query.
+   */
+  listContacts(
+    customerId: string,
+    query: ListQuery,
+    options?: RequestOptions,
+  ): Promise<ApiResult<readonly Contact[]>>;
+
+  /**
+   * `POST /api/admin/customers/:id/contacts` — adds a contact.
+   *
+   * `roles` is the whole role set of the new contact; `isActive` starts `true`
+   * (the server decides that, not the caller).
+   *
+   * @param customerId - the customer's uuid.
+   * @param input - the create payload.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `409
+   *   CUSTOMER_PRIMARY_CONTACT_CONFLICT`, `422 SEMANTIC_VALIDATION_FAILED` for a
+   *   `customerUserId` of another customer.
+   */
+  createContact(
+    customerId: string,
+    input: CreateContactInput,
+    options?: RequestOptions,
+  ): Promise<Contact>;
+
+  /**
+   * `PATCH /api/admin/customers/:id/contacts/:contactId` — partial update.
+   *
+   * `roles`, when present, **replaces** the role set; `updatedAt` is the version
+   * the caller last read, and a mismatch is `409 STALE_WRITE`.
+   *
+   * @param customerId - the customer's uuid.
+   * @param contactId - the contact's uuid.
+   * @param input - the changed fields, the role set to write and the token.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404`, `409 STALE_WRITE`, `409
+   *   CUSTOMER_PRIMARY_CONTACT_CONFLICT`, `422 SEMANTIC_VALIDATION_FAILED`.
+   */
+  updateContact(
+    customerId: string,
+    contactId: string,
+    input: UpdateContactInput,
+    options?: RequestOptions,
+  ): Promise<Contact>;
+
+  /**
+   * `DELETE /api/admin/customers/:id/contacts/:contactId` — archives the contact
+   * and drops its role rows, freeing the `primary` slot.
+   *
+   * @param customerId - the customer's uuid.
+   * @param contactId - the contact's uuid.
+   * @param options - optional abort signal / extra headers.
+   * @throws {import('../api-error.js').ApiError} `404 NOT_FOUND` (including a
+   *   repeat delete).
+   */
+  removeContact(
+    customerId: string,
+    contactId: string,
+    options?: RequestOptions,
+  ): Promise<null>;
 }

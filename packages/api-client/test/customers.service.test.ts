@@ -15,13 +15,17 @@
  *    a contract violation, not a silently missing field.
  */
 
-import type { CustomerListQuery } from '@callback/shared';
+import type { CustomerListQuery, ListQuery } from '@callback/shared';
 import {
+  CUSTOMERS_CONTACTS_PATH,
+  CUSTOMERS_CONTACT_PATH,
   CUSTOMERS_DETAIL_PATH,
   CUSTOMERS_PATH,
   CUSTOMERS_STATUS_PATH,
   clientPathOf,
   createCustomersService,
+  toCustomerContactPath,
+  toCustomerContactsPath,
   toCustomerDetailPath,
   toCustomerStatusPath,
   UNEXPECTED_PAYLOAD_CODE,
@@ -37,10 +41,14 @@ import {
 } from './mocks/fetch.mock.js';
 import {
   UPDATED_CUSTOMER,
+  VALID_CONTACT,
+  VALID_CONTACT_LIST,
+  VALID_CREATE_CONTACT_INPUT,
   VALID_CREATE_INPUT,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
+  VALID_UPDATE_CONTACT_INPUT,
   VALID_UPDATE_INPUT,
 } from './mocks/customer.mock.js';
 
@@ -386,5 +394,204 @@ describe('createCustomersService — request options', () => {
     await service.list(DEFAULT_QUERY, { signal: controller.signal });
 
     expect(fetchMock.calls[0]?.init?.signal).toBe(controller.signal);
+  });
+});
+
+describe('the contact path constants (AIS-178, slice d)', () => {
+  it('keep both placeholders on the collection and the item path', () => {
+    expect(CUSTOMERS_CONTACTS_PATH).toBe('/admin/customers/:id/contacts');
+    expect(CUSTOMERS_CONTACT_PATH).toBe(
+      '/admin/customers/:id/contacts/:contactId',
+    );
+  });
+
+  it('substitute and encode both ids', () => {
+    expect(toCustomerContactsPath('a/b')).toBe('/admin/customers/a%2Fb/contacts');
+    expect(toCustomerContactPath('customer', 'contact')).toBe(
+      '/admin/customers/customer/contacts/contact',
+    );
+  });
+
+  it('keep the registry parity of the four contact operations', () => {
+    expect(clientPathOf('customers.listContacts')).toBe(CUSTOMERS_CONTACTS_PATH);
+    expect(clientPathOf('customers.createContact')).toBe(CUSTOMERS_CONTACTS_PATH);
+    expect(clientPathOf('customers.updateContact')).toBe(CUSTOMERS_CONTACT_PATH);
+    expect(clientPathOf('customers.removeContact')).toBe(CUSTOMERS_CONTACT_PATH);
+  });
+});
+
+describe('createCustomersService — listContacts', () => {
+  const CONTACT_QUERY: ListQuery = { page: 1, limit: 20, order: 'desc' };
+
+  it('calls GET /api/admin/customers/:id/contacts without a query when default', async () => {
+    const { service, fetchMock } = setup([paginatedResponse(VALID_CONTACT_LIST)]);
+
+    await service.listContacts(VALID_CUSTOMER.id, CONTACT_QUERY);
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/contacts`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('GET');
+  });
+
+  it('returns the contacts with the pager block', async () => {
+    const { service } = setup([paginatedResponse(VALID_CONTACT_LIST)]);
+
+    const result = await service.listContacts(VALID_CUSTOMER.id, CONTACT_QUERY);
+
+    expect(result.data).toHaveLength(VALID_CONTACT_LIST.length);
+    expect(result.meta.pagination.total).toBe(1);
+  });
+
+  it('surfaces an unknown customer as not found', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'No customer with that id was found.',
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.listContacts(VALID_CUSTOMER.id, CONTACT_QUERY),
+    );
+
+    expect(isNotFoundError(error)).toBe(true);
+  });
+});
+
+describe('createCustomersService — createContact', () => {
+  it('posts the payload and parses the created contact', async () => {
+    const { service, fetchMock } = setup([successResponse(VALID_CONTACT, 201)]);
+
+    const created = await service.createContact(
+      VALID_CUSTOMER.id,
+      VALID_CREATE_CONTACT_INPUT,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/contacts`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('POST');
+    expect(readBody(fetchMock.calls[0])).toEqual(VALID_CREATE_CONTACT_INPUT);
+    expect(created.id).toBe(VALID_CONTACT.id);
+  });
+
+  it('keeps the primary-contact conflict code and its field detail', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'CUSTOMER_PRIMARY_CONTACT_CONFLICT',
+        status: 409,
+        message: 'Another contact is already the primary contact.',
+        details: [
+          {
+            path: 'roles',
+            message: 'Another contact is already the primary contact.',
+          },
+        ],
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.createContact(VALID_CUSTOMER.id, VALID_CREATE_CONTACT_INPUT),
+    );
+
+    expect(error.code).toBe('CUSTOMER_PRIMARY_CONTACT_CONFLICT');
+    expect(error.issues[0]?.path).toBe('roles');
+  });
+
+  it('keeps the 422 code for a login user of another customer', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'SEMANTIC_VALIDATION_FAILED',
+        status: 422,
+        message: 'Customer user does not belong to this customer.',
+        details: [
+          {
+            path: 'customerUserId',
+            message: 'Customer user does not belong to this customer.',
+          },
+        ],
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.createContact(VALID_CUSTOMER.id, VALID_CREATE_CONTACT_INPUT),
+    );
+
+    expect(error.status).toBe(422);
+    expect(error.code).toBe('SEMANTIC_VALIDATION_FAILED');
+    expect(error.issues[0]?.path).toBe('customerUserId');
+  });
+});
+
+describe('createCustomersService — updateContact', () => {
+  it('patches the contact route with the version token', async () => {
+    const { service, fetchMock } = setup([successResponse(VALID_CONTACT)]);
+
+    await service.updateContact(
+      VALID_CUSTOMER.id,
+      VALID_CONTACT.id,
+      VALID_UPDATE_CONTACT_INPUT,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/contacts/${VALID_CONTACT.id}`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('PATCH');
+    expect(readBody(fetchMock.calls[0])).toEqual(VALID_UPDATE_CONTACT_INPUT);
+  });
+
+  it('surfaces a stale token as 409 STALE_WRITE', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'STALE_WRITE',
+        status: 409,
+        message: 'The contact was updated by someone else.',
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.updateContact(
+        VALID_CUSTOMER.id,
+        VALID_CONTACT.id,
+        VALID_UPDATE_CONTACT_INPUT,
+      ),
+    );
+
+    expect(error.code).toBe('STALE_WRITE');
+  });
+});
+
+describe('createCustomersService — removeContact', () => {
+  it('deletes the contact route and resolves the null payload', async () => {
+    const { service, fetchMock } = setup([successResponse(null)]);
+
+    const result = await service.removeContact(
+      VALID_CUSTOMER.id,
+      VALID_CONTACT.id,
+    );
+
+    expect(fetchMock.calls[0]?.url).toBe(
+      `${BASE_URL}/admin/customers/${VALID_CUSTOMER.id}/contacts/${VALID_CONTACT.id}`,
+    );
+    expect(fetchMock.calls[0]?.init?.method).toBe('DELETE');
+    expect(result).toBeNull();
+  });
+
+  it('treats a repeat delete as a 404', async () => {
+    const { service } = setup([
+      errorResponse({
+        code: 'NOT_FOUND',
+        status: 404,
+        message: 'No contact with that id was found.',
+      }),
+    ]);
+
+    const error = await captureError(() =>
+      service.removeContact(VALID_CUSTOMER.id, VALID_CONTACT.id),
+    );
+
+    expect(isNotFoundError(error)).toBe(true);
   });
 });

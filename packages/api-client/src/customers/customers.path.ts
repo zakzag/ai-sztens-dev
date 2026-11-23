@@ -13,8 +13,13 @@
  * `api-keys.path.ts` made).
  */
 
-import { CUSTOMERS_ID_PARAM } from '@callback/shared';
-import { CUSTOMERS_DETAIL_PATH, CUSTOMERS_STATUS_PATH } from './customers.const.js';
+import { CUSTOMERS_CONTACT_ID_PARAM, CUSTOMERS_ID_PARAM } from '@callback/shared';
+import {
+  CUSTOMERS_CONTACTS_PATH,
+  CUSTOMERS_CONTACT_PATH,
+  CUSTOMERS_DETAIL_PATH,
+  CUSTOMERS_STATUS_PATH,
+} from './customers.const.js';
 
 /**
  * Substitutes the customer id into the detail path.
@@ -42,4 +47,39 @@ export function toCustomerStatusPath(id: string): string {
     CUSTOMERS_ID_PARAM,
     encodeURIComponent(id),
   );
+}
+
+/**
+ * Substitutes the customer id into the contact collection path.
+ *
+ * @param customerId - the customer's uuid.
+ * @returns the path relative to the injected base URL, e.g.
+ *   `/admin/customers/<id>/contacts`.
+ */
+export function toCustomerContactsPath(customerId: string): string {
+  return CUSTOMERS_CONTACTS_PATH.replace(
+    CUSTOMERS_ID_PARAM,
+    encodeURIComponent(customerId),
+  );
+}
+
+/**
+ * Substitutes both ids into the single-contact path.
+ *
+ * The order matters only for readability: `:id` cannot match inside
+ * `:contactId` (the placeholder is `:` followed by `contactId`), so the two
+ * substitutions never interfere.
+ *
+ * @param customerId - the customer's uuid.
+ * @param contactId - the contact's uuid.
+ * @returns the path relative to the injected base URL.
+ */
+export function toCustomerContactPath(
+  customerId: string,
+  contactId: string,
+): string {
+  return CUSTOMERS_CONTACT_PATH.replace(
+    CUSTOMERS_ID_PARAM,
+    encodeURIComponent(customerId),
+  ).replace(CUSTOMERS_CONTACT_ID_PARAM, encodeURIComponent(contactId));
 }

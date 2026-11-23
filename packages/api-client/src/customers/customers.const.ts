@@ -52,3 +52,17 @@ export const CUSTOMER_LIST_QUERY_DEFAULTS: ListQueryDefaults = {
   ...LIST_QUERY_DEFAULTS,
   sort: CUSTOMER_DEFAULT_SORT,
 };
+
+/**
+ * Path of the contact collection of one customer (AIS-178, slice d).
+ *
+ * Still carrying `:id`; the contacts list has no further placeholder, so this is
+ * the path every `…/:id/contacts` call starts from.
+ */
+export const CUSTOMERS_CONTACTS_PATH = clientPathOf('customers.listContacts');
+
+/**
+ * Path of one contact inside its customer, still carrying `:id` and
+ * `:contactId`; both are substituted by `toCustomerContactPath()`.
+ */
+export const CUSTOMERS_CONTACT_PATH = clientPathOf('customers.updateContact');

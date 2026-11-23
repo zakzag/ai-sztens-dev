@@ -12,19 +12,29 @@
  */
 
 import {
+  SECOND_CONTACT,
   SECOND_CUSTOMER,
+  VALID_CONTACT,
+  VALID_CONTACT_LIST,
+  VALID_CREATE_CONTACT_REQUEST,
   VALID_CREATE_CUSTOMER_REQUEST,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
+  VALID_UPDATE_CONTACT_REQUEST,
   VALID_UPDATE_CUSTOMER_REQUEST,
+  type CreateContactInput,
   type CreateCustomerInput,
   type Customer,
+  type UpdateContactInput,
   type UpdateCustomerInput,
 } from '@callback/shared';
 
 export {
+  SECOND_CONTACT,
   SECOND_CUSTOMER,
+  VALID_CONTACT,
+  VALID_CONTACT_LIST,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
@@ -55,3 +65,11 @@ export const UPDATED_CUSTOMER: Customer = {
   shortName: 'Példa Kft. (új)',
   updatedAt: '2026-11-20T11:00:00.000Z',
 };
+
+/** A valid `POST /api/admin/customers/:id/contacts` body. */
+export const VALID_CREATE_CONTACT_INPUT: CreateContactInput =
+  VALID_CREATE_CONTACT_REQUEST;
+
+/** A valid `PATCH /api/admin/customers/:id/contacts/:contactId` body. */
+export const VALID_UPDATE_CONTACT_INPUT: UpdateContactInput =
+  VALID_UPDATE_CONTACT_REQUEST;

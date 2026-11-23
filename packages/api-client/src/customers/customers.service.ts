@@ -21,15 +21,24 @@
  */
 
 import {
+  LIST_QUERY_DEFAULTS,
+  contactListSchema,
+  contactSchema,
+  createContactSchema,
   customerDetailSchema,
   customerListSchema,
   customerSchema,
   noPayloadSchema,
+  updateContactSchema,
   type ApiResult,
+  type Contact,
+  type CreateContactInput,
   type CreateCustomerInput,
   type Customer,
   type CustomerDetail,
   type CustomerListQuery,
+  type ListQuery,
+  type UpdateContactInput,
   type UpdateCustomerInput,
   type UpdateCustomerStatusInput,
 } from '@callback/shared';
@@ -38,7 +47,12 @@ import {
   CUSTOMER_LIST_QUERY_DEFAULTS,
 } from './customers.const.js';
 import type { CustomersService } from './customers.interface.js';
-import { toCustomerDetailPath, toCustomerStatusPath } from './customers.path.js';
+import {
+  toCustomerContactPath,
+  toCustomerContactsPath,
+  toCustomerDetailPath,
+  toCustomerStatusPath,
+} from './customers.path.js';
 import type { HttpClient, RequestOptions } from '../http-client.interface.js';
 
 /**
@@ -102,5 +116,58 @@ export function createCustomersService(client: HttpClient): CustomersService {
     // contract violation instead of a silent success.
     remove: async (id: string, options?: RequestOptions): Promise<null> =>
       client.delete(toCustomerDetailPath(id), noPayloadSchema, options),
+
+    // ---- contacts (AIS-178, slice d) -------------------------------------
+    // The contact list paginates like every other collection, so it goes
+    // through `getList`: `meta.pagination` is what the tab's pager reads.
+    listContacts: async (
+      customerId: string,
+      query: ListQuery,
+      options?: RequestOptions,
+    ): Promise<ApiResult<readonly Contact[]>> =>
+      client.getList(
+        toCustomerContactsPath(customerId),
+        contactListSchema,
+        { query, defaults: LIST_QUERY_DEFAULTS },
+        options,
+      ),
+
+    createContact: async (
+      customerId: string,
+      input: CreateContactInput,
+      options?: RequestOptions,
+    ): Promise<Contact> =>
+      client.post(
+        toCustomerContactsPath(customerId),
+        input,
+        contactSchema,
+        options,
+      ),
+
+    // One request replaces the role set; a second `primary` is refused by the
+    // server with `409 CUSTOMER_PRIMARY_CONTACT_CONFLICT`, not by the client.
+    updateContact: async (
+      customerId: string,
+      contactId: string,
+      input: UpdateContactInput,
+      options?: RequestOptions,
+    ): Promise<Contact> =>
+      client.patch(
+        toCustomerContactPath(customerId, contactId),
+        input,
+        contactSchema,
+        options,
+      ),
+
+    removeContact: async (
+      customerId: string,
+      contactId: string,
+      options?: RequestOptions,
+    ): Promise<null> =>
+      client.delete(
+        toCustomerContactPath(customerId, contactId),
+        noPayloadSchema,
+        options,
+      ),
   };
 }

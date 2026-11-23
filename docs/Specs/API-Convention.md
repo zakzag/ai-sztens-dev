@@ -1,9 +1,11 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-11-23 (AIS-178/f: a customer **aktivitás-** és **napló-olvasó**
-végpontjai élnek, a napló írhatatlan, a szerző a szerveroldali `AUDIT_ACTOR_PROVIDER`-ből jön)
+**Utolsó frissítés:** 2026-11-23 (AIS-178/f + AIS-14 closeout: az aktivitás- és napló-olvasó
+végpontok élnek, a napló írhatatlan, és a `PATCH` státuszkód-döntés rögzítve van a §4.3.1-ben)
 
 **Frissítések**:
+
+- **2026-11-23 — AIS-14 (closeout, `D1`):** a `PATCH` státuszkód-döntés rögzítve — malformed body → `400`, elavult `updatedAt` → `409 STALE_WRITE`, tartalmilag lehetetlen de jól formált kérés → `422 SEMANTIC_VALIDATION_FAILED` (csak a `customers` gyerek-erőforrásain), üres patch a helyes tokennel → `200` no-op; az AIS-14 DoD „`422` on `PATCH /:id`” szövege ezzel **felülírt**, lásd §4.3.1
 
 - **2026-11-23 - AIS-178/f:** a `customers` **aktivitás** végpontjai és a **napló** olvasása élnek — `GET`/`POST /api/admin/customers/:id/activities`, `PATCH`/`DELETE …/:activityId`, `GET …/audit-logs`; az aktivitás szerzője a szerveroldali `AUDIT_ACTOR_PROVIDER`-ből jön, a token az `updatedAt ?? createdAt`, a napló **írhatatlan**, `from > to` → `422`, lásd §12.3)
 - **2026-11-23 — AIS-178/e:** a `customers` **címke-** és **belépő-felhasználó** végpontjai élnek — `POST`/`PATCH /api/admin/customers/:id/tags`, `DELETE …/:tagId`, `POST`/`PATCH`/`DELETE …/customer-users[/:customerUserId]`; címke create-or-attach név alapján, egy aktív `owner` → `409 CUSTOMER_OWNER_CONFLICT`, globális e-mail → `409 CUSTOMER_USER_EMAIL_CONFLICT`, hivatkozott felhasználó → `409 CUSTOMER_USER_IN_USE_CONFLICT`, lásd §12.2
@@ -315,6 +317,33 @@ partial unique index excludes `deleted_at IS NOT NULL`).
 `actor_type = 'system'` (§7.1); the mutating handlers are the only ones that read the raw request
 (`@Req()` + `toAuditRequestFacts()`), because `ip`, `user-agent` and `source` are not part of the
 envelope context.
+
+#### 4.3.1 `PATCH` status codes — the shape boundary and the `422` rule (AIS-14 `D1`)
+
+The AIS-14 story DoD asked for “`422` semantic error on `PATCH /:id`”. That wording **predates
+AIS-108 and is superseded by this section**: the implementation keeps the AIS-108 convention, because
+a one-off `422` branch on `PATCH /customers/:id` would make this the only resource in the API that
+answers that way, for no client benefit.
+
+| Situation on `PATCH /api/admin/customers/:id` | Answer | Raised by |
+| --- | --- | --- |
+| malformed body, unknown key, non-uuid `:id` | `400 VALIDATION_FAILED` + `details[].path` | the route's `ZodValidationPipe` |
+| valid body, `updatedAt` is not the current version | `409 STALE_WRITE` + `details[{ path: 'updatedAt' }]` | the repository's version guard |
+| valid body, content impossible (foreign `customerUserId`, foreign `tagId`, `from > to`, …) | `422 SEMANTIC_VALIDATION_FAILED` | the child-resource services |
+| empty patch object with the current token | `200`, silent no-op | the service (AIS-108 `D7`) |
+
+**The rule in one line: `PATCH` never answers `422` for a shape or a version problem.** `422` is
+reserved for a *well-formed* request whose content is impossible, and today only the `customers` child
+resources (contacts, tags, customer users, activities, the audit-log range) produce it. Two corollaries:
+
+- the same split applies to the children: `400` for the body's shape, `409 STALE_WRITE` for a stale
+  token, `422` for a reference that cannot exist;
+- `DELETE` never answers `STALE_WRITE` at all (§4.3 above): it carries no body, so there is no token
+  to compare.
+
+The activity feed adds one detail worth knowing: its version token is `updated_at ?? created_at`,
+because `updated_at` is `NULL` until the first edit — the guard compares
+`coalesce(updated_at, created_at)` against the instant the client was shown (§12.3).
 
 ---
 

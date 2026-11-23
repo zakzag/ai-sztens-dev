@@ -35,6 +35,15 @@ const MAX_CAUSE_DEPTH = 5;
 /** Postgres SQLSTATE of a unique-constraint violation. */
 export const PG_UNIQUE_VIOLATION_CODE = '23505';
 
+/**
+ * Postgres SQLSTATE of a foreign-key violation (AIS-178, slice d).
+ *
+ * A *semantic* failure rather than a conflict: the payload is well formed, but a
+ * reference it carries does not exist — or exists in a scope that does not match
+ * (a contact pointing at another customer's login user).
+ */
+export const PG_FOREIGN_KEY_VIOLATION_CODE = '23503';
+
 /** A non-null, non-array object — the only shape that can carry driver fields. */
 interface UnknownRecord {
   readonly [key: string]: unknown;

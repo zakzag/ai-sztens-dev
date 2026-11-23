@@ -1,5 +1,6 @@
 # API Convention — unified request/response contract
 
+**Utolsó frissítés:** 2026-11-23 (AIS-178/d: a `customers` **kapcsolattartó** végpontjai élnek — `GET`/`POST /api/admin/customers/:id/contacts`, `PATCH`/`DELETE …/:contactId`, a szerepkör-készlet egy kérésben cserélődik, második `primary` → `409 CUSTOMER_PRIMARY_CONTACT_CONFLICT`, idegen `customerUserId` → `422 SEMANTIC_VALIDATION_FAILED`, lásd §12.1)
 **Utolsó frissítés:** 2026-11-22 (AIS-178/b: a `customers` végpontok élnek — hat route a `/api/admin/*` alatt, `CUSTOMER_NUMBER_CONFLICT` / `CUSTOMER_TAX_NUMBER_CONFLICT`, `primaryContactName` a wire-en, malformed uuid → `400`, lásd §4.3) 2026-11-22 (AIS-16: a `customers` erőforrás szerződés-sémái a `packages/shared/src/contract/customers/` alatt; a lista a közös lapozás mellé négy szűrőt kap — `type`, `status`, `source`, `responsibleOperatorId` —, lásd §4.1) 2026-11-07 (AIS-152: a `HttpEvent` négy új mezőt hordoz — `requestId`, `query`, maszkolt `bodyPreview`, `responseMeta` —, a token/`Authorization` továbbra sem kerülhet az eseménybe; lásd §9) (AIS-136: a 3. tier — app-szintű banner — a megjelenítés **mellett** toastol is; a `field` tier az egyetlen, amely toast nélkül marad, lásd §10) (AIS-112: közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3)
 **Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109; client binding of every registered operation + registry ⇄ service coverage gate + resource template: AIS-110; közös formátum-sémák + kétnyelvű validációs üzenetek: AIS-112
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
@@ -508,6 +509,35 @@ service method fails `packages/api-client/test/service-coverage.test.ts` (§12).
 | Mapper ⇄ shared-schema drift (fixture through `apiKeySchema` + the dev validator's assertion)                                                                 | `apps/api/test/envelope-contract.e2e-spec.ts`                                                               |
 | CI runs the e2e gates on Node 24 with Postgres                                                                                                                | `.github/workflows/ci.yml` → `api-e2e` job                                                                  |
 | OpenAPI baseline + breaking-change gate                                                                                                                       | **not built yet** — AIS-99                                                                                  |
+
+---
+
+## 12.1 Contact endpoints (AIS-178/d)
+
+A contact belongs to a customer, so every contact route lives **under** the customer path and every
+read is scoped by `customer_id`. Guessing a contact uuid therefore cannot cross the customer boundary:
+the answer is `404`, never someone else's contact.
+
+| operationId                 | verb   | path                                                     | success | notes                                                                    |
+| --------------------------- | ------ | -------------------------------------------------------- | ------- | ------------------------------------------------------------------------ |
+| `customers.listContacts`    | GET    | `/api/admin/customers/:id/contacts`                       | `200` + `meta.pagination` | paged, ordered by `name`, `?q=` searches name/email/phone |
+| `customers.createContact`   | POST   | `/api/admin/customers/:id/contacts`                       | `201`   | `isActive` starts `true`; `roles` is the whole role set                    |
+| `customers.updateContact`   | PATCH  | `/api/admin/customers/:id/contacts/:contactId`            | `200`   | `updatedAt` required; `roles`, when present, **replaces** the set          |
+| `customers.removeContact`   | DELETE | `/api/admin/customers/:id/contacts/:contactId`            | `200`, `data: null` | soft delete + its role rows removed, which frees the `primary` slot |
+
+Three rules are enforced by the **database**, not by a pre-check, and the answers are classified by
+constraint name:
+
+- one `primary` contact per customer (`contact_roles_primary_key`) → `409 CUSTOMER_PRIMARY_CONTACT_CONFLICT`
+  with `details[0].path = "roles"`; a role-set replace is atomic, so "move the flag" is one request;
+- a `customerUserId` of another customer (`contacts_customer_user_id_fkey`) → `422 SEMANTIC_VALIDATION_FAILED`
+  with `details[0].path = "customerUserId"` — the body is well formed, its content is not;
+- the contact row and its role rows share one transaction, and each audit row belongs to the table it
+  describes (`contact_roles` rows carry `recordId: null`, the pair travels in the payload).
+
+A **roles-only** PATCH does not bump `contacts.updated_at`, because the roles live in their own table;
+the concurrency token is still verified against the row that was read, so a stale client still gets
+`409 STALE_WRITE`.
 
 ---
 

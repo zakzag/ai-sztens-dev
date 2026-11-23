@@ -65,6 +65,16 @@ export const API_ERROR_CODE = {
    * index is partial (`WHERE deleted_at IS NULL`).
    */
   CUSTOMER_TAX_NUMBER_CONFLICT: 'CUSTOMER_TAX_NUMBER_CONFLICT',
+  /**
+   * Domain specific (AIS-178, slice d): a customer may have **one** `primary`
+   * contact, and another live contact already holds the flag.
+   *
+   * Enforced by the partial unique index `contact_roles_primary_key`
+   * (`customer_id WHERE role = 'primary'`), so the answer is classified from the
+   * constraint name, never from a pre-check — the pre-check would lie about the
+   * partial predicate.
+   */
+  CUSTOMER_PRIMARY_CONTACT_CONFLICT: 'CUSTOMER_PRIMARY_CONTACT_CONFLICT',
 } as const;
 
 /** Union of the catalogue values. */
@@ -92,6 +102,7 @@ export const API_ERROR_CODE_STATUS: Readonly<Record<ApiErrorCode, number>> = {
   [API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT]: HTTP_STATUS.CONFLICT,
   [API_ERROR_CODE.CUSTOMER_NUMBER_CONFLICT]: HTTP_STATUS.CONFLICT,
   [API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.CUSTOMER_PRIMARY_CONTACT_CONFLICT]: HTTP_STATUS.CONFLICT,
 };
 
 /**

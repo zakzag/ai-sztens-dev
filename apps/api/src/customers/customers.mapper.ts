@@ -20,6 +20,7 @@ import {
   type UpdateCustomerInput,
 } from '@callback/shared';
 import type { CustomerRow, NewCustomerRow } from '../db/schema.js';
+import { toIsoString, toNullableIsoString } from '../common/date/iso-date.js';
 import { hasMissingData } from './customers.logic.js';
 import type {
   ContactRoleJoinRow,
@@ -28,16 +29,6 @@ import type {
   CustomerListRow,
   CustomerPatch,
 } from './customers.interface.js';
-
-/** Converts a `Date` to the ISO 8601 string used on the wire. */
-function toIsoString(value: Date): string {
-  return value.toISOString();
-}
-
-/** Same as {@link toIsoString}, but keeps `null` as `null` (never `undefined`). */
-function toNullableIsoString(value: Date | null): string | null {
-  return value === null ? null : value.toISOString();
-}
 
 /**
  * Maps a projected customer row to the list/detail payload.

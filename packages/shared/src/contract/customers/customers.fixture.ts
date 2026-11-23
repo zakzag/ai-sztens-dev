@@ -20,11 +20,13 @@ import type {
   Activity,
   AuditLog,
   Contact,
+  CreateContactInput,
   CreateCustomerInput,
   Customer,
   CustomerDetail,
   CustomerTag,
   CustomerUser,
+  UpdateContactInput,
   UpdateCustomerInput,
 } from './customers.interface.js';
 
@@ -259,3 +261,36 @@ export const VALID_UPDATE_CUSTOMER_REQUEST: UpdateCustomerInput = {
   shortName: 'Példa Kft. (új)',
   updatedAt: VALID_CUSTOMER.updatedAt,
 };
+
+/**
+ * A valid `POST /api/admin/customers/:id/contacts` body (AIS-178, slice d).
+ *
+ * `customerUserId` is omitted on purpose: linking a contact to a login user is
+ * optional, and this fixture is the proof that the field may be absent.
+ */
+export const VALID_CREATE_CONTACT_REQUEST: CreateContactInput = {
+  name: 'Szabó Judit',
+  position: 'Gazdasági vezető',
+  email: 'judit.szabo@pelda.hu',
+  phone: '+36301112233',
+  roles: ['technical'],
+};
+
+/**
+ * A valid `PATCH /api/admin/customers/:id/contacts/:contactId` body.
+ *
+ * It moves the `primary` flag onto {@link VALID_CONTACT} — the same role set the
+ * contact already has, so the example is a *stable* one; the role-set replace is
+ * exercised by the slice-d tests, which build their own payloads.
+ */
+export const VALID_UPDATE_CONTACT_REQUEST: UpdateContactInput = {
+  position: 'Ügyvezető helyettes',
+  roles: ['primary'],
+  updatedAt: VALID_CONTACT.updatedAt,
+};
+
+/** Payload example of `GET /api/admin/customers/:id/contacts`. */
+export const VALID_CONTACT_LIST: readonly Contact[] = [
+  VALID_CONTACT,
+  SECOND_CONTACT,
+];

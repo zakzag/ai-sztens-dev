@@ -70,6 +70,25 @@ export const CUSTOMER_TAX_NUMBER_FIELD_MESSAGE =
   'Ez az adószám már egy másik ügyfélnél szerepel.';
 
 /**
+ * `CUSTOMER_PRIMARY_CONTACT_CONFLICT` (AIS-178, slice d) — one primary contact.
+ *
+ * A customer may have exactly one `primary` contact; the second one is refused by
+ * the database, so the message tells the user what to do instead of only what
+ * went wrong.
+ */
+export const CUSTOMER_PRIMARY_CONTACT_CONFLICT_MESSAGE =
+  'Ennél az ügyfélnél már van elsődleges kapcsolattartó. Előbb vedd le róla a jelölést.';
+
+/**
+ * Field-level copy of the primary-contact conflict (AIS-178, slice d, tier 1).
+ *
+ * The role picker is an input, so the message is rendered next to it — the
+ * generic sentence above stays for the page-level alert.
+ */
+export const CUSTOMER_PRIMARY_CONTACT_FIELD_MESSAGE =
+  'Már van elsődleges kapcsolattartó ennél az ügyfélnél.';
+
+/**
  * `VALIDATION_FAILED` on an identified field (plan `D11`, tier 1).
  *
  * Deliberately generic: the server's per-issue text (`issue.message`) is a

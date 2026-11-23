@@ -7,6 +7,8 @@ import {
   ENVELOPE_EXEMPTIONS,
   VALID_API_KEY,
   VALID_API_KEY_LIST,
+  VALID_CONTACT,
+  VALID_CONTACT_LIST,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
@@ -68,6 +70,12 @@ const SAMPLE_PAYLOADS: Readonly<Record<string, unknown>> = {
   'customers.update': VALID_CUSTOMER,
   'customers.updateStatus': VALID_CUSTOMER,
   'customers.remove': null,
+  // The contact aggregate (AIS-178, slice d): the page uses the list schema, the
+  // three single-contact routes the row schema, and the delete `null`.
+  'customers.listContacts': VALID_CONTACT_LIST,
+  'customers.createContact': VALID_CONTACT,
+  'customers.updateContact': VALID_CONTACT,
+  'customers.removeContact': null,
 };
 
 /** Minimal envelope `meta`; the registry only cares about the payload. */

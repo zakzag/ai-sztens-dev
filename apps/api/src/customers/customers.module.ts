@@ -19,13 +19,22 @@ import { CUSTOMERS_REPOSITORY } from './customers.const.js';
 import { CustomersController } from './customers.controller.js';
 import { DrizzleCustomersRepository } from './customers.repository.js';
 import { CustomersService } from './customers.service.js';
+import { CUSTOMER_CONTACTS_REPOSITORY } from './customers-contacts.const.js';
+import { CustomerContactsController } from './customers-contacts.controller.js';
+import { DrizzleCustomerContactsRepository } from './customers-contacts.repository.js';
+import { CustomerContactsService } from './customers-contacts.service.js';
 
 @Module({
   imports: [DatabaseModule, HttpModule, AuditModule],
-  controllers: [CustomersController],
+  controllers: [CustomersController, CustomerContactsController],
   providers: [
     CustomersService,
+    CustomerContactsService,
     { provide: CUSTOMERS_REPOSITORY, useClass: DrizzleCustomersRepository },
+    {
+      provide: CUSTOMER_CONTACTS_REPOSITORY,
+      useClass: DrizzleCustomerContactsRepository,
+    },
   ],
   exports: [CustomersService],
 })

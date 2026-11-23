@@ -27,6 +27,16 @@ export const CUSTOMERS_PATH = '/api/admin/customers';
 export const CUSTOMERS_ID_PARAM = ':id';
 
 /**
+ * Nest path-parameter placeholder of the contact routes (AIS-178, slice d).
+ *
+ * The contact id lives **under** the customer path
+ * (`…/:id/contacts/:contactId`), because a contact is only addressable inside its
+ * own customer: that is what keeps one customer's contact from being reachable
+ * with another customer's id.
+ */
+export const CUSTOMERS_CONTACT_ID_PARAM = ':contactId';
+
+/**
  * Shape of the generated customer number: `AIS-YYYYMM-NNN`.
  *
  * Six year-month digits (`202609`) and a three-digit sequence, so one month can

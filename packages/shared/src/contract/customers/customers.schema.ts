@@ -104,6 +104,14 @@ export const customerCountrySchema = z
 export const customerIdSchema = z.string().uuid();
 
 /**
+ * The `:contactId` path parameter of the contact routes (AIS-178, slice d).
+ *
+ * Same reasoning as {@link customerIdSchema}: a malformed uuid must be a `400`
+ * with a field path, not a Postgres `22P02` that the filter turns into a `500`.
+ */
+export const contactIdSchema = z.string().uuid();
+
+/**
  * JSON object column (`metadata`).
  *
  * `z.record(z.unknown())` instead of `z.any()`: the keys are known to be
@@ -195,6 +203,15 @@ export const contactSchema = z.object({
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 });
+
+/**
+ * Body of `GET /api/admin/customers/:id/contacts`.
+ *
+ * An array and never `null`: "no contacts" is an empty list (API-Convention §4).
+ * The rows are the same `contactSchema` the detail response publishes, so a
+ * consumer parses one shape for both reads.
+ */
+export const contactListSchema = z.array(contactSchema);
 
 /** A login user that belongs to exactly one customer. */
 export const customerUserSchema = z.object({

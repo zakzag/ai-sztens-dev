@@ -138,7 +138,10 @@ describe('component registration', () => {
       'ApiErrorEnvelope',
       'ApiKey',
       'ApiKeyList',
+      'Contact',
+      'ContactList',
       'CreateApiKey',
+      'CreateContact',
       'CreateCustomer',
       'Customer',
       'CustomerDetail',
@@ -147,6 +150,7 @@ describe('component registration', () => {
       'PaginationMeta',
       'ResponseMeta',
       'UpdateApiKey',
+      'UpdateContact',
       'UpdateCustomer',
       'UpdateCustomerStatus',
     ]);

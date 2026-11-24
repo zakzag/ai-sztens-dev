@@ -28,9 +28,9 @@ consequences run through every section below:
    contract; column lists, tab names and copy come from this file; the state buckets come from
    [`UI-Architecture.md`](UI-Architecture.md) §5.
 
-Anything the mockup
-([`docs/temp/12_ugyfelek_admin_mockup.html`](../../docs/temp/12_ugyfelek_admin_mockup.html:1), untracked)
-shows that the contract does not carry is listed in §7 and is **not** part of this screen family.
+Anything the mockup (`docs/temp/12_ugyfelek_admin_mockup.html`, a local scratch file that is **not**
+in git — hence not a link) shows that the contract does not carry is listed in §7 and is **not** part
+of this screen family.
 
 ---
 

@@ -72,8 +72,8 @@ export interface CustomersService {
    * `GET /api/admin/customers` — one page of customers, plus `meta.pagination`.
    *
    * Every filter of the query travels in the URL (`type`, `status`, `source`,
-   * `responsibleOperatorId`, `q`); a field still at its default is omitted, so
-   * the URL only carries what the operator actually changed.
+   * `q`); a field still at its default is omitted, so the URL only carries what
+   * the operator actually changed.
    *
    * @param query - the validated list query.
    * @param options - optional abort signal / extra headers.

@@ -1,7 +1,7 @@
 # Customers admin screens — screen contract (list, detail, wizard, edit)
 
 **Utolsó frissítés: 2026-11-24** (AIS-17 hullám-delta: a hullám hat döntése (`D-W1`–`D-W6`) átvezetve —
-a felelős operátor szűrő halasztott (`D-W2`), a kapcsolattartók és a felhasználók a detail payloadból olvasnak
+a felelős operátor fogalma teljesen megszűnt (DB-oszlop, szerződés, szűrő — 2026-11-24), a kapcsolattartók és a felhasználók a detail payloadból olvasnak
 lapozó és URL-listaállapot nélkül (`D-W3`), a címkék chip-műveletek (`D-W1`), az aktivitás szerkesztése/törlése
 `authorType === 'operator'` sorokra korlátozott (`D-W4`), a varázsló csak a céget hozza létre (`D-W6`); a
 mezőkészletet az AIS-16 adta, a felületet az AIS-19 / AIS-20 / AIS-21 / AIS-179 / AIS-181 / AIS-182 építi; terv:
@@ -66,7 +66,7 @@ of the detail entry, which is why `CustomerDetailPage` renders an `<Outlet/>`.
 
 | Parameter | Route | Values | Default | Invalid value | Owner |
 | --- | --- | --- | --- | --- | --- |
-| `page`, `limit`, `sort`, `order`, `q`, `type`, `status`, `source`, `responsibleOperatorId` | `/customers` | the shared list-query contract | contract defaults | falls back to the default, never throws | [`use-list-params.ts`](../../apps/admin/src/features/api/use-list-params.ts:1) + `customerListQuerySchema` |
+| `page`, `limit`, `sort`, `order`, `q`, `type`, `status`, `source` | `/customers` | the shared list-query contract | contract defaults | falls back to the default, never throws | [`use-list-params.ts`](../../apps/admin/src/features/api/use-list-params.ts:1) + `customerListQuerySchema` |
 | `tab` | `/customers/:id` | `overview` \| `data` \| `contacts` \| `users` \| `activity` \| `audit` | `overview` | falls back to `overview` | `features/api/use-tab-param.ts` — **created by AIS-19** (first consumer `?step=`), reused here from AIS-20 |
 | `step` | `/customers/new` | `1` … `4` | `1` | falls back to `1` | `features/api/use-tab-param.ts` (new, AIS-19) |
 
@@ -87,7 +87,6 @@ plus `use-tab-param.ts`, whose first consumer is `/customers` — `useListParams
 | Header action „Új cég” | `Link` + `buttonVariants()` (a navigation, not a `Button` — [`UI-Architecture.md`](UI-Architecture.md) §4.0) + `PlusIcon` |
 | Filters: free-text search | `Input` inside `FormField` (`type="search"`), debounced, writes `q` |
 | Filters: type, status, source | `Select` inside `FormField`, one URL write per change |
-| Filter: responsible operator — **deferred (`D-W2`)** | **not rendered in AIS-19**: the contract has no operator-directory operation (`GET /operators` does not exist), so the planned `Combobox` (the operator list is a lookup, not a closed enum) has no source. The shared `customerListQuerySchema` keeps `responsibleOperatorId`, so adding the filter later stays additive (follow-up ticket, wave plan `Q-1`) |
 | Filter reset | `Button` `variant="ghost"` — writes the schema defaults in **one** `setParams` call |
 | Table | `DataTable` (`columns`, `sort`, `onSortChange`, `isLoading`, `rowActions`, `caption`) with `aria-sort` |
 | Row name link | `Link` to `/customers/:id` (the row's name is the navigation, not a button) |
@@ -119,9 +118,9 @@ JSX: the row mapper reads the flag the API returns.
 
 ### 2.3 Query, filters, sort
 
-- Three contractual filters are **implemented** here — `type`, `status`, `source` — plus the free-text `q`.
-  The fourth contractual filter, `responsibleOperatorId`, is **deferred** (`D-W2`, §2.1): no operator-directory
-  operation exists yet, so the URL contract of AIS-19 carries it only as an unused schema field.
+- Three contractual filters — `type`, `status`, `source` — plus the free-text `q`, and there is **no fourth**:
+  the responsible-operator filter was removed together with its column and its contract field (2026-11-24), so
+  the list URL carries exactly these four values beside paging and sorting.
 - One `useListParams(customerListQuerySchema)` call; `params` is both the request and the query key.
 - Search is **server-side** (`q` over name, tax number, customer number — D2). Filtering the current
   page would contradict `meta.total`.
@@ -329,7 +328,7 @@ A ticket that adds any of these rows changes the contract first (AIS-16 family),
 
 | # | Question | Decision |
 | --- | --- | --- |
-| **D7** | Which ticket closes the two AIS-174 gaps (search/filter UI, per-row action)? | **AIS-19, this page.** The contract exposes `q` + four filters, of which AIS-19 implements three and defers `responsibleOperatorId` (`D-W2`); shipping half a list would create two implementations. `New-Admin-Page.md` §2 records the ownership. |
+| **D7** | Which ticket closes the two AIS-174 gaps (search/filter UI, per-row action)? | **AIS-19, this page.** The contract exposes `q` + three filters (`type`, `status`, `source`), all of them implemented here; shipping half a list would create two implementations. `New-Admin-Page.md` §2 records the ownership. |
 | **D8** | `EmptyState` with a CTA contradicts AIS-174 ("two competing create affordances"). | **Documented exception for `/customers`**, because AIS-17 `D4` requires the CTA. Recorded in `New-Admin-Page.md` §3; every other page keeps the rule. |
 | **D9** | The list needs a primary contact the row contract does not carry. | **`customers` list projection gains `primaryContactName`** (derived: `contacts` where `roles` contains `primary`), documented beside `lastActivityAt` / `hasMissingData` as derived-not-stored. Owned by AIS-178. Fallback if rejected: drop column 6 and keep the data on the overview tab only. |
 | **D10** | `status` → badge variant, 7 statuses into 5 variants. | `active`→`success`, `trial`→`info`, `registered`→`info`, `prospect`→`neutral`, `suspended`→`warning`, `churned`→`danger`, `anonymized`→`neutral` + label „Anonimizált”. Lives in `entities/customer/customer.mapper.ts`, table-tested. |

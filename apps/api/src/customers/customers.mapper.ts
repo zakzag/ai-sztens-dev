@@ -61,7 +61,6 @@ export function toCustomer(row: CustomerListRow): Customer {
     industry: row.industry,
     headcountRange: row.headcountRange,
     source: row.source,
-    responsibleOperatorId: row.responsibleOperatorId,
     status: row.status,
     statusChangedAt: toIsoString(row.statusChangedAt),
     createdAt: toIsoString(row.createdAt),
@@ -169,7 +168,6 @@ export function toNewCustomerRow(
     industry: input.industry ?? null,
     headcountRange: input.headcountRange ?? null,
     source: input.source ?? null,
-    responsibleOperatorId: input.responsibleOperatorId ?? null,
     status: input.status ?? CUSTOMER_INITIAL_STATUS,
   };
 }
@@ -223,9 +221,6 @@ export function toCustomerPatch(input: UpdateCustomerInput): CustomerPatch {
       ? {}
       : { headcountRange: input.headcountRange }),
     ...(input.source === undefined ? {} : { source: input.source }),
-    ...(input.responsibleOperatorId === undefined
-      ? {}
-      : { responsibleOperatorId: input.responsibleOperatorId }),
   };
 }
 
@@ -309,7 +304,6 @@ export function toCustomerAuditPayload(
     industry: row.industry,
     headcountRange: row.headcountRange,
     source: row.source,
-    responsibleOperatorId: row.responsibleOperatorId,
     status: row.status,
     statusChangedAt: toIsoString(row.statusChangedAt),
     createdAt: toIsoString(row.createdAt),

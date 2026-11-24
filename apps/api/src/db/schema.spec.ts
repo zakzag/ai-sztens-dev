@@ -372,7 +372,6 @@ const CUSTOMERS_COLUMNS: readonly ColumnExpectation[] = [
   ['industry', 'PgText', false],
   ['headcount_range', 'PgEnumColumn', false],
   ['source', 'PgEnumColumn', false],
-  ['responsible_operator_id', 'PgUUID', false],
   ['status', 'PgEnumColumn', true],
   ['status_changed_at', 'PgTimestamp', true],
   ['created_at', 'PgTimestamp', true],
@@ -609,9 +608,11 @@ describe('customers constraints', () => {
     ]);
   });
 
-  it('lets the responsible operator disappear without the customer', () => {
-    expect(config.foreignKeys).toHaveLength(1);
-    expect(config.foreignKeys[0]?.onDelete).toBe('set null');
+  it('references no other table, so nothing can cascade into a customer', () => {
+    // The responsible-operator FK used to be the only reference here. Its column
+    // was removed (2026-11-24), so an assertion of "zero foreign keys" is what
+    // keeps the table from silently growing one back.
+    expect(config.foreignKeys).toEqual([]);
   });
 });
 

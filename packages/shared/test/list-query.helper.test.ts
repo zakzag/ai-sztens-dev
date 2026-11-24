@@ -32,12 +32,10 @@ describe('toListQueryParams — resource filters (AIS-178/c)', () => {
       status: 'active',
       type: 'company',
       source: 'referral',
-      responsibleOperatorId: '0c9d3b01-6f0f-4a3e-9f4c-4a1b2c3d4e5f',
     }).toString();
 
     expect(search).toBe(
-      'page=2&limit=50&order=asc&status=active&type=company&source=referral' +
-        '&responsibleOperatorId=0c9d3b01-6f0f-4a3e-9f4c-4a1b2c3d4e5f',
+      'page=2&limit=50&order=asc&status=active&type=company&source=referral',
     );
   });
 

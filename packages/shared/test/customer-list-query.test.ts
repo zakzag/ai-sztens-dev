@@ -13,10 +13,8 @@ import { firstMessage, parsedValue } from './lib/validation.helper.js';
  * The query string is always text, so the interesting behaviour is: the shared
  * defaults are filled in, numbers are coerced, an unknown `sort` is a validation
  * error naming the permitted columns (not a `500` from Postgres), and each of
- * the four customer-specific filters is optional.
+ * the three customer-specific filters is optional.
  */
-
-const RESPONSIBLE_OPERATOR_ID = 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e';
 
 describe('customerListQuerySchema', () => {
   it('fills the shared paging defaults', () => {
@@ -36,7 +34,6 @@ describe('customerListQuerySchema', () => {
     expect(query?.type).toBeUndefined();
     expect(query?.status).toBeUndefined();
     expect(query?.source).toBeUndefined();
-    expect(query?.responsibleOperatorId).toBeUndefined();
   });
 
   it('coerces page and limit from the query string', () => {
@@ -64,18 +61,16 @@ describe('customerListQuerySchema', () => {
     );
   });
 
-  it('accepts the four customer filters together', () => {
+  it('accepts the three customer filters together', () => {
     const query = parsedValue(customerListQuerySchema, {
       type: 'company',
       status: 'active',
       source: 'website',
-      responsibleOperatorId: RESPONSIBLE_OPERATOR_ID,
     });
 
     expect(query?.type).toBe('company');
     expect(query?.status).toBe('active');
     expect(query?.source).toBe('website');
-    expect(query?.responsibleOperatorId).toBe(RESPONSIBLE_OPERATOR_ID);
   });
 
   it('rejects an unknown status filter', () => {
@@ -90,10 +85,17 @@ describe('customerListQuerySchema', () => {
     ).toBe(false);
   });
 
-  it('rejects a responsible operator id that is not a uuid', () => {
+  it('strips the retired responsibleOperatorId filter instead of validating it', () => {
+    // The column and the filter were removed in 2026-11-24: a bookmarked link or
+    // an older client must be ignored like any other unknown key, not answered
+    // with a `400` that says nothing about the removed feature.
+    const parsed = customerListQuerySchema.safeParse({
+      responsibleOperatorId: 'kalman',
+    });
+
+    expect(parsed.success).toBe(true);
     expect(
-      customerListQuerySchema.safeParse({ responsibleOperatorId: 'kalman' })
-        .success,
+      Object.hasOwn(parsed.success ? parsed.data : {}, 'responsibleOperatorId'),
     ).toBe(false);
   });
 
@@ -107,7 +109,7 @@ describe('customerListQuerySchema', () => {
 });
 
 describe('CUSTOMER_LIST_QUERY_PARAMETERS', () => {
-  it('documents the paging fields, the sort and the four filters', () => {
+  it('documents the paging fields, the sort and the three filters', () => {
     const names = CUSTOMER_LIST_QUERY_PARAMETERS.map((parameter) => parameter.name);
 
     expect(names).toEqual([
@@ -119,7 +121,6 @@ describe('CUSTOMER_LIST_QUERY_PARAMETERS', () => {
       'type',
       'status',
       'source',
-      'responsibleOperatorId',
     ]);
   });
 

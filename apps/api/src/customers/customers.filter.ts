@@ -92,9 +92,6 @@ export function customerVisibleFilter(query: CustomerListQuery): SQL {
     query.type === undefined ? undefined : eq(customers.type, query.type),
     query.status === undefined ? undefined : eq(customers.status, query.status),
     query.source === undefined ? undefined : eq(customers.source, query.source),
-    query.responsibleOperatorId === undefined
-      ? undefined
-      : eq(customers.responsibleOperatorId, query.responsibleOperatorId),
   ].filter((condition): condition is SQL => condition !== undefined);
 
   return and(...conditions) ?? notDeleted;

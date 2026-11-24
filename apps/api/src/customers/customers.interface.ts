@@ -123,7 +123,6 @@ export interface CustomerPatch {
   readonly industry?: string | null;
   readonly headcountRange?: HeadcountRange | null;
   readonly source?: CustomerSource | null;
-  readonly responsibleOperatorId?: string | null;
 }
 
 /**

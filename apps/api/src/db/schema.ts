@@ -466,14 +466,6 @@ export const customers = customerSchema.table(
     industry: text('industry'),
     headcountRange: headcountRangeEnum('headcount_range'),
     source: customerSourceEnum('source'),
-    /**
-     * The operator who owns the relationship. `SET NULL` rather than
-     * `CASCADE`: losing a staff member must not delete the customer.
-     */
-    responsibleOperatorId: uuid('responsible_operator_id').references(
-      () => operators.id,
-      { onDelete: 'set null' },
-    ),
     status: customerStatusEnum('status').notNull(),
     /**
      * When the current status was entered. The service maintains it, which is

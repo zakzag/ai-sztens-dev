@@ -85,9 +85,8 @@ the read-only overlay). A page that needs either opens its own ticket; a page th
 is a defect.
 
 **Both gaps are closed on one screen, on purpose (AIS-17 `D7`).** `pages/customers` (AIS-19) is the
-first page that renders the search field and **three of the four** contract filters (`type`, `status`,
-`source`; `responsibleOperatorId` is deferred until an operator-directory operation exists — wave
-decision `D-W2`), and the first with a per-row
+first page that renders the search field and all **three** contract filters (`type`, `status`, `source`),
+and the first with a per-row
 `DropdownMenu` (open / edit / archive). That does **not** widen this checklist: another page that
 wants them copies the customers pattern in its own ticket, and the empty-state CTA stays the
 documented exception of §3. The screen contract is

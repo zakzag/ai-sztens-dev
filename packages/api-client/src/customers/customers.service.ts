@@ -10,7 +10,7 @@
  * `list` goes through `getList` and not `get`: the pager block
  * (`meta.pagination`) only exists on the list response, and dropping it here
  * would make it unobservable for every consumer above. The resource filters
- * (`type`, `status`, `source`, `responsibleOperatorId`) travel because
+ * (`type`, `status`, `source`) travel because
  * `toListQueryParams` appends them (AIS-178/c `D3`) — before that they were
  * silently dropped, which is the one defect this slice had to fix outside the
  * package.

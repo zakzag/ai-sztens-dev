@@ -1,9 +1,12 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-11-23 (AIS-178/f + AIS-14 closeout: az aktivitás- és napló-olvasó
-végpontok élnek, a napló írhatatlan, és a `PATCH` státuszkód-döntés rögzítve van a §4.3.1-ben)
+**Utolsó frissítés:** 2026-11-24 (a `customers` felelős operátor szűrője és mezője megszűnt; előzőleg
+2026-11-23, AIS-178/f + AIS-14 closeout: az aktivitás- és napló-olvasó végpontok élnek, a napló írhatatlan,
+és a `PATCH` státuszkód-döntés rögzítve van a §4.3.1-ben)
 
 **Frissítések**:
+
+- **2026-11-24 — AIS-16 (`responsibleOperatorId` eltávolítás):** a `customers` **felelős operátor** fogalma megszűnt — törölve a `customer.customers.responsible_operator_id` oszlop és a hozzá tartozó FK (`0008` migráció), a `customerSchema` / `createCustomerSchema` / `updateCustomerSchema` mezője, valamint a lista negyedik szűrője; a lista szűrői most `type`, `status`, `source`. Egy régi hivatkozás `?responsibleOperatorId=…` értékét a séma csendben eldobja (`400` helyett), mert egy ismeretlen query-kulcs nem hiba; lásd §4.1
 
 - **2026-11-23 — AIS-14 (closeout, `D1`):** a `PATCH` státuszkód-döntés rögzítve — malformed body → `400`, elavult `updatedAt` → `409 STALE_WRITE`, tartalmilag lehetetlen de jól formált kérés → `422 SEMANTIC_VALIDATION_FAILED` (csak a `customers` gyerek-erőforrásain), üres patch a helyes tokennel → `200` no-op; az AIS-14 DoD „`422` on `PATCH /:id`” szövege ezzel **felülírt**, lásd §4.3.1
 
@@ -195,8 +198,8 @@ const params = toListQueryParams(query); // → '?page=3&limit=50' — never '?p
 **Resource-specific filters (AIS-16).** A resource may extend the shared query with **optional**
 filters; they are plain optional fields on its own schema (`listQuerySchema.extend({ … })`), never a
 change to the shared one, and an absent filter means “no filter”. `customers` is the first resource
-that uses this: `type`, `status`, `source` (each an enum over the contract's value set) and
-`responsibleOperatorId` (uuid). `lastActivityAt` is sortable although it is **derived**
+that uses this: `type`, `status` and `source`, each an enum over the contract's value set.
+`lastActivityAt` is sortable although it is **derived**
 (`max(activities.created_at)`) — derived values are allowed in `sort` and in the response, never as
 stored columns.
 

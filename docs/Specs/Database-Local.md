@@ -212,7 +212,7 @@ A kényszerek, amiket érdemes ismerni (mind a `0005` migrációban):
 | `contacts_customer_user_id_fkey`: (`customer_id`,`customer_user_id`) → `iam.customer_users` | `CHECK` nem tud másik táblát olvasni, ezért összetett FK; `customer_user_id IS NULL` esetén a MATCH SIMPLE miatt nem ellenőriz („nem belépő felhasználó”) |
 | `contact_roles_contact_id_fkey`: (`contact_id`,`customer_id`) → `customer.contacts (id, customer_id)` | ugyanaz a trükk: a szerep sora nem hivatkozhat más cégre, mint a szülő kontakt                                                              |
 | `contacts_customer_id_customers_id_fk`, a `customer_tags_*` FK-k, `customer_users_customer_id_customers_id_fk` (`ON DELETE CASCADE`) | a cég törlésével a gyerek sorok is mennek                                                                |
-| `customers_responsible_operator_id_operators_id_fk`, `customer_users_invited_by_operator_id_operators_id_fk` (`ON DELETE SET NULL`) | a kilépő munkatárs nem viszi magával a céget és a felhasználót                                                            |
+| `customer_users_invited_by_operator_id_operators_id_fk` (`ON DELETE SET NULL`) | a kilépő munkatárs nem viszi magával a belépő felhasználót; a cég felelős operátorának FK-ja 2026-11-24-én megszűnt a `0008` migrációval |
 
 > A `contact_roles` szándékosan **nem** visz `deleted_at`-et: a szerepek nem
 > történet. Kontakt soft delete esetén a szerep-sorok törlődnek (AIS-178),

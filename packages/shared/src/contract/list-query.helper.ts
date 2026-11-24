@@ -123,7 +123,7 @@ export function toPaginationMeta(
  *
  * The five paging fields are written first, in a fixed order; **every other key**
  * of the query is treated as a resource filter and appended after them (the
- * `customers` list has `type`, `status`, `source` and `responsibleOperatorId`).
+ * `customers` list has `type`, `status` and `source`).
  * Without that pass-through a filter would be silently dropped on its way to the
  * server — a lie the client could not see.
  *

@@ -179,7 +179,6 @@ export const customerSchema = z.object({
   industry: z.string().max(CUSTOMER_INDUSTRY_MAX_LENGTH).nullable(),
   headcountRange: headcountRangeSchema.nullable(),
   source: customerSourceSchema.nullable(),
-  responsibleOperatorId: z.string().uuid().nullable(),
   status: customerStatusSchema,
   statusChangedAt: isoDateTimeSchema,
   createdAt: isoDateTimeSchema,
@@ -370,7 +369,6 @@ export const createCustomerSchema = z
     industry: trimmedStringSchema({ max: CUSTOMER_INDUSTRY_MAX_LENGTH }).optional(),
     headcountRange: headcountRangeSchema.optional(),
     source: customerSourceSchema.optional(),
-    responsibleOperatorId: z.string().uuid().optional(),
     status: customerStatusSchema.default(CUSTOMER_INITIAL_STATUS),
   })
   .strict();
@@ -425,7 +423,6 @@ export const updateCustomerSchema = z
       .optional(),
     headcountRange: headcountRangeSchema.nullable().optional(),
     source: customerSourceSchema.nullable().optional(),
-    responsibleOperatorId: z.string().uuid().nullable().optional(),
     updatedAt: isoDateTimeSchema,
   })
   .strict();

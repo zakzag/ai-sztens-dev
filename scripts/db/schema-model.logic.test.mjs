@@ -319,7 +319,9 @@ test('the real schema parses completely (regression guard)', () => {
     'audit',
   ]);
   assert.equal(model.tables.length, 10);
-  assert.equal(model.relationships.length, 11);
+  // Ten relationships, not eleven: the `customers` responsible-operator FK was
+  // dropped together with its column (2026-11-24, migration `0008`).
+  assert.equal(model.relationships.length, 10);
   assert.equal(model.enums.length, 12);
 
   assert.deepEqual(
@@ -348,7 +350,6 @@ test('the real schema parses completely (regression guard)', () => {
   assert.deepEqual(
     model.relationships.map((relationship) => relationship.name),
     [
-      'customers_responsible_operator_id_operators_id_fk',
       'customer_tags_customer_id_customers_id_fk',
       'customer_tags_tag_id_tags_id_fk',
       'customer_users_customer_id_customers_id_fk',

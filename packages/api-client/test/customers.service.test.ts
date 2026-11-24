@@ -8,9 +8,8 @@
  * Two things are asserted on every list call, because both were defects before
  * this slice:
  *
- * 1. the **resource filters** (`type`, `status`, `source`,
- *    `responsibleOperatorId`) actually travel in the URL — `toListQueryParams`
- *    used to drop them;
+ * 1. the **resource filters** (`type`, `status`, `source`) actually travel in
+ *    the URL — `toListQueryParams` used to drop them;
  * 2. the **pager block** is returned and a response without `meta.pagination` is
  *    a contract violation, not a silently missing field.
  */
@@ -89,9 +88,6 @@ const DEFAULT_QUERY: CustomerListQuery = {
   sort: 'createdAt',
   order: 'desc',
 };
-
-/** The operator id a filter can carry; any uuid is valid. */
-const OPERATOR_ID = 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e';
 
 /**
  * Builds the service over a doubled `fetch`.
@@ -211,7 +207,7 @@ describe('createCustomersService — list', () => {
     );
   });
 
-  it('sends the four resource filters (they used to be dropped)', async () => {
+  it('sends the three resource filters (they used to be dropped)', async () => {
     const { service, fetchMock } = setup([paginatedResponse(VALID_CUSTOMER_LIST)]);
 
     await service.list({
@@ -220,12 +216,11 @@ describe('createCustomersService — list', () => {
       type: 'company',
       status: 'active',
       source: 'referral',
-      responsibleOperatorId: OPERATOR_ID,
     });
 
     expect(fetchMock.calls[0]?.url).toBe(
       `${BASE_URL}/admin/customers?q=acme&type=company&status=active` +
-        `&source=referral&responsibleOperatorId=${OPERATOR_ID}`,
+        `&source=referral`,
     );
   });
 

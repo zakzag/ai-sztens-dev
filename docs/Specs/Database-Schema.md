@@ -1,6 +1,6 @@
 # Adatbázis séma — táblák és relációk
 
-**Utolsó frissítés:** 2026-11-22
+**Utolsó frissítés:** 2026-11-24
 
 **Státusz:** generált élő dokumentum — kézi szerkesztés tilos.
 **Igazságforrás:** [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts) — Drizzle séma-kód
@@ -20,8 +20,8 @@
 
 ## 1. Kapcsolati diagram
 
-A diagram **10 táblát** és **11 relációt** mutat
-összesen **95 oszloppal**, 5 Postgres sémában.
+A diagram **10 táblát** és **10 relációt** mutat
+összesen **94 oszloppal**, 5 Postgres sémában.
 
 ```mermaid
 erDiagram
@@ -55,7 +55,6 @@ erDiagram
         text industry
         headcount_range headcount_range
         customer_source source
-        uuid responsible_operator_id FK
         customer_status status
         timestamptz status_changed_at
         timestamptz created_at
@@ -155,7 +154,6 @@ erDiagram
     iam__customer_users ||--o{ activity__activities : "customer_user_id"
     iam__customer_users ||--o{ customer__contacts : "customer_id+customer_user_id"
     iam__operators ||--o{ activity__activities : "operator_id"
-    iam__operators ||--o{ customer__customers : "responsible_operator_id"
     iam__operators ||--o{ iam__customer_users : "invited_by_operator_id"
 ```
 
@@ -220,12 +218,11 @@ Drizzle deklaráció: `customers` · Mermaid entity: `customer__customers`
 | 14 | `industry` | `text` | igen | — | — | — |
 | 15 | `headcount_range` | `headcount_range` | igen | — | — | — |
 | 16 | `source` | `customer_source` | igen | — | — | — |
-| 17 | `responsible_operator_id` | `uuid` | igen | — | FK | `iam.operators.id` (ON DELETE set null) |
-| 18 | `status` | `customer_status` | nem | — | — | — |
-| 19 | `status_changed_at` | `timestamptz` | nem | `now()` | — | — |
-| 20 | `created_at` | `timestamptz` | nem | `now()` | — | — |
-| 21 | `updated_at` | `timestamptz` | nem | `now()` | — | — |
-| 22 | `deleted_at` | `timestamptz` | igen | — | — | — |
+| 17 | `status` | `customer_status` | nem | — | — | — |
+| 18 | `status_changed_at` | `timestamptz` | nem | `now()` | — | — |
+| 19 | `created_at` | `timestamptz` | nem | `now()` | — | — |
+| 20 | `updated_at` | `timestamptz` | nem | `now()` | — | — |
+| 21 | `deleted_at` | `timestamptz` | igen | — | — | — |
 
 **Megkötések és indexek**
 
@@ -431,17 +428,16 @@ pedig pontosan egy hivatkozott sorra mutat.
 
 | # | Megkötés | Honnan | Oszlop(ok) | Hová | Oszlop(ok) | ON DELETE |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `customers_responsible_operator_id_operators_id_fk` * | `customer.customers` | `responsible_operator_id` | `iam.operators` | `id` | set null |
-| 2 | `customer_tags_customer_id_customers_id_fk` * | `customer.customer_tags` | `customer_id` | `customer.customers` | `id` | cascade |
-| 3 | `customer_tags_tag_id_tags_id_fk` * | `customer.customer_tags` | `tag_id` | `customer.tags` | `id` | cascade |
-| 4 | `customer_users_customer_id_customers_id_fk` * | `iam.customer_users` | `customer_id` | `customer.customers` | `id` | cascade |
-| 5 | `customer_users_invited_by_operator_id_operators_id_fk` * | `iam.customer_users` | `invited_by_operator_id` | `iam.operators` | `id` | set null |
-| 6 | `contacts_customer_id_customers_id_fk` * | `customer.contacts` | `customer_id` | `customer.customers` | `id` | cascade |
-| 7 | `contacts_customer_user_id_fkey` | `customer.contacts` | `customer_id`, `customer_user_id` | `iam.customer_users` | `customer_id`, `id` | nincs megadva (NO ACTION) |
-| 8 | `contact_roles_contact_id_fkey` | `customer.contact_roles` | `contact_id`, `customer_id` | `customer.contacts` | `id`, `customer_id` | cascade |
-| 9 | `activities_customer_id_customers_id_fk` * | `activity.activities` | `customer_id` | `customer.customers` | `id` | cascade |
-| 10 | `activities_operator_id_operators_id_fk` * | `activity.activities` | `operator_id` | `iam.operators` | `id` | nincs megadva (NO ACTION) |
-| 11 | `activities_customer_user_id_customer_users_id_fk` * | `activity.activities` | `customer_user_id` | `iam.customer_users` | `id` | nincs megadva (NO ACTION) |
+| 1 | `customer_tags_customer_id_customers_id_fk` * | `customer.customer_tags` | `customer_id` | `customer.customers` | `id` | cascade |
+| 2 | `customer_tags_tag_id_tags_id_fk` * | `customer.customer_tags` | `tag_id` | `customer.tags` | `id` | cascade |
+| 3 | `customer_users_customer_id_customers_id_fk` * | `iam.customer_users` | `customer_id` | `customer.customers` | `id` | cascade |
+| 4 | `customer_users_invited_by_operator_id_operators_id_fk` * | `iam.customer_users` | `invited_by_operator_id` | `iam.operators` | `id` | set null |
+| 5 | `contacts_customer_id_customers_id_fk` * | `customer.contacts` | `customer_id` | `customer.customers` | `id` | cascade |
+| 6 | `contacts_customer_user_id_fkey` | `customer.contacts` | `customer_id`, `customer_user_id` | `iam.customer_users` | `customer_id`, `id` | nincs megadva (NO ACTION) |
+| 7 | `contact_roles_contact_id_fkey` | `customer.contact_roles` | `contact_id`, `customer_id` | `customer.contacts` | `id`, `customer_id` | cascade |
+| 8 | `activities_customer_id_customers_id_fk` * | `activity.activities` | `customer_id` | `customer.customers` | `id` | cascade |
+| 9 | `activities_operator_id_operators_id_fk` * | `activity.activities` | `operator_id` | `iam.operators` | `id` | nincs megadva (NO ACTION) |
+| 10 | `activities_customer_user_id_customer_users_id_fk` * | `activity.activities` | `customer_user_id` | `iam.customer_users` | `id` | nincs megadva (NO ACTION) |
 
 \* A megkötésnév a Postgres alapértelmezett nevezési sémája szerint
 származtatott (`<tábla>_<oszlop>_<cél_tábla>_<cél_oszlop>_fk`), mert az

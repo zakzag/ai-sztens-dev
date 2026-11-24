@@ -52,12 +52,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # pnpm/action-setup installs pnpm using corepack by default. Pin the
-      # version so a future pnpm release cannot break CI silently.
+      # The pnpm version has exactly one source: the `packageManager` field in
+      # the root package.json. Passing `version:` here as well is what broke the
+      # whole pipeline with "Multiple versions of pnpm specified" once the field
+      # moved to pnpm 12 — the action refuses to guess, and rightly so.
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       # Node 24, not 22: the API unit suite contains a test that compiles the
       # real `ApiKeysModule` (a DI-graph regression guard — a bad provider token
@@ -82,19 +82,20 @@ jobs:
       - name: Build shared
         run: pnpm --filter @callback/shared build
 
-      # Emit-free type check of every workspace. Runs after "Build shared"
-      # because `@callback/shared` and `@callback/api-client` are consumed
-      # through `dist/*.d.ts` and `tsc --noEmit` produces none, so a fresh
-      # clone would fail on unresolved types. `apps/api` checks
-      # `tsconfig.build.json` — the same file `nest build` compiles with — so
-      # this step matches the production compile scope exactly; the spec and
-      # `test/` files it excludes are a known, tracked gap (UI-Architecture
-      # §9, AIS-122 follow-up).
-      - name: Typecheck all packages
-        run: pnpm typecheck
-
       - name: Build all packages
         run: pnpm -r build
+
+      # Emit-free type check of every workspace. It must come **after** the
+      # build: `@callback/shared` and `@callback/api-client` are consumed through
+      # `dist/*.d.ts` and `tsc --noEmit` produces none, so on a fresh clone
+      # `apps/admin` cannot resolve `@callback/api-client` until that package has
+      # been compiled — which is exactly how this step used to fail while the
+      # comment claimed the opposite. `apps/api` checks `tsconfig.build.json` —
+      # the same file `nest build` compiles with — so this step matches the
+      # production compile scope exactly; the spec and `test/` files it excludes
+      # are a known, tracked gap (UI-Architecture §9, AIS-122 follow-up).
+      - name: Typecheck all packages
+        run: pnpm typecheck
 
       - name: Lint
         run: pnpm -r lint
@@ -159,8 +160,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -218,8 +217,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       # Node 24 to match `build-test`: dependency-cruiser's TypeScript parser and
       # the gates' `import.meta.resolve` call are both proven on this runtime.

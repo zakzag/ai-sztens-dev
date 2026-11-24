@@ -3,8 +3,8 @@
  *
  * The generic paging fields (`page`, `limit`, `order`, `q`) come from
  * `../list-query.schema.ts` **unchanged**; this file adds what is specific to
- * customers: the sortable-column allow-list and the four filters the list screen
- * needs (type, status, source, responsible operator).
+ * customers: the sortable-column allow-list and the three filters the list screen
+ * needs (type, status, source).
  *
  * Why `listQuerySchema.extend()` and not `createListQuerySchema()`: the factory
  * returns a `ZodType` (it exists to carry the literal `sort` union through a
@@ -14,8 +14,7 @@
  * {@link CustomerSortField} because it is declared inline.
  *
  * The filters are **optional and independent**: an absent filter means “no
- * filter”, never “match null”. A filter for “no responsible operator” would need
- * a distinct parameter name; adding one later is additive.
+ * filter”, never “match null”.
  */
 
 import type { ApiQueryParameterContract } from '../endpoint.interface.js';
@@ -57,7 +56,6 @@ export const customerListQuerySchema = listQuerySchema.extend({
   type: customerTypeSchema.optional(),
   status: customerStatusSchema.optional(),
   source: customerSourceSchema.optional(),
-  responsibleOperatorId: z.string().uuid().optional(),
 });
 
 /** The validated query of `GET /api/admin/customers`, as the controller sees it. */
@@ -99,14 +97,6 @@ export const CUSTOMER_SOURCE_PARAMETER: ApiQueryParameterContract = {
   schema: { type: 'string', enum: [...CUSTOMER_SOURCE_VALUES] },
 };
 
-/** The `responsibleOperatorId` query parameter. */
-export const CUSTOMER_RESPONSIBLE_OPERATOR_PARAMETER: ApiQueryParameterContract = {
-  name: 'responsibleOperatorId',
-  description: 'Filter by the responsible operator id; omit for every operator.',
-  required: false,
-  schema: { type: 'string', format: 'uuid' },
-};
-
 /**
  * Every query parameter of `GET /api/admin/customers`, in publication order.
  *
@@ -124,7 +114,6 @@ export const CUSTOMER_LIST_QUERY_PARAMETERS: readonly ApiQueryParameterContract[
     CUSTOMER_TYPE_PARAMETER,
     CUSTOMER_STATUS_PARAMETER,
     CUSTOMER_SOURCE_PARAMETER,
-    CUSTOMER_RESPONSIBLE_OPERATOR_PARAMETER,
   ];
 
 /**

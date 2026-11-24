@@ -142,19 +142,13 @@ describe('DrizzleCustomersRepository', () => {
           type: 'company',
           status: 'active',
           source: 'website',
-          responsibleOperatorId: 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e',
         }),
       );
 
       const columns = readSqlColumnNames(database.whereExpressions[1]);
 
       expect(columns).toEqual(
-        expect.arrayContaining([
-          'type',
-          'status',
-          'source',
-          'responsible_operator_id',
-        ]),
+        expect.arrayContaining(['type', 'status', 'source']),
       );
     });
 

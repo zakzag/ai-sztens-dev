@@ -54,7 +54,6 @@ describe('toCustomer', () => {
       industry: 'Szoftverfejlesztés',
       headcountRange: '2_5',
       source: 'website',
-      responsibleOperatorId: 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e',
       status: 'active',
       statusChangedAt: new Date('2026-11-15T09:00:00.000Z').toISOString(),
       createdAt: CUSTOMER_CREATED_AT.toISOString(),
@@ -221,7 +220,6 @@ describe('toNewCustomerRow', () => {
     expect(row.industry).toBeNull();
     expect(row.headcountRange).toBeNull();
     expect(row.source).toBeNull();
-    expect(row.responsibleOperatorId).toBeNull();
   });
 });
 

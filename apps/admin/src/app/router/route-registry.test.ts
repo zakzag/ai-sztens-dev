@@ -15,10 +15,17 @@ import {
   API_KEY_VIEW_ROUTE_PATH,
 } from '../../pages/api-keys/api-keys.const.js';
 import {
+  CUSTOMERS_CREATE_LABEL,
+  CUSTOMERS_CREATE_ROUTE_PATH,
+  CUSTOMERS_LIST_ROUTE_PATH,
+} from '../../pages/customers/customers.const.js';
+import {
   APP_API_PATH_PREFIX,
+  APP_CUSTOMERS_LABEL,
   APP_NAV_HOME_LABEL,
   APP_ROUTE_API_KEYS_PATH,
   APP_ROUTE_CALLS_PATH,
+  APP_ROUTE_CUSTOMERS_PATH,
   APP_ROUTE_HOME_PATH,
   APP_ROUTE_LOGIN_PATH,
 } from '../app.const.js';
@@ -70,21 +77,34 @@ describe('route registry', () => {
     expect(login?.navLabel).toBeNull();
   });
 
-  it('keeps an unlinked top-level entry addressable only through a URL parameter', () => {
-    // A detail page has no place in the navigation (see `RouteEntry.navLabel`),
-    // so `null` is legal — but for a top-level route only when a user can
-    // address it by URL parameter. A plain page without a label would be
-    // unreachable: no nav link and nothing to type into the address bar.
+  it('keeps an unlinked top-level entry reachable on purpose', () => {
+    // A page has no place in the navigation (see `RouteEntry.navLabel`), so
+    // `null` is legal — but only when the user can still get there. Two shapes
+    // qualify, and nothing else does:
     //
-    // Nested overlay routes (`/api-keys/new`) are exempt on purpose: they are
-    // reached from their parent's own action button, not from a URL parameter
-    // (AIS-155 `D2`). Since AIS-173 retired the legacy `/api-keys/:identifier`
-    // page, no top-level entry is unlinked any more, so the loop guards the rule
-    // for the next page that adds one.
+    // 1. a **parameterised** route (a detail page) — the operator types or
+    //    follows an id;
+    // 2. a **sub-path of a linked page** — `/customers/new` (AIS-19) sits under
+    //    `/customers` and is opened from that page's own header action and empty
+    //    state, exactly like the api-keys overlays are opened from their list.
+    //
+    // A plain, unlinked, unrelated path would be unreachable: no nav link and
+    // nothing to type into the address bar.
+    const linkedPaths = PROTECTED_ROUTE_ENTRIES.filter(
+      (route) => route.navLabel !== null,
+    ).map((route) => route.path);
+
     for (const route of PROTECTED_ROUTE_ENTRIES) {
-      if (route.navLabel === null) {
-        expect(route.path).toContain(':');
+      if (route.navLabel !== null) {
+        continue;
       }
+
+      const isParameterised = route.path.includes(':');
+      const isSubPathOfLinkedPage = linkedPaths.some((linkedPath) =>
+        route.path.startsWith(`${linkedPath}/`),
+      );
+
+      expect(isParameterised || isSubPathOfLinkedPage).toBe(true);
     }
   });
 
@@ -268,5 +288,37 @@ describe('route registry breadcrumb metadata (AIS-146)', () => {
     expect(view?.resolveBreadcrumbLabel?.({ identifier: 'abc123' })).toBe(
       'abc123',
     );
+  });
+});
+
+describe('route registry customers entries (AIS-19)', () => {
+  const list = PROTECTED_ROUTE_ENTRIES.find(
+    (route) => route.path === APP_ROUTE_CUSTOMERS_PATH,
+  );
+  const create = PROTECTED_ROUTE_ENTRIES.find(
+    (route) => route.path === CUSTOMERS_CREATE_ROUTE_PATH,
+  );
+
+  it('keeps the page copy of the list path in sync with the app constant', () => {
+    // `pages` must not import `app`, so the page carries its own copy of the
+    // list path; this assertion is what keeps the copy honest.
+    expect(CUSTOMERS_LIST_ROUTE_PATH).toBe(APP_ROUTE_CUSTOMERS_PATH);
+  });
+
+  it('exposes the list in the navigation with the shared wording', () => {
+    expect(list).toBeDefined();
+    expect(list?.navLabel).toBe(APP_CUSTOMERS_LABEL);
+    expect(list?.breadcrumbLabel).toBe(APP_CUSTOMERS_LABEL);
+    expect(list?.breadcrumbParentPath).toBe(APP_ROUTE_HOME_PATH);
+  });
+
+  it('mounts the create wizard as a sibling with a crumb of its own', () => {
+    // The detail and edit pages are siblings too (screen contract `D14`), so the
+    // wizard must not be a child of the list: the list is not mounted behind it.
+    expect(create).toBeDefined();
+    expect(create?.navLabel).toBeNull();
+    expect(create?.breadcrumbLabel).toBe(CUSTOMERS_CREATE_LABEL);
+    expect(create?.breadcrumbParentPath).toBe(APP_ROUTE_CUSTOMERS_PATH);
+    expect(list?.children).toBeUndefined();
   });
 });

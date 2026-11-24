@@ -10,15 +10,23 @@ import { ApiKeyCreateDialog } from '../../pages/api-keys/ui/ApiKeyCreateDialog.j
 import { ApiKeyEditDialog } from '../../pages/api-keys/ui/ApiKeyEditDialog.js';
 import { ApiKeyViewDialog } from '../../pages/api-keys/ui/ApiKeyViewDialog.js';
 import { CallsPlaceholderPage } from '../../pages/calls/CallsPlaceholderPage.js';
+import {
+  CUSTOMERS_CREATE_LABEL,
+  CUSTOMERS_CREATE_ROUTE_PATH,
+} from '../../pages/customers/customers.const.js';
+import { CustomerCreatePage } from '../../pages/customers/CustomerCreatePage.js';
+import { CustomersPage } from '../../pages/customers/CustomersPage.js';
 import { LoginPage } from '../../pages/LoginPage.js';
 import { NotFoundPage } from '../../pages/not-found/NotFoundPage.js';
 import { PlaceholderPage } from '../../pages/PlaceholderPage.js';
 import {
   APP_API_KEYS_LABEL,
   APP_CALLS_LABEL,
+  APP_CUSTOMERS_LABEL,
   APP_NAV_HOME_LABEL,
   APP_ROUTE_API_KEYS_PATH,
   APP_ROUTE_CALLS_PATH,
+  APP_ROUTE_CUSTOMERS_PATH,
   APP_ROUTE_HOME_PATH,
   APP_ROUTE_LOGIN_PATH,
 } from '../app.const.js';
@@ -116,6 +124,29 @@ export const PROTECTED_ROUTE_ENTRIES: readonly RouteEntry[] = [
         resolveBreadcrumbLabel: (params) => params.identifier,
       },
     ],
+  },
+  {
+    // The customer list (AIS-19). Its detail and edit pages are **sibling**
+    // entries (AIS-20/AIS-21), not children: they replace the list rather than
+    // float above it, so the list is not mounted behind them (screen contract
+    // `D14`).
+    path: APP_ROUTE_CUSTOMERS_PATH,
+    navLabel: APP_CUSTOMERS_LABEL,
+    element: <CustomersPage />,
+    protected: true,
+    breadcrumbLabel: APP_CUSTOMERS_LABEL,
+    breadcrumbParentPath: APP_ROUTE_HOME_PATH,
+  },
+  {
+    // The create wizard (AIS-19 shell, AIS-182 steps). Reachable from the list's
+    // header action and its empty state, never from the nav — which is why a
+    // `null` nav label is legal here (AIS-155 `D2`).
+    path: CUSTOMERS_CREATE_ROUTE_PATH,
+    navLabel: null,
+    element: <CustomerCreatePage />,
+    protected: true,
+    breadcrumbLabel: CUSTOMERS_CREATE_LABEL,
+    breadcrumbParentPath: APP_ROUTE_CUSTOMERS_PATH,
   },
   {
     path: APP_ROUTE_CALLS_PATH,

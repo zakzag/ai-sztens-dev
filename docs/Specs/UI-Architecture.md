@@ -1,9 +1,12 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-24 — AIS-17: a `customers` admin felület képernyő-szerződése új living
-specben él ([`Customers-Admin-Screens.md`](Customers-Admin-Screens.md)), és a `pages/customers` a
-**első page-local store** (a létrehozó varázsló draftja, AIS-17 `D11`) — a `zustand` telepítése az
-AIS-19 dolga, addig a §7 sora _planned_; lásd §5. Előző, 2026-11-08 — AIS-174: a doksi a kódot követi ott, ahol a kód indokolhatóan jobb (a
+**Utolsó frissítés: 2026-11-25 — AIS-19: a `pages/customers` lista oldal (URL-listaállapot, három
+szűrő, sor-műveletek), a létrehozó varázsló shellje és az **első page-local store** leszállítva; a
+`zustand` (`^5.1.0`) **telepítve**, a §7 sora `installed`, a store és a `features/api/use-tab-param.ts`
+olvasó tesztelve — lásd §5. Előző, 2026-11-24 — AIS-17: a `customers` admin felület
+képernyő-szerződése új living specben él ([`Customers-Admin-Screens.md`](Customers-Admin-Screens.md)),
+a `pages/customers` page-local store-ját (`D11`) pedig az AIS-19 telepíti. Előző, 2026-11-08 —
+AIS-174: a doksi a kódot követi ott, ahol a kód indokolhatóan jobb (a
 fejléc-akció `Link` + `buttonVariants`, §4.0), és a kód a doksit ott, ahol a doksi a szabály (route-path
 forrás, standard lista, kivétel-lista — `New-Admin-Page.md` step 11–12 és a _Do not_ szakasz). Előző:
 AIS-173: az `api-keys` törlése a read-only overlay-be költözött, a
@@ -1013,13 +1016,15 @@ read from and written back to the URL through [`features/api/use-list-params.ts`
 (`useListParams(schema)`), so they are **not** page UI state and never enter a Zustand store.
 The hook is generic and takes the resource's shared list-query schema as a parameter; the
 parsed `params` is what the generic `useApiList` (AIS-114) feeds into a TanStack Query key.
-`zustand` therefore stays **uninstalled** — the decision was closed in **AIS-130** (§7): it is added
-together with the first page that genuinely needs transient UI state (open drawer, selected row,
-column filters), and that change flips the §7 row to `installed`.
-**AIS-17 `D11` named that page:** `pages/customers` keeps the create wizard's draft in a page-local
-store, so **AIS-19** installs `zustand`, flips the §7 row and ships the store test (init → action →
-selector → reset) in the same change. Until that commit the dependency is still absent, and a page
-that needs a store before it must not add one "in advance".
+`zustand` was **uninstalled** until AIS-19, on the strength of the **AIS-130** decision in §7: it is
+added together with the first page that genuinely needs transient UI state, and that change flips the
+§7 row to `installed`.
+**AIS-19 was that change.** `pages/customers` keeps the create wizard's draft in a page-local store
+(`customers-wizard.store.ts`, a **vanilla** store created once per mount by
+`customers-wizard.provider.tsx`), so AIS-19 installed `zustand` (`^5.1.0`), flipped the §7 row and
+shipped the store test (init → `setDraft` → `setStep` → `reset`) in the same commit. The rule does not
+relax: a page that needs a store still ships it together with its first consumer, because an unused
+store fails `pnpm quality:dead-code`.
 
 **AIS-175 derives the cache keys instead of retyping them.** TanStack Query matches an
 invalidation by **prefix**, so the `pages/api-keys` row's `API_KEYS_QUERY_KEYS` was safe only as
@@ -1125,17 +1130,16 @@ Route registration is derived: one `RouteEntry` in `app/router/route-registry.ts
 | `react-hook-form`                                                                                       | `apps/admin`                             | form-state bucket (`ApiKeyForm`)                                                                                                 | installed (`^7.54.2`, resolved 7.90.0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `zod` (direct dependency)                                                                               | `apps/admin`                             | form schema validation                                                                                                           | installed (`^3.24.1`, resolved 3.25.76) — **pinned to v3** so `zodResolver` accepts the zod-3 schema objects from `@callback/shared` (D30). A second zod (4.x) exists only for `knip`; see the `packageExtensions` note below §7.                                                                                                                                                                                                                                                                                            |
 | `@hookform/resolvers`                                                                                   | `apps/admin`                             | `zodResolver` for react-hook-form                                                                                                | installed (`^3.9.1`, resolved 3.10.0) — the v3 line, matching zod v3. It declares `zod` as a **peer only**, so `pnpm-workspace.yaml > packageExtensions` injects a real zod 3 dependency; without that, its `.d.ts` resolved knip's zod 4 and `apps/admin`'s `tsc` failed.                                                                                                                                                                                                                                                   |
-| `zustand`                                                                                               | `apps/admin`                             | page-local stores, global session store                                                                                          | **planned — the first page is named:** `pages/customers` (AIS-17 `D11`, the create wizard's draft). Installed by **AIS-19** together with the store, its provider and its test; `/api-keys` still has none (D9)                                                                                                                                                                                                                                                                                                                |
+| `zustand`                                                                                               | `apps/admin`                             | page-local stores, global session store                                                                                          | **installed (`^5.1.0`) by AIS-19** — the first consumer is `pages/customers/customers-wizard.store.ts` (the create wizard's draft, AIS-17 `D11`), created once per mount by its provider and read only through `useCustomersWizardStore(selector)`. `/api-keys` still has none (D9); no global store exists yet                                                                                                                                                                                                               |
 | `@callback/notifications`                                                                               | `packages/notifications`, `apps/admin`   | notification + log store, framework-free (AIS-79) + React bindings on `./react` (AIS-83), consumed by the admin capture (AIS-84) | **core + React bindings installed, consumed by `apps/admin`** — `react`/`react-dom` are **peer** dependencies, `@callback/ui` is a dependency, `@testing-library/*` and `jsdom` are dev-only. The root export stays React-free; `build` runs `tsconfig.core.json` (no DOM) first, then `tsconfig.json` (DOM + JSX), so a DOM reference in `src/core` cannot compile. The admin app imports both the core (`createNotificationStore`, `createNotificationStorage`) and `./react` (`NotificationProvider`, `NotificationHost`) |
 | `dependency-cruiser`                                                                                    | repo root                                | layer gate: `app → pages → features → entities → services → lib` (§9.1)                                                          | installed (`^16`) — dev-only, never shipped                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `knip`                                                                                                  | repo root                                | dead-code gate: unused files / exports / dependencies (§9.2)                                                                     | installed (`^5`) — dev-only, `apps/api` deliberately out of scope (D8)                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 Adding a dependency requires updating this table in the same change. Rows marked
-_planned_ must not be read as available. The `zustand` row's decision was **closed in AIS-130**: it
-stays _planned_ because no page has transient UI state yet; the page that first needs one installs it,
-flips this row to `installed` and ships the store test in the same change (§5, rule §6.4).
-Since **AIS-17 `D11`** that page is known — `pages/customers` — and **AIS-19** is the change that
-installs the dependency.
+_planned_ must not be read as available. The `zustand` row's decision was **closed in AIS-130** and
+**executed in AIS-19**: the page that first needed transient UI state installs it, flips this row to
+`installed` and ships the store test in the same change (§5, rule §6.4). That page is
+`pages/customers`, and the store is the create wizard's draft.
 
 **Two zod instances, on purpose (AIS-113 build fix).** `@hookform/resolvers` declares `zod` as a
 _peer_ and imports it by bare specifier, while `knip` (dev-only, repo root) depends on zod **4**.

@@ -35,6 +35,9 @@ export const APP_API_KEYS_LABEL = 'API kulcsok';
 /** Label of the (placeholder) calls page, used by the nav and the breadcrumb (AIS-146). */
 export const APP_CALLS_LABEL = 'Hívások';
 
+/** Label of the customer list, used by the nav and the breadcrumb (AIS-19). */
+export const APP_CUSTOMERS_LABEL = 'Cégek';
+
 /** Path of the landing page. */
 export const APP_ROUTE_HOME_PATH = '/';
 
@@ -54,6 +57,9 @@ export const APP_ROUTE_API_KEYS_PATH = '/api-keys';
 
 /** Path of the (placeholder) calls page. */
 export const APP_ROUTE_CALLS_PATH = '/calls';
+
+/** Path of the customer list (AIS-19). */
+export const APP_ROUTE_CUSTOMERS_PATH = '/customers';
 
 /**
  * Prefix reserved by the API. A SPA route must never start with it: the Vite

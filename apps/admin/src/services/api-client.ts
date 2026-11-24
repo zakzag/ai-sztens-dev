@@ -17,8 +17,10 @@
 
 import {
   createApiKeysService,
+  createCustomersService,
   createHttpClient,
   type ApiKeysService,
+  type CustomersService,
   type HttpClient,
 } from '@callback/api-client';
 import { readSessionToken } from '../auth/session-token.js';
@@ -57,3 +59,13 @@ export const httpClient: HttpClient = createHttpClient({
 
 /** `api-keys` service consumed by `features/api-keys`. */
 export const apiKeysService: ApiKeysService = createApiKeysService(httpClient);
+
+/**
+ * `customers` service consumed by `features/customers` (AIS-19).
+ *
+ * One instance over the shared transport, exactly like `apiKeysService`: the
+ * query hooks depend on this object (or a double of it), never on `fetch`. The
+ * service was delivered by AIS-178; this line is the only wiring it needed.
+ */
+export const customersService: CustomersService =
+  createCustomersService(httpClient);

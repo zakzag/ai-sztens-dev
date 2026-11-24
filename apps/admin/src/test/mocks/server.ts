@@ -11,6 +11,7 @@
 
 import { setupServer } from 'msw/node';
 import { apiKeysHandlers } from './handlers/api-keys.handlers.js';
+import { customersHandlers } from './handlers/customers.handlers.js';
 
 /** Shared server instance; imported by the setup file and the test helpers. */
-export const server = setupServer(...apiKeysHandlers);
+export const server = setupServer(...apiKeysHandlers, ...customersHandlers);

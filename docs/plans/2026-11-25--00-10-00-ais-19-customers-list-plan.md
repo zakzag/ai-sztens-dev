@@ -28,15 +28,14 @@ Precondition: `apps/admin/src` contains **no** `pages/customers`, **no** `featur
 `entities/customer`, and [`package.json`](../../apps/admin/package.json:20) has **no** `zustand` —
 verified, so the whole layer stack is new.
 
-**Step 1 — land the AIS-14 branch on `main`.** PR #12 is merged, but two documentation commits
-(`943e7bb`, `79d1ae2`) sit on top of that merge commit and are not on `main`. If `main` is still at the
-PR merge commit, the merge is a fast-forward and needs no message of its own; if `main` moved, a merge
-commit is created and its title follows the convention.
+**Step 1 — land the AIS-14 branch on `main`.** PR #12 is merged, but three documentation commits
+(`943e7bb`, `79d1ae2`, `337fb84` — all keyed `AIS-189`) sit on top of that merge commit and are not on
+`main`. They carry no behaviour: two documentation files, one history entry and one milestone.
 
 ```powershell
 git fetch origin --prune
 git status -sb                                    # expect a clean tree, no tracked modifications
-git log --oneline origin/main..AIS-14-company-admin   # expect the two documentation commits
+git log --oneline origin/main..AIS-14-company-admin   # expect the three AIS-189 documentation commits
 git switch main
 git pull --ff-only
 git merge --no-ff AIS-14-company-admin -m "AIS-14: docs(specs): merge the outstanding close-out documentation into main"
@@ -44,9 +43,14 @@ git push origin main
 ```
 
 `--no-ff` is deliberate even when a fast-forward is possible: a named merge commit is the only reliable
-marker in `git log` that the AIS-14 branch was folded in, and it keeps the two documentation commits
+marker in `git log` that the AIS-14 branch was folded in, and it keeps the documentation commits
 visually grouped. If `git log origin/main..AIS-14-company-admin` is **empty**, everything is already on
 `main` — skip the merge and say so, rather than creating an empty merge commit.
+
+**Result (2026-11-25).** Done, and it took the slow path: the three commits touched five documentation
+files with no conflict, a merge commit was created, and `main` moved `de62e41..ebab234`. The branch
+`AIS-15-customers-admin` was then cut from that commit. The `AIS-189` merge title was intentional — the
+commits being folded in are `AIS-189` work, not `AIS-14` code.
 
 **Step 2 — cut the wave branch.**
 

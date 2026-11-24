@@ -1,7 +1,11 @@
 # Customers admin screens — screen contract (list, detail, wizard, edit)
 
-**Utolsó frissítés: 2026-11-22** (AIS-17: a `customers` admin felület képernyő-szerződése; a mezőkészletet
-az AIS-16 adta, a felületet az AIS-19 / AIS-20 / AIS-21 / AIS-179 / AIS-181 építi)
+**Utolsó frissítés: 2026-11-24** (AIS-17 hullám-delta: a hullám hat döntése (`D-W1`–`D-W6`) átvezetve —
+a felelős operátor szűrő halasztott (`D-W2`), a kapcsolattartók és a felhasználók a detail payloadból olvasnak
+lapozó és URL-listaállapot nélkül (`D-W3`), a címkék chip-műveletek (`D-W1`), az aktivitás szerkesztése/törlése
+`authorType === 'operator'` sorokra korlátozott (`D-W4`), a varázsló csak a céget hozza létre (`D-W6`); a
+mezőkészletet az AIS-16 adta, a felületet az AIS-19 / AIS-20 / AIS-21 / AIS-179 / AIS-181 / AIS-182 építi; terv:
+[`2026-11-23--23-05-00-ais-15-customers-admin-implementation-wave-plan.md`](../plans/2026-11-23--23-05-00-ais-15-customers-admin-implementation-wave-plan.md:1))
 **Status:** living document — the current contract, not a snapshot
 **Owner:** AIS-17 (parent story: AIS-15 `Admin - cég felület`)
 **Contract source:** [`customers.schema.ts`](../../packages/shared/src/contract/customers/customers.schema.ts:1),
@@ -63,7 +67,7 @@ of the detail entry, which is why `CustomerDetailPage` renders an `<Outlet/>`.
 | Parameter | Route | Values | Default | Invalid value | Owner |
 | --- | --- | --- | --- | --- | --- |
 | `page`, `limit`, `sort`, `order`, `q`, `type`, `status`, `source`, `responsibleOperatorId` | `/customers` | the shared list-query contract | contract defaults | falls back to the default, never throws | [`use-list-params.ts`](../../apps/admin/src/features/api/use-list-params.ts:1) + `customerListQuerySchema` |
-| `tab` | `/customers/:id` | `overview` \| `data` \| `contacts` \| `users` \| `activity` \| `audit` | `overview` | falls back to `overview` | `features/api/use-tab-param.ts` (new, AIS-20) |
+| `tab` | `/customers/:id` | `overview` \| `data` \| `contacts` \| `users` \| `activity` \| `audit` | `overview` | falls back to `overview` | `features/api/use-tab-param.ts` — **created by AIS-19** (first consumer `?step=`), reused here from AIS-20 |
 | `step` | `/customers/new` | `1` … `4` | `1` | falls back to `1` | `features/api/use-tab-param.ts` (new, AIS-19) |
 
 `tab` and `step` are **not** list-query fields, and a component never reads `searchParams` itself
@@ -83,7 +87,7 @@ plus `use-tab-param.ts`, whose first consumer is `/customers` — `useListParams
 | Header action „Új cég” | `Link` + `buttonVariants()` (a navigation, not a `Button` — [`UI-Architecture.md`](UI-Architecture.md) §4.0) + `PlusIcon` |
 | Filters: free-text search | `Input` inside `FormField` (`type="search"`), debounced, writes `q` |
 | Filters: type, status, source | `Select` inside `FormField`, one URL write per change |
-| Filter: responsible operator | `Combobox` inside `FormField` (operator list is a lookup, not a closed enum) |
+| Filter: responsible operator — **deferred (`D-W2`)** | **not rendered in AIS-19**: the contract has no operator-directory operation (`GET /operators` does not exist), so the planned `Combobox` (the operator list is a lookup, not a closed enum) has no source. The shared `customerListQuerySchema` keeps `responsibleOperatorId`, so adding the filter later stays additive (follow-up ticket, wave plan `Q-1`) |
 | Filter reset | `Button` `variant="ghost"` — writes the schema defaults in **one** `setParams` call |
 | Table | `DataTable` (`columns`, `sort`, `onSortChange`, `isLoading`, `rowActions`, `caption`) with `aria-sort` |
 | Row name link | `Link` to `/customers/:id` (the row's name is the navigation, not a button) |
@@ -115,6 +119,9 @@ JSX: the row mapper reads the flag the API returns.
 
 ### 2.3 Query, filters, sort
 
+- Three contractual filters are **implemented** here — `type`, `status`, `source` — plus the free-text `q`.
+  The fourth contractual filter, `responsibleOperatorId`, is **deferred** (`D-W2`, §2.1): no operator-directory
+  operation exists yet, so the URL contract of AIS-19 carries it only as an unused schema field.
 - One `useListParams(customerListQuerySchema)` call; `params` is both the request and the query key.
 - Search is **server-side** (`q` over name, tax number, customer number — D2). Filtering the current
   page would contradict `meta.total`.
@@ -164,9 +171,9 @@ The tab strip is the one element with no existing primitive. It stays a **page p
 | --- | --- | --- |
 | `overview` — Áttekintés | status + `statusChangedAt`, primary contact, last activity, missing-data notice | `StatusBadge`, `DescriptionList`, `Alert` (`warning`) |
 | `data` — Cégadatok | key–value groups: azonosítók / jogi adatok / cím / egyéb | `Card` per group + `DescriptionList` (`columns: 2`) — **D12** |
-| `contacts` — Kapcsolattartók | list + create/edit/delete, roles as badges, "belépő" marker when `customerUserId !== null` | `DataTable` + `EntityDialog` (children routes), `StatusBadge`, `ConfirmDialog` |
-| `users` — Felhasználók | list + invite; role/status per row | `DataTable` + `EntityDialog` (invite), `StatusBadge` |
-| `activity` — Tevékenység | feed (newest first) + „Megjegyzés írása” form | `Card` list + `Textarea` + `Button` + `FormActions` in `useAppForm` |
+| `contacts` — Kapcsolattartók | list + create/edit/delete, roles as badges, "belépő" marker when `customerUserId !== null`. The list is read from the **detail payload** (`D-W3`): **no pager, no URL list state** | `DataTable` (no `Pagination`) + `EntityDialog` (children routes), `StatusBadge`, `ConfirmDialog` |
+| `users` — Felhasználók | list + invite; role/status per row. Also read from the **detail payload** (`D-W3`): **no pager, no URL list state** — the contract has no `listCustomerUsers` operation | `DataTable` (no `Pagination`) + `EntityDialog` (invite), `StatusBadge` |
+| `activity` — Tevékenység | feed (newest first) + „Megjegyzés írása” form. Edit/delete render **only** on rows where `authorType === 'operator'` (`D-W4`, a client-side rule until AIS-73/74 adds authentication) | `Card` list + `Textarea` + `Button` + `FormActions` in `useAppForm` |
 | `audit` — Napló | read-only rows: `occurredAt`, `actorName`, `operation`, `tableName`; expandable diff | `DataTable` + the existing JSON logic of [`json.logic.ts`](../../packages/ui/src/lib/json.logic.ts:1) (`toPrettyJson`) — **no second renderer** |
 
 ### 3.3 The four states per tab
@@ -174,8 +181,8 @@ The tab strip is the one element with no existing primitive. It stays a **page p
 | Tab | Loading | Empty | Error | Success |
 | --- | --- | --- | --- | --- |
 | `overview` / `data` | `DescriptionList isLoading` (skeleton rows, no `dd`) | n/a — the detail always has a row | `PageErrorState` + retry (tier `page`) | the two lists |
-| `contacts` | `DataTable isLoading` | „Nincs kapcsolattartó” + CTA „Kapcsolattartó hozzáadása” | `PageErrorState` **inside the tab** + retry | table |
-| `users` | `DataTable isLoading` | „Nincs belépő felhasználó” + CTA „Meghívás” | same | table |
+| `contacts` | the **detail's own** loading state (`useApiDetail` in flight) — the tab has no list request of its own (`D-W3`), so there is no `DataTable isLoading` here | „Nincs kapcsolattartó” + CTA „Kapcsolattartó hozzáadása” | `PageErrorState` **inside the tab** + retry | table, no pager |
+| `users` | the **detail's own** loading state, same reason (`D-W3`) | „Nincs belépő felhasználó” + CTA „Meghívás” | same | table, no pager |
 | `activity` | skeleton cards | „Nincs rögzített tevékenység” + the note form | same | feed + the note form |
 | `audit` | `DataTable isLoading` | „Nincs naplóbejegyzés” | same | table + JSON detail |
 
@@ -254,6 +261,13 @@ The mockup's wizard has **five** steps: `1 Típus`, `2 Adószám & név`, `3 Cí
 | `4 Kapcsolattartó` | — (dropped) | A contact is its own entity with its own CRUD (AIS-16 `D5`, AIS-179); creating a customer and its contact in one form would need a transaction the API does not offer |
 | `5 Ellenőrzés` | `4 Ellenőrzés` | kept, renumbered |
 
+A third change is recorded by the wave (`D-W6`): **the wizard creates only the company**, with **one**
+`POST /customers` request. AIS-182's description still says the wizard also creates the first contact; this
+screen contract wins (§4.1, wave plan `Q-4`). On success the wizard navigates to
+`/customers/:id?tab=contacts`, where the contact is added with its own dialog (`D-W3`, AIS-179) — the API
+offers no customer+contact transaction, so a second create inside the wizard would only be able to leave a
+half-created customer behind.
+
 ---
 
 ## 5. The edit surface (`/customers/:id/edit`, AIS-21)
@@ -262,6 +276,7 @@ The mockup's wizard has **five** steps: `1 Típus`, `2 Adószám & név`, `3 Cí
 | --- | --- |
 | Form | `useAppForm` with `updateCustomerSchema` (partial `PATCH` + a **required** `updatedAt` token) |
 | Fields | `FormSection` per group (Azonosítók / Jogi adatok / Cím / Besorolás) → `FormField` → `Input` / `Select` / `Combobox` |
+| Tags (címkék) | **not** a form field (`D-W1`): `updateCustomerSchema` has no `tagIds`, so `PATCH` never carries tags. Tags are chip actions on the **Cégadatok** tab — `CustomerTagsCard` with *Új címke* (`createTag`, then `attachTag` when the catalogue id is known) and per-chip *Eltávolítás* (`detachTag`), each its own mutation invalidating the detail key |
 | Buttons | `FormActions` (`submitLabel` „Mentés”, `cancelLabel` „Mégse”, `isSubmitting`) |
 | Field error | `toFieldErrors` mapping, rendered on the field |
 | Success | back to `/customers/:id`, toast, cache invalidation |
@@ -277,7 +292,7 @@ Read-only-by-contract fields are **not** inputs: `customerNumber` (generated), `
 
 | Page | Server state | Page UI state | Form state | Notes |
 | --- | --- | --- | --- | --- |
-| `pages/customers` (AIS-17, `/customers`, `/customers/new`, `/customers/:id`, `/customers/:id/edit`) | `useApiList`/`useApiDetail`/`useApiMutation` in `features/customers`; query keys from `createEntityQueryKeys<CustomerListQuery>('customers')`; hooks expose `errorMessage` + `errorSurface` | **one page store**: `customers-wizard.store.ts` (draft + step mirror, `reset`), created per mount by the wizard's provider; the list, the detail and the edit get **no** store — their state is the URL (`page`/`limit`/`sort`/`order`/`q`/four filters, `?tab=`, `?step=`) | `useAppForm` + the shared schemas (`createCustomerSchema` per step, `updateCustomerSchema` with `updatedAt`); contact/user overlays and the note form use `useAppForm` too | First page with a page-local store → `zustand` installed here (§7 row flips). Overlay open state is the URL; the archive confirmation is the documented `useState` exception (AIS-173) |
+| `pages/customers` (AIS-17, `/customers`, `/customers/new`, `/customers/:id`, `/customers/:id/edit`) | `useApiList`/`useApiDetail`/`useApiMutation` in `features/customers`; query keys from `createEntityQueryKeys<CustomerListQuery>('customers')`; hooks expose `errorMessage` + `errorSurface` | **one page store**: `customers-wizard.store.ts` (draft + step mirror, `reset`), created per mount by the wizard's provider; the list, the detail and the edit get **no** store — their state is the URL (`page`/`limit`/`sort`/`order`/`q`/three implemented filters of four, `?tab=`, `?step=`); the **contacts and users tabs have no URL list state at all** (`D-W3`) | `useAppForm` + the shared schemas (`createCustomerSchema` per step, `updateCustomerSchema` with `updatedAt`); contact/user overlays and the note form use `useAppForm` too | First page with a page-local store → `zustand` installed here (§7 row flips). Overlay open state is the URL; the archive confirmation is the documented `useState` exception (AIS-173) |
 
 ---
 
@@ -314,7 +329,7 @@ A ticket that adds any of these rows changes the contract first (AIS-16 family),
 
 | # | Question | Decision |
 | --- | --- | --- |
-| **D7** | Which ticket closes the two AIS-174 gaps (search/filter UI, per-row action)? | **AIS-19, this page.** The contract already exposes `q` + four filters; shipping half a list would create two implementations. `New-Admin-Page.md` §2 records the ownership. |
+| **D7** | Which ticket closes the two AIS-174 gaps (search/filter UI, per-row action)? | **AIS-19, this page.** The contract exposes `q` + four filters, of which AIS-19 implements three and defers `responsibleOperatorId` (`D-W2`); shipping half a list would create two implementations. `New-Admin-Page.md` §2 records the ownership. |
 | **D8** | `EmptyState` with a CTA contradicts AIS-174 ("two competing create affordances"). | **Documented exception for `/customers`**, because AIS-17 `D4` requires the CTA. Recorded in `New-Admin-Page.md` §3; every other page keeps the rule. |
 | **D9** | The list needs a primary contact the row contract does not carry. | **`customers` list projection gains `primaryContactName`** (derived: `contacts` where `roles` contains `primary`), documented beside `lastActivityAt` / `hasMissingData` as derived-not-stored. Owned by AIS-178. Fallback if rejected: drop column 6 and keep the data on the overview tab only. |
 | **D10** | `status` → badge variant, 7 statuses into 5 variants. | `active`→`success`, `trial`→`info`, `registered`→`info`, `prospect`→`neutral`, `suspended`→`warning`, `churned`→`danger`, `anonymized`→`neutral` + label „Anonimizált”. Lives in `entities/customer/customer.mapper.ts`, table-tested. |
@@ -350,11 +365,18 @@ Names are the contract; a ticket that needs a different name changes this file f
 ```text
 packages/shared/src/contract/customers/          AIS-178: customers.contract.ts (+ registry + list projection D9)
 packages/api-client/src/customers/               AIS-178: customers.service.ts, .interface.ts, .const.ts, .path.ts
-apps/admin/src/features/customers/               AIS-19/20/21: use-customers-list.ts, use-customer-detail.ts,
-                                                 use-create-customer.ts, use-update-customer.ts,
-                                                 customers.const.ts (query keys via createEntityQueryKeys),
-                                                 customers.logic.ts, customers.interface.ts
-apps/admin/src/features/api/use-tab-param.ts     AIS-19 (first consumer): use-tab-param.ts + .logic.ts (+ test)
+apps/admin/src/features/customers/               AIS-19: use-customers-list.ts, use-archive-customer.ts
+                                                 AIS-20: use-customer-detail.ts
+                                                 AIS-21: use-update-customer.ts, use-update-customer-status.ts,
+                                                 use-customer-tags.ts
+                                                 AIS-179: use-customer-contacts.ts, use-customer-users.ts
+                                                 AIS-181: use-customer-activities.ts, use-customer-audit-logs.ts
+                                                 AIS-182: use-create-customer.ts
+                                                 shared: customers.const.ts (query keys via
+                                                 createEntityQueryKeys), customers.logic.ts,
+                                                 customers.interface.ts
+apps/admin/src/features/api/use-tab-param.ts     AIS-19 **creates** it (first consumer `?step=`); AIS-20 reuses
+                                                 it for `?tab=` — use-tab-param.ts + .logic.ts (+ test)
 apps/admin/src/entities/customer/                AIS-19: customer.interface.ts, customer.mapper.ts,
                                                  customer.const.ts (labels, status variants), components/
 apps/admin/src/pages/customers/                  AIS-19/20/21/179/181:

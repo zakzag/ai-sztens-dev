@@ -133,16 +133,38 @@ describe('component registration', () => {
 
   it('registers the envelope, meta and error components once', () => {
     expect(Object.keys(components.components?.schemas ?? {}).sort()).toEqual([
+      'Activity',
+      'ActivityList',
       'ApiEnvelope',
       'ApiErrorDetail',
       'ApiErrorEnvelope',
       'ApiKey',
       'ApiKeyList',
+      'AttachCustomerTag',
+      'AuditLog',
+      'AuditLogList',
+      'Contact',
+      'ContactList',
+      'CreateActivity',
       'CreateApiKey',
+      'CreateContact',
+      'CreateCustomer',
+      'CreateCustomerTag',
+      'Customer',
+      'CustomerDetail',
+      'CustomerList',
+      'CustomerTag',
+      'CustomerUser',
+      'InviteCustomerUser',
       'NoPayload',
       'PaginationMeta',
       'ResponseMeta',
+      'UpdateActivity',
       'UpdateApiKey',
+      'UpdateContact',
+      'UpdateCustomer',
+      'UpdateCustomerStatus',
+      'UpdateCustomerUser',
     ]);
   });
 

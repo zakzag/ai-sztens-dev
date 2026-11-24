@@ -52,6 +52,79 @@ export const IDENTIFIER_CONFLICT_MESSAGE =
 export const API_KEY_IDENTIFIER_FIELD_MESSAGE =
   'Ez az identifier már foglalt. Adj meg egyedit.';
 
+/** `CUSTOMER_NUMBER_CONFLICT` (AIS-178) — the generated number collided. */
+export const CUSTOMER_NUMBER_CONFLICT_MESSAGE =
+  'Az ügyfélszám generálása ütközött. Próbáld újra.';
+
+/** `CUSTOMER_TAX_NUMBER_CONFLICT` (AIS-178) — one live customer per tax number. */
+export const CUSTOMER_TAX_NUMBER_CONFLICT_MESSAGE =
+  'Ezzel az adószámmal már létezik élő ügyfél.';
+
+/**
+ * Field-level copy of a duplicate tax number (AIS-178, tier 1).
+ *
+ * The tax number is a form input, so the message is rendered under it — the
+ * generic sentence above stays for the page-level alert.
+ */
+export const CUSTOMER_TAX_NUMBER_FIELD_MESSAGE =
+  'Ez az adószám már egy másik ügyfélnél szerepel.';
+
+/**
+ * `CUSTOMER_PRIMARY_CONTACT_CONFLICT` (AIS-178, slice d) — one primary contact.
+ *
+ * A customer may have exactly one `primary` contact; the second one is refused by
+ * the database, so the message tells the user what to do instead of only what
+ * went wrong.
+ */
+export const CUSTOMER_PRIMARY_CONTACT_CONFLICT_MESSAGE =
+  'Ennél az ügyfélnél már van elsődleges kapcsolattartó. Előbb vedd le róla a jelölést.';
+
+/**
+ * Field-level copy of the primary-contact conflict (AIS-178, slice d, tier 1).
+ *
+ * The role picker is an input, so the message is rendered next to it — the
+ * generic sentence above stays for the page-level alert.
+ */
+export const CUSTOMER_PRIMARY_CONTACT_FIELD_MESSAGE =
+  'Már van elsődleges kapcsolattartó ennél az ügyfélnél.';
+
+/**
+ * `CUSTOMER_USER_EMAIL_CONFLICT` (AIS-178, slice e) — the address is taken.
+ *
+ * `customer_users_email_key` is a **global**, case-insensitive unique index, so
+ * one address can hold at most one login across **every** customer. The sentence
+ * says that, because "already exists at this customer" would send the operator
+ * looking in the wrong place.
+ */
+export const CUSTOMER_USER_EMAIL_CONFLICT_MESSAGE =
+  'Ezzel az e-mail-címmel már létezik belépő felhasználó. Egy cím csak egy belépéshez tartozhat.';
+
+/** Field-level copy of the duplicate login e-mail (AIS-178, slice e, tier 1). */
+export const CUSTOMER_USER_EMAIL_FIELD_MESSAGE =
+  'Ez az e-mail-cím már foglalt.';
+
+/**
+ * `CUSTOMER_OWNER_CONFLICT` (AIS-178, slice e) — one active owner per customer.
+ *
+ * Raised when a second login user is **activated** as `owner`; the message names
+ * the action that resolves it instead of only the rule that was violated.
+ */
+export const CUSTOMER_OWNER_CONFLICT_MESSAGE =
+  'Ennél az ügyfélnél már van aktív tulajdonos. Előbb a jelenlegi tulajdonost kell lefokozni.';
+
+/** Field-level copy of the owner conflict (AIS-178, slice e, tier 1). */
+export const CUSTOMER_OWNER_FIELD_MESSAGE =
+  'Már van aktív tulajdonos ennél az ügyfélnél.';
+
+/**
+ * `CUSTOMER_USER_IN_USE_CONFLICT` (AIS-178, slice e) — still referenced.
+ *
+ * A login user referenced by a contact or an activity cannot be deleted without
+ * destroying that history, so the row must be deactivated instead.
+ */
+export const CUSTOMER_USER_IN_USE_CONFLICT_MESSAGE =
+  'A felhasználóhoz még kapcsolattartó vagy tevékenység tartozik, ezért nem törölhető. Előbb szüntesd meg a hivatkozást, vagy állítsd inaktívra.';
+
 /**
  * `VALIDATION_FAILED` on an identified field (plan `D11`, tier 1).
  *

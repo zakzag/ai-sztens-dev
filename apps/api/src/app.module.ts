@@ -5,6 +5,7 @@ import { ApiKeysModule } from './api-keys/api-keys.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { HttpModule } from './common/http/http.module.js';
+import { CustomersModule } from './customers/customers.module.js';
 import { OpenApiModule } from './common/openapi/openapi.module.js';
 import { DatabaseModule } from './db/database.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -55,6 +56,7 @@ const envFilePaths: string[] =
     DatabaseModule,
     HealthModule,
     ApiKeysModule,
+    CustomersModule,
     VapiWebhooksModule,
   ],
   controllers: [AppController],

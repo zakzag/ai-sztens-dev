@@ -12,6 +12,7 @@
  */
 
 import { createApiKeysService } from './api-keys/api-keys.service.js';
+import { createCustomersService } from './customers/customers.service.js';
 import type { ServiceFactories } from './service-coverage.interface.js';
 
 /**
@@ -20,5 +21,6 @@ import type { ServiceFactories } from './service-coverage.interface.js';
 export function createServiceFactories(): ServiceFactories {
   return {
     apiKeys: createApiKeysService,
+    customers: createCustomersService,
   };
 }

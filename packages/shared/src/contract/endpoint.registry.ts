@@ -8,6 +8,7 @@
  */
 
 import { API_KEYS_ENDPOINTS } from './api-keys/api-keys.contract.js';
+import { CUSTOMERS_ENDPOINTS } from './customers/customers.contract.js';
 import type { ApiEndpointContract } from './endpoint.interface.js';
 
 /**
@@ -23,6 +24,7 @@ import type { ApiEndpointContract } from './endpoint.interface.js';
  */
 export const API_ENDPOINTS = [
   ...API_KEYS_ENDPOINTS,
+  ...CUSTOMERS_ENDPOINTS,
 ] as const satisfies readonly ApiEndpointContract[];
 
 /**

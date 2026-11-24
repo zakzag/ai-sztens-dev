@@ -51,6 +51,59 @@ export const API_ERROR_CODE = {
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
   /** Domain specific: the `identifier` of an API key is already taken. */
   API_KEY_IDENTIFIER_CONFLICT: 'API_KEY_IDENTIFIER_CONFLICT',
+  /**
+   * Domain specific (AIS-178): the generated `customer_number` collided.
+   *
+   * The number is produced inside the write transaction, so a collision is
+   * answered by retrying once; the code is only emitted when the retry fails
+   * too, which means concurrent creates are racing on the same month.
+   */
+  CUSTOMER_NUMBER_CONFLICT: 'CUSTOMER_NUMBER_CONFLICT',
+  /**
+   * Domain specific (AIS-178): another **live** customer already carries this
+   * tax number. A soft-deleted row does not block reuse, because the unique
+   * index is partial (`WHERE deleted_at IS NULL`).
+   */
+  CUSTOMER_TAX_NUMBER_CONFLICT: 'CUSTOMER_TAX_NUMBER_CONFLICT',
+  /**
+   * Domain specific (AIS-178, slice d): a customer may have **one** `primary`
+   * contact, and another live contact already holds the flag.
+   *
+   * Enforced by the partial unique index `contact_roles_primary_key`
+   * (`customer_id WHERE role = 'primary'`), so the answer is classified from the
+   * constraint name, never from a pre-check — the pre-check would lie about the
+   * partial predicate.
+   */
+  CUSTOMER_PRIMARY_CONTACT_CONFLICT: 'CUSTOMER_PRIMARY_CONTACT_CONFLICT',
+  /**
+   * Domain specific (AIS-178, slice e): the e-mail address of a login user is
+   * already taken.
+   *
+   * `customer_users_email_key` is a **global**, case-insensitive unique index
+   * (`lower(email)`), so one address can hold at most one login — across every
+   * customer, not just this one. Classified from the constraint name.
+   */
+  CUSTOMER_USER_EMAIL_CONFLICT: 'CUSTOMER_USER_EMAIL_CONFLICT',
+  /**
+   * Domain specific (AIS-178, slice e): a customer may have **one active
+   * `owner`**, and another active owner already exists.
+   *
+   * Enforced by the partial unique index `customer_users_customer_owner_key`
+   * (`customer_id WHERE role = 'owner' AND status = 'active'`). The predicate is
+   * why a *pending* second owner is legal and why this code is raised at
+   * **activation**, never by a pre-check: the index is the only thing that knows
+   * both the role and the status.
+   */
+  CUSTOMER_OWNER_CONFLICT: 'CUSTOMER_OWNER_CONFLICT',
+  /**
+   * Domain specific (AIS-178, slice e): a login user is still referenced by a
+   * contact or by an activity, so removing the row would break that history.
+   *
+   * Raised from a `23503` on `contacts_customer_user_id_fkey` /
+   * `activities_customer_user_id_fkey`. Deactivating (`status = 'inactive'`) is
+   * the answer for such a user — the row stays and the reference survives.
+   */
+  CUSTOMER_USER_IN_USE_CONFLICT: 'CUSTOMER_USER_IN_USE_CONFLICT',
 } as const;
 
 /** Union of the catalogue values. */
@@ -76,6 +129,12 @@ export const API_ERROR_CODE_STATUS: Readonly<Record<ApiErrorCode, number>> = {
   [API_ERROR_CODE.INTERNAL_ERROR]: HTTP_STATUS.INTERNAL_SERVER_ERROR,
   [API_ERROR_CODE.SERVICE_UNAVAILABLE]: HTTP_STATUS.SERVICE_UNAVAILABLE,
   [API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.CUSTOMER_NUMBER_CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.CUSTOMER_PRIMARY_CONTACT_CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.CUSTOMER_USER_EMAIL_CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.CUSTOMER_OWNER_CONFLICT]: HTTP_STATUS.CONFLICT,
+  [API_ERROR_CODE.CUSTOMER_USER_IN_USE_CONFLICT]: HTTP_STATUS.CONFLICT,
 };
 
 /**

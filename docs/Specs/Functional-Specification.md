@@ -1,6 +1,6 @@
 # Funkcionális Specifikáció
 
-**Utolsó frissítés:** 2026-11-05 (AIS-133: a header pótolva a `quality:docs` kapuhoz; a tartalom változatlan)
+**Utolsó frissítés:** 2026-11-22 (AIS-17: az O1 sor felületi szerződése a [`Customers-Admin-Screens.md`](Customers-Admin-Screens.md) — lista, adatlap, varázsló, szerkesztés és a `D1`–`D16` döntések; korábban ugyanezen a napon AIS-16: az ügyfél-adatmodell mezőkészlete rögzítve a `customers` szerződésben — a 3. pont funkciótáblázata valós sort kapott. Korábban, 2026-11-05: AIS-133, a header pótolva a `quality:docs` kapuhoz)
 
 **Dátum:** [Dátum]
 **Státusz:** [Vázlat / Elfogadva]
@@ -28,9 +28,9 @@
 
 ## 3. Funkciók a működtető szemszögéből (amit az üzemeltető / admin lát)
 
-| ID  | Funkció        | Leírás (user story / use case) | MVP?         | Prioritás      |
-| --- | -------------- | ------------------------------ | ------------ | -------------- |
-| O1  | [Funkció neve] | [Leírás: ki, mit, miért]       | [Igen / Nem] | [P0 / P1 / P2] |
+| ID  | Funkció               | Leírás (user story / use case)                                                                                                                                                                                                            | MVP?         | Prioritás      |
+| --- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | -------------- |
+| O1  | Ügyfél-nyilvántartás  | Az admin a cégeket listázza (keresés + típus / státusz / forrás / felelős operátor szűrő), felveszi, szerkeszti, státuszt vált, Soft delete-tel archivál; az adatlapon kapcsolattartók (szerepekkel), belépő felhasználók, tevékenység-feed és csak olvasható audit napló. Adatmodell: AIS-14, szerződés: AIS-16, felület: AIS-15, képernyőterv: [`Customers-Admin-Screens.md`](Customers-Admin-Screens.md). | Igen | P0 |
 | O2  | [Funkció neve] | [Leírás]                       | [Igen / Nem] | [P0 / P1 / P2] |
 | O3  | [Funkció neve] | [Leírás]                       | [Igen / Nem] | [P0 / P1 / P2] |
 

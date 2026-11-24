@@ -25,16 +25,38 @@ import {
 } from '@asteasolutions/zod-to-openapi';
 import {
   HTTP_STATUS,
+  activityListSchema,
+  activitySchema,
   apiErrorDetailSchema,
   apiErrorEnvelopeSchema,
   apiKeyListSchema,
   apiKeySchema,
+  attachCustomerTagSchema,
+  auditLogListSchema,
+  auditLogSchema,
+  createActivitySchema,
   createApiKeySchema,
+  createCustomerSchema,
+  createCustomerTagSchema,
+  contactListSchema,
+  contactSchema,
+  createContactSchema,
+  customerDetailSchema,
+  customerListSchema,
+  customerSchema,
+  customerTagSchema,
+  customerUserSchema,
+  inviteCustomerUserSchema,
   noPayloadSchema,
   paginationMetaSchema,
+  updateActivitySchema,
+  updateContactSchema,
   responseMetaSchema,
   resolveApiErrorStatus,
   updateApiKeySchema,
+  updateCustomerSchema,
+  updateCustomerUserSchema,
+  updateCustomerStatusSchema,
 } from '@callback/shared';
 import type { ApiEndpointContract, ApiErrorCode } from '@callback/shared';
 import { UnregisteredPayloadSchemaError } from './openapi.errors.js';
@@ -96,6 +118,38 @@ const PAYLOAD_COMPONENTS: ReadonlyMap<z.ZodTypeAny, string> = new Map<
   [apiKeySchema, 'ApiKey'],
   [apiKeyListSchema, 'ApiKeyList'],
   [createApiKeySchema, 'CreateApiKey'],
+  // The `customers` aggregate (AIS-178): one component per published schema, so
+  // the list, the detail and the three request bodies each have their own name.
+  [customerSchema, 'Customer'],
+  [customerListSchema, 'CustomerList'],
+  [customerDetailSchema, 'CustomerDetail'],
+  // The contact aggregate (AIS-178, slice d): the row, its page and its two
+  // request bodies.
+  [contactSchema, 'Contact'],
+  [contactListSchema, 'ContactList'],
+  [createContactSchema, 'CreateContact'],
+  [updateContactSchema, 'UpdateContact'],
+  // The tag and customer-user resources (AIS-178, slice e): two payload rows and
+  // the four request bodies. `createTag` and `attachTag` share the row component
+  // because both answer with the catalogue row.
+  [customerTagSchema, 'CustomerTag'],
+  [customerUserSchema, 'CustomerUser'],
+  [createCustomerTagSchema, 'CreateCustomerTag'],
+  [attachCustomerTagSchema, 'AttachCustomerTag'],
+  [inviteCustomerUserSchema, 'InviteCustomerUser'],
+  [updateCustomerUserSchema, 'UpdateCustomerUser'],
+  // The activity feed and the audit read (AIS-178, slice f): two payload rows,
+  // their two pages and the two activity request bodies. The ledger has **no**
+  // request component, because nothing but `AuditWriter` may append to it.
+  [activitySchema, 'Activity'],
+  [activityListSchema, 'ActivityList'],
+  [createActivitySchema, 'CreateActivity'],
+  [updateActivitySchema, 'UpdateActivity'],
+  [auditLogSchema, 'AuditLog'],
+  [auditLogListSchema, 'AuditLogList'],
+  [createCustomerSchema, 'CreateCustomer'],
+  [updateCustomerSchema, 'UpdateCustomer'],
+  [updateCustomerStatusSchema, 'UpdateCustomerStatus'],
   // `UpdateApiKey` is a **request** component (AIS-108): `envelopeOf()` never
   // wraps it, but `payloadComponentName()` resolves the request body's `$ref`
   // through this same table, so it has to be named here.

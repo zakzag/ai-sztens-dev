@@ -17,6 +17,7 @@ scripts/
 ├── test-syntax.ps1      # PowerShell syntax guard for init.ps1
 ├── lib/agent-artifacts/ # shared Node generator behind init.sh / init.ps1
 ├── lib/vite-build.mjs   # Vite CLI wrapper with a project-local temp dir
+├── db/                  # DB schema diagram generator → db/README.md
 ├── env-test/            # .env validation suite        → env-test/README.md
 ├── ssh/                 # local SSH key tooling        → ssh/README.md
 ├── sonar/               # local SonarQube analysis     → sonar/README.md
@@ -158,10 +159,32 @@ pnpm sonar
 See [`sonar/README.md`](sonar/README.md) for the file-level breakdown and
 [`docs/Specs/SonarQube.md`](../docs/Specs/SonarQube.md) for prerequisites and troubleshooting.
 
+### `db/` — database schema diagram
+
+Generates [`docs/Specs/Database-Schema.md`](../docs/Specs/Database-Schema.md) — a
+Mermaid `erDiagram` plus the per-table column, constraint and relationship tables —
+from the Drizzle schema-as-code ([`apps/api/src/db/schema.ts`](../apps/api/src/db/schema.ts)).
+Driven by the root scripts `pnpm db:diagram` (write) and `pnpm db:diagram:check`
+(verify only; exit `2` when the document is stale).
+
+```bash
+pnpm db:diagram          # after any change to schema.ts (and db:generate)
+pnpm db:diagram:check    # CI-style verification, never writes
+```
+
+- **No dependency:** plain Node ESM; the parser and the renderer are pure and their
+  suites run in `pnpm test:quality`.
+- **Offline:** it reads the schema source, not a running Postgres, so it works on a
+  fresh checkout and in CI.
+- **Exit codes:** `0` success/up to date, `1` missing or unparsable schema, `2` stale.
+
+See [`db/README.md`](db/README.md) for the file-level breakdown and the parser's scope.
+
 ## Folders
 
 | Folder                            | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Documentation                              |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| [`db/`](db/README.md)             | Database schema diagram generator: parses the Drizzle schema-as-code and writes the living `docs/Specs/Database-Schema.md` (Mermaid ER diagram + column/constraint/relationship tables). Wired to `pnpm db:diagram` and `pnpm db:diagram:check`.                                                                                                                                                                                                                                                                                    | [`db/README.md`](db/README.md)             |
 | [`test/`](test/README.md)         | Container-level smoke suite for the `infra/docker-compose.yml` stack (api / postgres / caddy / monitor), wired to `pnpm test:stack`, **plus** the offline `_deploy-sh-*.sh` suites that exercise `deploy/deploy.sh` without a droplet (argument/target handling, the logger, the env-file paths, the remote identity), `_postgres-init-schemas-test.sh` (throwaway Postgres with the real init scripts mounted), and `_stack-env-default-test.sh` (three-env leftover defaults + the legacy `infra/.env` deploy.sh hard-reject). | [`test/README.md`](test/README.md)         |
 | [`env-test/`](env-test/README.md) | `.env` validation: an offline syntax/consistency checker plus an explicit live-access checker.                                                                                                                                                                                                                                                                                                                                                                                                                                   | [`env-test/README.md`](env-test/README.md) |
 | [`ssh/`](ssh/README.md)           | Local SSH key tooling (PPK → OpenSSH conversion, key inspection, passphrase removal).                                                                                                                                                                                                                                                                                                                                                                                                                                            | [`ssh/README.md`](ssh/README.md)           |

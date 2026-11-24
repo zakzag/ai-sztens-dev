@@ -2,6 +2,8 @@
 
 **Státusz:** Élő
 
+**Utolsó frissítés:** 2026-11-24 (AIS-189: a `0008` migráció a lokális dev DB-re alkalmazva; közben kiderült, hogy a korábbi lokális volume tábláit a `postgres` superuser hozta létre, ezért az `aisztens` nem tudta `ALTER TABLE`-ezni őket — a tünet a Drizzle elrejtett `Failed query: ALTER TABLE …` üzenete, a javítás a §8.1-ben)
+
 **Utolsó frissítés:** 2026-11-23 (AIS-178/f: a napló olvasása él — `GET /api/admin/customers/:id/audit-logs` —, és mivel az `audit.audit_logs` append-only, az e2e suite-ok által hagyott sorok kitakarításának receptje a §10.1-ben van)
 
 **Utolsó frissítés:** 2026-11-22 (AIS-177: a tevékenység- és audit-napló — `activity` és `audit` séma, 2 tábla (`activity.activities`, `audit.audit_logs`), 4 enum típus, `0006` generált migráció + `0007` kézi migráció (append-only trigger és grant); a két új sémán az app role `USAGE + CREATE`-ot kap, ezért a grant-mátrix és a smoke-várható értékek 6 séma / 18 USAGE / 5 CREATE lettek. **Korábban:** AIS-18: a cég-aggregátum saját `customer` sémát kapott, az identitás-kezelés pedig `iam` sémát — összesen 8 Postgres enum típus és 7 tábla (`iam.operators`, `customer.customers`, `customer.tags`, `customer.customer_tags`, `iam.customer_users`, `customer.contacts`, `customer.contact_roles`), `0005` migrációval; a két új sémán az app role `USAGE + CREATE`-ot kap, az `email` marad `USAGE`-only, ezért a grant-mátrix és a smoke-várható értékek 4 séma / 12 USAGE / 3 CREATE lettek. AIS-108: a `DELETE` **soft delete** — a `platform.api_keys` tábla nullable `deleted_at` oszlopot és `api_keys_deleted_at_idx` indexet kapott a `0003` migrációban; minden olvasás és írás `deleted_at IS NULL`-ra szűr, ezért a törölt sor `404`-et ad, a `PATCH` pedig az `updated_at`-et használja optimistic concurrency tokenként (`409 STALE_WRITE`). AIS-40: a `platform.api_keys` tábla **első fogyasztója** elkészült — `api-keys` modul (`DrizzleApiKeysRepository` a `API_KEYS_REPOSITORY` tokenen, service, controller, DTO), `GET /api/api-keys`, `GET /api/api-keys/:identifier`, `POST /api/api-keys`; duplikált `identifier` → `409`, ismeretlen azonosító → `404`, érvénytelen payload → `400`. A duplikátum-detektálás a `23505` + `api_keys_identifier_key` párost használja a Drizzle `cause`-láncában. AIS-39: elkészült az első valódi domain tábla, a `platform.api_keys` — `0002` migráció, uuid PK, `api_keys_identifier_key` egyedi constraint az `identifier`-en, `timestamptz` időbélyegek, `getTableConfig()`-alapú egységtesztek. AIS-56: elkészült a `DatabaseModule` — `DATABASE` provider a Drizzle handle-hez, `DATABASE_URL` a `ConfigService`-ből, hangos boot-hiba hiányzó URL-re, `client.end()` leállításkor. AIS-64: a teljes callback kontextus törölve — `callback.callback_requests`, `callback.call_status` **és** a `callback` Postgres séma; a `0001` migráció a táblát és az enumot dobja el, a sémát meglevő volume-on egyszeri superuser lépés viszi el. AIS-37: a repository szerződés + unit tesztek elkészültek, de a repository az AIS-64-gyel törlődött. AIS-36: a `db:migrate` létrehozta a `callback.callback_requests` táblát és a `platform.__drizzle_migrations` könyvelő táblát; AIS-35: a lokális Postgres bootstrap sémákra és grantokra bővült. A dokumentum a bootstrap, verifikáció, reset és a jelenlegi korlátok egyetlen helye)
@@ -430,6 +432,61 @@ pnpm db:up
 
 A teljes stacknél ugyanez a `pgdata` volume-ra igaz (a scriptek ugyanazok).
 
+### 8.1 A `db:migrate` a táblák tulajdonjogán bukik (nem a sémáén)
+
+A `02-schemas.sh` újrafuttatása a **séma**-szintű jogosultságokat rendezi. Ha viszont a
+táblákat egyszer egy `postgres` superuserrel futtatott migráció hozta létre, akkor az
+`aisztens` app role **nem tulajdonosa** a tábláknak, és a következő migráció
+`ALTER TABLE`-nél elhal. A Drizzle a kiváltó okot elrejti, ezért a hiba csak ennyit mutat:
+
+```text
+[db:migrate] failed: Failed query: ALTER TABLE "customer"."customers" DROP CONSTRAINT "customers_responsible_operator_id_operators_id_fk";
+```
+
+A `permission denied for schema …` üzenet **elmarad**, mert az `ALTER TABLE` a tábla
+tulajdonjogát kéri, nem a séma `CREATE`-ját — ezért nem elég a §8 a) lépése.
+Ellenőrzés és javítás (egyszeri, adat megmarad):
+
+```bash
+# 1) Ki a táblák tulajdonosa? (elvárt: aisztens)
+docker exec infra-postgres-1 psql -U postgres -d aisztens_db \
+  -c "select tableowner, count(*) from pg_tables where schemaname in ('customer','iam','activity','audit') group by tableowner;"
+
+# 2) Táblák, sequence-ek és enumok átírása az app role-ra
+docker exec -i infra-postgres-1 psql -U postgres -d aisztens_db <<'SQL'
+do $$
+declare r record;
+begin
+  for r in select schemaname s, tablename n from pg_tables
+            where schemaname in ('customer', 'iam', 'activity', 'audit') loop
+    execute format('alter table %I.%I owner to aisztens', r.s, r.n);
+  end loop;
+  for r in select sequence_schema s, sequence_name n from information_schema.sequences
+            where sequence_schema in ('customer', 'iam', 'activity', 'audit') loop
+    execute format('alter sequence %I.%I owner to aisztens', r.s, r.n);
+  end loop;
+  for r in select n.nspname s, t.typname n from pg_type t
+            join pg_namespace n on n.oid = t.typnamespace
+            where n.nspname in ('customer', 'iam', 'activity', 'audit') and t.typtype = 'e' loop
+    execute format('alter type %I.%I owner to aisztens', r.s, r.n);
+  end loop;
+end $$;
+SQL
+
+# 3) A grant-mátrix helyreállítása (idempotens, §8 a)
+docker exec infra-postgres-1 bash /docker-entrypoint-initdb.d/02-schemas.sh
+```
+
+A **séma** tulajdonosát ne írd át: friss volume-on is a bootstrap superuser (`postgres`) a
+tulajdonos, csak a jogosultságok mennek át (`02-schemas.sh` fejléce), a táblák viszont a
+migráló app role tulajdonában lesznek. A helyes végállapot ellenőrzése:
+
+```bash
+docker exec infra-postgres-1 psql -U postgres -d aisztens_db -c "select nspname, pg_get_userbyid(nspowner) as owner from pg_namespace where nspname in ('customer','iam','activity','audit');" \
+  -c "select tableowner, count(*) from pg_tables where schemaname in ('customer','iam','activity','audit') group by tableowner;"
+# elvárt: owner = postgres mind a négy séma, tableowner = aisztens
+```
+
 ---
 
 ## 9. Mi van, és mi még nincs a lokális DB-ben (2026-10-21)
@@ -526,6 +583,7 @@ Két ismert korlát tartozik ide:
 | `FATAL: the database system is shutting down`                           | az entrypoint **ideiglenes** init-szervere áll le, miközben te már kérdezel                                                                                                                                                   | várj a `PostgreSQL init process complete` markerre, utána kérdezz                                                                                  |
 | a `db:migrate` „lefut”, de a tábla nem jelenik meg                      | a runner a `drizzle/` mappát a **cwd**-hez képest keresi, tehát `pnpm --filter @callback/api db:migrate`-tel (cwd = `apps/api`) kell futtatni; közvetlen `node dist/migrate.js` máshonnan a repó gyökeréből nézve nem találja | futtasd `pnpm --filter @callback/api db:migrate`-tel                                                                                               |
 | `password authentication failed for user "aisztens"` a `db:migrate`-nél | a `DATABASE_URL` nem oldható fel, és a config az `infra/.env.local`-ból komponál — de az `AISZTENS_DB_PASSWORD` más, mint amivel a volume inicializálódott                                                                    | lásd a fenti sort: `01-roles.sh` újrafuttatás vagy `down -v`                                                                                       |
+| `db:migrate` `Failed query: ALTER TABLE …` (a valódi ok rejtve)        | a táblákat egy korábbi migráció a `postgres` superuserrel futtatta, ezért az `aisztens` nem tulajdonos → `must be owner of table …`                                                                                         | §8.1 (tulajdonjog-átírás + `02-schemas.sh` újrafuttatás)                                                                                            |
 
 ---
 

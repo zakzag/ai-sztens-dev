@@ -82,19 +82,20 @@ jobs:
       - name: Build shared
         run: pnpm --filter @callback/shared build
 
-      # Emit-free type check of every workspace. Runs after "Build shared"
-      # because `@callback/shared` and `@callback/api-client` are consumed
-      # through `dist/*.d.ts` and `tsc --noEmit` produces none, so a fresh
-      # clone would fail on unresolved types. `apps/api` checks
-      # `tsconfig.build.json` — the same file `nest build` compiles with — so
-      # this step matches the production compile scope exactly; the spec and
-      # `test/` files it excludes are a known, tracked gap (UI-Architecture
-      # §9, AIS-122 follow-up).
-      - name: Typecheck all packages
-        run: pnpm typecheck
-
       - name: Build all packages
         run: pnpm -r build
+
+      # Emit-free type check of every workspace. It must come **after** the
+      # build: `@callback/shared` and `@callback/api-client` are consumed through
+      # `dist/*.d.ts` and `tsc --noEmit` produces none, so on a fresh clone
+      # `apps/admin` cannot resolve `@callback/api-client` until that package has
+      # been compiled — which is exactly how this step used to fail while the
+      # comment claimed the opposite. `apps/api` checks `tsconfig.build.json` —
+      # the same file `nest build` compiles with — so this step matches the
+      # production compile scope exactly; the spec and `test/` files it excludes
+      # are a known, tracked gap (UI-Architecture §9, AIS-122 follow-up).
+      - name: Typecheck all packages
+        run: pnpm typecheck
 
       - name: Lint
         run: pnpm -r lint

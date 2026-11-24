@@ -52,12 +52,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # pnpm/action-setup installs pnpm using corepack by default. Pin the
-      # version so a future pnpm release cannot break CI silently.
+      # The pnpm version has exactly one source: the `packageManager` field in
+      # the root package.json. Passing `version:` here as well is what broke the
+      # whole pipeline with "Multiple versions of pnpm specified" once the field
+      # moved to pnpm 12 — the action refuses to guess, and rightly so.
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       # Node 24, not 22: the API unit suite contains a test that compiles the
       # real `ApiKeysModule` (a DI-graph regression guard — a bad provider token
@@ -159,8 +159,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -218,8 +216,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       # Node 24 to match `build-test`: dependency-cruiser's TypeScript parser and
       # the gates' `import.meta.resolve` call are both proven on this runtime.

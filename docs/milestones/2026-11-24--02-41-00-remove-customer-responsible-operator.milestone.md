@@ -1,6 +1,6 @@
 # Milestone — the customer responsible operator was removed, not deferred
 
-**Date:** 2026-11-24 · **Branch:** `AIS-14-company-admin` · **Plan:** [`2026-11-24--02-41-00-remove-customer-responsible-operator-plan.md`](../plans/2026-11-24--02-41-00-remove-customer-responsible-operator-plan.md:1)
+**Date:** 2026-11-24 · **Ticket:** AIS-189 · **Branch:** `AIS-14-company-admin` · **Plan:** [`2026-11-24--02-41-00-remove-customer-responsible-operator-plan.md`](../plans/2026-11-24--02-41-00-remove-customer-responsible-operator-plan.md:1)
 
 ## 1. Problem / feature
 
@@ -91,7 +91,7 @@ Only historical plans, history entries and the previous migration `0005` may sti
 
 - The wave plan's `Q-1` follow-up ticket (operator-directory endpoint for the filter) is **moot** and
   should be closed rather than implemented.
-- The commit carries no ticket key: no Jira ticket exists yet for this removal. Once an AIS-16-family
-  ticket is created, the PR/squash-merge title should carry its key so the ticket–commit link survives.
+- The ticket is **AIS-189**; the commit subject carries the branch-derived `AIS-14` key, so the
+  PR/squash-merge title must carry `AIS-189` for the ticket–commit link to survive on `main`.
 - The migration is verified by tests and the generator only; applying it on a deployed database is the
   deploy step, with the pre-check from plan §6.

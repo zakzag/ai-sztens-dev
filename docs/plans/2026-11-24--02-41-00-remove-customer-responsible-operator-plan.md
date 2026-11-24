@@ -1,6 +1,6 @@
 # Remove the customer responsible-operator concept — implementation plan
 
-**Date:** 2026-11-24 02:41 (Europe/Budapest) · **Branch:** `AIS-14-company-admin` (before its merge)
+**Date:** 2026-11-24 02:41 (Europe/Budapest) · **Ticket:** AIS-189 · **Branch:** `AIS-14-company-admin` (before its merge)
 **Trigger:** product decision — "we do not need a company responsible operator now"
 **Scope:** full removal — DB column + FK, shared contract field + query parameter, API mapper/filter, api-client docs/tests, every living spec
 

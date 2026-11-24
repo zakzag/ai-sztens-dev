@@ -1,6 +1,6 @@
 # The customer responsible operator no longer exists — column, contract, filter, docs
 
-**Date:** 2026-11-24 02:41 (Europe/Budapest) · **Branch:** `AIS-14-company-admin`
+**Date:** 2026-11-24 02:41 (Europe/Budapest) · **Ticket:** AIS-189 · **Branch:** `AIS-14-company-admin`
 **Type:** breaking contract + schema change — the field is gone everywhere, not deprecated
 **Plan:** [`2026-11-24--02-41-00-remove-customer-responsible-operator-plan.md`](../plans/2026-11-24--02-41-00-remove-customer-responsible-operator-plan.md:1)
 
@@ -62,5 +62,6 @@ the deploy step, and the safe pre-check is recorded in the plan §6.
   filter, so it should be closed instead of implemented.
 - If a responsible-operator notion returns later, it comes back as a new contract change (AIS-16
   family), not as a resurrected column: the removal is recorded in the migration history.
-- Committed without a ticket key in the subject because no ticket exists yet for this removal; the
-  branch-derived key rule (`AIS-14`) applies to the branch, not to a new AIS-16-family ticket.
+- The removal is tracked as **AIS-189** (created right after the commit). The commit subject carries the
+  branch-derived `AIS-14` key, so the PR/squash-merge title must carry `AIS-189` to keep the
+  ticket–commit link alive on `main`.

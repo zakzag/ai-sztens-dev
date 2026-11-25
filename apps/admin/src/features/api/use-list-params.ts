@@ -32,10 +32,12 @@ import {
   applyListParamsPatch,
   applyPageReset,
   applyPatchDefaults,
+  mergeListParams,
   parseListParams,
   parseListParamsDefaults,
   toListParamsDefaults,
   toListParamsUrlSearchParams,
+  toOwnedListParamNames,
 } from './use-list-params.logic.js';
 
 /**
@@ -69,11 +71,25 @@ export function useListParams<TParams extends ListParams>(
    * (AIS-116 fix of an AIS-119 defect that only showed once a sort header wrote
    * a non-default value).
    *
+   * The list params are **merged into** the current search params and not written
+   * in their place (AIS-181): the hook owns exactly the schema's keys, so a
+   * `?tab=` of the same route has to survive a pager click. The owned keys come
+   * from `defaults`, i.e. from the same schema that parsed the query.
+   *
    * @param next - the query to serialise.
    */
   const writeParams = (next: TParams): void => {
+    const listParams = toListParamsUrlSearchParams(
+      next,
+      toListParamsDefaults(defaults),
+    );
+
     setSearchParams(
-      toListParamsUrlSearchParams(next, toListParamsDefaults(defaults)),
+      mergeListParams(
+        searchParams,
+        listParams,
+        toOwnedListParamNames(schema, defaults),
+      ),
       { replace: false },
     );
   };

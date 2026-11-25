@@ -7,6 +7,7 @@
  */
 
 import { toListQueryParams, type ListQueryDefaults } from '@callback/shared';
+import { z } from 'zod';
 import {
   LIST_PARAMS_DEFAULT_PAGE,
   LIST_PARAMS_NO_DEFAULTS_MESSAGE,
@@ -193,4 +194,66 @@ export function toListParamsUrlSearchParams<TParams extends ListParams>(
   defaults: ListQueryDefaults,
 ): URLSearchParams {
   return toListQueryParams(params, defaults);
+}
+
+/**
+ * Merges the list params into the page's **existing** search params (AIS-181).
+ *
+ * A paged list can live on a route that carries parameters it does not own —
+ * `/customers/:id?tab=activity` is the first one. Before this function the hook
+ * built a **fresh** `URLSearchParams`, so the first pager click silently dropped
+ * `tab` and the user landed back on the default tab.
+ *
+ * The rule is “replace what you own, keep what you do not”: every key the schema
+ * declares is removed from the current set first (so a field that went back to
+ * its default disappears instead of lingering), then the freshly serialised list
+ * params are copied in. Nothing else is touched.
+ *
+ * Both inputs are cloned, never mutated.
+ *
+ * @param current - the search params currently in the URL.
+ * @param next - the serialised list params of the new state.
+ * @param ownedKeys - the field names the list query owns (the schema's keys).
+ * @returns a new set: the untouched foreign params plus the new list params.
+ */
+export function mergeListParams(
+  current: URLSearchParams,
+  next: URLSearchParams,
+  ownedKeys: readonly string[],
+): URLSearchParams {
+  const merged = new URLSearchParams(current);
+
+  for (const key of ownedKeys) {
+    merged.delete(key);
+  }
+
+  next.forEach((value, key) => {
+    merged.set(key, value);
+  });
+
+  return merged;
+}
+
+/**
+ * The names of the query fields the list **owns**, i.e. the ones a write may
+ * replace without touching the rest of the URL (AIS-181).
+ *
+ * They come from the **schema shape**, not from the parsed defaults: a filter
+ * without a `default()` — the customers list's `type`, `status`, `source` and `q` —
+ * is still a field the hook owns, but it is absent from the parsed defaults object.
+ * Deriving the names there would leave `?status=active` in the URL after a reset.
+ *
+ * @param schema - the list-query schema of the resource.
+ * @param defaults - the parsed defaults, used only when the schema has no shape.
+ * @returns the field names to delete before the new state is written.
+ */
+export function toOwnedListParamNames<TParams extends ListParams>(
+  schema: ListParamsSchema<TParams>,
+  defaults: TParams,
+): readonly string[] {
+  if (schema instanceof z.ZodObject) {
+    return Object.keys(schema.shape);
+  }
+
+  return Object.keys(defaults);
 }

@@ -40,6 +40,7 @@ import {
   CUSTOMER_DETAIL_UNAVAILABLE_DESCRIPTION,
   CUSTOMER_DETAIL_UNAVAILABLE_TITLE,
   CUSTOMERS_LIST_ROUTE_PATH,
+  CUSTOMER_TAB_LIST_PARAM_NAMES,
   CUSTOMER_TAB_VALUES,
 } from './customers.const.js';
 import { toCustomerDetailState } from './customers.logic.js';
@@ -62,6 +63,13 @@ export function CustomerDetailPage() {
     paramName: CUSTOMER_DETAIL_TAB_PARAM,
     allowed: CUSTOMER_TAB_VALUES,
     fallback: CUSTOMER_DETAIL_DEFAULT_TAB,
+    /*
+      A tab switch invalidates the paged list state of the tab being left (AIS-181):
+      the activity feed and the ledger share `page`/`limit`, so keeping the page
+      across a switch would open the third page of a different collection. The
+      deletion happens in the **same** URL write as the tab change.
+    */
+    clearParams: CUSTOMER_TAB_LIST_PARAM_NAMES,
   });
 
   const data = detail.data;

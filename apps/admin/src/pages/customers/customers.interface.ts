@@ -6,6 +6,8 @@
 
 import type { ReactNode } from 'react';
 import type {
+  ActivityType,
+  AuditLogListQuery,
   ContactRole,
   CustomerDetail,
   CustomerListQuery,
@@ -14,6 +16,9 @@ import type {
 } from '@callback/shared';
 import type { DataTableSort } from '@callback/ui';
 import type {
+  AuditLogActorOption,
+  CustomerActivityViewModel,
+  CustomerAuditLogViewModels,
   CustomerContactViewModel,
   CustomerDetailViewModel,
   CustomerRowViewModel,
@@ -388,4 +393,107 @@ export interface CustomerStatusDialogProps {
   readonly updatedAt: string;
   /** Called on every dismissal (cancel, `Esc`, outside click, success). */
   readonly onClose: () => void;
+}
+
+/*
+  ---------------------------------------------------------------------------
+  AIS-181 — the activity feed and the audit ledger
+  ---------------------------------------------------------------------------
+*/
+
+/** Values of the note form (create). */
+export interface CustomerActivityFormValues {
+  /** The kind of the new entry — one of the four writable kinds. */
+  readonly type: ActivityType;
+  /** The entry's text; required, trimmed, bounded. */
+  readonly body: string;
+}
+
+/** Values of the inline edit form: the text is the only editable field. */
+export interface CustomerActivityEditFormValues {
+  /** The entry's text; required, trimmed, bounded. */
+  readonly body: string;
+}
+
+/** Props of the note form above the feed. */
+export interface CustomerActivityFormProps {
+  /** The customer the entry belongs to (route parameter). */
+  readonly customerId: string;
+}
+
+/**
+ * Props of one feed entry.
+ *
+ * `isEditing` and the three callbacks are owned by the tab: the inline editor and
+ * the delete confirmation have no address of their own (AIS-173 exception), so
+ * their state is local `useState` in the tab and never a route or a store.
+ */
+export interface CustomerActivityFeedItemProps {
+  /** The customer the entry belongs to — the writes' path parameter. */
+  readonly customerId: string;
+  /** The row, already formatted by the mapper. */
+  readonly activity: CustomerActivityViewModel;
+  /** `true` while this row shows its inline editor. */
+  readonly isEditing: boolean;
+  /** Requests the inline editor for this row. */
+  readonly onStartEdit: (activityId: string) => void;
+  /** Leaves the inline editor without saving. */
+  readonly onCancelEdit: () => void;
+  /** Reports a saved edit (the tab closes the editor and re-reads the feed). */
+  readonly onSaved: () => void;
+  /** Reports a `409 STALE_WRITE` (the tab re-reads and closes the editor). */
+  readonly onStaleWrite: () => void;
+  /** Requests the delete confirmation for this row. */
+  readonly onDelete: (activity: CustomerActivityViewModel) => void;
+}
+
+/** Props of the inline edit form of one entry. */
+export interface CustomerActivityEditFormProps {
+  /** The customer the entry belongs to (route parameter). */
+  readonly customerId: string;
+  /** The row being edited — its `updateToken` is the concurrency token. */
+  readonly activity: CustomerActivityViewModel;
+  /** Leaves the editor without saving. */
+  readonly onCancel: () => void;
+  /** Called after a successful save. */
+  readonly onSaved: () => void;
+  /** Called on `409 STALE_WRITE`, **before** the error is re-thrown. */
+  readonly onStaleWrite: () => void;
+}
+
+/** Props of the activity delete confirmation (AIS-173 exception). */
+export interface CustomerActivityDeleteDialogProps {
+  /** The customer the entry belongs to (route parameter). */
+  readonly customerId: string;
+  /** The entry the confirmation is about. */
+  readonly activity: CustomerActivityViewModel;
+  /** Called on every dismissal and after a successful delete. */
+  readonly onClose: () => void;
+}
+
+/** Props of the four filters of the ledger. */
+export interface CustomerAuditFiltersProps {
+  /** The parsed query — the current state of every control. */
+  readonly params: AuditLogListQuery;
+  /** The author choices, derived from the rows of the current page. */
+  readonly actorOptions: readonly AuditLogActorOption[];
+  /** Reports one filter change; the tab performs one URL write. */
+  readonly onFilterChange: (patch: Partial<AuditLogListQuery>) => void;
+  /** Reports the “clear filters” request (all filters back to their defaults). */
+  readonly onReset: () => void;
+}
+
+/**
+ * Props of the ledger's row list.
+ *
+ * `rows` are view models: the component maps each one to a `LogEntryRow` item, so
+ * neither the label table nor the diff builder is reachable from JSX.
+ */
+export interface CustomerAuditLogListProps {
+  /** Already mapped rows, in server order. */
+  readonly rows: CustomerAuditLogViewModels;
+  /** `true` while the first response is in flight. */
+  readonly isLoading: boolean;
+  /** The empty-state node, chosen by the tab (filtered vs unfiltered copy). */
+  readonly empty: ReactNode;
 }

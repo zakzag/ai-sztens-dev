@@ -7,7 +7,11 @@
 
 import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
-import { createListQuerySchema, listQuerySchema } from '@callback/shared';
+import {
+  createListQuerySchema,
+  customerListQuerySchema,
+  listQuerySchema,
+} from '@callback/shared';
 import type {
   ListParams,
   ListParamsSchema,
@@ -17,10 +21,12 @@ import {
   applyPageReset,
   applyPatchDefaults,
   ListParamsError,
+  mergeListParams,
   parseListParams,
   parseListParamsDefaults,
   toListParamsDefaults,
   toListParamsUrlSearchParams,
+  toOwnedListParamNames,
 } from './use-list-params.logic.js';
 
 describe('parseListParams', () => {
@@ -208,5 +214,75 @@ describe('toListParamsUrlSearchParams', () => {
     );
 
     expect(url.toString()).toBe('page=3&order=asc&q=abc');
+  });
+});
+
+describe('mergeListParams', () => {
+  it('keeps a parameter the list query does not own', () => {
+    const merged = mergeListParams(
+      new URLSearchParams('tab=activity&page=2'),
+      new URLSearchParams('page=3'),
+      ['page', 'limit', 'order'],
+    );
+
+    expect(merged.get('tab')).toBe('activity');
+    expect(merged.get('page')).toBe('3');
+  });
+
+  it('drops a list key the new state no longer carries', () => {
+    const merged = mergeListParams(
+      new URLSearchParams('tab=audit&limit=50'),
+      new URLSearchParams(''),
+      ['page', 'limit', 'order'],
+    );
+
+    expect(merged.get('limit')).toBeNull();
+    expect(merged.toString()).toBe('tab=audit');
+  });
+
+  it('appends every list param to an empty current set', () => {
+    const merged = mergeListParams(
+      new URLSearchParams(''),
+      new URLSearchParams('page=2&limit=50'),
+      ['page', 'limit', 'order'],
+    );
+
+    expect(merged.toString()).toBe('page=2&limit=50');
+  });
+
+  it('mutates neither input', () => {
+    const current = new URLSearchParams('tab=activity');
+    const next = new URLSearchParams('page=4');
+
+    mergeListParams(current, next, ['page']);
+
+    expect(current.toString()).toBe('tab=activity');
+    expect(next.toString()).toBe('page=4');
+  });
+});
+
+describe('toOwnedListParamNames', () => {
+  it('lists the schema keys of the base list query', () => {
+    const names = toOwnedListParamNames(
+      listQuerySchema,
+      parseListParamsDefaults(listQuerySchema),
+    );
+
+    expect(names).toEqual(
+      expect.arrayContaining(['page', 'limit', 'order', 'q']),
+    );
+  });
+
+  it('includes a filter that has no default value', () => {
+    // `status` is optional without a `default()`, so it is **absent** from the
+    // parsed defaults — yet the hook owns it, or a reset would leave it in the URL.
+    const names = toOwnedListParamNames(
+      customerListQuerySchema,
+      parseListParamsDefaults(customerListQuerySchema),
+    );
+
+    expect(names).toEqual(
+      expect.arrayContaining(['type', 'status', 'source', 'q']),
+    );
   });
 });

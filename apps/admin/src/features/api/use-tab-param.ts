@@ -17,7 +17,7 @@
  */
 
 import { useSearchParams } from 'react-router-dom';
-import { parseAllowedValue } from './use-tab-param.logic.js';
+import { applyTabWrite, parseAllowedValue } from './use-tab-param.logic.js';
 import type {
   UseTabParamOptions,
   UseTabParamResult,
@@ -26,27 +26,23 @@ import type {
 /**
  * Reads and writes one enum-like URL parameter.
  *
- * @param options - parameter name, the closed set of legal values and the default.
+ * @param options - parameter name, the closed set of legal values, the default
+ *   and the query keys a change invalidates (`clearParams`, AIS-181).
  * @returns the parsed value and a setter that performs one navigation.
  */
 export function useTabParam<TValue extends string>(
   options: UseTabParamOptions<TValue>,
 ): UseTabParamResult<TValue> {
-  const { paramName, allowed, fallback } = options;
+  const { paramName, allowed, fallback, clearParams } = options;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const value = parseAllowedValue(searchParams.get(paramName), allowed, fallback);
 
   const setValue = (next: TValue): void => {
-    const params = new URLSearchParams(searchParams);
-
-    if (next === fallback) {
-      params.delete(paramName);
-    } else {
-      params.set(paramName, next);
-    }
-
-    setSearchParams(params, { replace: false });
+    setSearchParams(
+      applyTabWrite(searchParams, { paramName, value: next, fallback, clearParams }),
+      { replace: false },
+    );
   };
 
   return { value, setValue };

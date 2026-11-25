@@ -72,9 +72,17 @@ type CopyTimerHandle = ReturnType<typeof setTimeout>;
  * sentence never becomes the inside of a pressable button. The collapsed row
  * therefore looks exactly like it did before (decision D-D).
  *
+ * The badge text is `levelLabel` when the host supplies one (AIS-181): an audit
+ * log's levels name an operation, not a severity, and the glyph plus `data-level`
+ * already carry the verdict.
+ *
  * @param props - see {@link LogEntryRowProps}.
  */
-export function LogEntryRow({ entry, formatTimestamp }: LogEntryRowProps) {
+export function LogEntryRow({
+  entry,
+  formatTimestamp,
+  levelLabel,
+}: LogEntryRowProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState<LogEntryCopyFlags>(LOG_ENTRY_COPY_IDLE);
 
@@ -208,7 +216,7 @@ export function LogEntryRow({ entry, formatTimestamp }: LogEntryRowProps) {
           {TOAST_LEVEL_GLYPHS[entry.level]}
         </span>
         <span className="text-xs font-semibold tracking-wide text-text-secondary uppercase">
-          {LOG_LEVEL_LABELS[entry.level]}
+          {levelLabel ?? LOG_LEVEL_LABELS[entry.level]}
         </span>
         <time className="ml-auto shrink-0 text-xs text-text-muted">
           {formatTimestamp(entry.createdAt)}

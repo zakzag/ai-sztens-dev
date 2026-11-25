@@ -1,6 +1,12 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-25 — AIS-179: a `pages/customers` **Kapcsolattartók** és **Felhasználók**
+**Utolsó frissítés: 2026-11-25 — AIS-181: a `pages/customers` **Tevékenység** és **Napló** füle —
+két saját, lapozott olvasás (`useCustomerActivities`, `useCustomerAuditLogs`), a lapozó és a négy napló-szűrő
+az **URL-ben** (`useListParams` a `activityListQuerySchema` / `auditLogListQuerySchema` sémán), az inline
+szerkesztő és a törlés-megerősítés helyi `useState`-ben (AIS-173 kivétel); a napló sorait a meglévő
+`LogEntryRow` rendereli egy új, opcionális `levelLabel` proppal (§4), és a `useListParams` mostantól
+**megtartja az idegen query paramétereket**, a `useTabParam` pedig egy írásban törli a lapozó kulcsokat —
+lásd §5. Előző, 2026-11-25 — AIS-179: a `pages/customers` **Kapcsolattartók** és **Felhasználók**
 füle — a detail view model (`id`, `contacts`, `customerUsers`) hordozza az adatot, a két fül csak markup,
 nincs saját kérés, lapozó vagy URL-listaállapot; a négy írási felület a detail entry **`children`**
 route-jaként él (`/contacts/new`, `/contacts/:contactId/edit`, `/users/invite`, `/users/:userId/edit`),
@@ -160,6 +166,14 @@ csukva. A nyitottság **komponens-lokális** `useState` (§5), a `LogDrawer` pro
 régióban két copy gomb van (`requestId`, csak ha van ilyen mező; `JSON`, mindig), a vágólap-hívás a
 [`lib/copy-text.ts`](../../packages/ui/src/lib/copy-text.ts:1)-ben izolált, csendes degradációval. A
 csukott sor külseje változatlan (a `detail` egysoros marad). Részletek a §4 primitíva-táblában.
+
+**AIS-181 (2026-11-25):** a `LogEntryRow` **egy opcionális `levelLabel` propot** kapott. A fejléc eddig a
+beépített súlyossági szót írta ki („Sikeres”, „Figyelmeztetés”), ami egy naplósor esetében nem a
+mondanivaló: a `pages/customers` **Napló** füle a művelet nevét (`Létrehozás`, `Módosítás`, `Törlés`,
+`Törlés (archiválás)`) mutatja benne, míg a glyph és a sor `data-level`-je továbbra is a súlyosságot
+hordozza. A prop elhagyásával a sor pontosan úgy renderel, mint eddig, tehát a notification-log
+viselkedése változatlan; a primitívnek **nem** kellett új komponenst kapnia, mert a „kinyitható JSON-detail"
+már itt van (AIS-153/163) — a napló ugyanezt használja, diff-páronként egy `mono` mezővel.
 
 **AIS-163 (2026-11-07):** a részletek-régió **JSON-értékei kibonthatók** — ha egy mezőérték `JSON.parse`
 után objektum vagy tömb (pl. `queryKey`, `mutationKey`, `body`, `responseMeta`), a `dd` megtartja a
@@ -1035,6 +1049,31 @@ archive a contact, revoke a pending invitation — are `ConfirmDialog`s with a l
 the tab (the AIS-173 exception), and the revoke action is rendered **only** on an `invited` row, because
 that is the only state the API lets an operator revoke. Both edit overlays mount their form keyed by
 `updatedAt`, the AIS-172 pattern, so a `409 STALE_WRITE` re-read reaches the inputs.
+
+**The activity and audit tabs (AIS-181).** These are the first two tabs with a read **of their own**, and
+that is the whole reason the page needed no structural change: each panel owns its `useListParams` call —
+`activityListQuerySchema` (`page`, `limit`, `order`) and `auditLogListQuerySchema` (the same three plus
+`tableName`, `operation`, `actorId`, `from`, `to`) — so the paging and the four ledger filters are **URL**
+state and `useCustomerActivities` / `useCustomerAuditLogs` simply consume the parsed query. The child
+collections have their own key factories (`CUSTOMER_ACTIVITIES_QUERY_KEYS`, `CUSTOMER_AUDIT_LOGS_QUERY_KEYS`)
+spread from `CUSTOMERS_QUERY_KEYS.all`, so one `customers` invalidation still refreshes the feed, the
+detail (`lastActivityAt` is derived from the activities) and the ledger together. Two interactions stay
+**local** `useState`: the inline activity editor (an inline surface has no address) and the delete
+confirmation (AIS-173 exception) — neither is linkable, neither comes from the server, no second part of
+the page reads them. The feed's note form renders in **every** state, empty included, because a customer
+without history must still be able to receive the first entry. The ledger renders through `LogEntryRow`
+(§4), imports **no** mutation, and shows an explicit read-only notice, so "no mutating action on this tab"
+is a property of the module graph rather than of a disabled flag.
+
+**Two URL-hook rules came out of that (AIS-181).** `useListParams` now **preserves the query parameters it
+does not own**: `writeParams` deletes only the schema's keys and merges the new list state into the
+current search params, so a pager click on `/customers/:id?tab=activity` no longer drops `tab` (that was a
+real defect, first observable the moment a paged list shared a route with a view parameter). The owned
+names come from the **schema shape**, not from the parsed defaults — a filter without a `default()`
+(`type`, `status`, `source`, `q`) is absent from the defaults object yet still owned, and deriving the
+names there would have left `?status=active` in the URL after a reset. And `useTabParam` takes an optional
+`clearParams`, so a **tab switch** deletes the previous tab's list keys in the *same* write: the two paged
+tabs share `page`/`limit`, and `?tab=activity&page=3` must not become `?tab=audit&page=3`.
 
 **The customer edit page (AIS-21) — the second half of that row.** `/customers/:id/edit` is a
 **sibling** of the detail entry (`D5`/`D14`), so editing replaces the read-only page instead of floating

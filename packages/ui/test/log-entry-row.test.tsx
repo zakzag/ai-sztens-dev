@@ -105,6 +105,34 @@ describe('LogEntryRow', () => {
     expect(screen.getByText(LOG_LEVEL_LABELS.warning)).toBeInTheDocument();
   });
 
+  it('renders the supplied levelLabel instead of the severity word (AIS-181)', () => {
+    render(
+      <LogEntryRow
+        entry={buildLogEntry({ level: 'info' })}
+        formatTimestamp={stubFormatTimestamp}
+        levelLabel="Módosítás"
+      />,
+    );
+
+    expect(screen.getByText('Módosítás')).toBeInTheDocument();
+    expect(screen.queryByText(LOG_LEVEL_LABELS.info)).not.toBeInTheDocument();
+  });
+
+  it('keeps the severity glyph and data-level when levelLabel is supplied', () => {
+    const { container } = render(
+      <LogEntryRow
+        entry={buildLogEntry({ level: 'warning' })}
+        formatTimestamp={stubFormatTimestamp}
+        levelLabel="Törlés"
+      />,
+    );
+
+    expect(container.firstElementChild).toHaveAttribute(
+      'data-level',
+      'warning',
+    );
+  });
+
   it('marks the row with its level for the accent recipe', () => {
     const { container } = renderRow({ level: 'system' });
 

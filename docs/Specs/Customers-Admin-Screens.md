@@ -1,6 +1,12 @@
 # Customers admin screens — screen contract (list, detail, wizard, edit)
 
-**Utolsó frissítés: 2026-11-25** (AIS-179: a cég adatlap **Kapcsolattartók** és **Felhasználók** füle —
+**Utolsó frissítés: 2026-11-25** (AIS-181: a cég adatlap **Tevékenység** és **Napló** füle —
+időrendi feed jegyzetíró űrlappal, soronkénti inline szerkesztéssel és `ConfirmDialog`-os soft delete-tel
+(**csak** `authorType === 'operator'` soron, `D-W4`), illetve egy **csak olvasható** napló négy URL-szűrővel
+(`tableName`, `operation`, `actorId`, `from`, `to`) és kibontható before → after diffel, amelyet a meglévő
+`LogEntryRow` primitív renderel (új `levelLabel` prop, `D8`/`D9`) — leszállítva; a két fül lapozója az
+URL-ben él, és a `useListParams` mostantól **megtartja az idegen query paramétereket** (`?tab=`), a
+fülváltás pedig egyetlen írásban törli a lapozó kulcsokat. Előző, 2026-11-25 — AIS-179: a cég adatlap **Kapcsolattartók** és **Felhasználók** füle —
 a detail payloadból olvasva, lapozó és URL-listaállapot nélkül (`D-W3`), négy route-alapú overlay
 (`/contacts/new`, `/contacts/:contactId/edit`, `/users/invite`, `/users/:userId/edit`), a
 `CUSTOMER_PRIMARY_CONTACT_CONFLICT` / `CUSTOMER_USER_EMAIL_CONFLICT` / `CUSTOMER_OWNER_CONFLICT` kódok a
@@ -188,8 +194,8 @@ The tab strip is the one element with no existing primitive. It stays a **page p
 | `data` — Cégadatok | key–value groups: azonosítók / jogi adatok / cím / egyéb | `Card` per group + `DescriptionList` (`columns: 2`) — **D12** |
 | `contacts` — Kapcsolattartók | list + create/edit/delete, roles as badges, "belépő" marker when `customerUserId !== null`. The list is read from the **detail payload** (`D-W3`): **no pager, no URL list state** — **delivered by AIS-179** | `DataTable` (no `Pagination`) + `EntityDialog` (children routes), `StatusBadge`, `ConfirmDialog` |
 | `users` — Felhasználók | list + invite; role/status per row, revoke **only** on an `invited` row. Also read from the **detail payload** (`D-W3`): **no pager, no URL list state** — the contract has no `listCustomerUsers` operation; **delivered by AIS-179** | `DataTable` (no `Pagination`) + `EntityDialog` (invite + edit), `StatusBadge` |
-| `activity` — Tevékenység | feed (newest first) + „Megjegyzés írása” form. Edit/delete render **only** on rows where `authorType === 'operator'` (`D-W4`, a client-side rule until AIS-73/74 adds authentication) | `Card` list + `Textarea` + `Button` + `FormActions` in `useAppForm` |
-| `audit` — Napló | read-only rows: `occurredAt`, `actorName`, `operation`, `tableName`; expandable diff | `DataTable` + the existing JSON logic of [`json.logic.ts`](../../packages/ui/src/lib/json.logic.ts:1) (`toPrettyJson`) — **no second renderer** |
+| `activity` — Tevékenység | feed (newest first) + „Megjegyzés írása” form. Edit/delete render **only** on rows where `authorType === 'operator'` (`D-W4`, a client-side rule until AIS-73/74 adds authentication); the editor is **inline** in the row and the delete is a `ConfirmDialog` with a local target (AIS-173 exception) — **delivered by AIS-181** | `Card` list + `Textarea` + `Button` + `FormActions` in `useAppForm` + `Pagination` |
+| `audit` — Napló | read-only rows: operation badge, `actorName` as the sentence, `actorName`/actor kind + `tableName` + `recordId` as the one-line detail and `occurredAt` as the timestamp; the expandable **before → after** diff is the row's `details` region. Four filters (`tableName`, `operation`, author, `from`/`to`) live in the URL — **delivered by AIS-181**. The author choices are the distinct actors of the current page (no directory endpoint exists), and `to` is sent as the start of the **following** day because the bound is inclusive | `LogEntryRow` (severity glyph + `levelLabel` = the operation, expandable key–value list with `toPrettyJson` and the copy controls) + `Select`/`DatePicker` filters + `Pagination` — **no second renderer**, and `packages/ui` gains no new component |
 
 ### 3.3 The four states per tab
 
@@ -198,8 +204,8 @@ The tab strip is the one element with no existing primitive. It stays a **page p
 | `overview` / `data` | `DescriptionList isLoading` (skeleton rows, no `dd`) | n/a — the detail always has a row | `PageErrorState` + retry (tier `page`) | the two lists |
 | `contacts` | the **detail's own** loading state (`useApiDetail` in flight) — the tab has no list request of its own (`D-W3`), so there is no `DataTable isLoading` here | „Nincs kapcsolattartó” + CTA „Kapcsolattartó hozzáadása” | `PageErrorState` **inside the tab** + retry | table, no pager |
 | `users` | the **detail's own** loading state, same reason (`D-W3`) | „Nincs belépő felhasználó” + CTA „Meghívás” | same | table, no pager |
-| `activity` | skeleton cards | „Nincs rögzített tevékenység” + the note form | same | feed + the note form |
-| `audit` | `DataTable isLoading` | „Nincs naplóbejegyzés” | same | table + JSON detail |
+| `activity` | `Skeleton` + an `sr-only` loading sentence | „Nincs rögzített tevékenység” + the note form (**the form stays usable**) | `PageErrorState` inside the tab + retry | feed + pager + the note form |
+| `audit` | `Skeleton` + an `sr-only` loading sentence | „Nincs naplóbejegyzés”, or the filtered copy when a filter is active | `PageErrorState` inside the tab + retry | `LogEntryRow` list + filters + pager, and the read-only notice |
 
 A nested tab error is **scoped to the tab**: it does not replace the whole page, because the other
 tabs may be perfectly readable. That is the one place where `PageErrorState` is rendered inside a
@@ -403,7 +409,7 @@ apps/admin/src/features/customers/               AIS-19 ✅: use-customers-list.
                                                  AIS-21 ✅: use-update-customer.ts, use-update-customer-status.ts
                                                  (a use-customer-tags.ts az AIS-193 ticketé)
                                                  AIS-179 ✅: use-customer-contacts.ts, use-customer-users.ts
-                                                 AIS-181: use-customer-activities.ts, use-customer-audit-logs.ts
+                                                 AIS-181 ✅: use-customer-activities.ts, use-customer-audit-logs.ts
                                                  AIS-182: use-create-customer.ts
                                                  shared: customers.const.ts (query keys via
                                                  createEntityQueryKeys), customers.logic.ts,
@@ -437,9 +443,10 @@ const, mapper, `components/CustomerStatusBadge.tsx`), `pages/customers/*` (`Cust
 `CustomerCreatePage`, `customers.const.ts`, `customers.interface.ts`, `customers.logic.ts`,
 `customers-wizard.store.ts` + provider/interface/errors, `ui/CustomersFilters`, `ui/CustomersTable`,
 `ui/ArchiveCustomerDialog`, `ui/CustomerWizardStepper`), the route entries and the MSW handlers in
-`apps/admin/src/test/mocks/handlers/customers.handlers.ts`. Still open on this contract: the edit form
-and the tags chip bar (AIS-21), the two overlay tabs (AIS-179), the activity/audit tabs (AIS-181) and
-the wizard's steps 2–4 with the submit (AIS-182).
+`apps/admin/src/test/mocks/handlers/customers.handlers.ts`. Every read of the detail surface is part of
+the default set (the detail, the feed and the ledger); a test that writes registers the outcome it
+asserts. Still open on this contract: the wizard's steps 2–4 with the submit (AIS-182) and the tag
+chip bar (AIS-193).
 
 **Delivered by AIS-20 (2026-11-25), verified against the tree:** `features/customers/use-customer-detail.ts`,
 the entity additions (`CustomerDetailViewModel`/`CustomerDetailGroup` in `customer.interface.ts`, the

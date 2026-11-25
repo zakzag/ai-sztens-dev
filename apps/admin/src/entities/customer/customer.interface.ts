@@ -8,12 +8,14 @@
  */
 
 import type {
+  ActivityType,
+  AuditOperation,
   ContactRole,
   CustomerStatus,
   CustomerUserRole,
   CustomerUserStatus,
 } from '@callback/shared';
-import type { BadgeVariants, DescriptionListItem } from '@callback/ui';
+import type { BadgeVariants, DescriptionListItem, ToastLevel } from '@callback/ui';
 
 /** The badge vocabulary of `@callback/ui`, so the mapper cannot invent a variant. */
 export type BadgeVariant = NonNullable<BadgeVariants['variant']>;
@@ -194,3 +196,95 @@ export interface CustomerUserViewModel {
 
 /** The mapped login users of one customer, in server order. */
 export type CustomerUserViewModels = readonly CustomerUserViewModel[];
+
+/**
+ * One entry of the *Tevékenység* feed, ready to render (AIS-181).
+ *
+ * `canEdit` is the `D-W4` client-side rule materialised: the API checks no author
+ * (there is no admin authentication before AIS-73/74), so the screen only offers
+ * the edit and delete actions on entries an **operator** wrote.
+ */
+export interface CustomerActivityViewModel {
+  /** Entry uuid — the row key and the id the two writes address. */
+  readonly id: string;
+  /** Machine kind, kept for the badge hook (`data-type`). */
+  readonly type: ActivityType;
+  /** Localised kind. */
+  readonly typeLabel: string;
+  /** Badge variant of the kind. */
+  readonly typeVariant: BadgeVariant;
+  /** The author's name, snapshotted by the server so it survives deactivation. */
+  readonly authorName: string;
+  /** Localised author kind (`Operátor`, `Ügyfél felhasználója`, …). */
+  readonly authorTypeText: string;
+  /** Formatted creation time, never a raw ISO string. */
+  readonly createdAtText: string;
+  /** The entry's text, rendered with its line breaks preserved. */
+  readonly body: string;
+  /** `true` only for an `operator`-authored entry (`D-W4`). */
+  readonly canEdit: boolean;
+  /** Concurrency token of a patch: `updatedAt ?? createdAt` (AIS-181 `D13`). */
+  readonly updateToken: string;
+}
+
+/** The mapped entries of one page, in server order (newest first). */
+export type CustomerActivityViewModels = readonly CustomerActivityViewModel[];
+
+/**
+ * One changed field of an audited row (AIS-181).
+ *
+ * `beforeText`/`afterText` are already display strings: a missing side is the
+ * “no value” copy and an object value is compact JSON, so the renderer never
+ * decides how a `null` or a nested document looks.
+ */
+export interface AuditLogDiffField {
+  /** Wire name of the column, rendered as the field's visible label. */
+  readonly label: string;
+  /** The previous value, or the “no value” copy when the column had none. */
+  readonly beforeText: string;
+  /** The new value, or the “no value” copy when the column has none. */
+  readonly afterText: string;
+}
+
+/** One row of the *Napló* tab, ready to render (AIS-181). */
+export interface CustomerAuditLogViewModel {
+  /** Row key — the ledger's own numeric id, as a string. */
+  readonly id: string;
+  /** Formatted occurrence time. */
+  readonly occurredAtText: string;
+  /** The same instant in epoch milliseconds, as `LogEntryRow` expects. */
+  readonly occurredAtMs: number;
+  /** Machine operation, kept for the level table. */
+  readonly operation: AuditOperation;
+  /** Localised operation — also the row's badge text. */
+  readonly operationLabel: string;
+  /** Severity the row's glyph and `data-level` use. */
+  readonly level: ToastLevel;
+  /** Raw table name, kept for the filter value. */
+  readonly tableName: string;
+  /** Localised table name. */
+  readonly tableLabel: string;
+  /** The actor's name, snapshotted by the ledger. */
+  readonly actorName: string;
+  /** The actor's uuid, or `null` for a `system` row (which no filter can select). */
+  readonly actorId: string | null;
+  /** Localised actor kind. */
+  readonly actorTypeText: string;
+  /** Id of the audited record, or `null` when the ledger row has none. */
+  readonly recordIdText: string | null;
+  /** Before → after pairs of the changed columns, in stable order. */
+  readonly diffFields: readonly AuditLogDiffField[];
+  /** Correlation id of the request, or `null`. */
+  readonly requestId: string | null;
+}
+
+/** The mapped rows of one page, in server order. */
+export type CustomerAuditLogViewModels = readonly CustomerAuditLogViewModel[];
+
+/** One selectable author of the ledger's `actorId` filter (AIS-181). */
+export interface AuditLogActorOption {
+  /** Actor uuid — the value written to the URL. */
+  readonly id: string;
+  /** Actor name — the visible text. */
+  readonly name: string;
+}

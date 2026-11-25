@@ -3,41 +3,23 @@
  *
  * A **total** `Record` over the closed `CustomerTab` union, not a `switch` with a
  * `default`: a seventh tab added to `CUSTOMER_TAB_VALUES` fails the build here
- * until somebody decides what it renders. That is also what let AIS-179 land its
- * two tabs by editing **this file only** — the page itself never learns how many
- * tabs exist.
+ * until somebody decides what it renders. That is also what let AIS-179 and AIS-181
+ * land their tabs by editing **this file only** — the page itself never learns how
+ * many tabs exist or what they read.
  *
- * The two tabs that still belong to a later ticket (AIS-181) map to a shared
- * placeholder instead of being left out: an empty body would look like a customer
- * without data, while the placeholder says the tab is not there yet.
+ * The two AIS-181 entries are the first ones with a read of their own: the feed and
+ * the ledger are separate paged endpoints, so their components own their
+ * `useListParams` state and their own four UI states.
  */
 
-import { EmptyState } from '@callback/ui';
 import type { ComponentType } from 'react';
-import {
-  CUSTOMER_DETAIL_TAB_PLACEHOLDER_DESCRIPTION,
-  CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE,
-} from '../customers.const.js';
 import type { CustomerTab, CustomerTabPanelProps } from '../customers.interface.js';
+import { CustomerActivityTab } from './CustomerActivityTab.js';
+import { CustomerAuditTab } from './CustomerAuditTab.js';
 import { CustomerContactsTab } from './CustomerContactsTab.js';
 import { CustomerDataTab } from './CustomerDataTab.js';
 import { CustomerOverviewTab } from './CustomerOverviewTab.js';
 import { CustomerUsersTab } from './CustomerUsersTab.js';
-
-/**
- * Body of a tab whose content is owned by AIS-181.
- *
- * Deliberately prop-free: it renders the same notice whichever tab is open, and
- * the active tab is already named by the strip's `aria-current`.
- */
-function CustomerTabPlaceholder() {
-  return (
-    <EmptyState
-      title={CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE}
-      description={CUSTOMER_DETAIL_TAB_PLACEHOLDER_DESCRIPTION}
-    />
-  );
-}
 
 /** The panel of every tab, keyed by the `?tab=` value. */
 export const CUSTOMER_TAB_PANELS: Readonly<
@@ -48,6 +30,7 @@ export const CUSTOMER_TAB_PANELS: Readonly<
   // AIS-179: both tabs read the detail payload, so they need no page change.
   contacts: CustomerContactsTab,
   users: CustomerUsersTab,
-  activity: CustomerTabPlaceholder,
-  audit: CustomerTabPlaceholder,
+  // AIS-181: two paged reads of their own (feed and ledger).
+  activity: CustomerActivityTab,
+  audit: CustomerAuditTab,
 };

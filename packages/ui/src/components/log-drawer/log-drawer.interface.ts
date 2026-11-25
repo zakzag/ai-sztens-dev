@@ -129,6 +129,17 @@ export interface LogEntryRowProps {
    * library, and the caller already owns localisation (AIS-82 decision D6).
    */
   readonly formatTimestamp: (epochMs: number) => string;
+  /**
+   * Copy of the badge next to the severity glyph, when severity is not what the
+   * reader needs to see (AIS-181).
+   *
+   * The glyph and the row's `data-level` keep communicating severity, so a host
+   * whose entries are **not** severities — the customer audit log, whose levels
+   * stand for `insert`/`update`/`delete`/`soft_delete` — can show the operation's
+   * own name instead of “Sikeres” or “Figyelmeztetés”. Omitted, the row renders
+   * the built-in severity label exactly as before.
+   */
+  readonly levelLabel?: string;
 }
 
 /**

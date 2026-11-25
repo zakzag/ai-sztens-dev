@@ -6,11 +6,15 @@
  */
 
 import type {
+  Activity,
+  AuditLog,
   Contact,
+  CreateActivityInput,
   CreateContactInput,
   Customer,
   CustomerUser,
   InviteCustomerUserInput,
+  UpdateActivityInput,
   UpdateContactInput,
   UpdateCustomerInput,
   UpdateCustomerStatusInput,
@@ -189,6 +193,72 @@ export interface UseUpdateCustomerUserResult extends ApiErrorView {
 export interface UseRemoveCustomerUserResult extends ApiErrorView {
   /** Revokes the bound **pending invitation**; answers `data: null`. */
   readonly removeCustomerUser: () => Promise<null>;
+  /** `true` while the write is in flight; disables the confirm button. */
+  readonly isPending: boolean;
+}
+
+/**
+ * The two inputs the **activity note** form owns (AIS-181).
+ *
+ * `type` and `body` only: the author is a server-side decision (`author_*` comes
+ * from the request context, `createActivitySchema` is `.strict()`), and
+ * `metadata` has no control on this screen.
+ */
+export type CustomerActivityFormFieldName = 'type' | 'body';
+
+/**
+ * Result of {@link useCustomerActivities} (AIS-181).
+ *
+ * `meta` is the envelope's `meta`, or `null` before the first response — the same
+ * shape the list hook exposes, so the tab's pager renders only once a page exists.
+ */
+export interface CustomerActivitiesResult extends ApiErrorView {
+  /** Live activities of the current page; the frozen empty list until a response. */
+  readonly activities: readonly Activity[];
+  /** `meta.pagination` of the current response, or `null` before the first one. */
+  readonly meta: PaginatedMeta<readonly Activity[]> | null;
+  /** `true` until the first response (or failure) arrives. */
+  readonly isLoading: boolean;
+  /** `true` while any request is in flight, including a manual refetch. */
+  readonly isFetching: boolean;
+  /** Manual retry for the error state. */
+  readonly refetch: () => void;
+}
+
+/** Result of {@link useCustomerAuditLogs} — the ledger's read-only counterpart. */
+export interface CustomerAuditLogsResult extends ApiErrorView {
+  /** Rows of the current page; the frozen empty list until a response. */
+  readonly auditLogs: readonly AuditLog[];
+  /** `meta.pagination` of the current response, or `null` before the first one. */
+  readonly meta: PaginatedMeta<readonly AuditLog[]> | null;
+  /** `true` until the first response (or failure) arrives. */
+  readonly isLoading: boolean;
+  /** `true` while any request is in flight, including a manual refetch. */
+  readonly isFetching: boolean;
+  /** Manual retry for the error state. */
+  readonly refetch: () => void;
+}
+
+/** Result of {@link useCreateActivityMutation}. */
+export interface UseCreateActivityResult extends ApiErrorView {
+  /** Records one entry in the caller's name; the author is never in the body. */
+  readonly createActivity: (input: CreateActivityInput) => Promise<Activity>;
+  /** `true` while the write is in flight; disables the submit button. */
+  readonly isPending: boolean;
+}
+
+/** Result of {@link useUpdateActivityMutation} — both ids are bound. */
+export interface UseUpdateActivityResult extends ApiErrorView {
+  /** Patches the bound entry; the body always carries the concurrency token. */
+  readonly updateActivity: (input: UpdateActivityInput) => Promise<Activity>;
+  /** `true` while the write is in flight; disables the save button. */
+  readonly isPending: boolean;
+}
+
+/** Result of {@link useRemoveActivityMutation} — both ids are bound. */
+export interface UseRemoveActivityResult extends ApiErrorView {
+  /** Soft-deletes the bound entry; the endpoint answers `data: null`. */
+  readonly removeActivity: () => Promise<null>;
   /** `true` while the write is in flight; disables the confirm button. */
   readonly isPending: boolean;
 }

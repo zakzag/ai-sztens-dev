@@ -85,4 +85,41 @@ describe('useTabParam', () => {
     expect(getSearch()).toContain('q=pelda');
     expect(getSearch()).toContain('step=4');
   });
+
+  it('clears the named list params in the same write (AIS-181)', () => {
+    const tabs = ['overview', 'activity', 'audit'] as const;
+    const { result, getSearch } = renderHookWithRouter(
+      () =>
+        useTabParam({
+          paramName: 'tab',
+          allowed: tabs,
+          fallback: 'overview',
+          clearParams: ['page', 'limit'],
+        }),
+      { initialEntries: ['/customers/abc?tab=activity&page=3&limit=50'] },
+    );
+
+    act(() => {
+      result.current.setValue('audit');
+    });
+
+    const searchParams = new URLSearchParams(getSearch());
+    expect(searchParams.get('tab')).toBe('audit');
+    expect(searchParams.get('page')).toBeNull();
+    expect(searchParams.get('limit')).toBeNull();
+  });
+
+  it('keeps the cleared params when no clearParams is configured', () => {
+    const { result, getSearch } = renderHookWithRouter(
+      () =>
+        useTabParam({ paramName: 'step', allowed: ALLOWED, fallback: '1' }),
+      { initialEntries: ['/customers/new?page=2'] },
+    );
+
+    act(() => {
+      result.current.setValue('2');
+    });
+
+    expect(getSearch()).toContain('page=2');
+  });
 });

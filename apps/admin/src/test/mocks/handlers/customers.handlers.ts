@@ -15,11 +15,21 @@
  */
 
 import { http } from 'msw';
-import type { Customer, CustomerDetail, PaginationMeta } from '@callback/shared';
+import type {
+  Activity,
+  AuditLog,
+  Customer,
+  CustomerDetail,
+  PaginationMeta,
+} from '@callback/shared';
 import {
   API_ERROR_CODE,
   CUSTOMERS_PATH,
   SECOND_CUSTOMER,
+  VALID_ACTIVITY,
+  VALID_ACTIVITY_LIST,
+  VALID_AUDIT_LOG,
+  VALID_AUDIT_LOG_LIST,
   VALID_CONTACT,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
@@ -351,12 +361,134 @@ export const customersUserRemoveSuccess = http.delete(
 export const CUSTOMER_CONTACT_FIXTURES = VALID_CUSTOMER_DETAIL.contacts;
 export const CUSTOMER_USER_FIXTURES = VALID_CUSTOMER_DETAIL.customerUsers;
 
+// ---------------------------------------------------------------------------
+// AIS-181 — the activity feed and the audit ledger
+// ---------------------------------------------------------------------------
+
+/**
+ * Path templates of the two paged child collections (AIS-181).
+ *
+ * Built from `CUSTOMERS_PATH` like every pattern above, so a change of the
+ * resource root cannot leave a stale handler behind.
+ */
+export const CUSTOMERS_ACTIVITIES_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/activities`;
+export const CUSTOMERS_ACTIVITY_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/activities/:activityId`;
+export const CUSTOMERS_AUDIT_LOGS_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/audit-logs`;
+
+/** Pagination block of the two-row activity fixture page. */
+const ACTIVITY_PAGE_PAGINATION: PaginationMeta = toPaginationMeta(
+  { page: 1, limit: 20 },
+  VALID_ACTIVITY_LIST.length,
+);
+
+/** `200` activity page — one operator entry and one system entry. */
+export const customersActivitiesSuccess = http.get(
+  CUSTOMERS_ACTIVITIES_PATH_PATTERN,
+  () =>
+    successResponse(VALID_ACTIVITY_LIST, {
+      pagination: ACTIVITY_PAGE_PAGINATION,
+    }),
+);
+
+/** `200` empty activity page — `totalPages` is `0`, never `1`. */
+export const customersActivitiesEmpty = http.get(
+  CUSTOMERS_ACTIVITIES_PATH_PATTERN,
+  () =>
+    successResponse([], {
+      pagination: toPaginationMeta({ page: 1, limit: 20 }, 0),
+    }),
+);
+
+/** `500` activity page failure with its own correlation id. */
+export const customersActivitiesServerError = http.get(
+  CUSTOMERS_ACTIVITIES_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.INTERNAL_ERROR, 'Internal server error', {
+      requestId: 'req-customer-activities-server',
+      path: CUSTOMERS_ACTIVITIES_PATH_PATTERN,
+    }),
+);
+
+/** `201` activity creation — answers the operator fixture row. */
+export const customerActivityCreateSuccess = http.post(
+  CUSTOMERS_ACTIVITIES_PATH_PATTERN,
+  () => successResponse(VALID_ACTIVITY),
+);
+
+/** `200` activity patch — answers the operator fixture row. */
+export const customerActivityUpdateSuccess = http.patch(
+  CUSTOMERS_ACTIVITY_PATH_PATTERN,
+  () => successResponse(VALID_ACTIVITY),
+);
+
+/** `409 STALE_WRITE` on an activity patch. */
+export const customerActivityUpdateStaleWrite = http.patch(
+  CUSTOMERS_ACTIVITY_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.STALE_WRITE, 'The row was modified meanwhile', {
+      path: CUSTOMERS_ACTIVITY_PATH_PATTERN,
+    }),
+);
+
+/** `200` activity soft delete — the envelope carries `data: null`. */
+export const customerActivityRemoveSuccess = http.delete(
+  CUSTOMERS_ACTIVITY_PATH_PATTERN,
+  () => successResponse(null),
+);
+
+/** `200` audit-log page — one `insert` row, authored by `system`. */
+export const customersAuditLogsSuccess = http.get(
+  CUSTOMERS_AUDIT_LOGS_PATH_PATTERN,
+  () =>
+    successResponse(VALID_AUDIT_LOG_LIST, {
+      pagination: toPaginationMeta(
+        { page: 1, limit: 20 },
+        VALID_AUDIT_LOG_LIST.length,
+      ),
+    }),
+);
+
+/** `200` empty audit-log page. */
+export const customersAuditLogsEmpty = http.get(
+  CUSTOMERS_AUDIT_LOGS_PATH_PATTERN,
+  () =>
+    successResponse([], {
+      pagination: toPaginationMeta({ page: 1, limit: 20 }, 0),
+    }),
+);
+
+/** `500` audit-log page failure with its own correlation id. */
+export const customersAuditLogsServerError = http.get(
+  CUSTOMERS_AUDIT_LOGS_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.INTERNAL_ERROR, 'Internal server error', {
+      requestId: 'req-customer-audit-logs-server',
+      path: CUSTOMERS_AUDIT_LOGS_PATH_PATTERN,
+    }),
+);
+
+/**
+ * The activity and ledger fixtures the handlers answer with, re-exported for
+ * assertions — a tab test reads the same object the wire carried.
+ */
+export const CUSTOMER_ACTIVITY_FIXTURES: readonly Activity[] =
+  VALID_ACTIVITY_LIST;
+export const CUSTOMER_AUDIT_LOG_FIXTURES: readonly AuditLog[] =
+  VALID_AUDIT_LOG_LIST;
+export const CUSTOMER_AUDIT_LOG_FIXTURE: AuditLog = VALID_AUDIT_LOG;
+
 /**
  * Default handler set registered by the global server.
  *
- * The detail read is part of it: the detail page is mounted by the router, so a
- * test that mounts the app (not just one page) must find a working detail
- * endpoint by default instead of a network error. The **write** handlers are not:
- * a test that writes registers exactly the outcome it asserts (AIS-21).
+ * The three **reads** of the detail surface are part of it: the detail page is
+ * mounted by the router and its two paged tabs fetch as soon as they are opened,
+ * so a test that mounts the app must find every read endpoint by default instead
+ * of a network error. The **write** handlers are not: a test that writes registers
+ * exactly the outcome it asserts (AIS-21, AIS-181).
  */
-export const customersHandlers = [customersListSuccess, customersDetailSuccess];
+export const customersHandlers = [
+  customersListSuccess,
+  customersDetailSuccess,
+  customersActivitiesSuccess,
+  customersAuditLogsSuccess,
+];

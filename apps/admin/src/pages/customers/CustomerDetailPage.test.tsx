@@ -13,7 +13,12 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
-import { VALID_CUSTOMER, VALID_CUSTOMER_DETAIL } from '@callback/shared';
+import {
+  VALID_ACTIVITY,
+  VALID_AUDIT_LOG,
+  VALID_CUSTOMER,
+  VALID_CUSTOMER_DETAIL,
+} from '@callback/shared';
 import { CUSTOMER_DETAIL_GROUP_TITLES } from '../../entities/customer/customer.const.js';
 import { PAGE_ERROR_RETRY_LABEL } from '../../lib/error-surface.const.js';
 import {
@@ -35,7 +40,6 @@ import {
   CUSTOMER_DETAIL_LOADING_MESSAGE,
   CUSTOMER_DETAIL_NOT_FOUND_TITLE,
   CUSTOMER_DETAIL_ROUTE_PATH,
-  CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE,
   CUSTOMER_DETAIL_TABS,
   CUSTOMER_USERS_INVITE_LABEL,
 } from './customers.const.js';
@@ -174,14 +178,10 @@ describe('CustomerDetailPage', () => {
       expect(location()).toContain('tab=users');
     });
     expect(location()).toBe(`/customers/${VALID_CUSTOMER_DETAIL.id}?tab=users`);
-    // AIS-179: the `users` tab is a real tab now — its invite CTA is the marker
-    // that the placeholder copy is gone from this panel.
+    // AIS-179: the `users` tab is a real tab now — its invite CTA is the marker.
     expect(
       screen.getByRole('link', { name: CUSTOMER_USERS_INVITE_LABEL }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText(CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE),
-    ).not.toBeInTheDocument();
   });
 
   it('falls back to the default tab for an unknown value', async () => {
@@ -196,8 +196,50 @@ describe('CustomerDetailPage', () => {
     expect(
       screen.getByRole('button', { name: labelOf('overview') }),
     ).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('renders the activity feed on `?tab=activity` (AIS-181)', async () => {
+    renderPage(`${DETAIL_ENTRY}?tab=activity`);
+
+    expect(await screen.findByText(VALID_ACTIVITY.body)).toBeInTheDocument();
     expect(
-      screen.queryByText(CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: labelOf('activity') }),
+    ).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('renders the audit ledger on `?tab=audit` (AIS-181)', async () => {
+    renderPage(`${DETAIL_ENTRY}?tab=audit`);
+
+    expect(await screen.findByText(VALID_AUDIT_LOG.actorName)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: labelOf('audit') }),
+    ).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('drops the paged list state when the tab changes (AIS-181)', async () => {
+    const { location } = renderPage(
+      `${DETAIL_ENTRY}?tab=activity&page=3&limit=50`,
+    );
+
+    await screen.findByText(VALID_ACTIVITY.body);
+
+    await userEvent.click(screen.getByRole('button', { name: labelOf('audit') }));
+
+    await waitFor(() => {
+      expect(location()).toContain('tab=audit');
+    });
+
+    // One write: the new tab, and none of the `activity` tab's paging keys.
+    expect(location()).toBe(`${DETAIL_ENTRY}?tab=audit`);
+  });
+
+  it('keeps `?tab=` when the feed is paged (AIS-181)', async () => {
+    const { location } = renderPage(`${DETAIL_ENTRY}?tab=activity&page=3`);
+
+    await screen.findByText(VALID_ACTIVITY.body);
+
+    // The tab is still `activity` — the paged read did not rewrite the URL.
+    expect(location()).toContain('tab=activity');
+    expect(location()).toContain('page=3');
   });
 });

@@ -17,6 +17,8 @@ import {
   CUSTOMER_USER_MANAGED_STATUS_VALUES,
   CUSTOMER_USER_ROLE_VALUES,
   HEADCOUNT_RANGE_VALUES,
+  activityListQuerySchema,
+  auditLogListQuerySchema,
   type CustomerListQuery,
 } from '@callback/shared';
 import type { RadioOption, SelectOption } from '@callback/ui';
@@ -325,15 +327,104 @@ export const CUSTOMER_DETAIL_UNAVAILABLE_DESCRIPTION =
   'A felső sávban jelzett hiba miatt az adatok nem tölthetők be. Próbáld újra, amint a kapcsolat helyreáll.';
 
 /**
- * Body of a tab whose content is owned by a later ticket (AIS-179 / AIS-181).
+ * The query keys a **tab switch** invalidates (AIS-181 `D5`).
  *
- * Its own copy, so a half-built tab reads as “not yet” instead of as an empty
- * table that looks like a customer without data.
+ * The two paged tabs of the detail page share `page`/`limit`, so a switch from
+ * `?tab=activity&page=3` to the ledger must not carry the page over — the third
+ * page of a different collection is not what the operator asked for. Derived from
+ * the two shared query schemas, so a new filter joins the list automatically.
  */
-export const CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE =
-  'Ez a fül még nem érhető el';
-export const CUSTOMER_DETAIL_TAB_PLACEHOLDER_DESCRIPTION =
-  'Ez a fül a következő fejlesztésben érkezik.';
+export const CUSTOMER_TAB_LIST_PARAM_NAMES: readonly string[] = Object.freeze([
+  ...new Set([
+    ...Object.keys(activityListQuerySchema.shape),
+    ...Object.keys(auditLogListQuerySchema.shape),
+  ]),
+]);
+
+/** Heading above the *Tevékenység* feed (also the form's section title). */
+export const CUSTOMER_ACTIVITY_TITLE = 'Tevékenységek';
+
+/** Announced by screen readers while the feed's first page is in flight. */
+export const CUSTOMER_ACTIVITY_LOADING_MESSAGE =
+  'A tevékenységek betöltése…';
+
+/** Page-tier failure of the feed (a tab-scoped `PageErrorState`). */
+export const CUSTOMER_ACTIVITY_ERROR_TITLE =
+  'A tevékenységek betöltése nem sikerült.';
+
+/** Empty feed — the form above it stays usable (screen contract §3.3). */
+export const CUSTOMER_ACTIVITY_EMPTY_TITLE = 'Nincs rögzített tevékenység';
+export const CUSTOMER_ACTIVITY_EMPTY_DESCRIPTION =
+  'Az első bejegyzést az alábbi űrlapon rögzítheted.';
+
+/** The note form of the feed. */
+export const CUSTOMER_ACTIVITY_FORM_TITLE = 'Új bejegyzés';
+export const CUSTOMER_ACTIVITY_TYPE_LABEL = 'Típus';
+export const CUSTOMER_ACTIVITY_BODY_LABEL = 'Szöveg';
+export const CUSTOMER_ACTIVITY_SUBMIT_LABEL = 'Megjegyzés hozzáadása';
+export const CUSTOMER_ACTIVITY_FORM_ERROR_TITLE = 'A rögzítés nem sikerült.';
+
+/** Field ids of the note form (labels and messages derive from them). */
+export const CUSTOMER_ACTIVITY_FIELD_IDS = {
+  type: 'customer-activity-type',
+  body: 'customer-activity-body',
+} as const;
+
+/** Per-row actions, rendered only on operator-authored entries (`D-W4`). */
+export const CUSTOMER_ACTIVITY_EDIT_LABEL = 'Szerkesztés';
+export const CUSTOMER_ACTIVITY_SAVE_LABEL = 'Mentés';
+export const CUSTOMER_ACTIVITY_CANCEL_LABEL = 'Mégse';
+export const CUSTOMER_ACTIVITY_DELETE_LABEL = 'Törlés';
+
+/** Delete confirmation — a non-navigable dialog (AIS-173 exception). */
+export const CUSTOMER_ACTIVITY_DELETE_DIALOG_TITLE = 'Bejegyzés törlése';
+export const CUSTOMER_ACTIVITY_DELETE_DIALOG_DESCRIPTION =
+  'A bejegyzés ezután nem jelenik meg a tevékenységek között. A napló viszont megőrzi a törlés tényét.';
+export const CUSTOMER_ACTIVITY_DELETE_CONFIRM_LABEL = 'Törlés';
+
+/** Heading and states of the *Napló* tab. */
+export const CUSTOMER_AUDIT_TITLE = 'Napló';
+
+/** Announced by screen readers while the ledger's first page is in flight. */
+export const CUSTOMER_AUDIT_LOADING_MESSAGE = 'A napló betöltése…';
+
+/** Page-tier failure of the ledger (a tab-scoped `PageErrorState`). */
+export const CUSTOMER_AUDIT_ERROR_TITLE =
+  'A napló betöltése nem sikerült.';
+export const CUSTOMER_AUDIT_LIST_LABEL = 'Naplóbejegyzések';
+export const CUSTOMER_AUDIT_EMPTY_TITLE = 'Nincs naplóbejegyzés';
+export const CUSTOMER_AUDIT_EMPTY_DESCRIPTION =
+  'Ezen a szűréssel nincs megjeleníthető bejegyzés.';
+export const CUSTOMER_AUDIT_EMPTY_FILTERED_TITLE =
+  'Nincs a szűrésnek megfelelő bejegyzés';
+export const CUSTOMER_AUDIT_EMPTY_FILTERED_DESCRIPTION =
+  'A beállított szűrők egyetlen naplóbejegyzést sem találnak. Töröld a szűrőket az összes bejegyzés megtekintéséhez.';
+export const CUSTOMER_AUDIT_READ_ONLY_NOTICE =
+  'A napló csak olvasható: bejegyzést sem szerkeszteni, sem törölni nem lehet.';
+
+/** Filters of the ledger, all four in the URL (AIS-181 `D10`). */
+export const CUSTOMER_AUDIT_FILTER_TABLE_LABEL = 'Tábla';
+export const CUSTOMER_AUDIT_FILTER_OPERATION_LABEL = 'Művelet';
+export const CUSTOMER_AUDIT_FILTER_ACTOR_LABEL = 'Szerző';
+export const CUSTOMER_AUDIT_FILTER_FROM_LABEL = 'Ettől';
+export const CUSTOMER_AUDIT_FILTER_TO_LABEL = 'Eddig';
+export const CUSTOMER_AUDIT_FILTER_ALL_LABEL = 'Összes';
+export const CUSTOMER_AUDIT_FILTER_CLEAR_LABEL = 'Szűrők törlése';
+
+/** Field ids of the four filters. */
+export const CUSTOMER_AUDIT_FILTER_IDS = {
+  tableName: 'customer-audit-table',
+  operation: 'customer-audit-operation',
+  actorId: 'customer-audit-actor',
+  from: 'customer-audit-from',
+  to: 'customer-audit-to',
+} as const;
+
+/** Detail field of the row that exposes the request's correlation id. */
+export const CUSTOMER_AUDIT_REQUEST_ID_LABEL = 'Kérés azonosító';
+
+/** Separator of the facts in a row's one-line detail. */
+export const CUSTOMER_AUDIT_META_SEPARATOR = ' · ';
 
 /** Page header of the edit surface (AIS-21). */
 export const CUSTOMER_EDIT_PAGE_TITLE = 'Cég szerkesztése';

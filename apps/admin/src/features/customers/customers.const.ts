@@ -15,11 +15,16 @@ import {
   API_ERROR_CODE,
   LIST_QUERY_DEFAULT_LIMIT,
   LIST_QUERY_MAX_LIMIT,
+  type Activity,
+  type ActivityListQuery,
+  type AuditLog,
+  type AuditLogListQuery,
   type Customer,
   type CustomerListQuery,
 } from '@callback/shared';
 import { createEntityQueryKeys } from '../api/create-entity-query-keys.js';
 import type {
+  CustomerActivityFormFieldName,
   CustomerContactFormFieldName,
   CustomerUpdateFieldName,
   CustomerUserEditFormFieldName,
@@ -189,3 +194,61 @@ export const CUSTOMER_USER_EDIT_DEFAULT_PATH_BY_CODE: Readonly<
 > = Object.freeze({
   [API_ERROR_CODE.CUSTOMER_OWNER_CONFLICT]: 'role',
 });
+
+/**
+ * Cache keys of the customer **activity feed** (AIS-181).
+ *
+ * `createEntityQueryKeys` models the customer's own `list`/`detail`; a child
+ * collection needs its own key, and deriving it from `CUSTOMERS_QUERY_KEYS.all`
+ * is what keeps **one** invalidation prefix: `invalidateQueries(customers.all)`
+ * refreshes the feed, the detail (`lastActivityAt` is derived from the feed) and
+ * the list row with a single call.
+ */
+export const CUSTOMER_ACTIVITIES_QUERY_KEYS = {
+  /** Prefix of every activity query of every customer. */
+  all: [...CUSTOMERS_QUERY_KEYS.all, 'activities'] as const,
+  /** One key per customer **and** per paged query. */
+  list: (customerId: string, params: ActivityListQuery) =>
+    [...CUSTOMERS_QUERY_KEYS.all, 'activities', customerId, params] as const,
+};
+
+/**
+ * Cache keys of the read-only **audit log** of one customer (AIS-181).
+ *
+ * Same derivation as {@link CUSTOMER_ACTIVITIES_QUERY_KEYS}, so the ledger is
+ * refreshed by the same `customers` prefix — a write anywhere in the aggregate
+ * legitimately appends a row here.
+ */
+export const CUSTOMER_AUDIT_LOGS_QUERY_KEYS = {
+  /** Prefix of every audit-log query of every customer. */
+  all: [...CUSTOMERS_QUERY_KEYS.all, 'audit-logs'] as const,
+  /** One key per customer **and** per filtered query. */
+  list: (customerId: string, params: AuditLogListQuery) =>
+    [...CUSTOMERS_QUERY_KEYS.all, 'audit-logs', customerId, params] as const,
+};
+
+/** Rows the feed returns until a response arrives — a stable, frozen `[]`. */
+export const EMPTY_ACTIVITY_LIST: readonly Activity[] = Object.freeze([]);
+
+/** Rows the ledger returns until a response arrives — a stable, frozen `[]`. */
+export const EMPTY_AUDIT_LOG_LIST: readonly AuditLog[] = Object.freeze([]);
+
+/**
+ * Success copy of the two activity **form** writes (AIS-181).
+ *
+ * Handed to `useAppForm`'s notify port, never to the mutation's `meta`: the form
+ * owns the announcement (AIS-136), and the delete — which has no form — carries
+ * its own `meta.successMessage` below.
+ */
+export const CUSTOMERS_ACTIVITY_CREATE_SUCCESS_MESSAGE =
+  'A bejegyzés rögzítve.';
+export const CUSTOMERS_ACTIVITY_UPDATE_SUCCESS_MESSAGE =
+  'A bejegyzés módosítva.';
+
+/** Success copy of the activity soft delete (AIS-181). */
+export const CUSTOMERS_ACTIVITY_REMOVE_SUCCESS_MESSAGE =
+  'A bejegyzés törölve.';
+
+/** Every input the **activity** form owns, in visual order (AIS-181). */
+export const CUSTOMER_ACTIVITY_FIELD_PATHS: readonly CustomerActivityFormFieldName[] =
+  Object.freeze(['type', 'body']);

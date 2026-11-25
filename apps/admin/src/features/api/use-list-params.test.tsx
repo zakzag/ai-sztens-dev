@@ -139,4 +139,35 @@ describe('useListParams', () => {
     expect(result.current.params.limit).toBe(20);
     expect(getSearch()).not.toContain('limit=999');
   });
+
+  it('keeps a parameter the list query does not own (AIS-181)', () => {
+    const { result, getSearch } = renderHookWithRouter(
+      () => useListParams(listQuerySchema),
+      { initialEntries: ['/customers/abc?tab=activity&page=1'] },
+    );
+
+    act(() => {
+      result.current.setParam('page', 2);
+    });
+
+    const searchParams = new URLSearchParams(getSearch());
+    expect(searchParams.get('tab')).toBe('activity');
+    expect(searchParams.get('page')).toBe('2');
+  });
+
+  it('keeps the foreign parameter when a filter resets the page', () => {
+    const { result, getSearch } = renderHookWithRouter(
+      () => useListParams(listQuerySchema),
+      { initialEntries: ['/customers/abc?tab=audit&page=4'] },
+    );
+
+    act(() => {
+      result.current.setParam('q', 'acme');
+    });
+
+    const searchParams = new URLSearchParams(getSearch());
+    expect(searchParams.get('tab')).toBe('audit');
+    expect(searchParams.get('q')).toBe('acme');
+    expect(searchParams.get('page')).toBeNull();
+  });
 });

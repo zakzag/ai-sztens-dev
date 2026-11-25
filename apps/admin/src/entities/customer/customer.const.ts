@@ -7,6 +7,10 @@
  */
 
 import type {
+  ActivityType,
+  AuthorType,
+  AuditLogTable,
+  AuditOperation,
   ContactRole,
   CustomerSource,
   CustomerStatus,
@@ -15,6 +19,7 @@ import type {
   CustomerUserStatus,
   HeadcountRange,
 } from '@callback/shared';
+import type { ToastLevel } from '@callback/ui';
 import type { BadgeVariant } from './customer.interface.js';
 
 /** Placeholder of a value the row does not have (`null` on the wire). */
@@ -265,3 +270,161 @@ export const CUSTOMER_USER_COLUMNS = {
   invitedAt: 'Meghívva',
   lastLogin: 'Utolsó belépés',
 } as const;
+
+// ---------------------------------------------------------------------------
+// AIS-181 — the activity feed and the audit log tabs
+// ---------------------------------------------------------------------------
+
+/** Localised activity kinds. */
+export const CUSTOMER_ACTIVITY_TYPE_LABELS: Readonly<
+  Record<ActivityType, string>
+> = {
+  note: 'Megjegyzés',
+  call: 'Hívás',
+  email: 'E-mail',
+  meeting: 'Megbeszélés',
+  status_change: 'Státuszváltás',
+  system: 'Rendszer',
+};
+
+/**
+ * Badge variant of an activity kind.
+ *
+ * The three contact kinds (`call`, `email`, `meeting`) share `info`: they are
+ * business events, not states, so none of them may borrow the `danger`/`warning`
+ * vocabulary that the status ladder uses.
+ */
+export const CUSTOMER_ACTIVITY_TYPE_VARIANTS: Readonly<
+  Record<ActivityType, BadgeVariant>
+> = {
+  note: 'neutral',
+  call: 'info',
+  email: 'info',
+  meeting: 'info',
+  status_change: 'warning',
+  system: 'neutral',
+};
+
+/**
+ * Kinds an operator may **write** (AIS-181 `D6`/Q2).
+ *
+ * `status_change` and `system` are written by the server (the status endpoint and
+ * the platform itself); offering them in the note form would let an operator
+ * claim an entry that the domain reserves for a machine.
+ */
+export const CUSTOMER_ACTIVITY_WRITABLE_TYPES = [
+  'note',
+  'call',
+  'email',
+  'meeting',
+] as const satisfies readonly ActivityType[];
+
+/** Localised operation names of the audit ledger. */
+export const CUSTOMER_AUDIT_OPERATION_LABELS: Readonly<
+  Record<AuditOperation, string>
+> = {
+  insert: 'Létrehozás',
+  update: 'Módosítás',
+  delete: 'Törlés',
+  soft_delete: 'Törlés (archiválás)',
+};
+
+/**
+ * `LogEntryRow` severity of one audited operation.
+ *
+ * The primitive's glyph, border and `data-level` are severity-coloured, so the
+ * operation is mapped onto that vocabulary once, here: a creation is a success, a
+ * correction is information, and both kinds of deletion are a warning rather than
+ * an error — nothing failed, something was removed on purpose.
+ */
+export const CUSTOMER_AUDIT_OPERATION_LEVELS: Readonly<
+  Record<AuditOperation, ToastLevel>
+> = {
+  insert: 'success',
+  update: 'info',
+  soft_delete: 'warning',
+  delete: 'warning',
+};
+
+/** Localised audited table names — one entry per `AUDIT_LOG_TABLE_VALUES`. */
+export const CUSTOMER_AUDIT_TABLE_LABELS: Readonly<
+  Record<AuditLogTable, string>
+> = {
+  customers: 'Cégek',
+  contacts: 'Kapcsolattartók',
+  contact_roles: 'Kapcsolattartó szerepkörök',
+  customer_tags: 'Cégcímkék',
+  customer_users: 'Belépő felhasználók',
+  activities: 'Tevékenységek',
+  tags: 'Címkék',
+};
+
+/** Localised actor kinds of the ledger. */
+export const CUSTOMER_AUDIT_ACTOR_TYPE_LABELS: Readonly<
+  Record<AuthorType, string>
+> = {
+  operator: 'Operátor',
+  customer_user: 'Ügyfél felhasználója',
+  system: 'Rendszer',
+  api_key: 'API kulcs',
+};
+
+/**
+ * Hungarian labels of the wire field names a diff can carry.
+ *
+ * A **partial** map on purpose: `beforeData`/`afterData` hold only the changed
+ * keys of an arbitrary table, so an unknown key falls back to its wire name
+ * instead of rendering `undefined`.
+ */
+export const CUSTOMER_AUDIT_FIELD_LABELS: Readonly<Record<string, string>> = {
+  // A `jsonb` snapshot can carry either spelling: the database column name
+  // (`legal_name`) or the domain key the writer used (`legalName`). Both are
+  // mapped, so a diff reads the same whichever side of that boundary produced it.
+  legal_name: 'Jogi név',
+  legalName: 'Jogi név',
+  short_name: 'Rövid név',
+  shortName: 'Rövid név',
+  tax_number: 'Adószám',
+  taxNumber: 'Adószám',
+  eu_vat_number: 'EU adószám',
+  euVatNumber: 'EU adószám',
+  company_registration_number: 'Cégjegyzékszám',
+  companyRegistrationNumber: 'Cégjegyzékszám',
+  legal_form: 'Jogi forma',
+  legalForm: 'Jogi forma',
+  registered_address_zip: 'Irányítószám',
+  registeredAddressZip: 'Irányítószám',
+  registered_address_city: 'Város',
+  registeredAddressCity: 'Város',
+  registered_address_line: 'Cím',
+  registeredAddressLine: 'Cím',
+  registered_address_country: 'Ország',
+  registeredAddressCountry: 'Ország',
+  industry: 'Iparág',
+  headcount_range: 'Létszám',
+  headcountRange: 'Létszám',
+  source: 'Forrás',
+  status: 'Státusz',
+  status_changed_at: 'Státuszváltás ideje',
+  statusChangedAt: 'Státuszváltás ideje',
+  customer_number: 'Ügyfélszám',
+  customerNumber: 'Ügyfélszám',
+  name: 'Név',
+  email: 'E-mail',
+  phone: 'Telefon',
+  position: 'Beosztás',
+  body: 'Szöveg',
+  metadata: 'Metaadat',
+  type: 'Típus',
+  active: 'Aktív',
+  role: 'Szerepkör',
+  label: 'Címke',
+  deleted_at: 'Törlés ideje',
+  deletedAt: 'Törlés ideje',
+};
+
+/** Copy of a diff row whose one side does not exist (insert / delete). */
+export const CUSTOMER_AUDIT_NO_VALUE_LABEL = '—';
+
+/** Separator between the two sides of one diff row. */
+export const CUSTOMER_AUDIT_DIFF_SEPARATOR = ' → ';

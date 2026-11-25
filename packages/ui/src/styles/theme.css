@@ -514,7 +514,7 @@
 
   /* Shape */
   --radius-control: 0.875rem;
-  --radius-card: 1.5rem;
+  --radius-card: .33rem;
   --radius-pill: 9999px;
 
   /* Motion */

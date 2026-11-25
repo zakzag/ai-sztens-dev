@@ -6,7 +6,7 @@ import { createFastifyAdapter } from '../src/common/http/create-fastify-adapter.
 import { DATABASE } from '../src/db/database.const.js';
 import type { Database } from '../src/db/database.interface.js';
 import { auditLogs, customers, tags } from '../src/db/schema.js';
-import { DATABASE_SKIP_REASON, probeDatabase } from './lib/database-gate.js';
+import { probeDatabase, reportDatabaseSkip } from './lib/database-gate.js';
 import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
 
 /**
@@ -98,8 +98,8 @@ describe('CustomerTagsController (e2e)', () => {
     const handle = booted.get<Database>(DATABASE);
 
     if (!(await probeDatabase(handle))) {
-      console.warn(`[database-gate] ${DATABASE_SKIP_REASON}`);
       await booted.close();
+      reportDatabaseSkip();
       return;
     }
 

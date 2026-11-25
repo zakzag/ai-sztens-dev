@@ -7,7 +7,7 @@ import { DATABASE } from '../src/db/database.const.js';
 import type { Database } from '../src/db/database.interface.js';
 import { apiKeys } from '../src/db/schema.js';
 import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
-import { DATABASE_SKIP_REASON, probeDatabase } from './lib/database-gate.js';
+import { probeDatabase, reportDatabaseSkip } from './lib/database-gate.js';
 
 /**
  * End-to-end coverage of the API-key endpoints **and of the envelope**.
@@ -167,8 +167,8 @@ describe('ApiKeysController (e2e)', () => {
     // filter answers 500 — a database outage, not a contract regression. Warn
     // loudly and leave `app` null so every test self-skips.
     if (!(await probeDatabase(handle))) {
-      console.warn(`[database-gate] ${DATABASE_SKIP_REASON}`);
       await booted.close();
+      reportDatabaseSkip();
       return;
     }
 

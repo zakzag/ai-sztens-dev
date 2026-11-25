@@ -173,8 +173,15 @@ export interface CustomersRepository {
    * constraint is plain, so an archived customer keeps its number and the next
    * allocation must continue after it.
    *
+   * **The read is serialised per month.** The implementation takes a
+   * transaction-scoped advisory lock on the prefix before reading `max()`, so
+   * two concurrent creates cannot derive the same next number. Reading the
+   * maximum "where it will be used" is not enough on its own: under READ
+   * COMMITTED both transactions see the pre-insert state, and the loser's
+   * unique violation aborts its whole unit of work.
+   *
    * @param tx - the write transaction (the `max()` must be read where it will be
-   *   used, or two callers could read the same value and one would collide).
+   *   used, and under the allocation lock).
    * @param prefix - the month prefix, e.g. `AIS-202611-`.
    * @returns the stored maximum, or `null` when the month is empty.
    */

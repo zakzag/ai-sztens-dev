@@ -20,9 +20,10 @@ import type {
 /**
  * Chainable `Database` mock for the `customers` repository spec (AIS-178).
  *
- * The repository builds seven query shapes:
+ * The repository builds eight query shapes:
  *
  * ```text
+ * execute(sql`select pg_advisory_xact_lock(…)`)                    // number allocation lock
  * insert(customers).values(input).returning()                      // create
  * update(customers).set(patch).where(expr).returning()             // guarded writes
  * select({ total: count() }).from(customers).where(expr)           // count(*)
@@ -129,6 +130,12 @@ export interface CustomersDatabaseMock {
   readonly set: jest.Mock;
   readonly updateReturning: jest.Mock;
   readonly transaction: jest.Mock;
+  /** Raw-SQL entry point (`tx.execute(sql`…`)`), used by the allocation lock. */
+  readonly execute: jest.Mock;
+  /** The statement of every `execute()`, in call order. */
+  readonly executeArguments: readonly unknown[];
+  /** Names of the entry points in call order (`execute`, `select`, …). */
+  readonly callOrder: readonly string[];
   /** The `WHERE` expression of every select chain, in build order. */
   readonly whereExpressions: readonly unknown[];
   /** The argument list of every `orderBy()`, in build order. */
@@ -183,6 +190,8 @@ export function createCustomersDatabaseMock(
   const offsetArguments: unknown[] = [];
   const updateWhereExpressions: unknown[] = [];
   const updateSetArguments: unknown[] = [];
+  const executeArguments: unknown[] = [];
+  const callOrder: string[] = [];
 
   const resolved = <T>(rows: readonly T[] | undefined): Promise<T[]> =>
     options.selectError !== undefined
@@ -235,8 +244,15 @@ export function createCustomersDatabaseMock(
   let pendingMode: SelectMode = 'projected';
 
   const select = jest.fn((fields?: unknown) => {
+    callOrder.push('select');
     pendingMode = readSelectMode(fields);
     return { from };
+  });
+
+  const execute = jest.fn((statement?: unknown) => {
+    executeArguments.push(statement);
+    callOrder.push('execute');
+    return Promise.resolve([] as unknown[]);
   });
 
   const from = jest.fn((table: object) => {
@@ -288,7 +304,12 @@ export function createCustomersDatabaseMock(
   });
   const update = jest.fn(() => ({ set }));
 
-  const handle = { insert, select, update } as unknown as DatabaseTransaction;
+  const handle = {
+    execute,
+    insert,
+    select,
+    update,
+  } as unknown as DatabaseTransaction;
 
   const transaction = jest.fn(
     async <T>(work: (tx: DatabaseTransaction) => Promise<T>): Promise<T> =>
@@ -311,6 +332,9 @@ export function createCustomersDatabaseMock(
     set,
     updateReturning,
     transaction,
+    execute,
+    executeArguments,
+    callOrder,
     whereExpressions,
     orderByArguments,
     limitArguments,

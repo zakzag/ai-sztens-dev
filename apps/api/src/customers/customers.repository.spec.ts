@@ -587,6 +587,28 @@ describe('DrizzleCustomersRepository', () => {
       expect(readSqlColumnNames(condition)).toEqual(['customer_number']);
       expect(readSqlExpression(condition).toLowerCase()).toContain('like');
     });
+
+    it('takes the per-month advisory lock before reading the maximum', async () => {
+      const database = createCustomersDatabaseMock({
+        maxCustomerNumber: 'AIS-202611-004',
+      });
+      const repository = new DrizzleCustomersRepository(database.db);
+
+      await repository.nextCustomerNumber(database.tx, 'AIS-202611-');
+
+      expect(database.execute).toHaveBeenCalledTimes(1);
+
+      const [statement] = database.executeArguments;
+      const text = readSqlExpression(statement);
+
+      // The lock has to be keyed on the month prefix and taken by name — a
+      // plain `max()` is what let two concurrent creates derive the same
+      // number and answer a spurious `409 CUSTOMER_NUMBER_CONFLICT`.
+      expect(text).toContain('pg_advisory_xact_lock');
+      expect(text).toContain('hashtext');
+      // Order matters: locking after the read would serialise nothing.
+      expect(database.callOrder).toEqual(['execute', 'select']);
+    });
   });
 
   describe('runInTransaction', () => {

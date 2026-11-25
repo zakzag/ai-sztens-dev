@@ -8,6 +8,7 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "testTimeout": 30000,
   "extensionsToTreatAsEsm": [".ts"],
   "transform": {
     "^.+\\.(t|j)s$": [

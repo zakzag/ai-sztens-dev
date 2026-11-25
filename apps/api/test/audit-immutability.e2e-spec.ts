@@ -18,6 +18,7 @@ import {
   operators,
 } from '../src/db/schema.js';
 import { DATABASE_SKIP_REASON, probeDatabase } from './lib/database-gate.js';
+import { reportSkip } from './lib/skip-policy.js';
 
 /**
  * The AIS-177 invariants that only a real Postgres can prove.
@@ -40,8 +41,11 @@ import { DATABASE_SKIP_REASON, probeDatabase } from './lib/database-gate.js';
  * nested transaction (a savepoint), so an aborted statement cannot poison the
  * outer one.
  *
- * Same gating rule as the other persistence suites: without a reachable
- * `DATABASE_URL` the suite warns loudly and self-skips.
+ * Same gating rule as the other persistence suites: the connection string is
+ * resolved the same way the API resolves it (`resolveDatabaseUrl()` — an
+ * exported `DATABASE_URL` first, then `apps/api/.env.local`, then
+ * `infra/.env.local`), and the suite warns loudly and self-skips only when the
+ * probe against that database fails.
  */
 
 /** Sentinel thrown to roll a test transaction back on purpose. */
@@ -218,19 +222,18 @@ async function seedParents(
 }
 
 beforeAll(async () => {
-  if (process.env['DATABASE_URL'] === undefined) {
-    skipReason = DATABASE_SKIP_REASON;
-    console.warn(`[audit-immutability.e2e-spec] ${skipReason}`);
-    return;
-  }
-
+  // Do **not** pre-check `process.env['DATABASE_URL']`: nothing loads the dotenv
+  // file in this process (the suite never imports `AppModule`, which is what
+  // runs `ConfigModule.forRoot()`), so that check skipped the suite even when
+  // `apps/api/.env.local` pointed at a perfectly reachable database — the one
+  // suite proving the append-only ledger guarantee never ran locally.
   let url: string;
 
   try {
     url = resolveDatabaseUrl();
   } catch (error) {
     skipReason = `${DATABASE_SKIP_REASON} (${error instanceof Error ? error.message : String(error)})`;
-    console.warn(`[audit-immutability.e2e-spec] ${skipReason}`);
+    reportSkip('[audit-immutability.e2e-spec]', skipReason);
     return;
   }
 
@@ -239,9 +242,9 @@ beforeAll(async () => {
 
   if ((await probeDatabase(handle)) === false) {
     skipReason = DATABASE_SKIP_REASON;
-    console.warn(`[audit-immutability.e2e-spec] ${skipReason}`);
     await client.end({ timeout: 5 });
     client = null;
+    reportSkip('[audit-immutability.e2e-spec]', skipReason);
     return;
   }
 

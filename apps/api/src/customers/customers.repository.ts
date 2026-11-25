@@ -364,6 +364,16 @@ export class DrizzleCustomersRepository implements CustomersRepository {
     tx: DatabaseTransaction,
     prefix: string,
   ): Promise<string | null> {
+    // Serialise the allocation of one month *before* reading the maximum.
+    // Without this lock two concurrent creates read the same `max()`, both
+    // derive the same next number, and the loser's `23505` aborts its whole
+    // transaction — under parallel load (six e2e suites, or two admins clicking
+    // at once) the retry budget ran out and surfaced as a spurious
+    // `409 CUSTOMER_NUMBER_CONFLICT`. The lock is transaction-scoped, so commit
+    // or rollback releases it, and it is keyed on the month prefix only, so
+    // different months still allocate in parallel.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${prefix}))`);
+
     const rows = await tx
       .select({ max: sql<string | null>`max(${customers.customerNumber})` })
       .from(customers)

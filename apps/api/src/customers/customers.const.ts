@@ -53,11 +53,13 @@ export const CUSTOMER_TAX_NUMBER_CONSTRAINT = 'customers_tax_number_key';
 /**
  * How many times `create` may try to allocate a customer number.
  *
- * `max()` of the month inside the write transaction, retried **once** on a
- * `23505` (plan `D6`) — and each attempt needs a *fresh* transaction: a unique
- * violation aborts the Postgres transaction, so an in-place retry is
- * impossible. A `pg_advisory_xact_lock` per month would remove collisions
- * entirely and is documented as the alternative, not built.
+ * The normal collision path is closed by the per-month advisory lock the
+ * repository takes before reading `max()`
+ * (`CustomersRepository.nextCustomerNumber`); this loop is now the safety net
+ * for the remaining case — a lock that could not be taken, or a number sequence
+ * that raced with a writer outside this code path. Each attempt needs a *fresh*
+ * transaction: a `23505` aborts the Postgres transaction, so an in-place retry
+ * is impossible (plan `D6`).
  */
 export const CREATE_ATTEMPTS = 2;
 

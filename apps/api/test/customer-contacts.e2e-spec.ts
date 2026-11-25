@@ -11,7 +11,7 @@ import {
   contacts,
   customers,
 } from '../src/db/schema.js';
-import { DATABASE_SKIP_REASON, probeDatabase } from './lib/database-gate.js';
+import { probeDatabase, reportDatabaseSkip } from './lib/database-gate.js';
 import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
 
 /**
@@ -26,7 +26,9 @@ import { loadAppModuleOrSkip } from './lib/app-module-gate.js';
  * Hygiene (the same rules as `customers.e2e-spec.ts`): every fixture carries a
  * unique `e2e-<uuid>` legal-name prefix, business rows are removed in `afterAll`,
  * and the ledger is left untouched — it is append-only by trigger, and its rows
- * are tagged with a fixed user agent so a future purge recipe can find them.
+ * are tagged with the stable `customer-contacts-e2e/1.0 (AIS-178 d)` prefix plus
+ * this run's uuid, so a purge recipe can find them while repeated runs never
+ * count each other's rows.
  */
 
 interface CustomerBody {
@@ -61,8 +63,17 @@ interface ErrorEnvelopeBody {
   };
 }
 
-/** User agent that tags every ledger row this suite writes. */
-const AUDIT_TAG = 'customer-contacts-e2e/1.0 (AIS-178 d)';
+/**
+ * User agent that tags every ledger row this suite writes.
+ *
+ * The run id is part of the tag on purpose: the ledger is append-only, so a
+ * constant tag made the table-wide count below accumulate one extra row per
+ * `pnpm test:e2e` invocation (`1`, `3`, `5`, …) until the assertion could never
+ * pass again on a reused local database. A per-run tag keeps the documented
+ * purge recipe working (it filters on the stable prefix) while making rows of
+ * *this* run the only ones the assertions can see.
+ */
+const AUDIT_TAG = `customer-contacts-e2e/1.0 (AIS-178 d) ${randomUUID()}`;
 
 /** Reads a success body as the envelope (the assertions below prove the shape). */
 function readEnvelope<T>(body: unknown): SuccessEnvelopeBody<T> {
@@ -107,8 +118,8 @@ describe('CustomerContactsController (e2e)', () => {
     const handle = booted.get<Database>(DATABASE);
 
     if (!(await probeDatabase(handle))) {
-      console.warn(`[database-gate] ${DATABASE_SKIP_REASON}`);
       await booted.close();
+      reportDatabaseSkip();
       return;
     }
 
@@ -132,7 +143,14 @@ describe('CustomerContactsController (e2e)', () => {
     }
   });
 
-  /** Reads the ledger rows of one recorded table/operation pair. */
+  /**
+   * Reads the ledger rows of one recorded table/operation pair.
+   *
+   * `customerId` scopes every count to this suite's own customer, which is the
+   * `contact_roles` rows' only link back to the run (`recordId` is `null` for
+   * them, by design of the writer). `recordId` narrows further when the caller
+   * has one; `null` means "any row of this table for this customer".
+   */
   async function countAuditRows(
     recordId: string | null,
     tableName: string,
@@ -140,19 +158,21 @@ describe('CustomerContactsController (e2e)', () => {
   ): Promise<number> {
     if (database === null) return 0;
 
+    const conditions = [
+      eq(auditLogs.customerId, customerId),
+      eq(auditLogs.tableName, tableName),
+      eq(auditLogs.operation, operation),
+      eq(auditLogs.userAgent, AUDIT_TAG),
+    ];
+
+    if (recordId !== null) {
+      conditions.push(eq(auditLogs.recordId, recordId));
+    }
+
     const rows = await database
       .select({ total: count() })
       .from(auditLogs)
-      .where(
-        and(
-          recordId === null
-            ? eq(auditLogs.tableName, tableName)
-            : eq(auditLogs.recordId, recordId),
-          eq(auditLogs.tableName, tableName),
-          eq(auditLogs.operation, operation),
-          eq(auditLogs.userAgent, AUDIT_TAG),
-        ),
-      );
+      .where(and(...conditions));
 
     return Number(rows[0]?.total ?? 0);
   }

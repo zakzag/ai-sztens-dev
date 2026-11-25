@@ -241,8 +241,10 @@ export const logDetailJsonToggleVariants = cva(
  * key or a long body scrolls inside the region instead of stretching the panel;
  * monospaced, because indentation is meaningless in a proportional font.
  */
+// The pretty-printed JSON block is a **panel** (card radius), not a control; the
+// toggles around it stay controls (AIS-191).
 export const logDetailJsonPreVariants = cva(
-  'mt-1 w-full max-h-48 overflow-auto rounded-control bg-surface-sunken p-2 font-mono text-xs whitespace-pre',
+  'mt-1 w-full max-h-48 overflow-auto rounded-card bg-surface-sunken p-2 font-mono text-xs whitespace-pre',
 );
 
 export type LogEntryRowVariants = VariantProps<typeof logEntryRowVariants>;

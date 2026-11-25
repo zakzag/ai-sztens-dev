@@ -261,7 +261,7 @@ Every color, border, radius, shadow and duration comes from `packages/ui/src/sty
 | State      | `--color-success/-warning/-danger/-info` + `-foreground` → `bg-danger text-danger-foreground`                                                                               |
 | Depth      | `--shadow-neu-raised/-inset/-pressed`, `--shadow-focus-ring` → `shadow-neu-raised`                                                                                          |
 | Thickness  | `--border-width-hairline/-default/-strong` → utility classes `border-hairline`, `border-strong`                                                                             |
-| Shape      | `--radius-control/-card/-pill` → `rounded-control`                                                                                                                          |
+| Shape      | `--radius-control` / `--radius-card` / `--radius-pill` → `rounded-control`, `rounded-card`, `rounded-full`                                                                  |
 | Motion     | `--duration-fast/-base`, `--ease-neu` → `transition-shadow duration-fast`                                                                                                   |
 | Appearance | `--color-scheme`, `--app-backdrop`, `--blur-glass`, `--saturate-glass`, `--glass-sheen` → `surface-glass` (blur + gloss) / `sheen-glass` (gloss only) (AIS-165/166/169/170) |
 
@@ -285,13 +285,24 @@ from all of that, and both are machine-checked:
 | Element         | Classes                                                                                                                            |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Frosted panel   | `rounded-card border border-hairline border-border-hairline bg-surface-raised shadow-neu-raised surface-glass`                     |
-| Frosted popover | `rounded-control border border-hairline border-border-hairline bg-surface-overlay shadow-neu-raised surface-glass`                 |
+| Frosted popover | `rounded-card border border-hairline border-border-hairline bg-surface-overlay shadow-neu-raised surface-glass`                    |
 | Glossy shell    | `rounded-card border border-hairline border-border-hairline bg-surface-raised shadow-neu-raised sheen-glass`                       |
 | Never (blur)    | cards, table rows, table shells — translucency and gloss from the tokens, but one `backdrop-filter` per scrolling row costs frames |
 
 The glass family thickens the frame ladder to `2 / 2.5 / 3px`: glass must read as a pane edge,
 so `--border-width-*` is appearance state and an appearance block may restate it. Its panels are
 deliberately the **most transparent** surfaces of the app and its blur stays in the 9–18px band.
+
+**The glass family also has its own corner ladder (AIS-191).** The four glass members state
+`--radius-control: 0.25rem` (input boxes) and `--radius-card: 0.33rem` (panels, windows), while
+`dark`, `light` and `ambient` keep the softer `0.625rem / 1rem` from `@theme`. Shape therefore
+behaves like thickness: an appearance may restate the radius **values**, but the token **names** must
+stay in every block — `pnpm quality:themes` fails with `theme-token-missing` otherwise. Two placement
+rules follow and are enforced in review: **a surface** — anything that floats or holds content
+(`Card`, `Dialog`, `EntityDialog`, `Alert`, `Toast`, the table shell, `EmptyState`, tooltip, dropdown
+and combobox popover) — uses `rounded-card`; **a control** — anything you type into or click (`Input`,
+`Textarea`, `Select`, `Button`, pagination controls, the skeleton, the breadcrumb link, a menu item) —
+uses `rounded-control`. The nested corner is always the smaller one.
 
 Dark neomorphism recipes:
 

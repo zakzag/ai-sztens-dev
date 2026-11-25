@@ -138,7 +138,9 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(
             id={listboxId}
             role="listbox"
             className={cn(
-              'absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-control border border-border-hairline bg-surface-overlay p-1 shadow-neu-raised',
+              // The listbox is a **surface**; the option rows inside it stay
+              // controls, so the nested corner is the smaller one (AIS-191).
+              'absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-card border border-border-hairline bg-surface-overlay p-1 shadow-neu-raised',
               SURFACE_GLASS_CLASS,
             )}
           >

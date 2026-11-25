@@ -7,8 +7,10 @@ import { SURFACE_GLASS_CLASS } from '../../theme/theme.const.js';
  * The overlay surface token, the hairline border colour and the raised depth are
  * the same as every other floating layer in the kit.
  */
+// The popover is a **surface** (card radius); its items below stay controls, so
+// the nested corner is always the smaller one (AIS-191).
 export const dropdownMenuContentVariants = cva(
-  `z-50 min-w-40 rounded-control border border-hairline border-border-hairline bg-surface-overlay p-1 shadow-neu-raised ${SURFACE_GLASS_CLASS}`,
+  `z-50 min-w-40 rounded-card border border-hairline border-border-hairline bg-surface-overlay p-1 shadow-neu-raised ${SURFACE_GLASS_CLASS}`,
 );
 
 /**

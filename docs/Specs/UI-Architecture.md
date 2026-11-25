@@ -1,8 +1,12 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-25 — AIS-20: a `pages/customers` **adatlap** (`/customers/:id`) — fejléc,
-hat fül `?tab=`-bal az URL-ben, `Áttekintés` és `Cégadatok` tartalommal, öt felület (loading / `404` /
-banner-tier / hiba / siker) — leszállítva; a felületet a tiszta `toCustomerDetailState` választja, a
+**Utolsó frissítés: 2026-11-25 — AIS-191: a **glass család** saját sarok-létrát kapott (`0.25rem`
+control / `0.33rem` surface), a `dark` / `light` / `ambient` a lágy `0.625rem / 1rem` értéken maradt —
+a shape ezzel a thickness létra párja lett, és a négy lebegő felület (tooltip, dropdown, combobox
+listbox, log JSON blokk) `rounded-card`-ra került — lásd §3.2 és §3.3. Előző, 2026-11-25 — AIS-20: a
+`pages/customers` **adatlap** (`/customers/:id`) — fejléc, hat fül `?tab=`-bal az URL-ben,
+`Áttekintés` és `Cégadatok` tartalommal, öt felület (loading / `404` / banner-tier / hiba / siker) —
+leszállítva; a felületet a tiszta `toCustomerDetailState` választja, a
 négy későbbi fül panelje pedig egy totális `Record`-ban már helyet kapott, így az AIS-179 / AIS-181
 nem érinti a page-et — lásd §5. Előző, 2026-11-25 — AIS-19: a `pages/customers` lista oldal
 (URL-listaállapot, három szűrő, sor-műveletek), a létrehozó varázsló shellje és az **első page-local
@@ -334,6 +338,19 @@ those three names in an appearance block (`THEME_STATE_TOKENS` in
 `scripts/quality/theme-tokens.const.mjs`), so the override is legal without being
 mandatory.
 
+**The corner ladder follows the same split (AIS-191).** `@theme`, `light` and `ambient` keep the
+softer `--radius-control: 0.625rem` / `--radius-card: 1rem`; the four glass members state
+`--radius-control: 0.25rem` (input boxes) and `--radius-card: 0.33rem` (panels, windows). The radius
+tokens stay in the `@theme` set, so every appearance block must still **declare** them — only the
+value differs, and the gate compares names, not values, which is why four identical glass values and
+three softer opaque ones pass together. The radius is therefore state-like but is **not** added to
+`THEME_STATE_TOKENS`: that list is for `:root`-only tokens such as `--blur-glass` that are absent
+from `@theme`. Placement follows one rule: a **surface** (anything that floats or holds content —
+`Card`, `Dialog`, `EntityDialog`, `Alert`, `Toast`, the table shell, `EmptyState`, tooltip, dropdown
+and combobox popover) uses `rounded-card`; a **control** (`Input`, `Textarea`, `Select`, `Button`,
+pagination controls, `Skeleton`, the breadcrumb link, a menu item) uses `rounded-control`, and the
+nested corner is always the smaller one.
+
 ### 3.2.2 Appearance-state and glass tokens (AIS-165, AIS-166)
 
 Four tokens cannot live in `@theme`: `--color-*` is Tailwind's colour namespace,
@@ -451,6 +468,11 @@ non-default outline, it must name a border/state token.
    z-index token**: overlay depth is layout, not colour, and the palette gate does not
    cover it (AIS-117 **D5**). The literals live in the primitives' `.const.ts` files,
    never repeated in JSX.
+6. Corner radius comes from the two tokens only, and the token must match the role
+   (AIS-191): a **surface** — floating or content-holding — is `rounded-card`, a
+   **control** — typed into or clicked — is `rounded-control`, and a nested corner is
+   always the smaller one. `rounded-sm/-md/-lg/-xl`, arbitrary radius values and
+   per-appearance radius forks in a component are defects.
 
 Definition-of-done check — the gate that enforces §3.3 (it also scans
 `packages/ui/src`, which the old `rg` one-liner did not):

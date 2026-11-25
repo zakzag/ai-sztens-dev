@@ -1,6 +1,6 @@
 # Local Development — AIsztens
 
-**Utolsó frissítés:** 2026-11-25 (párhuzamos `tsc` memória-kimerülés: a `pnpm -r typecheck` egyszerre indítja a workspace-eket, ami `Zone Allocation failed`-del elbukhat — sorosan futtatva zöld, §5; lokális DB-kliens: `pnpm db:psql` és `pnpm db:gui` (Adminer) — a DB-topic részletei a [`Database-Local.md`](Database-Local.md) §7.1-ben; a `5432` host port mindkét lokális stackben `127.0.0.1`-re szűkült, ezért a `docker ps` kimenete `127.0.0.1:5432->5432/tcp` — §2, §2b.2, §6.2)
+**Utolsó frissítés:** 2026-11-25 (párhuzamos `tsc` memória-kimerülés javítva: a `workspaceConcurrency: 1` a `pnpm-workspace.yaml`-ben, illetve a `typecheck`/`build` scriptekben egyidejűleg egy workspace fut, így a memóriacsúcs a legnagyobb workspace és nem az összeg, §5; lokális DB-kliens: `pnpm db:psql` és `pnpm db:gui` (Adminer) — a DB-topic részletei a [`Database-Local.md`](Database-Local.md) §7.1-ben; a `5432` host port mindkét lokális stackben `127.0.0.1`-re szűkült, ezért a `docker ps` kimenete `127.0.0.1:5432->5432/tcp` — §2, §2b.2, §6.2)
 **Previous update:** 2026-11-25 — e2e: a `test/jest-e2e.json` `testTimeout` értéke 30 000 ms, mert a párhuzamos `AppModule` bootstrap (~3,5 s/suite) alatt az 5 s-os Jest-alapérték 96 tesztet buktatott el; a `[app-module-gate]` / `[database-gate]` skip `CI=true` alatt immár **hibát** ad, nem zöld futást — §2.1.1
 **Previous update:** 2026-11-07 — a `pnpm dev:local` script javítva: a PowerShell-only `$env:APP_ENV='local'; pnpm dev` test helyett `cross-env APP_ENV=local pnpm dev` fut, mert a `package.json` scripteket nem PowerShell, hanem az OS shellje futtatja — Windows-on `cmd.exe`, POSIX-on `/bin/sh`; §5 és §6.6 a `pnpm dev:local`-t ajánlja.
 **Status:** living spec
@@ -332,20 +332,24 @@ one place, the others propagate.
 
 ## 5. Common pitfalls
 
-- **A parallel `pnpm -r typecheck` can die with `Zone Allocation failed - process out of memory`.**
-  pnpm starts one `tsc --noEmit` per workspace, and on a machine that already runs the
-  dev server or the IDE's language service the simultaneous compiles exhaust the Node
-  heap. The failure is a V8 crash, **not** a type error: `apps/api`, `apps/web` and
-  `packages/notifications` all aborted at ~150–290 MB while the very same sources passed
-  one at a time. Run the check sequentially — it is green:
+- **`pnpm -r <script>` deliberately runs ONE workspace at a time.** Every workspace starts its
+  own memory-hungry compiler (`tsc --noEmit`, `nest build`, `vite build`), and at pnpm's default
+  concurrency (4, or the CPU count) a machine that also runs the dev server or the IDE's
+  language service died with a V8 crash **instead of a type error** — `apps/api`, `apps/web` and
+  `packages/notifications` aborted between 150 and 290 MB, while the very same sources passed one
+  at a time:
 
-  ```bash
-  pnpm --filter @callback/shared build && pnpm -r --workspace-concurrency=1 typecheck
+  ```text
+  FATAL ERROR: Zone Allocation failed - process out of memory
   ```
 
-  The same applies to `pnpm -r build` / `pnpm -r test` on a loaded machine. If you want to
-  keep the parallel run, raise the heap instead (`set NODE_OPTIONS=--max-old-space-size=4096`
-  in cmd, `$env:NODE_OPTIONS='--max-old-space-size=4096'` in PowerShell).
+  The cap is set twice on purpose. `pnpm-workspace.yaml` declares `workspaceConcurrency: 1`, which
+  covers every manual `pnpm -r …` in the repo (that is where pnpm 10+ reads workspace settings
+  from — the same `.npmrc` key is **not** honoured: `pnpm config get workspace-concurrency`
+  returns `undefined`), and the `typecheck` / `build` scripts pass `--workspace-concurrency=1`
+  explicitly, so the ceiling survives a pnpm version that stops reading the setting. The peak is
+  then the largest single workspace instead of the sum of them. Raise it only for a command you
+  know the machine can take: `pnpm -r --workspace-concurrency=4 typecheck`.
 
 - **`pnpm dev` does not set `APP_ENV`, so the API runs in `dev` mode.** Two
   consequences on a developer machine:

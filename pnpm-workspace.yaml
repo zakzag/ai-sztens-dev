@@ -2,6 +2,26 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# Run `pnpm -r <script>` on ONE workspace at a time (default: 4, or the CPU
+# count). The recursive scripts start a memory-hungry compiler per workspace
+# (`tsc --noEmit`, `nest build`, `vite build`); running four of them at once
+# exhausted the Node heap on a developer machine that also runs the dev server
+# or the IDE language service, and the run died with a V8 crash instead of a
+# type error:
+#
+#   FATAL ERROR: Zone Allocation failed - process out of memory
+#
+# `apps/api`, `apps/web` and `packages/notifications` aborted between 150 and
+# 290 MB, while the very same sources passed one at a time. At concurrency 1 the
+# peak is the largest single workspace, not the sum of them. Raise it only for a
+# command you know the machine can take:
+#
+#   pnpm -r --workspace-concurrency=4 typecheck
+#
+# The setting lives here (not in `.npmrc`) because that is where pnpm 10+ reads
+# workspace settings from — see the note below.
+workspaceConcurrency: 1
+
 # pnpm settings live here, not in package.json: from pnpm 10/11 on, the `pnpm`
 # field of package.json is no longer read, and a lockfile written under the old
 # location makes `pnpm <script>` fail with ERR_PNPM_VERIFY_DEPS_BEFORE_RUN

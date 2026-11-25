@@ -8,7 +8,7 @@
   },
   "scripts": {
     "predev": "pnpm --filter @callback/shared build",
-    "typecheck": "pnpm --filter @callback/shared build && pnpm -r typecheck",
+    "typecheck": "pnpm --filter @callback/shared build && pnpm -r --workspace-concurrency=1 typecheck",
     "quality:layers": "depcruise apps/admin/src --config .dependency-cruiser.cjs --output-type err",
     "quality:dead-code": "knip",
     "quality:tokens": "node scripts/quality/palette-gate.mjs",
@@ -26,7 +26,7 @@
     "db:gui:down": "docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml -f infra/docker-compose.tools.yml --profile tools stop adminer",
     "db:diagram": "node scripts/db/schema-diagram.mjs",
     "db:diagram:check": "node scripts/db/schema-diagram.mjs --check",
-    "build": "pnpm -r build",
+    "build": "pnpm -r --workspace-concurrency=1 build",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml}\"",

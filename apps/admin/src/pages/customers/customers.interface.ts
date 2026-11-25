@@ -6,15 +6,20 @@
 
 import type { ReactNode } from 'react';
 import type {
+  ContactRole,
   CustomerDetail,
   CustomerListQuery,
   CustomerStatus,
+  CustomerUserRole,
 } from '@callback/shared';
 import type { DataTableSort } from '@callback/ui';
 import type {
+  CustomerContactViewModel,
   CustomerDetailViewModel,
   CustomerRowViewModel,
   CustomerRowViewModels,
+  CustomerUserViewModel,
+  CustomerUserViewModels,
 } from '../../entities/customer/customer.interface.js';
 import type { CustomerUpdateFieldName } from '../../features/customers/customers.interface.js';
 import type { ErrorSurface } from '../../lib/error-surface.interface.js';
@@ -191,6 +196,125 @@ export interface CustomerDetailStateInput {
 export type CustomerEditValues = Readonly<
   Record<CustomerUpdateFieldName, string>
 >;
+
+/*
+  ---------------------------------------------------------------------------
+  AIS-179 — the contacts and users tabs and their four child overlays
+  ---------------------------------------------------------------------------
+*/
+
+/**
+ * The statuses an operator may set on a login user.
+ *
+ * `invited` is deliberately absent: it is a server-written state, and
+ * `updateCustomerUserSchema` rejects it (`customerUserManagedStatusSchema`).
+ */
+export type CustomerUserManagedStatus = 'active' | 'inactive';
+
+/** One role checkbox of the contact form, as the form and its test read it. */
+export interface CustomerContactRoleFieldDefinition {
+  /** The form field the checkbox registers. */
+  readonly field: 'isPrimary' | 'isTechnical' | 'isAlerting';
+  /** The contract role the flag stands for, in wire vocabulary. */
+  readonly role: ContactRole;
+  /** DOM id of the checkbox — also the error target of the role conflict. */
+  readonly id: string;
+  /** Visible label, taken from the entity's role table. */
+  readonly label: string;
+}
+
+/**
+ * Values of the contact form (create **and** edit).
+ *
+ * Every free-text input is a `string` (`''` means “not set”, converted back to
+ * `null`/absent by the payload builders) and the role set is three booleans, so
+ * the form needs no `useFieldArray` (plan decision `D3`).
+ */
+export interface CustomerContactFormValues {
+  readonly name: string;
+  readonly position: string;
+  readonly email: string;
+  readonly phone: string;
+  readonly customerUserId: string;
+  readonly isPrimary: boolean;
+  readonly isTechnical: boolean;
+  readonly isAlerting: boolean;
+  readonly isActive: boolean;
+}
+
+/** Values of the invite form. */
+export interface CustomerUserInviteFormValues {
+  readonly name: string;
+  readonly email: string;
+  readonly role: CustomerUserRole;
+}
+
+/** Values of the login-user edit form. */
+export interface CustomerUserEditFormValues {
+  readonly name: string;
+  readonly role: CustomerUserRole;
+  readonly status: CustomerUserManagedStatus;
+}
+
+/**
+ * Props of the contact form, shared by the create and the edit overlay.
+ *
+ * One component for both because the four sections, the validation and the
+ * failure mapping are identical; the `contact === null` case is what makes it a
+ * creation, and it also decides whether the body carries `updatedAt`.
+ */
+export interface CustomerContactFormProps {
+  /** The customer the contact belongs to (route parameter). */
+  readonly customerId: string;
+  /** The contact being edited, or `null` when the form creates one. */
+  readonly contact: CustomerContactViewModel | null;
+  /** The customer's login users — the options of the “belépő” select. */
+  readonly customerUsers: CustomerUserViewModels;
+  /** Called on dismissal and after a successful save. */
+  readonly onClose: () => void;
+  /** Re-reads the record after a `409 STALE_WRITE`. */
+  readonly onStaleWrite: () => void;
+}
+
+/** Props of the invite form (create-only). */
+export interface CustomerUserInviteFormProps {
+  /** The customer the invitation belongs to (route parameter). */
+  readonly customerId: string;
+  /** Called on dismissal and after a successful save. */
+  readonly onClose: () => void;
+}
+
+/** Props of the login-user edit form. */
+export interface CustomerUserEditFormProps {
+  /** The customer the user belongs to (route parameter). */
+  readonly customerId: string;
+  /** The row being edited, already formatted by the mapper. */
+  readonly user: CustomerUserViewModel;
+  /** Called on dismissal and after a successful save. */
+  readonly onClose: () => void;
+  /** Re-reads the record after a `409 STALE_WRITE`. */
+  readonly onStaleWrite: () => void;
+}
+
+/** Props of the contact archive confirmation (AIS-179). */
+export interface ContactArchiveDialogProps {
+  /** The customer the contact belongs to. */
+  readonly customerId: string;
+  /** The row the confirmation is about. */
+  readonly contact: CustomerContactViewModel;
+  /** Called on every dismissal and after a successful archive. */
+  readonly onClose: () => void;
+}
+
+/** Props of the invitation-revoke confirmation (AIS-179). */
+export interface CustomerUserRevokeDialogProps {
+  /** The customer the invitation belongs to. */
+  readonly customerId: string;
+  /** The pending invitation the confirmation is about. */
+  readonly user: CustomerUserViewModel;
+  /** Called on every dismissal and after a successful revoke. */
+  readonly onClose: () => void;
+}
 
 /**
  * Props of the edit form.

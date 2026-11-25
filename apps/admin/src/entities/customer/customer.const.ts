@@ -7,9 +7,12 @@
  */
 
 import type {
+  ContactRole,
   CustomerSource,
   CustomerStatus,
   CustomerType,
+  CustomerUserRole,
+  CustomerUserStatus,
   HeadcountRange,
 } from '@callback/shared';
 import type { BadgeVariant } from './customer.interface.js';
@@ -172,3 +175,93 @@ export const CUSTOMER_HEADCOUNT_RANGE_LABELS: Readonly<
  */
 export const CUSTOMER_DETAIL_MISSING_DATA_DESCRIPTION =
   'Hiányzik az adószám vagy a bejegyzett cím. A cég a listában hiányos adatként jelenik meg.';
+
+/**
+ * Marker of a contact who is also a login user of the customer (AIS-179).
+ *
+ * The wire says `customerUserId !== null`; the row says *Belépő*, and no cell
+ * decides which word stands for that fact.
+ */
+export const CUSTOMER_CONTACT_LOGIN_USER_LABEL = 'Belépő';
+
+/** Active / inactive copy of a contact row. */
+export const CUSTOMER_CONTACT_ACTIVE_LABEL = 'Aktív';
+export const CUSTOMER_CONTACT_INACTIVE_LABEL = 'Inaktív';
+
+/** Shown when a contact holds no role at all — a valid state, not an error. */
+export const CUSTOMER_CONTACT_NO_ROLE_LABEL = 'Nincs szerepkör';
+
+/**
+ * Localised contact roles.
+ *
+ * A `Record` over the contract's closed union, so a fourth role fails the build
+ * here instead of rendering an untranslated value.
+ */
+export const CONTACT_ROLE_LABELS: Readonly<Record<ContactRole, string>> = {
+  primary: 'Elsődleges',
+  technical: 'Technikai',
+  alerting: 'Riasztási',
+};
+
+/** Badge variant per contact role — the role table is the only mapping. */
+export const CONTACT_ROLE_BADGE_VARIANT: Readonly<
+  Record<ContactRole, BadgeVariant>
+> = {
+  primary: 'success',
+  technical: 'info',
+  alerting: 'warning',
+};
+
+/** Localised customer-user roles. */
+export const CUSTOMER_USER_ROLE_LABELS: Readonly<
+  Record<CustomerUserRole, string>
+> = {
+  owner: 'Tulajdonos',
+  admin: 'Admin',
+  member: 'Tag',
+  viewer: 'Megfigyelő',
+};
+
+/** Localised customer-user statuses. */
+export const CUSTOMER_USER_STATUS_LABELS: Readonly<
+  Record<CustomerUserStatus, string>
+> = {
+  invited: 'Meghívva',
+  active: 'Aktív',
+  inactive: 'Inaktív',
+};
+
+/**
+ * Badge variant per customer-user status.
+ *
+ * `invited` is `info` and not `warning`: a sent invitation is a normal step of
+ * the lifecycle, not a state that needs attention.
+ */
+export const CUSTOMER_USER_STATUS_BADGE_VARIANT: Readonly<
+  Record<CustomerUserStatus, BadgeVariant>
+> = {
+  invited: 'info',
+  active: 'success',
+  inactive: 'neutral',
+};
+
+/** Column headers of the *Kapcsolattartók* tab, in the render order. */
+export const CONTACT_COLUMNS = {
+  name: 'Név',
+  position: 'Beosztás',
+  email: 'E-mail',
+  phone: 'Telefon',
+  roles: 'Szerepkör',
+  loginUser: 'Belépő',
+  active: 'Állapot',
+} as const;
+
+/** Column headers of the *Felhasználók* tab, in the render order. */
+export const CUSTOMER_USER_COLUMNS = {
+  name: 'Név',
+  email: 'E-mail',
+  role: 'Szerepkör',
+  status: 'Státusz',
+  invitedAt: 'Meghívva',
+  lastLogin: 'Utolsó belépés',
+} as const;

@@ -7,7 +7,12 @@
  * made once, by the pure mapper, and is therefore testable without React.
  */
 
-import type { CustomerStatus } from '@callback/shared';
+import type {
+  ContactRole,
+  CustomerStatus,
+  CustomerUserRole,
+  CustomerUserStatus,
+} from '@callback/shared';
 import type { BadgeVariants, DescriptionListItem } from '@callback/ui';
 
 /** The badge vocabulary of `@callback/ui`, so the mapper cannot invent a variant. */
@@ -83,6 +88,8 @@ export interface CustomerDetailGroup {
  * decides how a missing value looks.
  */
 export interface CustomerDetailViewModel {
+  /** Customer uuid — the address every child overlay route is built from (AIS-179). */
+  readonly id: string;
   /** `shortName ?? legalName`, chosen once by the mapper. */
   readonly displayName: string;
   /** Generated identifier (`AIS-YYYYMM-NNN`); the page's subtitle. */
@@ -93,6 +100,97 @@ export interface CustomerDetailViewModel {
   readonly overview: readonly DescriptionListItem[];
   /** Azonosítók / Jogi adatok / Cím / Egyéb, in this fixed order. */
   readonly groups: readonly CustomerDetailGroup[];
+  /** The customer's contacts, already formatted (AIS-179). */
+  readonly contacts: CustomerContactViewModels;
+  /** The customer's login users, already formatted (AIS-179). */
+  readonly customerUsers: CustomerUserViewModels;
   /** `true` when the customer misses its tax number or its registered address. */
   readonly hasMissingData: boolean;
 }
+
+/**
+ * One role of a contact, ready to render as a badge (AIS-179).
+ *
+ * The role stays next to its label and variant because `Badge` needs an
+ * accessible, per-role hook (`data-role`) and the mapper is the only place that
+ * knows which variant the role gets.
+ */
+export interface ContactRoleBadge {
+  /** Machine role — rendered as `data-role`, never as visible text. */
+  readonly role: ContactRole;
+  /** Already localised role name. */
+  readonly label: string;
+  /** Visual verdict the entity's role table assigns. */
+  readonly variant: BadgeVariant;
+}
+
+/**
+ * One row of the *Kapcsolattartók* tab (AIS-179).
+ *
+ * `isLoginUser` replaces the mockup's “is a login user?” checkbox: the wire
+ * carries `customerUserId`, the row carries the verdict, and no cell decides.
+ */
+export interface CustomerContactViewModel {
+  /** Contact uuid — the row key and the edit overlay's segment. */
+  readonly id: string;
+  /** The contact's full name. */
+  readonly name: string;
+  /** Job title, or the empty-value placeholder. */
+  readonly positionText: string;
+  /** E-mail address, or the empty-value placeholder. */
+  readonly emailText: string;
+  /** Phone number, or the empty-value placeholder. */
+  readonly phoneText: string;
+  /** Roles as badges, in contract order; empty when the contact holds none. */
+  readonly roleBadges: readonly ContactRoleBadge[];
+  /** `true` when the contact is also a login user of this customer. */
+  readonly isLoginUser: boolean;
+  /** Screen-reader copy of {@link isLoginUser} (“belépő”), or `null`. */
+  readonly loginUserText: string | null;
+  /** `true` when the contact is active; archived rows never reach the UI. */
+  readonly isActive: boolean;
+  /** Localised active/inactive copy of the row. */
+  readonly activeText: string;
+  /** The version the edit overlay must send back as the concurrency token. */
+  readonly updatedAt: string;
+}
+
+/** The mapped contacts of one customer, in server order. */
+export type CustomerContactViewModels = readonly CustomerContactViewModel[];
+
+/**
+ * One row of the *Felhasználók* tab (AIS-179).
+ *
+ * `isInvited` is derived from the status and is what the tab uses to decide
+ * whether the revoke action may appear: the API revokes pending invitations
+ * only, so showing it on an `active` row would promise a refused write.
+ */
+export interface CustomerUserViewModel {
+  /** Login user uuid — the row key and the edit overlay's segment. */
+  readonly id: string;
+  /** The user's full name. */
+  readonly name: string;
+  /** The user's e-mail address — the identity of an invitation. */
+  readonly email: string;
+  /** Machine role, kept for the form's preselect and the badge hook. */
+  readonly role: CustomerUserRole;
+  /** Already localised role name. */
+  readonly roleLabel: string;
+  /** Machine status, kept for `data-status`. */
+  readonly status: CustomerUserStatus;
+  /** Already localised status name. */
+  readonly statusLabel: string;
+  /** Badge variant of the status. */
+  readonly statusVariant: BadgeVariant;
+  /** Invitation date, or the empty-value placeholder. */
+  readonly invitedAtText: string;
+  /** Last login, or the empty-value placeholder. */
+  readonly lastLoginText: string;
+  /** `true` when the row is a **pending invitation** (the only revocable state). */
+  readonly isInvited: boolean;
+  /** The version the edit overlay must send back as the concurrency token. */
+  readonly updatedAt: string;
+}
+
+/** The mapped login users of one customer, in server order. */
+export type CustomerUserViewModels = readonly CustomerUserViewModel[];

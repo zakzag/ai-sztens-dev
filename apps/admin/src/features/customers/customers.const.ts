@@ -19,7 +19,12 @@ import {
   type CustomerListQuery,
 } from '@callback/shared';
 import { createEntityQueryKeys } from '../api/create-entity-query-keys.js';
-import type { CustomerUpdateFieldName } from './customers.interface.js';
+import type {
+  CustomerContactFormFieldName,
+  CustomerUpdateFieldName,
+  CustomerUserEditFormFieldName,
+  CustomerUserInviteFormFieldName,
+} from './customers.interface.js';
 
 /**
  * Cache keys of the `customers` queries.
@@ -109,4 +114,78 @@ export const CUSTOMER_UPDATE_DEFAULT_PATH_BY_CODE: Readonly<
   Record<string, CustomerUpdateFieldName>
 > = Object.freeze({
   [API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT]: 'taxNumber',
+});
+
+/** Success copy of the three contact writes (AIS-179). */
+export const CUSTOMERS_CONTACT_CREATE_SUCCESS_MESSAGE =
+  'A kapcsolattartó hozzáadva.';
+export const CUSTOMERS_CONTACT_UPDATE_SUCCESS_MESSAGE =
+  'A kapcsolattartó adatai mentve.';
+export const CUSTOMERS_CONTACT_REMOVE_SUCCESS_MESSAGE =
+  'A kapcsolattartó archiválva.';
+
+/** Success copy of the three login-user writes (AIS-179). */
+export const CUSTOMERS_USER_INVITE_SUCCESS_MESSAGE = 'A meghívó elküldve.';
+export const CUSTOMERS_USER_UPDATE_SUCCESS_MESSAGE =
+  'A felhasználó adatai mentve.';
+export const CUSTOMERS_USER_REMOVE_SUCCESS_MESSAGE = 'A meghívó visszavonva.';
+
+/**
+ * Every input the **contact** form owns, in visual order (AIS-179).
+ *
+ * Same contract as {@link CUSTOMER_UPDATE_FIELD_PATHS}: server errors are applied
+ * in this order and only the first one takes focus, so the markup cannot change
+ * the outcome by reordering its controls.
+ */
+export const CUSTOMER_CONTACT_FIELD_PATHS: readonly CustomerContactFormFieldName[] =
+  Object.freeze([
+    'name',
+    'position',
+    'email',
+    'phone',
+    'customerUserId',
+    'isPrimary',
+    'isTechnical',
+    'isAlerting',
+    'isActive',
+  ]);
+
+/**
+ * Path the primary-contact conflict blames (AIS-179).
+ *
+ * The server rejects the write when a second contact would hold the `primary`
+ * role, and the only control that can fix it is the role checkbox group — so the
+ * message lands there instead of on the form.
+ */
+export const CUSTOMER_CONTACT_DEFAULT_PATH_BY_CODE: Readonly<
+  Record<string, CustomerContactFormFieldName>
+> = Object.freeze({
+  [API_ERROR_CODE.CUSTOMER_PRIMARY_CONTACT_CONFLICT]: 'isPrimary',
+});
+
+/** Every input the **invite** form owns, in visual order (AIS-179). */
+export const CUSTOMER_USER_INVITE_FIELD_PATHS: readonly CustomerUserInviteFormFieldName[] =
+  Object.freeze(['name', 'email', 'role']);
+
+/**
+ * Path the duplicate e-mail conflict blames (AIS-179).
+ *
+ * `CUSTOMER_USER_EMAIL_CONFLICT` is global — an address belongs to at most one
+ * login user anywhere — and the address is the only input that can fix it.
+ */
+export const CUSTOMER_USER_INVITE_DEFAULT_PATH_BY_CODE: Readonly<
+  Record<string, CustomerUserInviteFormFieldName>
+> = Object.freeze({
+  [API_ERROR_CODE.CUSTOMER_USER_EMAIL_CONFLICT]: 'email',
+});
+
+/** Every input the **login-user edit** form owns, in visual order (AIS-179). */
+export const CUSTOMER_USER_EDIT_FIELD_PATHS: readonly CustomerUserEditFormFieldName[] =
+  Object.freeze(['name', 'role', 'status']);
+
+/** Path the second-owner conflict blames: the role control (AIS-179). */
+export const CUSTOMER_USER_EDIT_DEFAULT_PATH_BY_CODE: Readonly<
+  Record<string, CustomerUserEditFormFieldName>
+> = Object.freeze({
+  [API_ERROR_CODE.CUSTOMER_OWNER_CONFLICT]: 'role',
 });

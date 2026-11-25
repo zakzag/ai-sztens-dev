@@ -11,16 +11,26 @@ import { ApiKeyEditDialog } from '../../pages/api-keys/ui/ApiKeyEditDialog.js';
 import { ApiKeyViewDialog } from '../../pages/api-keys/ui/ApiKeyViewDialog.js';
 import { CallsPlaceholderPage } from '../../pages/calls/CallsPlaceholderPage.js';
 import {
+  CUSTOMER_CONTACT_CREATE_ROUTE_PATH,
+  CUSTOMER_CONTACT_EDIT_ROUTE_PATH,
+  CUSTOMER_CONTACT_PARAM,
   CUSTOMERS_CREATE_LABEL,
   CUSTOMERS_CREATE_ROUTE_PATH,
   CUSTOMER_DETAIL_PARAM,
   CUSTOMER_DETAIL_ROUTE_PATH,
   CUSTOMER_EDIT_ROUTE_PATH,
+  CUSTOMER_USER_EDIT_ROUTE_PATH,
+  CUSTOMER_USER_INVITE_ROUTE_PATH,
+  CUSTOMER_USER_PARAM,
 } from '../../pages/customers/customers.const.js';
 import { CustomerCreatePage } from '../../pages/customers/CustomerCreatePage.js';
 import { CustomerDetailPage } from '../../pages/customers/CustomerDetailPage.js';
 import { CustomerEditPage } from '../../pages/customers/CustomerEditPage.js';
 import { CustomersPage } from '../../pages/customers/CustomersPage.js';
+import { ContactCreateDialog } from '../../pages/customers/ui/ContactCreateDialog.js';
+import { ContactEditDialog } from '../../pages/customers/ui/ContactEditDialog.js';
+import { CustomerUserEditDialog } from '../../pages/customers/ui/CustomerUserEditDialog.js';
+import { CustomerUserInviteDialog } from '../../pages/customers/ui/CustomerUserInviteDialog.js';
 import { LoginPage } from '../../pages/LoginPage.js';
 import { NotFoundPage } from '../../pages/not-found/NotFoundPage.js';
 import { PlaceholderPage } from '../../pages/PlaceholderPage.js';
@@ -157,8 +167,9 @@ export const PROTECTED_ROUTE_ENTRIES: readonly RouteEntry[] = [
     // The customer detail (AIS-20) is a **sibling** of the list, not a child
     // (screen contract `D14`): it replaces the list instead of floating above
     // it, so the list is not mounted behind it. The contact and invite overlays
-    // arrive as `children` in AIS-179 — which is why the page already renders an
-    // `<Outlet/>`.
+    // (AIS-179) are `children` of this entry — which is why the page renders an
+    // `<Outlet/>`: each overlay has an address of its own while the detail page
+    // stays mounted behind it.
     path: CUSTOMER_DETAIL_ROUTE_PATH,
     navLabel: null,
     element: <CustomerDetailPage />,
@@ -169,6 +180,50 @@ export const PROTECTED_ROUTE_ENTRIES: readonly RouteEntry[] = [
     breadcrumbLabel: null,
     breadcrumbParentPath: APP_ROUTE_CUSTOMERS_PATH,
     resolveBreadcrumbLabel: (params) => params[CUSTOMER_DETAIL_PARAM],
+    children: [
+      {
+        // Contact creation (AIS-179). `navLabel: null`: reachable from the tab's
+        // CTA and the empty state, never from the navigation.
+        path: CUSTOMER_CONTACT_CREATE_ROUTE_PATH,
+        navLabel: null,
+        element: <ContactCreateDialog />,
+        protected: true,
+        breadcrumbLabel: null,
+        breadcrumbParentPath: CUSTOMER_DETAIL_ROUTE_PATH,
+        resolveBreadcrumbLabel: (params) => params[CUSTOMER_DETAIL_PARAM],
+      },
+      {
+        // Contact edit (AIS-179): the same parameterised crumb as the detail, so
+        // a reloaded URL still says which customer it belongs to.
+        path: CUSTOMER_CONTACT_EDIT_ROUTE_PATH,
+        navLabel: null,
+        element: <ContactEditDialog />,
+        protected: true,
+        breadcrumbLabel: null,
+        breadcrumbParentPath: CUSTOMER_DETAIL_ROUTE_PATH,
+        resolveBreadcrumbLabel: (params) => params[CUSTOMER_CONTACT_PARAM],
+      },
+      {
+        // Login-user invitation (AIS-179).
+        path: CUSTOMER_USER_INVITE_ROUTE_PATH,
+        navLabel: null,
+        element: <CustomerUserInviteDialog />,
+        protected: true,
+        breadcrumbLabel: null,
+        breadcrumbParentPath: CUSTOMER_DETAIL_ROUTE_PATH,
+        resolveBreadcrumbLabel: (params) => params[CUSTOMER_DETAIL_PARAM],
+      },
+      {
+        // Login-user edit (AIS-179).
+        path: CUSTOMER_USER_EDIT_ROUTE_PATH,
+        navLabel: null,
+        element: <CustomerUserEditDialog />,
+        protected: true,
+        breadcrumbLabel: null,
+        breadcrumbParentPath: CUSTOMER_DETAIL_ROUTE_PATH,
+        resolveBreadcrumbLabel: (params) => params[CUSTOMER_USER_PARAM],
+      },
+    ],
   },
   {
     // The edit page (AIS-21) is another **sibling** of the list, not a child of

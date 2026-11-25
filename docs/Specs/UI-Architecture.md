@@ -1,6 +1,10 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-25 — AIS-21: a `pages/customers` **szerkesztő oldala**
+**Utolsó frissítés: 2026-11-25 — AIS-179: a `pages/customers` **Kapcsolattartók** és **Felhasználók**
+füle — a detail view model (`id`, `contacts`, `customerUsers`) hordozza az adatot, a két fül csak markup,
+nincs saját kérés, lapozó vagy URL-listaállapot; a négy írási felület a detail entry **`children`**
+route-jaként él (`/contacts/new`, `/contacts/:contactId/edit`, `/users/invite`, `/users/:userId/edit`),
+a megerősítések pedig helyi `useState`-tel (AIS-173 kivétel) — lásd §5. Előző, 2026-11-25 — AIS-21: a `pages/customers` **szerkesztő oldala**
 (`/customers/:id/edit`, testvér útvonal) — olvasás `useCustomerDetail`-dal és a **újrahasznált** tiszta
 `toCustomerDetailState`-tel, űrlap `useAppForm`-mal a szerződésből származtatott sémán, `key={updatedAt}`
 remounttal; a `409 STALE_WRITE` **oldalszintű figyelmeztetés újratöltés gombbal** (nem mezőhiba), a detail
@@ -1011,12 +1015,26 @@ surface is chosen by the pure `toCustomerDetailState` in `pages/customers/custom
 component branches on an error: `loading` → `Skeleton` plus the `sr-only` sentence, `404` → its own
 `EmptyState` copy, a **banner**-tier failure → a neutral `unavailable` notice (the layout's
 `AppErrorBanner` already says what went wrong, AIS-96), any other failure the page owns →
-`PageErrorState` + retry, a payload → the tab frame. The four tab bodies owned by AIS-179 / AIS-181 are
-already part of that frame: `pages/customers/ui/customer-tab-panels.tsx` is a **total**
-`Record<CustomerTab, ComponentType<CustomerTabPanelProps>>`, so those tickets replace four entries and
-never touch `CustomerDetailPage.tsx`. The strip itself stays a page part (`ui/CustomerTabs.tsx`) and is
+`PageErrorState` + retry, a payload → the tab frame. The tab bodies live in
+`pages/customers/ui/customer-tab-panels.tsx`, a **total**
+`Record<CustomerTab, ComponentType<CustomerTabPanelProps>>`: AIS-179 replaced two entries (`contacts`,
+`users`) there and AIS-181 will replace the remaining two, and neither ticket touches
+`CustomerDetailPage.tsx`. The strip itself stays a page part (`ui/CustomerTabs.tsx`) and is
 a labelled `<nav>` of `Button`s with `aria-current="page"` — not a `packages/ui` primitive and not a
 `tablist`, because every tab has an address of its own (screen contract `D16`).
+
+**The contact and login-user tabs (AIS-179).** Both tabs render `customer.contacts` /
+`customer.customerUsers` from the **detail** view model (`toCustomerContactViewModels`,
+`toCustomerUserViewModels`), which is why neither has a query, a pager or URL list state (`D-W3` — the
+contract has no `listCustomerUsers`). Their write surfaces are **route children** of the detail entry,
+all four rendered into its `<Outlet/>` with `navLabel: null`:
+`/customers/:id/contacts/new`, `/customers/:id/contacts/:contactId/edit`,
+`/customers/:id/users/invite`, `/customers/:id/users/:userId/edit`. Closing one returns to the tab it
+belongs to (`toCustomerTabRoute`), so the operator keeps their place. The two destructive actions —
+archive a contact, revoke a pending invitation — are `ConfirmDialog`s with a local `useState` target in
+the tab (the AIS-173 exception), and the revoke action is rendered **only** on an `invited` row, because
+that is the only state the API lets an operator revoke. Both edit overlays mount their form keyed by
+`updatedAt`, the AIS-172 pattern, so a `409 STALE_WRITE` re-read reaches the inputs.
 
 **The customer edit page (AIS-21) — the second half of that row.** `/customers/:id/edit` is a
 **sibling** of the detail entry (`D5`/`D14`), so editing replaces the read-only page instead of floating

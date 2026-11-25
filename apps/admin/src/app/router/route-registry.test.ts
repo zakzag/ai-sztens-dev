@@ -15,11 +15,15 @@ import {
   API_KEY_VIEW_ROUTE_PATH,
 } from '../../pages/api-keys/api-keys.const.js';
 import {
+  CUSTOMER_CONTACT_CREATE_ROUTE_PATH,
+  CUSTOMER_CONTACT_EDIT_ROUTE_PATH,
   CUSTOMERS_CREATE_LABEL,
   CUSTOMERS_CREATE_ROUTE_PATH,
   CUSTOMERS_LIST_ROUTE_PATH,
   CUSTOMER_DETAIL_ROUTE_PATH,
   CUSTOMER_EDIT_ROUTE_PATH,
+  CUSTOMER_USER_EDIT_ROUTE_PATH,
+  CUSTOMER_USER_INVITE_ROUTE_PATH,
 } from '../../pages/customers/customers.const.js';
 import {
   APP_API_PATH_PREFIX,
@@ -146,9 +150,18 @@ describe('route registry', () => {
       (route) => route.path === CUSTOMER_DETAIL_ROUTE_PATH,
     );
 
-    // Sibling, not child: the detail entry declares no `children`, so the two
-    // entries answer two independent addresses.
-    expect(detail?.children ?? []).toHaveLength(0);
+    // The edit page is a **sibling** of the detail, so it is not one of the
+    // detail entry's children. The children the detail *does* declare are the
+    // four AIS-179 overlays, whose addresses are built from the detail path.
+    const childPaths = (detail?.children ?? []).map((child) => child.path);
+
+    expect(childPaths).not.toContain(CUSTOMER_EDIT_ROUTE_PATH);
+    expect(childPaths).toEqual([
+      CUSTOMER_CONTACT_CREATE_ROUTE_PATH,
+      CUSTOMER_CONTACT_EDIT_ROUTE_PATH,
+      CUSTOMER_USER_INVITE_ROUTE_PATH,
+      CUSTOMER_USER_EDIT_ROUTE_PATH,
+    ]);
   });
 
   it('keeps the identifier parameter on the overlay children only', () => {

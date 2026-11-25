@@ -6,9 +6,15 @@
  */
 
 import type {
+  Contact,
+  CreateContactInput,
   Customer,
+  CustomerUser,
+  InviteCustomerUserInput,
+  UpdateContactInput,
   UpdateCustomerInput,
   UpdateCustomerStatusInput,
+  UpdateCustomerUserInput,
 } from '@callback/shared';
 import type {
   ApiErrorView,
@@ -102,5 +108,87 @@ export interface UseUpdateCustomerStatusResult extends ApiErrorView {
     input: UpdateCustomerStatusInput,
   ) => Promise<Customer>;
   /** `true` while the write is in flight; disables the save button. */
+  readonly isPending: boolean;
+}
+
+/**
+ * Every input the **contact** form owns (AIS-179).
+ *
+ * Roles are three booleans rather than the contract's `roles[]`: a set of three
+ * checkboxes is what the form shows, and `toCreateContactInput()` is the single
+ * place that turns the flags into the wire array (plan decision `D3`).
+ */
+export type CustomerContactFormFieldName =
+  | 'name'
+  | 'position'
+  | 'email'
+  | 'phone'
+  | 'customerUserId'
+  | 'isPrimary'
+  | 'isTechnical'
+  | 'isAlerting'
+  | 'isActive';
+
+/** Every input the **invite** form owns (AIS-179). */
+export type CustomerUserInviteFormFieldName = 'name' | 'email' | 'role';
+
+/** Every input the **login-user edit** form owns (AIS-179). */
+export type CustomerUserEditFormFieldName = 'name' | 'role' | 'status';
+
+/** Result of {@link useCreateContactMutation}. */
+export interface UseCreateContactResult extends ApiErrorView {
+  /** Adds one contact to the customer bound by the hook. */
+  readonly createContact: (input: CreateContactInput) => Promise<Contact>;
+  /** `true` while the write is in flight; disables the save button. */
+  readonly isPending: boolean;
+}
+
+/**
+ * Result of {@link useUpdateContactMutation}.
+ *
+ * Both the customer and the contact id are **bound** by the hook, exactly like
+ * `useUpdateCustomerMutation` binds the customer id: the request body schemas are
+ * `.strict()` and must never carry an address of their own.
+ */
+export interface UseUpdateContactResult extends ApiErrorView {
+  /** Patches the bound contact; the body always carries `updatedAt`. */
+  readonly updateContact: (input: UpdateContactInput) => Promise<Contact>;
+  /** `true` while the write is in flight; disables the save button. */
+  readonly isPending: boolean;
+}
+
+/** Result of {@link useRemoveContactMutation} — the contact id is bound. */
+export interface UseRemoveContactResult extends ApiErrorView {
+  /** Archives the bound contact; the soft delete answers `data: null`. */
+  readonly removeContact: () => Promise<null>;
+  /** `true` while the write is in flight; disables the confirm button. */
+  readonly isPending: boolean;
+}
+
+/** Result of {@link useInviteCustomerUserMutation}. */
+export interface UseInviteCustomerUserResult extends ApiErrorView {
+  /** Sends one invitation. */
+  readonly inviteCustomerUser: (
+    input: InviteCustomerUserInput,
+  ) => Promise<CustomerUser>;
+  /** `true` while the write is in flight; disables the invite button. */
+  readonly isPending: boolean;
+}
+
+/** Result of {@link useUpdateCustomerUserMutation} — both ids are bound. */
+export interface UseUpdateCustomerUserResult extends ApiErrorView {
+  /** Patches name, role and managed status; the body carries `updatedAt`. */
+  readonly updateCustomerUser: (
+    input: UpdateCustomerUserInput,
+  ) => Promise<CustomerUser>;
+  /** `true` while the write is in flight; disables the save button. */
+  readonly isPending: boolean;
+}
+
+/** Result of {@link useRemoveCustomerUserMutation} — both ids are bound. */
+export interface UseRemoveCustomerUserResult extends ApiErrorView {
+  /** Revokes the bound **pending invitation**; answers `data: null`. */
+  readonly removeCustomerUser: () => Promise<null>;
+  /** `true` while the write is in flight; disables the confirm button. */
   readonly isPending: boolean;
 }

@@ -1,6 +1,11 @@
 # Customers admin screens — screen contract (list, detail, wizard, edit)
 
-**Utolsó frissítés: 2026-11-25** (AIS-21: a cég **szerkesztő oldala** — `/customers/:id/edit` testvér
+**Utolsó frissítés: 2026-11-25** (AIS-179: a cég adatlap **Kapcsolattartók** és **Felhasználók** füle —
+a detail payloadból olvasva, lapozó és URL-listaállapot nélkül (`D-W3`), négy route-alapú overlay
+(`/contacts/new`, `/contacts/:contactId/edit`, `/users/invite`, `/users/:userId/edit`), a
+`CUSTOMER_PRIMARY_CONTACT_CONFLICT` / `CUSTOMER_USER_EMAIL_CONFLICT` / `CUSTOMER_OWNER_CONFLICT` kódok a
+megfelelő vezérlőre irányítva, a meghívó visszavonása pedig **csak** `invited` soron — leszállítva; a
+címke-chip sáv továbbra is az [AIS-193](https://zakzag.atlassian.net/browse/AIS-193) ticketé. Előző, 2026-11-25 — AIS-21: a cég **szerkesztő oldala** — `/customers/:id/edit` testvér
 útvonal, `useAppForm` a szerződésből származtatott sémával, négy `FormSection`, mezőnkénti hibák a
 `details[].path`-ból, a `409 STALE_WRITE` oldalszintű figyelmeztetés újratöltés gombbal, valamint a
 detail fejléc írási műveletei (*Szerkesztés*, *Státusz váltása*, *Archiválás*) — leszállítva; a
@@ -181,8 +186,8 @@ The tab strip is the one element with no existing primitive. It stays a **page p
 | --- | --- | --- |
 | `overview` — Áttekintés | status + `statusChangedAt`, primary contact, last activity, missing-data notice | `StatusBadge`, `DescriptionList`, `Alert` (`warning`) |
 | `data` — Cégadatok | key–value groups: azonosítók / jogi adatok / cím / egyéb | `Card` per group + `DescriptionList` (`columns: 2`) — **D12** |
-| `contacts` — Kapcsolattartók | list + create/edit/delete, roles as badges, "belépő" marker when `customerUserId !== null`. The list is read from the **detail payload** (`D-W3`): **no pager, no URL list state** | `DataTable` (no `Pagination`) + `EntityDialog` (children routes), `StatusBadge`, `ConfirmDialog` |
-| `users` — Felhasználók | list + invite; role/status per row. Also read from the **detail payload** (`D-W3`): **no pager, no URL list state** — the contract has no `listCustomerUsers` operation | `DataTable` (no `Pagination`) + `EntityDialog` (invite), `StatusBadge` |
+| `contacts` — Kapcsolattartók | list + create/edit/delete, roles as badges, "belépő" marker when `customerUserId !== null`. The list is read from the **detail payload** (`D-W3`): **no pager, no URL list state** — **delivered by AIS-179** | `DataTable` (no `Pagination`) + `EntityDialog` (children routes), `StatusBadge`, `ConfirmDialog` |
+| `users` — Felhasználók | list + invite; role/status per row, revoke **only** on an `invited` row. Also read from the **detail payload** (`D-W3`): **no pager, no URL list state** — the contract has no `listCustomerUsers` operation; **delivered by AIS-179** | `DataTable` (no `Pagination`) + `EntityDialog` (invite + edit), `StatusBadge` |
 | `activity` — Tevékenység | feed (newest first) + „Megjegyzés írása” form. Edit/delete render **only** on rows where `authorType === 'operator'` (`D-W4`, a client-side rule until AIS-73/74 adds authentication) | `Card` list + `Textarea` + `Button` + `FormActions` in `useAppForm` |
 | `audit` — Napló | read-only rows: `occurredAt`, `actorName`, `operation`, `tableName`; expandable diff | `DataTable` + the existing JSON logic of [`json.logic.ts`](../../packages/ui/src/lib/json.logic.ts:1) (`toPrettyJson`) — **no second renderer** |
 
@@ -396,8 +401,8 @@ apps/admin/src/features/customers/               AIS-19 ✅: use-customers-list.
                                                  customers.const.ts, customers.logic.ts, customers.interface.ts
                                                  AIS-20 ✅: use-customer-detail.ts
                                                  AIS-21 ✅: use-update-customer.ts, use-update-customer-status.ts
-                                                 (a use-customer-tags.ts a follow-up ticketé)
-                                                 AIS-179: use-customer-contacts.ts, use-customer-users.ts
+                                                 (a use-customer-tags.ts az AIS-193 ticketé)
+                                                 AIS-179 ✅: use-customer-contacts.ts, use-customer-users.ts
                                                  AIS-181: use-customer-activities.ts, use-customer-audit-logs.ts
                                                  AIS-182: use-create-customer.ts
                                                  shared: customers.const.ts (query keys via
@@ -407,17 +412,23 @@ apps/admin/src/features/api/use-tab-param.ts     AIS-19 ✅ **created** it (firs
                                                  .logic.ts + tests); AIS-20 reuses it for `?tab=`
 apps/admin/src/entities/customer/                AIS-19: customer.interface.ts, customer.mapper.ts,
                                                  customer.const.ts (labels, status variants), components/
-apps/admin/src/pages/customers/                  AIS-19 ✅ / AIS-20 ✅ / AIS-21 ✅ / AIS-179/181:
+apps/admin/src/pages/customers/                  AIS-19 ✅ / AIS-20 ✅ / AIS-21 ✅ / AIS-179 ✅ / AIS-181:
                                                  CustomersPage.tsx, CustomerCreatePage.tsx, CustomerDetailPage.tsx,
                                                  CustomerEditPage.tsx, customer-edit.logic.ts, customers.const.ts,
                                                  customers.interface.ts, customers.logic.ts,
                                                  customers-wizard.store.ts (+ provider), customers-wizard.logic.ts,
+                                                 customer-contact.logic.ts, customer-user.logic.ts,
                                                  ui/* (AIS-21 ✅: CustomerEditForm, CustomerDetailHeaderActions,
-                                                 CustomerStatusDialog)
+                                                 CustomerStatusDialog; AIS-179 ✅: CustomerContactsTab,
+                                                 CustomerUsersTab, CustomerContactForm, CustomerUserInviteForm,
+                                                 CustomerUserEditForm, ContactCreateDialog, ContactEditDialog,
+                                                 CustomerUserInviteDialog, CustomerUserEditDialog,
+                                                 ContactArchiveDialog, CustomerUserRevokeDialog)
 apps/admin/src/app/app.const.ts                  AIS-19 ✅: APP_ROUTE_CUSTOMERS_PATH, APP_CUSTOMERS_LABEL
 apps/admin/src/app/router/route-registry.tsx     AIS-19 ✅ (`/customers`, `/customers/new`) —
                                                  AIS-20 ✅: the detail entry (sibling, resolved crumb),
-                                                 AIS-21 ✅: the edit entry (sibling, resolved crumb)
+                                                 AIS-21 ✅: the edit entry (sibling, resolved crumb),
+                                                 AIS-179 ✅: the four overlay children of the detail entry
 docs/Specs/UI-Architecture.md §5                 AIS-19 ✅: the row of §6 above, `zustand` row flipped
 ```
 
@@ -441,6 +452,20 @@ Two decisions of this ticket are recorded here rather than in a rule file: **the
 the status/archive header menu stay in AIS-21** (they would point at a route that does not exist yet),
 and **the page folder stays flat** (`pages/customers/`, no `customer/` subfolder), superseding the
 `customer/…` paths of the wave plan for AIS-179 / AIS-181 as well.
+
+**Delivered by AIS-179 (2026-11-25), verified against the tree:** `features/customers/use-customer-contacts.ts`,
+`features/customers/use-customer-users.ts`, the entity additions (`ContactRoleBadge`,
+`CustomerContactViewModel(s)`, `CustomerUserViewModel(s)` in `customer.interface.ts`; the
+`CONTACT_*` / `CUSTOMER_USER_*` label and badge tables in `customer.const.ts`;
+`toCustomerContact(ViewModel|ViewModels)` / `toCustomerUser(ViewModel|ViewModels)` in `customer.mapper.ts`;
+the extended `toCustomerDetailViewModel` now carrying `id`, `contacts` and `customerUsers`),
+`pages/customers/customer-contact.logic.ts`, `pages/customers/customer-user.logic.ts`, the ten new
+`ui/` components listed in the file map above, the four route children, the contact and login-user MSW
+handlers and the `CUSTOMER_CONTACT_ROLE_FIELDS` / `*_FIELD_PATHS` / `*_DEFAULT_PATH_BY_CODE` copy tables.
+Three decisions are recorded here rather than in a rule file: **the detail view model owns the contact
+and user lists** (so a tab stays markup and no tab fetches), **the roles are three booleans in the form**
+(converted by `toContactRoles()`, no `useFieldArray`), and **the revoke action exists only on an
+`invited` row** (`D8`), because the API revokes pending invitations only.
 
 **Delivered by AIS-21 (2026-11-25), verified against the tree:** `pages/customers/customer-edit.logic.ts`
 (derived edit schema, status schema, record → values, values → payload, country options, read-only

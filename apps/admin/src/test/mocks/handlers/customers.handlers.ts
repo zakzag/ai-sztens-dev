@@ -20,9 +20,11 @@ import {
   API_ERROR_CODE,
   CUSTOMERS_PATH,
   SECOND_CUSTOMER,
+  VALID_CONTACT,
   VALID_CUSTOMER,
   VALID_CUSTOMER_DETAIL,
   VALID_CUSTOMER_LIST,
+  VALID_CUSTOMER_USER,
   toPaginationMeta,
 } from '@callback/shared';
 import { errorResponse, successResponse } from './handler-envelope.js';
@@ -229,6 +231,125 @@ export const customersStatusStaleWrite = http.patch(
       path: CUSTOMERS_STATUS_PATH_PATTERN,
     }),
 );
+
+/** Path templates of the contact writes (AIS-179), as MSW matches them. */
+export const CUSTOMERS_CONTACTS_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/contacts`;
+export const CUSTOMERS_CONTACT_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/contacts/:contactId`;
+
+/** Path templates of the login-user writes (AIS-179). */
+export const CUSTOMERS_USERS_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/customer-users`;
+export const CUSTOMERS_USER_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/customer-users/:customerUserId`;
+
+/** `201` contact creation — answers the first contact of the detail fixture. */
+export const customersContactCreateSuccess = http.post(
+  CUSTOMERS_CONTACTS_PATH_PATTERN,
+  () => successResponse(VALID_CONTACT),
+);
+
+/**
+ * `409 CUSTOMER_PRIMARY_CONTACT_CONFLICT` with the `roles` path.
+ *
+ * The role set is what the operator can change, so the envelope names it: the
+ * form maps the message onto the role checkbox group (plan decision `D7`).
+ */
+export const customersContactCreatePrimaryConflict = http.post(
+  CUSTOMERS_CONTACTS_PATH_PATTERN,
+  () =>
+    errorResponse(
+      API_ERROR_CODE.CUSTOMER_PRIMARY_CONTACT_CONFLICT,
+      'The customer already has a primary contact',
+      {
+        details: [
+          {
+            path: 'roles',
+            message: 'A cégnek már van elsődleges kapcsolattartója.',
+          },
+        ],
+        path: CUSTOMERS_CONTACTS_PATH_PATTERN,
+      },
+    ),
+);
+
+/** `200` contact patch — answers the updated fixture row. */
+export const customersContactUpdateSuccess = http.patch(
+  CUSTOMERS_CONTACT_PATH_PATTERN,
+  () => successResponse(VALID_CONTACT),
+);
+
+/** `409 STALE_WRITE` on a contact patch. */
+export const customersContactUpdateStaleWrite = http.patch(
+  CUSTOMERS_CONTACT_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.STALE_WRITE, 'The row was modified meanwhile', {
+      path: CUSTOMERS_CONTACT_PATH_PATTERN,
+    }),
+);
+
+/** `200` contact archive — the envelope carries `data: null`. */
+export const customersContactRemoveSuccess = http.delete(
+  CUSTOMERS_CONTACT_PATH_PATTERN,
+  () => successResponse(null),
+);
+
+/** `201` invitation — answers the login user of the detail fixture. */
+export const customersUserInviteSuccess = http.post(
+  CUSTOMERS_USERS_PATH_PATTERN,
+  () => successResponse(VALID_CUSTOMER_USER),
+);
+
+/** `409 CUSTOMER_USER_EMAIL_CONFLICT` with the `email` path (global address). */
+export const customersUserInviteEmailConflict = http.post(
+  CUSTOMERS_USERS_PATH_PATTERN,
+  () =>
+    errorResponse(
+      API_ERROR_CODE.CUSTOMER_USER_EMAIL_CONFLICT,
+      'The e-mail address is already in use',
+      {
+        details: [
+          { path: 'email', message: 'Ez az e-mail-cím már használatban van.' },
+        ],
+        path: CUSTOMERS_USERS_PATH_PATTERN,
+      },
+    ),
+);
+
+/** `200` login-user patch — answers the updated fixture row. */
+export const customersUserUpdateSuccess = http.patch(
+  CUSTOMERS_USER_PATH_PATTERN,
+  () => successResponse(VALID_CUSTOMER_USER),
+);
+
+/** `409 CUSTOMER_OWNER_CONFLICT` with the `role` path. */
+export const customersUserUpdateOwnerConflict = http.patch(
+  CUSTOMERS_USER_PATH_PATTERN,
+  () =>
+    errorResponse(
+      API_ERROR_CODE.CUSTOMER_OWNER_CONFLICT,
+      'The customer already has an active owner',
+      {
+        details: [
+          {
+            path: 'role',
+            message: 'A cégnek már van aktív tulajdonosa.',
+          },
+        ],
+        path: CUSTOMERS_USER_PATH_PATTERN,
+      },
+    ),
+);
+
+/** `200` invitation revoke — the envelope carries `data: null`. */
+export const customersUserRemoveSuccess = http.delete(
+  CUSTOMERS_USER_PATH_PATTERN,
+  () => successResponse(null),
+);
+
+/**
+ * The contact and login-user fixtures the handlers answer with, re-exported for
+ * assertions — a tab test reads the same object the wire carried.
+ */
+export const CUSTOMER_CONTACT_FIXTURES = VALID_CUSTOMER_DETAIL.contacts;
+export const CUSTOMER_USER_FIXTURES = VALID_CUSTOMER_DETAIL.customerUsers;
 
 /**
  * Default handler set registered by the global server.

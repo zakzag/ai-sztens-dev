@@ -37,6 +37,7 @@ import {
   CUSTOMER_DETAIL_ROUTE_PATH,
   CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE,
   CUSTOMER_DETAIL_TABS,
+  CUSTOMER_USERS_INVITE_LABEL,
 } from './customers.const.js';
 import type { CustomerTab } from './customers.interface.js';
 
@@ -173,9 +174,14 @@ describe('CustomerDetailPage', () => {
       expect(location()).toContain('tab=users');
     });
     expect(location()).toBe(`/customers/${VALID_CUSTOMER_DETAIL.id}?tab=users`);
+    // AIS-179: the `users` tab is a real tab now — its invite CTA is the marker
+    // that the placeholder copy is gone from this panel.
     expect(
-      screen.getByText(CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE),
+      screen.getByRole('link', { name: CUSTOMER_USERS_INVITE_LABEL }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE),
+    ).not.toBeInTheDocument();
   });
 
   it('falls back to the default tab for an unknown value', async () => {

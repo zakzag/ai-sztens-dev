@@ -14,19 +14,25 @@ import {
   CUSTOMER_SOURCE_VALUES,
   CUSTOMER_STATUS_VALUES,
   CUSTOMER_TYPE_VALUES,
+  CUSTOMER_USER_MANAGED_STATUS_VALUES,
+  CUSTOMER_USER_ROLE_VALUES,
   HEADCOUNT_RANGE_VALUES,
   type CustomerListQuery,
 } from '@callback/shared';
 import type { RadioOption, SelectOption } from '@callback/ui';
 import {
+  CONTACT_ROLE_LABELS,
   CUSTOMER_DETAIL_GROUP_TITLES,
   CUSTOMER_HEADCOUNT_RANGE_LABELS,
   CUSTOMER_SOURCE_LABELS,
   CUSTOMER_STATUS_LABELS,
   CUSTOMER_TYPE_LABELS,
+  CUSTOMER_USER_ROLE_LABELS,
+  CUSTOMER_USER_STATUS_LABELS,
 } from '../../entities/customer/customer.const.js';
 import type { CustomerWizardStep } from './customers-wizard.interface.js';
 import type {
+  CustomerContactRoleFieldDefinition,
   CustomerTab,
   CustomerTabDefinition,
   CustomerWizardStepDefinition,
@@ -496,3 +502,253 @@ export const CUSTOMERS_STATUS_OPTIONS: readonly SelectOption[] =
     value,
     label: CUSTOMER_STATUS_LABELS[value],
   }));
+
+/*
+  ---------------------------------------------------------------------------
+  AIS-179 — the contacts and users tabs and their four child overlays
+  ---------------------------------------------------------------------------
+*/
+
+/**
+ * Route templates of the four child overlays of the detail entry (AIS-179).
+ *
+ * All four are `children` of `/customers/:id` (screen contract §1): they render
+ * into the detail page's `<Outlet/>`, keep the page mounted behind them, and each
+ * has an address of its own — so the URL, not a `useState`, owns "is it open".
+ */
+export const CUSTOMER_CONTACT_CREATE_ROUTE_PATH = '/customers/:id/contacts/new';
+export const CUSTOMER_CONTACT_EDIT_ROUTE_PATH =
+  '/customers/:id/contacts/:contactId/edit';
+export const CUSTOMER_USER_INVITE_ROUTE_PATH = '/customers/:id/users/invite';
+export const CUSTOMER_USER_EDIT_ROUTE_PATH = '/customers/:id/users/:userId/edit';
+
+/** Route parameters of the two edit overlays. */
+export const CUSTOMER_CONTACT_PARAM = 'contactId';
+export const CUSTOMER_USER_PARAM = 'userId';
+
+/**
+ * Concrete address of the detail page on one tab.
+ *
+ * Used as the close target of every overlay: closing an invitation must return to
+ * the *Felhasználók* tab, not to the default one, otherwise the operator loses
+ * their place after each write.
+ *
+ * @param customerId - the customer's uuid.
+ * @param tab - the tab to land on.
+ * @returns the deep link, tab included.
+ */
+export function toCustomerTabRoute(
+  customerId: string,
+  tab: CustomerTab,
+): string {
+  const base = `${CUSTOMERS_LIST_ROUTE_PATH}/${encodeURIComponent(customerId)}`;
+
+  return `${base}?${CUSTOMER_DETAIL_TAB_PARAM}=${tab}`;
+}
+
+/**
+ * @param customerId - the customer's uuid.
+ * @returns the address of the contact-create overlay.
+ */
+export function toCustomerContactCreateRoute(customerId: string): string {
+  return `${CUSTOMERS_LIST_ROUTE_PATH}/${encodeURIComponent(customerId)}/contacts/new`;
+}
+
+/**
+ * @param customerId - the customer's uuid.
+ * @param contactId - the contact's uuid.
+ * @returns the address of the contact-edit overlay.
+ */
+export function toCustomerContactEditRoute(
+  customerId: string,
+  contactId: string,
+): string {
+  const base = `${CUSTOMERS_LIST_ROUTE_PATH}/${encodeURIComponent(customerId)}`;
+
+  return `${base}/contacts/${encodeURIComponent(contactId)}/edit`;
+}
+
+/**
+ * @param customerId - the customer's uuid.
+ * @returns the address of the invite overlay.
+ */
+export function toCustomerUserInviteRoute(customerId: string): string {
+  return `${CUSTOMERS_LIST_ROUTE_PATH}/${encodeURIComponent(customerId)}/users/invite`;
+}
+
+/**
+ * @param customerId - the customer's uuid.
+ * @param userId - the login user's uuid.
+ * @returns the address of the login-user edit overlay.
+ */
+export function toCustomerUserEditRoute(
+  customerId: string,
+  userId: string,
+): string {
+  const base = `${CUSTOMERS_LIST_ROUTE_PATH}/${encodeURIComponent(customerId)}`;
+
+  return `${base}/users/${encodeURIComponent(userId)}/edit`;
+}
+
+/** Contacts tab: header action, row action and empty state. */
+export const CUSTOMER_CONTACTS_CREATE_LABEL = 'Kapcsolattartó hozzáadása';
+export const CUSTOMER_CONTACTS_TABLE_CAPTION = 'A cég kapcsolattartói';
+export const CUSTOMER_CONTACTS_EMPTY_TITLE = 'Nincs kapcsolattartó';
+export const CUSTOMER_CONTACTS_EMPTY_DESCRIPTION =
+  'Ehhez a céghez még nem rögzítettek kapcsolattartót. Az elsőt a „Kapcsolattartó hozzáadása” gombbal veheted fel.';
+export const CUSTOMER_CONTACT_EDIT_LABEL = 'Szerkesztés';
+export const CUSTOMER_CONTACT_ARCHIVE_LABEL = 'Archiválás';
+export const CUSTOMER_CONTACT_ARCHIVE_CONFIRM_TITLE =
+  'Kapcsolattartó archiválása';
+export const CUSTOMER_CONTACT_ARCHIVE_CONFIRM_DESCRIPTION =
+  'Az archivált kapcsolattartó eltűnik a listából, és felszabadítja az elsődleges szerepkört.';
+
+/** Users tab: header action, row action and empty state. */
+export const CUSTOMER_USERS_INVITE_LABEL = 'Meghívás';
+export const CUSTOMER_USERS_TABLE_CAPTION = 'A cég belépő felhasználói';
+export const CUSTOMER_USERS_EMPTY_TITLE = 'Nincs belépő felhasználó';
+export const CUSTOMER_USERS_EMPTY_DESCRIPTION =
+  'Ehhez a céghez még nem tartozik belépő felhasználó. Az elsőt a „Meghívás” gombbal hívhatod meg.';
+export const CUSTOMER_USER_EDIT_LABEL = 'Szerkesztés';
+export const CUSTOMER_USER_REVOKE_LABEL = 'Meghívó visszavonása';
+export const CUSTOMER_USER_REVOKE_CONFIRM_TITLE = 'Meghívó visszavonása';
+export const CUSTOMER_USER_REVOKE_CONFIRM_DESCRIPTION =
+  'A visszavont meghívó érvénytelenné válik, a felhasználó nem tud belépni.';
+
+/** Titles and descriptions of the four overlays. */
+export const CUSTOMER_CONTACT_CREATE_DIALOG_TITLE =
+  'Kapcsolattartó hozzáadása';
+export const CUSTOMER_CONTACT_CREATE_DIALOG_DESCRIPTION =
+  'A kapcsolattartó a céghez jön létre, és azonnal megjelenik a listában.';
+export const CUSTOMER_CONTACT_EDIT_DIALOG_TITLE = 'Kapcsolattartó szerkesztése';
+export const CUSTOMER_USER_INVITE_DIALOG_TITLE = 'Felhasználó meghívása';
+export const CUSTOMER_USER_INVITE_DIALOG_DESCRIPTION =
+  'A meghívott felhasználó „Meghívva” állapotban jön létre, és csak elfogadás után tud belépni.';
+export const CUSTOMER_USER_EDIT_DIALOG_TITLE = 'Felhasználó szerkesztése';
+
+/** Not-found and failure copy of the two edit overlays. */
+export const CUSTOMER_CONTACT_NOT_FOUND_TITLE =
+  'Ez a kapcsolattartó nem található.';
+export const CUSTOMER_CONTACT_NOT_FOUND_MESSAGE =
+  'A hivatkozott kapcsolattartó már nem tartozik ehhez a céghez.';
+export const CUSTOMER_USER_NOT_FOUND_TITLE = 'Ez a felhasználó nem található.';
+export const CUSTOMER_USER_NOT_FOUND_MESSAGE =
+  'A hivatkozott felhasználó már nem tartozik ehhez a céghez.';
+
+/** Residue alert title of the four forms. */
+export const CUSTOMER_CONTACT_FORM_ERROR_TITLE = 'A mentés nem sikerült.';
+export const CUSTOMER_USER_FORM_ERROR_TITLE = 'A mentés nem sikerült.';
+
+/** `id` of the `<form>` each overlay's footer button submits. */
+export const CUSTOMER_CONTACT_FORM_ID = 'customer-contact-form';
+export const CUSTOMER_USER_INVITE_FORM_ID = 'customer-user-invite-form';
+export const CUSTOMER_USER_EDIT_FORM_ID = 'customer-user-edit-form';
+
+/** Submit labels (and their pending variants) of the four forms. */
+export const CUSTOMER_CONTACT_SUBMIT_LABEL = 'Mentés';
+export const CUSTOMER_CONTACT_SUBMIT_PENDING_LABEL = 'Mentés…';
+export const CUSTOMER_USER_INVITE_SUBMIT_LABEL = 'Meghívás';
+export const CUSTOMER_USER_INVITE_SUBMIT_PENDING_LABEL = 'Meghívás…';
+export const CUSTOMER_USER_EDIT_SUBMIT_LABEL = 'Mentés';
+export const CUSTOMER_USER_EDIT_SUBMIT_PENDING_LABEL = 'Mentés…';
+
+/** DOM ids of the contact form controls (also their `htmlFor` targets). */
+export const CUSTOMER_CONTACT_FIELD_IDS = {
+  name: 'customer-contact-name',
+  position: 'customer-contact-position',
+  email: 'customer-contact-email',
+  phone: 'customer-contact-phone',
+  customerUserId: 'customer-contact-user',
+  isPrimary: 'customer-contact-role-primary',
+  isTechnical: 'customer-contact-role-technical',
+  isAlerting: 'customer-contact-role-alerting',
+  isActive: 'customer-contact-active',
+} as const;
+
+/** Visible labels of the contact form controls. */
+export const CUSTOMER_CONTACT_FIELD_LABELS = {
+  name: 'Név',
+  position: 'Beosztás',
+  email: 'E-mail',
+  phone: 'Telefon',
+  customerUserId: 'Belépő felhasználó',
+  roles: 'Szerepkör',
+  isActive: 'Aktív kapcsolattartó',
+} as const;
+
+/** Hint of the two format-bearing contact inputs. */
+export const CUSTOMER_CONTACT_FIELD_HINTS = {
+  email: 'Például: kapcsolat@ceg.hu.',
+  phone: 'Formátum: +36 30 123 4567.',
+} as const;
+
+/** DOM ids of the two login-user forms. */
+export const CUSTOMER_USER_FIELD_IDS = {
+  name: 'customer-user-name',
+  email: 'customer-user-email',
+  role: 'customer-user-role',
+  status: 'customer-user-status',
+} as const;
+
+/** Visible labels of the two login-user forms. */
+export const CUSTOMER_USER_FIELD_LABELS = {
+  name: 'Név',
+  email: 'E-mail',
+  role: 'Szerepkör',
+  status: 'Státusz',
+} as const;
+
+/** Role options of the two login-user forms, from the contract's closed set. */
+export const CUSTOMER_USER_ROLE_OPTIONS: readonly SelectOption[] =
+  CUSTOMER_USER_ROLE_VALUES.map((value) => ({
+    value,
+    label: CUSTOMER_USER_ROLE_LABELS[value],
+  }));
+
+/**
+ * Status options of the edit form — the operator-managed subset only.
+ *
+ * `invited` is deliberately absent: it is a server-written state, and the request
+ * schema rejects it (`customerUserManagedStatusSchema`).
+ */
+export const CUSTOMER_USER_MANAGED_STATUS_OPTIONS: readonly SelectOption[] =
+  CUSTOMER_USER_MANAGED_STATUS_VALUES.map((value) => ({
+    value,
+    label: CUSTOMER_USER_STATUS_LABELS[value],
+  }));
+
+/**
+ * Label of the “no login user” option on the contact form's user select.
+ *
+ * An **option**, not a placeholder: `Select` renders its placeholder disabled,
+ * which would make the field impossible to clear once it had a value.
+ */
+export const CUSTOMER_CONTACT_NO_USER_LABEL = 'Nincs belépő felhasználó';
+
+/**
+ * The three role checkboxes of the contact form, in render order.
+ *
+ * A table rather than three copies of the same JSX: the order, the ids and the
+ * labels stay in one place, and the test asserts against the same entries the form
+ * renders.
+ */
+export const CUSTOMER_CONTACT_ROLE_FIELDS = [
+  {
+    field: 'isPrimary',
+    role: 'primary',
+    id: CUSTOMER_CONTACT_FIELD_IDS.isPrimary,
+    label: CONTACT_ROLE_LABELS.primary,
+  },
+  {
+    field: 'isTechnical',
+    role: 'technical',
+    id: CUSTOMER_CONTACT_FIELD_IDS.isTechnical,
+    label: CONTACT_ROLE_LABELS.technical,
+  },
+  {
+    field: 'isAlerting',
+    role: 'alerting',
+    id: CUSTOMER_CONTACT_FIELD_IDS.isAlerting,
+    label: CONTACT_ROLE_LABELS.alerting,
+  },
+] as const satisfies readonly CustomerContactRoleFieldDefinition[];

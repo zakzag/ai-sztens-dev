@@ -16,9 +16,21 @@
  * badge is a React node, and the overview component renders it.
  */
 
-import type { Customer, CustomerDetail, CustomerStatus } from '@callback/shared';
+import type {
+  Contact,
+  ContactRole,
+  Customer,
+  CustomerDetail,
+  CustomerStatus,
+  CustomerUser,
+} from '@callback/shared';
 import { formatDateTime } from '../../lib/date.js';
 import {
+  CONTACT_ROLE_BADGE_VARIANT,
+  CONTACT_ROLE_LABELS,
+  CUSTOMER_CONTACT_ACTIVE_LABEL,
+  CUSTOMER_CONTACT_INACTIVE_LABEL,
+  CUSTOMER_CONTACT_LOGIN_USER_LABEL,
   CUSTOMER_DETAIL_FIELD_LABELS,
   CUSTOMER_DETAIL_GROUP_TITLES,
   CUSTOMER_DETAIL_OVERVIEW_LABELS,
@@ -29,13 +41,21 @@ import {
   CUSTOMER_STATUS_BADGE_VARIANT,
   CUSTOMER_STATUS_LABELS,
   CUSTOMER_TYPE_LABELS,
+  CUSTOMER_USER_ROLE_LABELS,
+  CUSTOMER_USER_STATUS_BADGE_VARIANT,
+  CUSTOMER_USER_STATUS_LABELS,
 } from './customer.const.js';
 import type {
   BadgeVariant,
+  ContactRoleBadge,
+  CustomerContactViewModel,
+  CustomerContactViewModels,
   CustomerDetailGroup,
   CustomerDetailViewModel,
   CustomerRowViewModel,
   CustomerRowViewModels,
+  CustomerUserViewModel,
+  CustomerUserViewModels,
 } from './customer.interface.js';
 
 /**
@@ -257,9 +277,12 @@ export function toCustomerDetailViewModel(
   dto: CustomerDetail,
 ): CustomerDetailViewModel {
   return {
+    id: dto.id,
     displayName: toDisplayName(dto),
     customerNumber: dto.customerNumber,
     status: dto.status,
+    contacts: toCustomerContactViewModels(dto.contacts),
+    customerUsers: toCustomerUserViewModels(dto.customerUsers),
     hasMissingData: dto.hasMissingData,
     overview: [
       {
@@ -283,4 +306,96 @@ export function toCustomerDetailViewModel(
       toOtherGroup(dto),
     ],
   };
+}
+
+/**
+ * @param role - one role of a contact.
+ * @returns the badge descriptor: machine value, localised label, verdict.
+ */
+function toContactRoleBadge(role: ContactRole): ContactRoleBadge {
+  return {
+    role,
+    label: CONTACT_ROLE_LABELS[role],
+    variant: CONTACT_ROLE_BADGE_VARIANT[role],
+  };
+}
+
+/**
+ * Maps one contact of the detail payload onto its row (AIS-179).
+ *
+ * Three nullable text fields and the role set are resolved here, so the tab
+ * renders a row of final strings and badges — `customerUserId` never reaches the
+ * table as a second condition.
+ *
+ * @param dto - one entry of `customerDetailSchema.contacts`.
+ * @returns the renderable contact row.
+ */
+export function toCustomerContactViewModel(
+  dto: Contact,
+): CustomerContactViewModel {
+  const isLoginUser = dto.customerUserId !== null;
+
+  return {
+    id: dto.id,
+    name: dto.name,
+    positionText: toOptionalText(dto.position),
+    emailText: toOptionalText(dto.email),
+    phoneText: toOptionalText(dto.phone),
+    roleBadges: dto.roles.map(toContactRoleBadge),
+    isLoginUser,
+    loginUserText: isLoginUser ? CUSTOMER_CONTACT_LOGIN_USER_LABEL : null,
+    isActive: dto.isActive,
+    activeText: dto.isActive
+      ? CUSTOMER_CONTACT_ACTIVE_LABEL
+      : CUSTOMER_CONTACT_INACTIVE_LABEL,
+    updatedAt: dto.updatedAt,
+  };
+}
+
+/**
+ * @param dtos - `customerDetailSchema.contacts`.
+ * @returns the same order, mapped row by row.
+ */
+export function toCustomerContactViewModels(
+  dtos: readonly Contact[],
+): CustomerContactViewModels {
+  return dtos.map(toCustomerContactViewModel);
+}
+
+/**
+ * Maps one login user of the detail payload onto its row (AIS-179).
+ *
+ * `isInvited` is the one derived fact the tab needs: the revoke action exists for
+ * pending invitations only, so the rule lives here and not in a cell.
+ *
+ * @param dto - one entry of `customerDetailSchema.customerUsers`.
+ * @returns the renderable login-user row.
+ */
+export function toCustomerUserViewModel(
+  dto: CustomerUser,
+): CustomerUserViewModel {
+  return {
+    id: dto.id,
+    name: dto.name,
+    email: dto.email,
+    role: dto.role,
+    roleLabel: CUSTOMER_USER_ROLE_LABELS[dto.role],
+    status: dto.status,
+    statusLabel: CUSTOMER_USER_STATUS_LABELS[dto.status],
+    statusVariant: CUSTOMER_USER_STATUS_BADGE_VARIANT[dto.status],
+    invitedAtText: toOptionalDateTimeText(dto.invitedAt),
+    lastLoginText: toOptionalDateTimeText(dto.lastLoginAt),
+    isInvited: dto.status === 'invited',
+    updatedAt: dto.updatedAt,
+  };
+}
+
+/**
+ * @param dtos - `customerDetailSchema.customerUsers`.
+ * @returns the same order, mapped row by row.
+ */
+export function toCustomerUserViewModels(
+  dtos: readonly CustomerUser[],
+): CustomerUserViewModels {
+  return dtos.map(toCustomerUserViewModel);
 }

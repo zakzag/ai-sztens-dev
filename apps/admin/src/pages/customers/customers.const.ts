@@ -23,7 +23,11 @@ import {
   CUSTOMER_TYPE_LABELS,
 } from '../../entities/customer/customer.const.js';
 import type { CustomerWizardStep } from './customers-wizard.interface.js';
-import type { CustomerWizardStepDefinition } from './customers.interface.js';
+import type {
+  CustomerTab,
+  CustomerTabDefinition,
+  CustomerWizardStepDefinition,
+} from './customers.interface.js';
 
 /** The list route; must equal `APP_ROUTE_CUSTOMERS_PATH`. */
 export const CUSTOMERS_LIST_ROUTE_PATH = '/customers';
@@ -219,3 +223,94 @@ export const CUSTOMER_TYPE_OPTIONS: readonly RadioOption[] =
 
 /** Accessible name of the wizard's step strip. */
 export const CUSTOMERS_WIZARD_STEPPER_LABEL = 'A varázsló lépései';
+
+/**
+ * Name of the route parameter that carries the customer id (AIS-20).
+ *
+ * One literal, two consumers: the page reads it with `useParams` and the route
+ * registry resolves the breadcrumb with it.
+ */
+export const CUSTOMER_DETAIL_PARAM = 'id';
+
+/** Name of the URL parameter that carries the active tab (AIS-20). */
+export const CUSTOMER_DETAIL_TAB_PARAM = 'tab';
+
+/**
+ * The six tabs of the detail page, in render order (screen contract §3.2).
+ *
+ * `satisfies` keeps the literal types — `CUSTOMER_TAB_VALUES` is derived from
+ * this array — while still checking the shape, so a typo in a label cannot turn
+ * into a missing tab.
+ */
+export const CUSTOMER_DETAIL_TABS = [
+  { value: 'overview', label: 'Áttekintés' },
+  { value: 'data', label: 'Cégadatok' },
+  { value: 'contacts', label: 'Kapcsolattartók' },
+  { value: 'users', label: 'Felhasználók' },
+  { value: 'activity', label: 'Tevékenység' },
+  { value: 'audit', label: 'Napló' },
+] as const satisfies readonly CustomerTabDefinition[];
+
+/**
+ * The closed set of `?tab=` values — the allow-list of the URL reader.
+ *
+ * Derived from {@link CUSTOMER_DETAIL_TABS}, so the strip, the fallback and the
+ * `Record` of tab panels can never disagree about how many tabs exist. The
+ * `readonly CustomerTab[]` annotation is what makes the derived array checkable
+ * against the union: a value in the strip that the union does not know would not
+ * be assignable here.
+ */
+export const CUSTOMER_TAB_VALUES: readonly CustomerTab[] = Object.freeze(
+  CUSTOMER_DETAIL_TABS.map((tab) => tab.value),
+);
+
+/** The tab shown when the URL does not name one (also dropped from the URL). */
+export const CUSTOMER_DETAIL_DEFAULT_TAB = 'overview';
+
+/** Accessible name of the tab strip's navigation landmark. */
+export const CUSTOMER_DETAIL_TABS_LABEL = 'A cég adatlapjának szakaszai';
+
+/** Back link above the page title; goes to the list, not to history. */
+export const CUSTOMER_DETAIL_BACK_LABEL = 'Vissza a cégekhez';
+
+/**
+ * The page's `h1` until the payload names the customer.
+ *
+ * `PageShell` needs a string, and an empty heading would break the outline, so a
+ * neutral title stands in while the header is a skeleton.
+ */
+export const CUSTOMER_DETAIL_PAGE_TITLE = 'Cég adatlapja';
+
+/** Announced by screen readers while the header is a skeleton. */
+export const CUSTOMER_DETAIL_LOADING_MESSAGE = 'A cég adatlapjának betöltése…';
+
+/** Page-level (5xx / unexpected) failure. Retry labels come from `lib/`. */
+export const CUSTOMER_DETAIL_ERROR_TITLE =
+  'A cég adatlapjának betöltése nem sikerült.';
+
+/** Unknown id — its own state, never the generic error copy. */
+export const CUSTOMER_DETAIL_NOT_FOUND_TITLE = 'Ez a cég nem található.';
+export const CUSTOMER_DETAIL_NOT_FOUND_MESSAGE =
+  'Az azonosító nem tartozik élő céghez. Lehet, hogy archiválták, vagy hibás a hivatkozás.';
+
+/**
+ * A failure the app banner owns (offline, `401`, `503`).
+ *
+ * The page must not repeat the banner's sentence, so this is a neutral notice:
+ * it says the detail cannot be read *now* and names no cause (AIS-96).
+ */
+export const CUSTOMER_DETAIL_UNAVAILABLE_TITLE =
+  'A cég adatlapja most nem érhető el.';
+export const CUSTOMER_DETAIL_UNAVAILABLE_DESCRIPTION =
+  'A felső sávban jelzett hiba miatt az adatok nem tölthetők be. Próbáld újra, amint a kapcsolat helyreáll.';
+
+/**
+ * Body of a tab whose content is owned by a later ticket (AIS-179 / AIS-181).
+ *
+ * Its own copy, so a half-built tab reads as “not yet” instead of as an empty
+ * table that looks like a customer without data.
+ */
+export const CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE =
+  'Ez a fül még nem érhető el';
+export const CUSTOMER_DETAIL_TAB_PLACEHOLDER_DESCRIPTION =
+  'Ez a fül a következő fejlesztésben érkezik.';

@@ -8,7 +8,7 @@
  */
 
 import type { CustomerStatus } from '@callback/shared';
-import type { BadgeVariants } from '@callback/ui';
+import type { BadgeVariants, DescriptionListItem } from '@callback/ui';
 
 /** The badge vocabulary of `@callback/ui`, so the mapper cannot invent a variant. */
 export type BadgeVariant = NonNullable<BadgeVariants['variant']>;
@@ -53,4 +53,46 @@ export type CustomerRowViewModels = readonly CustomerRowViewModel[];
 export interface CustomerStatusBadgeProps {
   /** The domain status; the component resolves label and variant from it. */
   readonly status: CustomerStatus;
+}
+
+/**
+ * One titled group of the detail page's `data` tab (AIS-20, screen contract
+ * `D12`).
+ *
+ * `title` is unique inside one view model, because it is what the page uses as
+ * the React key of the group's `Card` — the same assumption {@link
+ * DescriptionListItem} makes about its `label`.
+ */
+export interface CustomerDetailGroup {
+  /** Hungarian group heading, taken from the entity's copy table. */
+  readonly title: string;
+  /** Already formatted pairs, in render order. */
+  readonly items: readonly DescriptionListItem[];
+}
+
+/**
+ * The detail page's view model (AIS-20).
+ *
+ * The `overview` pairs deliberately **exclude** the status row: a badge is a
+ * React node, and this mapper is pure (no JSX, no React import). The overview
+ * component prepends the `CustomerStatusBadge` row from `status`, so the `D10`
+ * mapping is still applied exactly once, by `toStatusVariant`.
+ *
+ * Every text field is final — a `null` has already become its placeholder copy
+ * and every timestamp has already gone through `lib/date.ts` — so no component
+ * decides how a missing value looks.
+ */
+export interface CustomerDetailViewModel {
+  /** `shortName ?? legalName`, chosen once by the mapper. */
+  readonly displayName: string;
+  /** Generated identifier (`AIS-YYYYMM-NNN`); the page's subtitle. */
+  readonly customerNumber: string;
+  /** Machine status, kept for the `CustomerStatusBadge` row. */
+  readonly status: CustomerStatus;
+  /** Status change date, primary contact and last activity, in that order. */
+  readonly overview: readonly DescriptionListItem[];
+  /** Azonosítók / Jogi adatok / Cím / Egyéb, in this fixed order. */
+  readonly groups: readonly CustomerDetailGroup[];
+  /** `true` when the customer misses its tax number or its registered address. */
+  readonly hasMissingData: boolean;
 }

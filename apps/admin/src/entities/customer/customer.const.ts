@@ -10,6 +10,7 @@ import type {
   CustomerSource,
   CustomerStatus,
   CustomerType,
+  HeadcountRange,
 } from '@callback/shared';
 import type { BadgeVariant } from './customer.interface.js';
 
@@ -91,3 +92,83 @@ export const CUSTOMER_STATUS_BADGE_VARIANT: Readonly<
   churned: 'danger',
   anonymized: 'neutral',
 };
+
+/**
+ * Headings of the detail page's four data groups (AIS-20, screen contract
+ * `D12`).
+ *
+ * The detail page renders exactly these four groups, in this order; the mapper
+ * builds them from this table, so a group cannot be renamed in one place and
+ * keep its old heading in the other.
+ */
+export const CUSTOMER_DETAIL_GROUP_TITLES = {
+  identifiers: 'Azonosítók',
+  legal: 'Jogi adatok',
+  address: 'Cím',
+  other: 'Egyéb',
+} as const;
+
+/**
+ * Field labels of the `data` tab, keyed by concept and not by column.
+ *
+ * One entry per rendered pair: the group builders in the mapper read this table
+ * instead of typing a label, which is what lets the detail test assert against
+ * the same strings the UI shows.
+ */
+export const CUSTOMER_DETAIL_FIELD_LABELS = {
+  customerNumber: 'Ügyfélszám',
+  type: 'Típus',
+  source: 'Forrás',
+  createdAt: 'Létrehozva',
+  updatedAt: 'Módosítva',
+  legalName: 'Bejegyzett név',
+  shortName: 'Rövid név',
+  taxNumber: 'Adószám',
+  euVatNumber: 'EU adószám',
+  companyRegistrationNumber: 'Cégjegyzékszám',
+  legalForm: 'Jogi forma',
+  zip: 'Postai irányítószám',
+  city: 'Város',
+  addressLine: 'Cím',
+  country: 'Ország',
+  industry: 'Iparág',
+  headcountRange: 'Létszám',
+  lastActivity: 'Utolsó aktivitás',
+} as const;
+
+/**
+ * Labels of the `overview` tab.
+ *
+ * `status` is not here as a pair: the overview component renders the status row
+ * from {@link CustomerStatusBadge}, and only the three text pairs come from the
+ * mapper (a badge is a React node, the mapper stays JSX-free).
+ */
+export const CUSTOMER_DETAIL_OVERVIEW_LABELS = {
+  status: 'Státusz',
+  statusChangedAt: 'Státuszváltás dátuma',
+  primaryContact: 'Elsődleges kapcsolattartó',
+} as const;
+
+/**
+ * Localised headcount bands.
+ *
+ * A `Record` over the closed union, like the status table: a fourth band in the
+ * contract breaks the build here instead of rendering an untranslated value.
+ */
+export const CUSTOMER_HEADCOUNT_RANGE_LABELS: Readonly<
+  Record<HeadcountRange, string>
+> = {
+  sole: '1 fő',
+  '2_5': '2–5 fő',
+  '6_20': '6–20 fő',
+};
+
+/**
+ * Explanation of the missing-data notice on the overview tab.
+ *
+ * The title is the already-localised {@link CUSTOMER_MISSING_DATA_LABEL}, so the
+ * badge in the list and the notice on the detail page cannot disagree about what
+ * the flag means.
+ */
+export const CUSTOMER_DETAIL_MISSING_DATA_DESCRIPTION =
+  'Hiányzik az adószám vagy a bejegyzett cím. A cég a listában hiányos adatként jelenik meg.';

@@ -1,17 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import type { CustomerStatus } from '@callback/shared';
+import type { CustomerDetail, CustomerStatus } from '@callback/shared';
 import {
   CUSTOMER_STATUS_VALUES,
   SECOND_CUSTOMER,
   VALID_CUSTOMER,
+  VALID_CUSTOMER_DETAIL,
 } from '@callback/shared';
 import { formatDateTime } from '../../lib/date.js';
 import {
+  CUSTOMER_DETAIL_FIELD_LABELS,
+  CUSTOMER_DETAIL_GROUP_TITLES,
+  CUSTOMER_DETAIL_OVERVIEW_LABELS,
   CUSTOMER_EMPTY_VALUE_LABEL,
+  CUSTOMER_HEADCOUNT_RANGE_LABELS,
   CUSTOMER_NO_PRIMARY_CONTACT_LABEL,
+  CUSTOMER_SOURCE_LABELS,
   CUSTOMER_TYPE_LABELS,
 } from './customer.const.js';
 import {
+  toCustomerDetailViewModel,
   toCustomerRowViewModel,
   toCustomerRowViewModels,
   toStatusVariant,
@@ -111,5 +118,115 @@ describe('toCustomerRowViewModels', () => {
 
   it('maps an empty page to an empty list', () => {
     expect(toCustomerRowViewModels([])).toEqual([]);
+  });
+});
+
+/** The fully filled customer's detail payload, as the page receives it. */
+const FULL_DETAIL: CustomerDetail = VALID_CUSTOMER_DETAIL;
+
+/** The other branch: a detail whose optional fields are all `null`. */
+const MISSING_DETAIL: CustomerDetail = {
+  ...SECOND_CUSTOMER,
+  tags: [],
+  contacts: [],
+  customerUsers: [],
+};
+
+describe('toCustomerDetailViewModel', () => {
+  it('resolves the header from the same display-name rule as the list', () => {
+    const model = toCustomerDetailViewModel(FULL_DETAIL);
+
+    expect(model.displayName).toBe(VALID_CUSTOMER.shortName);
+    expect(model.customerNumber).toBe(VALID_CUSTOMER.customerNumber);
+    expect(model.status).toBe(VALID_CUSTOMER.status);
+  });
+
+  it('falls back to the legal name and keeps the missing-data flag', () => {
+    const model = toCustomerDetailViewModel(MISSING_DETAIL);
+
+    expect(model.displayName).toBe(SECOND_CUSTOMER.legalName);
+    expect(model.hasMissingData).toBe(true);
+  });
+
+  it('builds the overview without the status row', () => {
+    const model = toCustomerDetailViewModel(FULL_DETAIL);
+
+    expect(model.overview.map((item) => item.label)).toEqual([
+      CUSTOMER_DETAIL_OVERVIEW_LABELS.statusChangedAt,
+      CUSTOMER_DETAIL_OVERVIEW_LABELS.primaryContact,
+      CUSTOMER_DETAIL_FIELD_LABELS.lastActivity,
+    ]);
+    expect(model.overview[0]?.value).toBe(
+      formatDateTime(VALID_CUSTOMER.statusChangedAt),
+    );
+    expect(model.overview[1]?.value).toBe(VALID_CUSTOMER.primaryContactName);
+    expect(model.overview[2]?.value).toBe(
+      formatDateTime(VALID_CUSTOMER.lastActivityAt ?? ''),
+    );
+  });
+
+  it('renders the absent primary contact and last activity as placeholders', () => {
+    const model = toCustomerDetailViewModel(MISSING_DETAIL);
+
+    expect(model.overview[1]?.value).toBe(CUSTOMER_NO_PRIMARY_CONTACT_LABEL);
+    expect(model.overview[2]?.value).toBe(CUSTOMER_EMPTY_VALUE_LABEL);
+  });
+
+  it('returns the four groups in the contract order', () => {
+    const model = toCustomerDetailViewModel(FULL_DETAIL);
+
+    expect(model.groups.map((group) => group.title)).toEqual([
+      CUSTOMER_DETAIL_GROUP_TITLES.identifiers,
+      CUSTOMER_DETAIL_GROUP_TITLES.legal,
+      CUSTOMER_DETAIL_GROUP_TITLES.address,
+      CUSTOMER_DETAIL_GROUP_TITLES.other,
+    ]);
+  });
+
+  it('translates type, source and headcount through the label tables', () => {
+    const [identifiers, , , other] = toCustomerDetailViewModel(FULL_DETAIL).groups;
+
+    expect(identifiers?.items[0]?.value).toBe(VALID_CUSTOMER.customerNumber);
+    expect(identifiers?.items[1]?.value).toBe(
+      CUSTOMER_TYPE_LABELS[VALID_CUSTOMER.type],
+    );
+    expect(identifiers?.items[2]?.value).toBe(
+      CUSTOMER_SOURCE_LABELS[VALID_CUSTOMER.source ?? 'manual'],
+    );
+    expect(other?.items[1]?.value).toBe(
+      CUSTOMER_HEADCOUNT_RANGE_LABELS[VALID_CUSTOMER.headcountRange ?? 'sole'],
+    );
+  });
+
+  it('formats every timestamp instead of rendering raw ISO', () => {
+    const [identifiers] = toCustomerDetailViewModel(FULL_DETAIL).groups;
+    const values = identifiers?.items.map((item) => item.value) ?? [];
+
+    expect(values).toContain(formatDateTime(VALID_CUSTOMER.createdAt));
+    expect(values).toContain(formatDateTime(VALID_CUSTOMER.updatedAt));
+    expect(values).not.toContain(VALID_CUSTOMER.createdAt);
+  });
+
+  it('renders the missing legal, address and other fields as placeholders', () => {
+    const [, legal, address, other] = toCustomerDetailViewModel(MISSING_DETAIL).groups;
+
+    expect(legal?.items[1]?.value).toBe(CUSTOMER_EMPTY_VALUE_LABEL);
+    expect(legal?.items[2]?.value).toBe(CUSTOMER_EMPTY_VALUE_LABEL);
+    expect(address?.items[0]?.value).toBe(CUSTOMER_EMPTY_VALUE_LABEL);
+    expect(address?.items[1]?.value).toBe(CUSTOMER_EMPTY_VALUE_LABEL);
+    expect(other?.items[0]?.value).toBe(CUSTOMER_EMPTY_VALUE_LABEL);
+    // The country is never null in the contract, so it is always shown.
+    expect(address?.items[3]?.value).toBe(SECOND_CUSTOMER.registeredAddressCountry);
+  });
+
+  it('treats a blank optional text as absent', () => {
+    const model = toCustomerDetailViewModel({
+      ...FULL_DETAIL,
+      shortName: '   ',
+      industry: '  ',
+    });
+
+    expect(model.displayName).toBe(FULL_DETAIL.legalName);
+    expect(model.groups[3]?.items[0]?.value).toBe(CUSTOMER_EMPTY_VALUE_LABEL);
   });
 });

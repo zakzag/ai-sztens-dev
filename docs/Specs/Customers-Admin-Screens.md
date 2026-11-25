@@ -1,8 +1,12 @@
 # Customers admin screens — screen contract (list, detail, wizard, edit)
 
-**Utolsó frissítés: 2026-11-25** (AIS-19: a lista oldal, a varázsló shellje, a page store és a
-`use-tab-param` olvasó leszállítva — a §10 fájltérkép ✅ jelölése ezt rögzíti; a lista szűrősora a
-három szerződéses szűrőt és a `q`-t viszi, a sor-műveletek a `DropdownMenu`-ben élnek. Előző,
+**Utolsó frissítés: 2026-11-25** (AIS-20: a cég **adatlap** váza — fejléc + `StatusBadge`, hat fül
+`?tab=`-bal az URL-ben, `Áttekintés` és `Cégadatok` tartalommal, öt felület (loading / `404` /
+`banner`-tier / hiba / siker) — leszállítva; a négy későbbi fül panelje a
+`ui/customer-tab-panels.tsx` totális `Record`-jában már helyet kapott, a §10 fájltérkép ✅ jelölése ezt
+rögzíti. Előző, 2026-11-25 — AIS-19: a lista oldal, a varázsló shellje, a page store és a
+`use-tab-param` olvasó leszállítva; a lista szűrősora a három szerződéses szűrőt és a `q`-t viszi, a
+sor-műveletek a `DropdownMenu`-ben élnek. Előző,
 2026-11-24 — AIS-17 hullám-delta: a hullám hat döntése (`D-W1`–`D-W6`) átvezetve —
 a felelős operátor fogalma teljesen megszűnt (DB-oszlop, szerződés, szűrő — 2026-11-24), a kapcsolattartók és a felhasználók a detail payloadból olvasnak
 lapozó és URL-listaállapot nélkül (`D-W3`), a címkék chip-műveletek (`D-W1`), az aktivitás szerkesztése/törlése
@@ -369,7 +373,7 @@ packages/shared/src/contract/customers/          AIS-178: customers.contract.ts 
 packages/api-client/src/customers/               AIS-178: customers.service.ts, .interface.ts, .const.ts, .path.ts
 apps/admin/src/features/customers/               AIS-19 ✅: use-customers-list.ts, use-archive-customer.ts,
                                                  customers.const.ts, customers.logic.ts, customers.interface.ts
-                                                 AIS-20: use-customer-detail.ts
+                                                 AIS-20 ✅: use-customer-detail.ts
                                                  AIS-21: use-update-customer.ts, use-update-customer-status.ts,
                                                  use-customer-tags.ts
                                                  AIS-179: use-customer-contacts.ts, use-customer-users.ts
@@ -382,14 +386,15 @@ apps/admin/src/features/api/use-tab-param.ts     AIS-19 ✅ **created** it (firs
                                                  .logic.ts + tests); AIS-20 reuses it for `?tab=`
 apps/admin/src/entities/customer/                AIS-19: customer.interface.ts, customer.mapper.ts,
                                                  customer.const.ts (labels, status variants), components/
-apps/admin/src/pages/customers/                  AIS-19/20/21/179/181:
+apps/admin/src/pages/customers/                  AIS-19 ✅ / AIS-20 ✅ / AIS-21/179/181:
                                                  CustomersPage.tsx, CustomerCreatePage.tsx, CustomerDetailPage.tsx,
                                                  CustomerEditPage.tsx, customers.const.ts, customers.interface.ts,
                                                  customers.logic.ts, customers-wizard.store.ts (+ provider),
                                                  customers-wizard.logic.ts, ui/*
 apps/admin/src/app/app.const.ts                  AIS-19 ✅: APP_ROUTE_CUSTOMERS_PATH, APP_CUSTOMERS_LABEL
-apps/admin/src/app/router/route-registry.tsx     AIS-19 ✅ (`/customers`, `/customers/new`) — AIS-20: the
-                                                 detail entry, AIS-21: the edit entry
+apps/admin/src/app/router/route-registry.tsx     AIS-19 ✅ (`/customers`, `/customers/new`) —
+                                                 AIS-20 ✅: the detail entry (sibling, resolved crumb),
+                                                 AIS-21: the edit entry
 docs/Specs/UI-Architecture.md §5                 AIS-19 ✅: the row of §6 above, `zustand` row flipped
 ```
 
@@ -398,9 +403,21 @@ const, mapper, `components/CustomerStatusBadge.tsx`), `pages/customers/*` (`Cust
 `CustomerCreatePage`, `customers.const.ts`, `customers.interface.ts`, `customers.logic.ts`,
 `customers-wizard.store.ts` + provider/interface/errors, `ui/CustomersFilters`, `ui/CustomersTable`,
 `ui/ArchiveCustomerDialog`, `ui/CustomerWizardStepper`), the route entries and the MSW handlers in
-`apps/admin/src/test/mocks/handlers/customers.handlers.ts`. Still open on this contract: the detail
-entry (AIS-20), the edit form and the tags chip bar (AIS-21), the two overlay tabs (AIS-179), the
-activity/audit tabs (AIS-181) and the wizard's steps 2–4 with the submit (AIS-182).
+`apps/admin/src/test/mocks/handlers/customers.handlers.ts`. Still open on this contract: the edit form
+and the tags chip bar (AIS-21), the two overlay tabs (AIS-179), the activity/audit tabs (AIS-181) and
+the wizard's steps 2–4 with the submit (AIS-182).
+
+**Delivered by AIS-20 (2026-11-25), verified against the tree:** `features/customers/use-customer-detail.ts`,
+the entity additions (`CustomerDetailViewModel`/`CustomerDetailGroup` in `customer.interface.ts`, the
+`CUSTOMER_DETAIL_*` label tables in `customer.const.ts`, `toCustomerDetailViewModel` in
+`customer.mapper.ts`), `pages/customers/CustomerDetailPage.tsx`, `customers.const.ts` + `customers.interface.ts`
+(the tab contract, `CustomerTab`, `CustomerDetailState`), the pure `toCustomerDetailState` in
+`customers.logic.ts`, `ui/CustomerTabs.tsx`, `ui/CustomerOverviewTab.tsx`, `ui/CustomerDataTab.tsx`,
+`ui/customer-tab-panels.tsx`, the detail route entry and the detail MSW handlers (200 / 404 / 500).
+Two decisions of this ticket are recorded here rather than in a rule file: **the `Szerkesztés` link and
+the status/archive header menu stay in AIS-21** (they would point at a route that does not exist yet),
+and **the page folder stays flat** (`pages/customers/`, no `customer/` subfolder), superseding the
+`customer/…` paths of the wave plan for AIS-21 / AIS-179 / AIS-181 as well.
 
 ---
 

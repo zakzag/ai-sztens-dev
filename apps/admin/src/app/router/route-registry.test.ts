@@ -18,6 +18,7 @@ import {
   CUSTOMERS_CREATE_LABEL,
   CUSTOMERS_CREATE_ROUTE_PATH,
   CUSTOMERS_LIST_ROUTE_PATH,
+  CUSTOMER_DETAIL_ROUTE_PATH,
 } from '../../pages/customers/customers.const.js';
 import {
   APP_API_PATH_PREFIX,
@@ -106,6 +107,23 @@ describe('route registry', () => {
 
       expect(isParameterised || isSubPathOfLinkedPage).toBe(true);
     }
+  });
+
+  it('mounts the customer detail as a sibling of the list with a resolved crumb', () => {
+    // AIS-20: the detail replaces the list instead of floating above it, so it
+    // is a top-level entry (screen contract `D14`), it is never linked from the
+    // nav, and its crumb text comes from the `:id` segment — the breadcrumb is
+    // derived from the URL only and must not read data.
+    const detail = ALL_ROUTE_ENTRIES.find(
+      (route) => route.path === CUSTOMER_DETAIL_ROUTE_PATH,
+    );
+
+    expect(detail).toBeDefined();
+    expect(detail?.navLabel).toBeNull();
+    expect(detail?.protected).toBe(true);
+    expect(detail?.breadcrumbLabel).toBeNull();
+    expect(detail?.breadcrumbParentPath).toBe(APP_ROUTE_CUSTOMERS_PATH);
+    expect(detail?.resolveBreadcrumbLabel?.({ id: 'abc' })).toBe('abc');
   });
 
   it('keeps the identifier parameter on the overlay children only', () => {

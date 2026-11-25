@@ -1,9 +1,13 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-25 — AIS-19: a `pages/customers` lista oldal (URL-listaállapot, három
-szűrő, sor-műveletek), a létrehozó varázsló shellje és az **első page-local store** leszállítva; a
-`zustand` (`^5.1.0`) **telepítve**, a §7 sora `installed`, a store és a `features/api/use-tab-param.ts`
-olvasó tesztelve — lásd §5. Előző, 2026-11-24 — AIS-17: a `customers` admin felület
+**Utolsó frissítés: 2026-11-25 — AIS-20: a `pages/customers` **adatlap** (`/customers/:id`) — fejléc,
+hat fül `?tab=`-bal az URL-ben, `Áttekintés` és `Cégadatok` tartalommal, öt felület (loading / `404` /
+banner-tier / hiba / siker) — leszállítva; a felületet a tiszta `toCustomerDetailState` választja, a
+négy későbbi fül panelje pedig egy totális `Record`-ban már helyet kapott, így az AIS-179 / AIS-181
+nem érinti a page-et — lásd §5. Előző, 2026-11-25 — AIS-19: a `pages/customers` lista oldal
+(URL-listaállapot, három szűrő, sor-műveletek), a létrehozó varázsló shellje és az **első page-local
+store** leszállítva; a `zustand` (`^5.1.0`) **telepítve**, a §7 sora `installed`, a store és a
+`features/api/use-tab-param.ts` olvasó tesztelve. Előző, 2026-11-24 — AIS-17: a `customers` admin felület
 képernyő-szerződése új living specben él ([`Customers-Admin-Screens.md`](Customers-Admin-Screens.md)),
 a `pages/customers` page-local store-ját (`D11`) pedig az AIS-19 telepíti. Előző, 2026-11-08 —
 AIS-174: a doksi a kódot követi ott, ahol a kód indokolhatóan jobb (a
@@ -970,6 +974,22 @@ A page appears in this table even when **three of the four buckets are intention
 | `pages/calls` (AIS-171, `/calls` route)                   | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                                              | none                                                                                                                                                                                                                                         | `CallsPlaceholderPage` + `PageShell`; a page folder váltotta a registry markup-literálját, a copy a `calls.const.ts`-ben él (a `pages` nem importálhat `app`-ot). A valódi híválista veszi át, amikor az a feature elindul                                                                                                                                                                                                                                                |
 | `pages/not-found` (AIS-171, `*` catch-all)                | none                                                                                                                                                                                                                                                    | none                                                                                                                                                                                                                              | none                                                                                                                                                                                                                                         | `NotFoundPage` + `PageShell`, az authenticated layouton belül; az `APP_NOT_FOUND_MESSAGE` törlődött az `app/app.const.ts`-ből ugyanezen layer-ok miatt                                                                                                                                                                                                                                                                                                                    |
 | `app/layout` (AIS-147, the shell of every protected page) | none — the header renders no data; the theme choice is not server state                                                                                                                                                                                 | **none** — no Zustand store. The appearance is _document_ state: `app/theme/theme-provider.tsx` keeps one `useState`, an effect writes `data-theme` onto `<html>`, and the choice is mirrored into `localStorage` (AIS-165)       | none                                                                                                                                                                                                                                         | The select box writes through `useTheme().setTheme`; AIS-165 replaced the `onThemeChange` no-op of AIS-140 `D3`/`D11`. The user-settings button stays inert on purpose (AIS-140 `D4`)                                                                                                                                                                                                                                                                                     |
+
+**The customer detail (AIS-20) — what the `pages/customers` row above now covers.** `/customers/:id`
+reads through `useCustomerDetail` (`useApiDetail` over `customersService.findById`, key
+`CUSTOMERS_QUERY_KEYS.detail(id)`, `enabled: false` while the URL names no id). The tab is the **URL**
+(`?tab=overview|data|contacts|users|activity|audit`, `useTabParam`, an unknown value falls back to
+`overview` without throwing) and the page gets **no** store and no `useState` for it. The rendered
+surface is chosen by the pure `toCustomerDetailState` in `pages/customers/customers.logic.ts`, so no
+component branches on an error: `loading` → `Skeleton` plus the `sr-only` sentence, `404` → its own
+`EmptyState` copy, a **banner**-tier failure → a neutral `unavailable` notice (the layout's
+`AppErrorBanner` already says what went wrong, AIS-96), any other failure the page owns →
+`PageErrorState` + retry, a payload → the tab frame. The four tab bodies owned by AIS-179 / AIS-181 are
+already part of that frame: `pages/customers/ui/customer-tab-panels.tsx` is a **total**
+`Record<CustomerTab, ComponentType<CustomerTabPanelProps>>`, so those tickets replace four entries and
+never touch `CustomerDetailPage.tsx`. The strip itself stays a page part (`ui/CustomerTabs.tsx`) and is
+a labelled `<nav>` of `Button`s with `aria-current="page"` — not a `packages/ui` primitive and not a
+`tablist`, because every tab has an address of its own (screen contract `D16`).
 
 **Every admin page renders through `PageShell` (AIS-171, §4).** The frame — the `space-y-6` section,
 the header row, the page's single `h1`, the optional subtitle, the optional back link above the title

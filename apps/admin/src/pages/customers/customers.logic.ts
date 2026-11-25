@@ -1,10 +1,11 @@
 /**
- * Pure rules of the `customers` page (AIS-19).
+ * Pure rules of the `customers` page (AIS-19, extended by AIS-20).
  *
- * Route building, filter-value narrowing and empty-state copy selection, all
- * testable with values alone. Anything that depends on the *contract* (the sort
- * allow-list, the active-filter test) lives in `features/customers/`, because it
- * is a use-case rule and not a page concern.
+ * Route building, filter-value narrowing, empty-state copy selection and the
+ * detail read's state decision, all testable with values alone. Anything that
+ * depends on the *contract* (the sort allow-list, the active-filter test) lives
+ * in `features/customers/`, because it is a use-case rule and not a page
+ * concern.
  */
 
 import {
@@ -15,11 +16,16 @@ import {
   type CustomerStatus,
   type CustomerType,
 } from '@callback/shared';
+import { isNotFoundFailure } from '../../lib/error-surface.logic.js';
 import {
   CUSTOMER_DETAIL_ROUTE_PATH,
   CUSTOMERS_EMPTY_DESCRIPTION_FILTERED,
   CUSTOMERS_EMPTY_DESCRIPTION_UNFILTERED,
 } from './customers.const.js';
+import type {
+  CustomerDetailState,
+  CustomerDetailStateInput,
+} from './customers.interface.js';
 
 /**
  * Builds the detail route of one row.
@@ -90,4 +96,54 @@ export function toEmptyStateDescription(hasFilters: boolean): string {
   return hasFilters
     ? CUSTOMERS_EMPTY_DESCRIPTION_FILTERED
     : CUSTOMERS_EMPTY_DESCRIPTION_UNFILTERED;
+}
+
+/**
+ * Decides which surface the detail page renders (AIS-20).
+ *
+ * The order is the decision, and it is frozen here rather than in the component
+ * for three reasons: a component may not branch on an error code
+ * (`png quality:field-errors` allowlists `*.logic.ts`), the branches are then
+ * testable without React, and a fifth branch cannot appear silently inside JSX.
+ *
+ * 1. **loading** wins over a stale error: while a fetch is in flight the user is
+ *    waiting for data, not reading a message about the previous attempt.
+ * 2. **silent** (a cancelled request) is *not* a failure to report — a new
+ *    request is already on its way, so the page stays on the skeleton.
+ * 3. **404** is its own state with its own copy; it is checked before the
+ *    generic page failure because `404` also lands in the `page` tier.
+ * 4. **banner** — offline, `401`, `503` — is the layout's failure, so the page
+ *    renders the neutral `unavailable` notice instead of repeating the banner
+ *    sentence (AIS-96).
+ * 5. anything else that failed is the page's own error.
+ * 6. a payload means success; no payload, no error and no request means the URL
+ *    named no customer at all, which is a not-found, not a blank page.
+ *
+ * @param input - see {@link CustomerDetailStateInput}.
+ * @returns the state the page must render.
+ */
+export function toCustomerDetailState(
+  input: CustomerDetailStateInput,
+): CustomerDetailState {
+  if (input.isLoading) {
+    return 'loading';
+  }
+
+  if (input.errorSurface === 'silent') {
+    return 'loading';
+  }
+
+  if (isNotFoundFailure(input.error)) {
+    return 'not-found';
+  }
+
+  if (input.errorSurface === 'banner') {
+    return 'unavailable';
+  }
+
+  if (input.errorSurface !== null) {
+    return 'error';
+  }
+
+  return input.hasData ? 'success' : 'not-found';
 }

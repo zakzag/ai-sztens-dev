@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { API_ERROR_CODE } from '@callback/shared';
+import { createCodedError } from '../../test/mocks/api-error.mock.js';
 import {
   CUSTOMERS_EMPTY_DESCRIPTION_FILTERED,
   CUSTOMERS_EMPTY_DESCRIPTION_UNFILTERED,
 } from './customers.const.js';
 import {
   toCustomerDetailRoute,
+  toCustomerDetailState,
   toCustomerEditRoute,
   toCustomerSource,
   toCustomerStatus,
@@ -13,6 +16,84 @@ import {
 } from './customers.logic.js';
 
 const CUSTOMER_ID = '0d9f3a2e-6b41-4c8a-9f2d-7c5e1a3b4d60';
+
+describe('toCustomerDetailState', () => {
+  /** The success shape: a payload, no failure, no request in flight. */
+  const SUCCESS = {
+    isLoading: false,
+    error: null,
+    errorSurface: null,
+    hasData: true,
+  } as const;
+
+  it('is success when the payload arrived', () => {
+    expect(toCustomerDetailState(SUCCESS)).toBe('success');
+  });
+
+  it('is loading while the read is in flight, even over a stale failure', () => {
+    expect(
+      toCustomerDetailState({
+        ...SUCCESS,
+        isLoading: true,
+        hasData: false,
+        errorSurface: 'page',
+        error: createCodedError({ status: 500, code: null }),
+      }),
+    ).toBe('loading');
+  });
+
+  it('treats a cancelled request as loading, not as a failure', () => {
+    expect(
+      toCustomerDetailState({
+        ...SUCCESS,
+        hasData: false,
+        errorSurface: 'silent',
+      }),
+    ).toBe('loading');
+  });
+
+  it('gives a 404 its own state', () => {
+    expect(
+      toCustomerDetailState({
+        ...SUCCESS,
+        hasData: false,
+        errorSurface: 'page',
+        error: createCodedError({
+          status: 404,
+          code: API_ERROR_CODE.NOT_FOUND,
+        }),
+      }),
+    ).toBe('not-found');
+  });
+
+  it('renders any other page-tier failure as the page error', () => {
+    expect(
+      toCustomerDetailState({
+        ...SUCCESS,
+        hasData: false,
+        errorSurface: 'page',
+        error: createCodedError({ status: 500, code: null }),
+      }),
+    ).toBe('error');
+  });
+
+  it('leaves a banner-tier failure to the layout banner', () => {
+    expect(
+      toCustomerDetailState({
+        ...SUCCESS,
+        hasData: false,
+        errorSurface: 'banner',
+        error: createCodedError({ status: 503, code: null }),
+      }),
+    ).toBe('unavailable');
+  });
+
+  it('treats a URL without an id as not found', () => {
+    expect(
+      toCustomerDetailState({ ...SUCCESS, hasData: false }),
+    ).toBe('not-found');
+  });
+});
 
 describe('toCustomerDetailRoute', () => {
   it('fills the registry template with the id', () => {

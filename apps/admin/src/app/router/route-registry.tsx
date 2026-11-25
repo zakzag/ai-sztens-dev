@@ -13,8 +13,11 @@ import { CallsPlaceholderPage } from '../../pages/calls/CallsPlaceholderPage.js'
 import {
   CUSTOMERS_CREATE_LABEL,
   CUSTOMERS_CREATE_ROUTE_PATH,
+  CUSTOMER_DETAIL_PARAM,
+  CUSTOMER_DETAIL_ROUTE_PATH,
 } from '../../pages/customers/customers.const.js';
 import { CustomerCreatePage } from '../../pages/customers/CustomerCreatePage.js';
+import { CustomerDetailPage } from '../../pages/customers/CustomerDetailPage.js';
 import { CustomersPage } from '../../pages/customers/CustomersPage.js';
 import { LoginPage } from '../../pages/LoginPage.js';
 import { NotFoundPage } from '../../pages/not-found/NotFoundPage.js';
@@ -147,6 +150,23 @@ export const PROTECTED_ROUTE_ENTRIES: readonly RouteEntry[] = [
     protected: true,
     breadcrumbLabel: CUSTOMERS_CREATE_LABEL,
     breadcrumbParentPath: APP_ROUTE_CUSTOMERS_PATH,
+  },
+  {
+    // The customer detail (AIS-20) is a **sibling** of the list, not a child
+    // (screen contract `D14`): it replaces the list instead of floating above
+    // it, so the list is not mounted behind it. The contact and invite overlays
+    // arrive as `children` in AIS-179 — which is why the page already renders an
+    // `<Outlet/>`.
+    path: CUSTOMER_DETAIL_ROUTE_PATH,
+    navLabel: null,
+    element: <CustomerDetailPage />,
+    protected: true,
+    // No static cell: the crumb text is the `:id` segment. The breadcrumb is
+    // derived from the URL only and must not read data, so it shows the id the
+    // address carries (screen contract §1).
+    breadcrumbLabel: null,
+    breadcrumbParentPath: APP_ROUTE_CUSTOMERS_PATH,
+    resolveBreadcrumbLabel: (params) => params[CUSTOMER_DETAIL_PARAM],
   },
   {
     path: APP_ROUTE_CALLS_PATH,

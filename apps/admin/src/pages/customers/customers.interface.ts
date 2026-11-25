@@ -8,9 +8,11 @@ import type { ReactNode } from 'react';
 import type { CustomerListQuery } from '@callback/shared';
 import type { DataTableSort } from '@callback/ui';
 import type {
+  CustomerDetailViewModel,
   CustomerRowViewModel,
   CustomerRowViewModels,
 } from '../../entities/customer/customer.interface.js';
+import type { ErrorSurface } from '../../lib/error-surface.interface.js';
 import type { CustomerWizardStep } from './customers-wizard.interface.js';
 
 /** One entry of the wizard's step strip. */
@@ -93,4 +95,81 @@ export interface CustomerWizardShellProps {
   readonly activeStep: CustomerWizardStep;
   /** Reports a step request; the page turns it into one URL write. */
   readonly onStepChange: (step: CustomerWizardStep) => void;
+}
+
+/**
+ * One tab of the customer detail page (AIS-20).
+ *
+ * Declared as a literal union here, not derived from the constant, so the two
+ * files are not circular: the strip in `customers.const.ts` is checked against
+ * this union with `satisfies`, and {@link CustomerTabDefinition} plus the page's
+ * total `Record<CustomerTab, …>` of panels fail the build when one side grows
+ * without the other.
+ */
+export type CustomerTab =
+  | 'overview'
+  | 'data'
+  | 'contacts'
+  | 'users'
+  | 'activity'
+  | 'audit';
+
+/** One entry of the detail page's tab strip: the `?tab=` value and its label. */
+export interface CustomerTabDefinition {
+  /** The value written into the URL. */
+  readonly value: CustomerTab;
+  /** The visible label of the tab. */
+  readonly label: string;
+}
+
+/** Props of the tab strip. */
+export interface CustomerTabsProps {
+  /** The tab the URL currently shows. */
+  readonly tab: CustomerTab;
+  /** Reports a tab request; the page turns it into one URL write. */
+  readonly onTabChange: (tab: CustomerTab) => void;
+}
+
+/**
+ * Props of one tab body.
+ *
+ * A tab receives the **view model**, never the wire payload: that is what makes
+ * the four later tabs (AIS-179 / AIS-181) unable to reintroduce a formatting
+ * decision the mapper already made.
+ */
+export interface CustomerTabPanelProps {
+  /** The already formatted detail page model. */
+  readonly customer: CustomerDetailViewModel;
+}
+
+/**
+ * The states of the detail read (AIS-20).
+ *
+ * Five and not four, because a failure the page does **not** own must not be
+ * rendered as a page error: `unavailable` is the banner tier's failure (offline,
+ * `401`, `503`), which the layout's `AppErrorBanner` already explains in its own
+ * words, so the page must not repeat the same sentence (AIS-96).
+ */
+export type CustomerDetailState =
+  | 'loading'
+  | 'not-found'
+  | 'error'
+  | 'unavailable'
+  | 'success';
+
+/**
+ * What {@link toCustomerDetailState} reads.
+ *
+ * Only the pieces of the read the decision needs, so the rule is testable with
+ * plain values and a component never passes a whole query object around.
+ */
+export interface CustomerDetailStateInput {
+  /** `useApiDetail`'s `isLoading`. */
+  readonly isLoading: boolean;
+  /** `useApiDetail`'s `error` — the raw thrown value, deliberately `unknown`. */
+  readonly error: unknown;
+  /** `useApiDetail`'s `errorSurface`, or `null` when there is no failure. */
+  readonly errorSurface: ErrorSurface | null;
+  /** `true` when a payload has arrived. */
+  readonly hasData: boolean;
 }

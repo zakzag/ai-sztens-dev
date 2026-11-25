@@ -37,6 +37,7 @@ import type {
   CustomerContactRoleFieldDefinition,
   CustomerTab,
   CustomerTabDefinition,
+  CustomerWizardFieldName,
   CustomerWizardStepDefinition,
 } from './customers.interface.js';
 
@@ -245,6 +246,93 @@ export const CUSTOMER_TYPE_OPTIONS: readonly RadioOption[] =
 
 /** Accessible name of the wizard's step strip. */
 export const CUSTOMERS_WIZARD_STEPPER_LABEL = 'A varázsló lépései';
+
+/*
+  ---------------------------------------------------------------------------
+  AIS-182 — the wizard's steps 2–4 and its submit
+  ---------------------------------------------------------------------------
+*/
+
+/** Navigation labels of the step bodies. */
+export const CUSTOMERS_WIZARD_NEXT_LABEL = 'Tovább';
+export const CUSTOMERS_WIZARD_BACK_STEP_LABEL = 'Vissza';
+export const CUSTOMERS_WIZARD_SUBMIT_LABEL = 'Létrehozás';
+
+/**
+ * Copy of the review step when the draft is still incomplete.
+ *
+ * Reachable only through a hand-written `?step=4`: the step strip disables the
+ * steps the draft does not unlock, but the address is the URL's, so the review
+ * step must still say something useful instead of rendering a submit that would
+ * fail. The button sends the operator back to the first step.
+ */
+export const CUSTOMERS_WIZARD_INCOMPLETE_TITLE =
+  'A varázsló még nem küldhető be.';
+export const CUSTOMERS_WIZARD_INCOMPLETE_DESCRIPTION =
+  'Néhány korábbi lépés kötelező mezője hiányzik. Lépj vissza, és egészítsd ki őket.';
+export const CUSTOMERS_WIZARD_RESTART_LABEL = 'Vissza az első lépéshez';
+
+/** Residue alert title of the review step. */
+export const CUSTOMERS_WIZARD_FORM_ERROR_TITLE =
+  'A cég létrehozása nem sikerült.';
+
+/** Step 1's validation message when no type was chosen yet. */
+export const CUSTOMERS_WIZARD_TYPE_REQUIRED = 'Válaszd ki a cég típusát.';
+
+/** Id of step 1's error paragraph — the `aria-describedby` of the radio group. */
+export const CUSTOMER_TYPE_ERROR_ID = 'customer-type-error';
+
+/** Placeholder of a value the draft does not hold yet, on the review step. */
+export const CUSTOMERS_WIZARD_EMPTY_VALUE = '—';
+
+/**
+ * The legal-form choices of step 2 (AIS-182 decision `D5`).
+ *
+ * `createCustomerSchema.legalForm` is a bounded free text, so the contract does
+ * not enumerate the forms; the wizard nevertheless offers a closed list, because
+ * an operator typing “Kft” and “kft.” would produce two spellings of one form.
+ * The values are the Hungarian abbreviations — what is stored is what the
+ * operator recognises on the detail page.
+ */
+export const CUSTOMER_LEGAL_FORM_OPTIONS: readonly SelectOption[] = Object.freeze(
+  [
+    { value: 'Kft.', label: 'Korlátolt felelősségű társaság (Kft.)' },
+    { value: 'Zrt.', label: 'Zártkörűen működő részvénytársaság (Zrt.)' },
+    { value: 'Nyrt.', label: 'Nyilvánosan működő részvénytársaság (Nyrt.)' },
+    { value: 'Bt.', label: 'Betéti társaság (Bt.)' },
+    { value: 'Kkt.', label: 'Közkereseti társaság (Kkt.)' },
+    { value: 'E.v.', label: 'Egyéni vállalkozó (E.v.)' },
+    { value: 'Egyéb', label: 'Egyéb' },
+  ],
+);
+
+/**
+ * The empty option of the legal-form select.
+ *
+ * An **option**, not a placeholder: `Select` renders its placeholder disabled,
+ * which would make the field impossible to clear once it had a value.
+ */
+export const CUSTOMER_LEGAL_FORM_EMPTY_LABEL = 'Nincs megadva';
+
+/**
+ * DOM ids of the wizard's step 2 and step 3 controls.
+ *
+ * A total `Record` over the wizard's field union, so a field added to the union
+ * without an id is a compile error — the same contract the contact form's id
+ * table has.
+ */
+export const CUSTOMER_WIZARD_FIELD_IDS = {
+  legalName: 'customer-wizard-legal-name',
+  shortName: 'customer-wizard-short-name',
+  taxNumber: 'customer-wizard-tax-number',
+  euVatNumber: 'customer-wizard-eu-vat-number',
+  companyRegistrationNumber: 'customer-wizard-registration-number',
+  legalForm: 'customer-wizard-legal-form',
+  registeredAddressZip: 'customer-wizard-zip',
+  registeredAddressCity: 'customer-wizard-city',
+  registeredAddressLine: 'customer-wizard-address-line',
+  registeredAddressCountry: 'customer-wizard-country',
+} as const satisfies Readonly<Record<CustomerWizardFieldName, string>>;
 
 /**
  * Name of the route parameter that carries the customer id (AIS-20).

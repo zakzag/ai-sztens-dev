@@ -26,7 +26,10 @@ import type {
   CustomerUserViewModel,
   CustomerUserViewModels,
 } from '../../entities/customer/customer.interface.js';
-import type { CustomerUpdateFieldName } from '../../features/customers/customers.interface.js';
+import type {
+  CustomerCreateFieldName,
+  CustomerUpdateFieldName,
+} from '../../features/customers/customers.interface.js';
 import type { ErrorSurface } from '../../lib/error-surface.interface.js';
 import type { CustomerWizardStep } from './customers-wizard.interface.js';
 
@@ -96,11 +99,34 @@ export interface ArchiveCustomerDialogProps {
   readonly onConfirm: () => void;
 }
 
-/** Props of the wizard shell's step strip. */
+/**
+ * Props of the wizard shell's step strip (AIS-19; extended by AIS-182).
+ *
+ * `reachableStep` is the **last** step whose predecessors are all valid
+ * (`isStepReachable`), derived from the draft by the page — which is why the
+ * store keeps its AIS-19 contract. A step beyond it renders disabled: jumping
+ * forward would only show a body whose inputs cannot be saved yet.
+ */
 export interface CustomerWizardStepperProps {
   /** The active step, read from `?step=`. */
   readonly activeStep: CustomerWizardStep;
+  /** The last step the draft already unlocks; the later ones are disabled. */
+  readonly reachableStep: CustomerWizardStep;
   /** Reports a step request (a navigation). */
+  readonly onStepChange: (step: CustomerWizardStep) => void;
+}
+
+/**
+ * Props of the wizard's stateful screen (AIS-182).
+ *
+ * Mounted inside the store provider, so it may read the draft — which is what
+ * makes `reachableStep` and the server-error routing possible without widening
+ * the store contract.
+ */
+export interface CustomerWizardScreenProps {
+  /** The step the URL currently shows. */
+  readonly activeStep: CustomerWizardStep;
+  /** Performs one URL write; the screen wraps it to drop a stale failure. */
   readonly onStepChange: (step: CustomerWizardStep) => void;
 }
 
@@ -108,8 +134,18 @@ export interface CustomerWizardStepperProps {
 export interface CustomerWizardShellProps {
   /** The step the URL currently shows. */
   readonly activeStep: CustomerWizardStep;
+  /** The last step the draft already unlocks. */
+  readonly reachableStep: CustomerWizardStep;
   /** Reports a step request; the page turns it into one URL write. */
   readonly onStepChange: (step: CustomerWizardStep) => void;
+  /**
+   * The active step's body.
+   *
+   * A slot, not a `switch` inside the shell: which step renders, and which
+   * failure belongs to it, is the page's decision (`D8`), while the shell stays
+   * the chrome the AIS-19 tests already describe.
+   */
+  readonly children: ReactNode;
 }
 
 /**
@@ -496,4 +532,94 @@ export interface CustomerAuditLogListProps {
   readonly isLoading: boolean;
   /** The empty-state node, chosen by the tab (filtered vs unfiltered copy). */
   readonly empty: ReactNode;
+}
+
+/*
+  ---------------------------------------------------------------------------
+  AIS-182 — the create wizard's steps 2–4 and its submit
+  ---------------------------------------------------------------------------
+*/
+
+/**
+ * A failure the server sent back for one wizard step (AIS-182, decision `D8`).
+ *
+ * The create request is sent from step 4, but a `409` blames the tax number on
+ * step 2 and a `422` blames whichever input the envelope names. The page keeps
+ * the raw error next to the step it belongs to, navigates there, and the step
+ * hands the value to `useAppForm.setServerError` — so the mapping stays the
+ * hook's and the store keeps its AIS-19 contract.
+ */
+export interface CustomerWizardServerError {
+  /** The step whose input can fix the failure. */
+  readonly step: CustomerWizardStep;
+  /** The raw rejection, mapped onto the inputs by `useAppForm` on arrival. */
+  readonly error: unknown;
+}
+
+/**
+ * Every input the wizard owns, in visual order (step 2, then step 3).
+ *
+ * An **alias** of the feature's union, not a second declaration: the field-path
+ * list, the code → path table (`features/customers/customers.const.ts`) and the
+ * summary rows must all agree, and two copies of ten literals would drift.
+ */
+export type CustomerWizardFieldName = CustomerCreateFieldName;
+
+/**
+ * Values of the wizard's **name and identifiers** step (step 2).
+ *
+ * `type` is deliberately absent: it is step 1's, and a step only ever writes the
+ * fields it owns (`setDraft` merges the patch).
+ */
+export interface CustomerNameValues {
+  readonly legalName: string;
+  readonly shortName: string;
+  readonly taxNumber: string;
+  readonly euVatNumber: string;
+  readonly companyRegistrationNumber: string;
+  readonly legalForm: string;
+}
+
+/** Values of the wizard's **address** step (step 3). */
+export interface CustomerAddressValues {
+  readonly registeredAddressZip: string;
+  readonly registeredAddressCity: string;
+  readonly registeredAddressLine: string;
+  readonly registeredAddressCountry: string;
+}
+
+/** Props of the wizard's step 1 body (the type chooser). */
+export interface CustomerTypeStepProps {
+  /** Requests the next step; the body records the type and validates it first. */
+  readonly onNext: () => void;
+}
+
+/** Props of the wizard's steps 2 and 3 — both are a real `useAppForm`. */
+export interface CustomerWizardStepFormProps {
+  /** Requests the next step after the values were written into the draft. */
+  readonly onNext: () => void;
+  /** Requests the previous step (one URL write). */
+  readonly onBack: () => void;
+  /** The failure this step has to show, or `undefined` when it has none (`D8`). */
+  readonly serverError?: unknown;
+}
+
+/**
+ * Props of the wizard's review step (step 4).
+ *
+ * The step owns the **one** `POST /api/admin/customers` (`D-W6`) and the jump to
+ * `/customers/:id?tab=contacts` after it resolves. A rejection is reported to the
+ * page, because only the page knows which step the failure belongs to and may
+ * navigate there (`D8`); the page hands back the copy to render when the failure
+ * stays on this step.
+ */
+export interface CustomerReviewStepProps {
+  /** Requests the previous step (one URL write). */
+  readonly onBack: () => void;
+  /** Jumps to the first step, for a draft that is still incomplete. */
+  readonly onRestart: () => void;
+  /** Reports a failed create; the page routes it to the step that can fix it. */
+  readonly onServerError: (error: unknown) => void;
+  /** The failure to render on this step, or `undefined` when it belongs elsewhere. */
+  readonly serverError?: unknown;
 }

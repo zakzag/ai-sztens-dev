@@ -26,6 +26,7 @@ import { createEntityQueryKeys } from '../api/create-entity-query-keys.js';
 import type {
   CustomerActivityFormFieldName,
   CustomerContactFormFieldName,
+  CustomerCreateFieldName,
   CustomerUpdateFieldName,
   CustomerUserEditFormFieldName,
   CustomerUserInviteFormFieldName,
@@ -77,6 +78,49 @@ export const CUSTOMERS_UPDATE_SUCCESS_MESSAGE = 'A cég adatai mentve.';
 
 /** Success copy of the dedicated status change (AIS-21). */
 export const CUSTOMERS_STATUS_SUCCESS_MESSAGE = 'A cég státusza módosítva.';
+
+/**
+ * Success copy of the create wizard (AIS-182).
+ *
+ * Handed to the review step's notify port — never to the mutation's `meta`: the
+ * form owns the announcement (`New-Admin-Page.md` step 15 / AIS-136).
+ */
+export const CUSTOMERS_CREATE_SUCCESS_MESSAGE = 'A cég létrejött.';
+
+/**
+ * Every input the **create wizard** owns, in visual order (AIS-182).
+ *
+ * Step 2's six fields first, then step 3's four — the same order the steps
+ * render, so a `422`'s first focus lands on the earliest offending input. The
+ * order is the contract of the focus behaviour, exactly like
+ * {@link CUSTOMER_UPDATE_FIELD_PATHS}.
+ */
+export const CUSTOMER_CREATE_FIELD_PATHS: readonly CustomerCreateFieldName[] =
+  Object.freeze([
+    'legalName',
+    'shortName',
+    'taxNumber',
+    'euVatNumber',
+    'companyRegistrationNumber',
+    'legalForm',
+    'registeredAddressZip',
+    'registeredAddressCity',
+    'registeredAddressLine',
+    'registeredAddressCountry',
+  ]);
+
+/**
+ * Path a code blames when the response carried no `details[]` (AIS-182).
+ *
+ * Only the duplicate tax number has an input to blame, and that input lives on
+ * the wizard's second step — which is why the page maps the blamed path back to
+ * its step before navigating.
+ */
+export const CUSTOMER_CREATE_DEFAULT_PATH_BY_CODE: Readonly<
+  Record<string, CustomerCreateFieldName>
+> = Object.freeze({
+  [API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT]: 'taxNumber',
+});
 
 /**
  * Every input the **edit** form owns, in visual order (AIS-21).

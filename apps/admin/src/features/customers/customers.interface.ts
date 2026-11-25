@@ -11,6 +11,7 @@ import type {
   Contact,
   CreateActivityInput,
   CreateContactInput,
+  CreateCustomerInput,
   Customer,
   CustomerUser,
   InviteCustomerUserInput,
@@ -96,6 +97,44 @@ export interface UseUpdateCustomerResult extends ApiErrorView {
   /** Sends the partial body (always with `updatedAt`) to `PATCH /:id`. */
   readonly updateCustomer: (input: UpdateCustomerInput) => Promise<Customer>;
   /** `true` while the write is in flight; disables the save button. */
+  readonly isPending: boolean;
+}
+
+/**
+ * Every input the **create wizard** owns, in visual order (AIS-182).
+ *
+ * The same closed-union contract as {@link CustomerUpdateFieldName}: the
+ * field-path list, the code → path table and the wizard's step map are all
+ * checked against it, so a renamed field breaks the build instead of silently
+ * losing focus.
+ *
+ * The server-managed fields (`customerNumber`, `status`, `createdAt`,
+ * `updatedAt`) are absent: `createCustomerSchema` is `.strict()` and defaults
+ * them server-side, so they can never be an error target either.
+ */
+export type CustomerCreateFieldName =
+  | 'legalName'
+  | 'shortName'
+  | 'taxNumber'
+  | 'euVatNumber'
+  | 'companyRegistrationNumber'
+  | 'legalForm'
+  | 'registeredAddressZip'
+  | 'registeredAddressCity'
+  | 'registeredAddressLine'
+  | 'registeredAddressCountry';
+
+/**
+ * Result of {@link useCreateCustomerMutation} (AIS-182).
+ *
+ * The body is the whole draft, not a partial patch: `createCustomerSchema`
+ * accepts absent optional fields and defaults the country, so the hook needs no
+ * second parameter.
+ */
+export interface UseCreateCustomerResult extends ApiErrorView {
+  /** Sends the create body; resolves with the created row. */
+  readonly createCustomer: (input: CreateCustomerInput) => Promise<Customer>;
+  /** `true` while the write is in flight; disables the submit button. */
   readonly isPending: boolean;
 }
 

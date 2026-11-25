@@ -1,6 +1,9 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-25 — AIS-181: a `pages/customers` **Tevékenység** és **Napló** füle —
+**Utolsó frissítés: 2026-11-25 — AIS-182: az új cég varázsló lépései és beküldése — a lépéssáv
+`reachableStep`-je a draftból **levezetett** (a store szerződése változatlan), a perzisztált állapot
+továbbra is csak a store `draft`/`step` párja, a létrehozás hibája pedig a page lokális `useState`-je
+(§5). Előző, 2026-11-25 — AIS-181: a `pages/customers` **Tevékenység** és **Napló** füle —
 két saját, lapozott olvasás (`useCustomerActivities`, `useCustomerAuditLogs`), a lapozó és a négy napló-szűrő
 az **URL-ben** (`useListParams` a `activityListQuerySchema` / `auditLogListQuerySchema` sémán), az inline
 szerkesztő és a törlés-megerősítés helyi `useState`-ben (AIS-173 kivétel); a napló sorait a meglévő
@@ -1151,6 +1154,15 @@ added together with the first page that genuinely needs transient UI state, and 
 shipped the store test (init → `setDraft` → `setStep` → `reset`) in the same commit. The rule does not
 relax: a page that needs a store still ships it together with its first consumer, because an unused
 store fails `pnpm quality:dead-code`.
+
+**AIS-182 kept that contract and derived the rest.** Widening the wizard (steps 2–4 plus the submit)
+needed two things the store does not hold, and neither was added to it: which steps the draft already
+unlocks — `toReachableStep(draft)` in
+[`customers-wizard.logic.ts`](../../apps/admin/src/pages/customers/customers-wizard.logic.ts:1),
+computed from `canLeaveStep` — and the failure a create returned, which is local `useState` in the page
+so that only the page can decide which step owns it (`D8`). The step strip therefore renders a step
+beyond the draft's frontier as `disabled` without a second source of truth, which is the §6.1 test
+applied one level down: a value derivable from the draft is not page UI state.
 
 **AIS-175 derives the cache keys instead of retyping them.** TanStack Query matches an
 invalidation by **prefix**, so the `pages/api-keys` row's `API_KEYS_QUERY_KEYS` was safe only as

@@ -8,11 +8,13 @@
  *    stay in the contract, and only what genuinely differs in a form is
  *    restated. Two things differ:
  *    - `updatedAt` is a hidden concurrency token, bound at submit time, so it is
- *      not an input;
+ *    not an input;
  *    - an optional format field may be **empty** (`''`), which is the only way a
- *      text input can say “no value”. `toOptionalFormatSchema()` keeps the shared
- *      schema's own issues for every non-empty value, so a mistyped tax number
- *      still gets the contract's `TAX_NUMBER` / `TAX_NUMBER_CHECKSUM` sentence.
+ *      text input can say “no value”. `toOptionalFormatSchema()` — shared with
+ *      the create wizard in `lib/optional-format.schema.ts` since AIS-182 —
+ *      keeps the shared schema's own issues for every non-empty value, so a
+ *      mistyped tax number still gets the contract's `TAX_NUMBER` /
+ *      `TAX_NUMBER_CHECKSUM` sentence.
  * 2. `toCustomerEditValues` — record → form values (`null` becomes `''`).
  * 3. `toUpdateCustomerPayload` — form values → `PATCH` body, always carrying the
  *    `updatedAt` token; `''` becomes `null` (“clear it”), never `undefined`
@@ -55,45 +57,13 @@ import {
   CUSTOMER_DETAIL_FIELD_LABELS,
 } from '../../entities/customer/customer.const.js';
 import { formatDateTime } from '../../lib/date.js';
+import { toOptionalFormatSchema } from '../../lib/optional-format.schema.js';
 import { CUSTOMER_COUNTRY_OPTIONS } from './customers.const.js';
 import type {
   CustomerEditValues,
   CustomerStatusFormValues,
 } from './customers.interface.js';
 import { toCustomerSource, toCustomerType } from './customers.logic.js';
-
-/**
- * Wraps a shared format schema so that the empty string is accepted.
- *
- * A text input cannot express “absent” any other way, so `''` short-circuits the
- * check; every non-empty value is validated by the **same** schema the request
- * uses, and its issues are re-added verbatim — that is what keeps the Hungarian
- * format copy (`TAX_NUMBER`, `TAX_NUMBER_CHECKSUM`, `POSTAL_CODE`) in the shared
- * catalogue instead of a second table here.
- *
- * @param schema - the shared format schema of the field.
- * @returns a string schema that accepts `''` and otherwise defers to `schema`.
- */
-function toOptionalFormatSchema(
-  schema: z.ZodType<string>,
-): z.ZodEffects<z.ZodString, string, string> {
-  return z
-    .string()
-    .trim()
-    .superRefine((value, ctx) => {
-      if (value.length === 0) {
-        return;
-      }
-
-      const result = schema.safeParse(value);
-
-      if (!result.success) {
-        result.error.issues.forEach((issue) => {
-          ctx.addIssue(issue);
-        });
-      }
-    });
-}
 
 /**
  * Field rules of the edit form.

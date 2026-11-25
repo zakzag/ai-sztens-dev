@@ -1,6 +1,14 @@
 # Customers admin screens — screen contract (list, detail, wizard, edit)
 
-**Utolsó frissítés: 2026-11-25** (AIS-181: a cég adatlap **Tevékenység** és **Napló** füle —
+**Utolsó frissítés: 2026-11-25** (AIS-182: az **új cég varázsló** teljes — a 2–4. lépés és a beküldés
+leszállítva. A lépéslogika tiszta (`customers-wizard.logic.ts`): `canLeaveStep` a lépés saját, a
+`createCustomerSchema`-ból származtatott sémájával dolgozik, `toReachableStep` a draftból **levezeti**,
+meddig enged ugrani a lépéssáv (ezért a store szerződése az AIS-19 óta változatlan), a
+`toCreateCustomerPayload` pedig **egyetlen** `POST /api/admin/customers` testét építi, üres mezők
+nélkül. Siker után a varázsló a `/customers/:id?tab=contacts` címre navigál (`D-W6`); a `409`/`422` a
+hibás lépés bemenetére kerül (`useAppForm.setServerError`), az 5xx a 4. lépés `Alert`-jében marad. A
+`legalForm` fix `Select` (`D5`), a `toOptionalFormatSchema` pedig közös
+`lib/optional-format.schema.ts`-be került. Előző, 2026-11-25 — AIS-181: a cég adatlap **Tevékenység** és **Napló** füle —
 időrendi feed jegyzetíró űrlappal, soronkénti inline szerkesztéssel és `ConfirmDialog`-os soft delete-tel
 (**csak** `authorType === 'operator'` soron, `D-W4`), illetve egy **csak olvasható** napló négy URL-szűrővel
 (`tableName`, `operation`, `actorId`, `from`, `to`) és kibontható before → after diffel, amelyet a meglévő
@@ -224,11 +232,22 @@ region instead of at page level.
 | 3 | Cím | `registeredAddressZip`, `registeredAddressCity`, `registeredAddressLine`, `registeredAddressCountry` (default `HU`) | `Input`, `Input`, `Input`, `Select` |
 | 4 | Ellenőrzés | read-only summary of the draft + submit | `Card` + `DescriptionList`, `FormActions` |
 
-- One `useAppForm` per step; the **wizard** owns the draft (see 4.2), the step owns its own fields.
+- `useAppForm` on **steps 2 and 3** only; the **wizard** owns the draft (see 4.2), the step owns its
+  own fields. Step 1 is a controlled `RadioGroup` (the primitive has no `register`-able input, so a
+  form wrapper would only add a resolver) and step 4 is a read-only summary — both keep their
+  `FormActions` row, so the keyboard path is the same on all four steps.
 - Step order and validity are pure: `customers-wizard.logic.ts` (`nextStep`, `previousStep`,
-  `canLeaveStep(values, step)`), tested without React.
+  `canLeaveStep(draft, step)`, `isStepReachable`, `toReachableStep`), tested without React.
+- The step strip only jumps up to `reachableStep` — the **last** step whose predecessors all pass
+  `canLeaveStep`. That value is **derived from the draft**, never stored: the page store keeps the
+  exact contract AIS-19 gave it (`draft`, `step`, `setDraft`, `setStep`, `reset`).
 - Copy for the stepper lives in `customers.const.ts` (`CUSTOMERS_WIZARD_STEPS`), so the test asserts
   against the same constant the UI renders.
+- `legalForm` is a closed `Select` (`CUSTOMER_LEGAL_FORM_OPTIONS`, `D5`): the contract stores a bounded
+  free text, but the wizard offers the seven Hungarian forms so one form cannot be spelled two ways.
+- A `409`/`422` is routed to the step that owns the blamed input (`toFieldErrors` → `toWizardStepOfField`),
+  and the step hands the raw error to `useAppForm.setServerError`; a failure no input can fix stays on
+  step 4 as its residue `Alert`.
 - „Mégse” closes to `/customers` (`navigate`, not `history.back()`), and it resets the store.
 
 ### 4.2 State ownership (D11 — confirmed: page-local Zustand store)
@@ -410,7 +429,7 @@ apps/admin/src/features/customers/               AIS-19 ✅: use-customers-list.
                                                  (a use-customer-tags.ts az AIS-193 ticketé)
                                                  AIS-179 ✅: use-customer-contacts.ts, use-customer-users.ts
                                                  AIS-181 ✅: use-customer-activities.ts, use-customer-audit-logs.ts
-                                                 AIS-182: use-create-customer.ts
+                                                 AIS-182 ✅: use-create-customer.ts
                                                  shared: customers.const.ts (query keys via
                                                  createEntityQueryKeys), customers.logic.ts,
                                                  customers.interface.ts
@@ -418,14 +437,17 @@ apps/admin/src/features/api/use-tab-param.ts     AIS-19 ✅ **created** it (firs
                                                  .logic.ts + tests); AIS-20 reuses it for `?tab=`
 apps/admin/src/entities/customer/                AIS-19: customer.interface.ts, customer.mapper.ts,
                                                  customer.const.ts (labels, status variants), components/
-apps/admin/src/pages/customers/                  AIS-19 ✅ / AIS-20 ✅ / AIS-21 ✅ / AIS-179 ✅ / AIS-181:
+apps/admin/src/pages/customers/                  AIS-19 ✅ / AIS-20 ✅ / AIS-21 ✅ / AIS-179 ✅ / AIS-181 ✅ /
+                                                 AIS-182 ✅:
                                                  CustomersPage.tsx, CustomerCreatePage.tsx, CustomerDetailPage.tsx,
                                                  CustomerEditPage.tsx, customer-edit.logic.ts, customers.const.ts,
                                                  customers.interface.ts, customers.logic.ts,
                                                  customers-wizard.store.ts (+ provider), customers-wizard.logic.ts,
                                                  customer-contact.logic.ts, customer-user.logic.ts,
                                                  ui/* (AIS-21 ✅: CustomerEditForm, CustomerDetailHeaderActions,
-                                                 CustomerStatusDialog; AIS-179 ✅: CustomerContactsTab,
+                                                 CustomerStatusDialog; AIS-182 ✅: CustomerNameStep,
+                                                 CustomerAddressStep, CustomerReviewStep; AIS-179 ✅:
+                                                 CustomerContactsTab,
                                                  CustomerUsersTab, CustomerContactForm, CustomerUserInviteForm,
                                                  CustomerUserEditForm, ContactCreateDialog, ContactEditDialog,
                                                  CustomerUserInviteDialog, CustomerUserEditDialog,
@@ -483,6 +505,21 @@ copy in `customers.const.ts`, the extended `customers.interface.ts`, `toCustomer
 tax-number conflict, `409 STALE_WRITE`, `500`, plus the status route). The ticket's DoD is satisfied:
 `useAppForm` only, field errors from `details[].path`, the stale write as a page-level notice with a
 reload action, a success toast plus invalidation, and the panel/state row in `UI-Architecture.md` §5.
+
+**Delivered by AIS-182 (2026-11-25), verified against the tree:** `pages/customers/customers-wizard.logic.ts`
+(`nextStep`/`previousStep`, `canLeaveStep`, `toReachableStep`/`isStepReachable`/`isDraftComplete`,
+`toCreateCustomerPayload`, `toWizardSummary`, `toWizardStepOfField`, `toWizardServerError`, plus the two
+step schemas derived from `createCustomerSchema`), `features/customers/use-create-customer.ts`,
+`ui/CustomerNameStep.tsx`, `ui/CustomerAddressStep.tsx`, `ui/CustomerReviewStep.tsx`, the extended
+`ui/CustomerWizardStepper.tsx` (gating), the rewritten `CustomerCreatePage.tsx` (four step bodies, the
+derived `reachableStep`, the server-error routing), the `CUSTOMERS_WIZARD_*` / `CUSTOMER_LEGAL_FORM_OPTIONS`
+/ `CUSTOMER_WIZARD_FIELD_IDS` copy in `customers.const.ts`, `CustomersWizardIncompleteError`, and the four
+`POST /customers` MSW handlers (201 / `409` tax conflict / `422` / `500`).
+Two decisions are recorded here rather than in a rule file: **the step strip's frontier is derived from the
+draft** instead of stored (the ticket's DoD keeps the store contract untouched), and **the create request
+is sent by the review step**, not by the hook — a `features` hook must not know the router, so the jump to
+`/customers/:id?tab=contacts` happens after the write resolves. Still open on this contract: the tag chip
+bar (AIS-193).
 
 ---
 

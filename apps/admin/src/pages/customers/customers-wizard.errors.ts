@@ -18,3 +18,27 @@ export class MissingCustomersWizardStoreError extends Error {
     this.name = 'MissingCustomersWizardStoreError';
   }
 }
+
+/**
+ * Thrown when the draft is too incomplete to build a create body (AIS-182).
+ *
+ * Unreachable through the UI — the review step renders its submit only when
+ * every step's inputs are valid — and deliberately loud if it happens anyway: a
+ * half-filled body would be rejected by the server with a `422` the form could
+ * not address, instead of pointing at the step that owns the missing value.
+ */
+export class CustomersWizardIncompleteError extends Error {
+  /** The fields that are missing or invalid. */
+  readonly fieldNames: readonly string[];
+
+  /**
+   * @param fieldNames - the fields that are missing or invalid.
+   */
+  constructor(fieldNames: readonly string[]) {
+    super(
+      `The create wizard draft is incomplete: ${fieldNames.join(', ') || 'unknown field'}`,
+    );
+    this.name = 'CustomersWizardIncompleteError';
+    this.fieldNames = fieldNames;
+  }
+}

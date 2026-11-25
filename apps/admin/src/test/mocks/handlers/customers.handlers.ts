@@ -242,6 +242,62 @@ export const customersStatusStaleWrite = http.patch(
     }),
 );
 
+/*
+  ---------------------------------------------------------------------------
+  AIS-182 — the create wizard's one write
+  ---------------------------------------------------------------------------
+*/
+
+/**
+ * `201` create (`POST /customers`) — answers the fixture row.
+ *
+ * The “exactly one request” guarantee (`D-W6`) is **not** asserted here: the
+ * handler must answer every call, so a test that accidentally sent two requests
+ * would still receive two valid responses and its own `createRequestRecorder()`
+ * would show both. A handler that refused the second call would hide the defect.
+ */
+export const customersCreateSuccess = http.post(CUSTOMERS_PATH, () =>
+  successResponse(VALID_CUSTOMER),
+);
+
+/**
+ * `409 CUSTOMER_TAX_NUMBER_CONFLICT` with the addressable path (AIS-182, `D8`).
+ *
+ * `details[0].path === 'taxNumber'` is what lets the wizard jump back to step 2
+ * and put the copy under the input; the page's `toWizardServerError` maps the
+ * path back to its step.
+ */
+export const customersCreateTaxConflict = http.post(CUSTOMERS_PATH, () =>
+  errorResponse(
+    API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT,
+    'Tax number is already in use',
+    {
+      details: [{ path: 'taxNumber', message: 'Tax number is already in use' }],
+      path: CUSTOMERS_PATH,
+    },
+  ),
+);
+
+/** `422 SEMANTIC_VALIDATION_FAILED` naming one input (`legalName`). */
+export const customersCreateValidationError = http.post(CUSTOMERS_PATH, () =>
+  errorResponse(
+    API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
+    'Legal name is not acceptable',
+    {
+      details: [{ path: 'legalName', message: 'Legal name is not acceptable' }],
+      path: CUSTOMERS_PATH,
+    },
+  ),
+);
+
+/** `500` create failure with its own correlation id (the review step's alert). */
+export const customersCreateServerError = http.post(CUSTOMERS_PATH, () =>
+  errorResponse(API_ERROR_CODE.INTERNAL_ERROR, 'Internal server error', {
+    requestId: 'req-customer-create-server',
+    path: CUSTOMERS_PATH,
+  }),
+);
+
 /** Path templates of the contact writes (AIS-179), as MSW matches them. */
 export const CUSTOMERS_CONTACTS_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/contacts`;
 export const CUSTOMERS_CONTACT_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/contacts/:contactId`;

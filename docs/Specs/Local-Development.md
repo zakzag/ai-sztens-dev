@@ -1,6 +1,7 @@
 # Local Development — AIsztens
 
-**Utolsó frissítés:** 2026-11-25 (e2e: a `test/jest-e2e.json` `testTimeout` értéke 30 000 ms, mert a párhuzamos `AppModule` bootstrap (~3,5 s/suite) alatt az 5 s-os Jest-alapérték 96 tesztet buktatott el; a `[app-module-gate]` / `[database-gate]` skip `CI=true` alatt immár **hibát** ad, nem zöld futást — §2.1.1)
+**Utolsó frissítés:** 2026-11-25 (lokális DB-kliens: `pnpm db:psql` és `pnpm db:gui` (Adminer) — a DB-topic részletei a [`Database-Local.md`](Database-Local.md) §7.1-ben; a `5432` host port mindkét lokális stackben `127.0.0.1`-re szűkült, ezért a `docker ps` kimenete `127.0.0.1:5432->5432/tcp` — §2, §2b.2, §6.2)
+**Previous update:** 2026-11-25 — e2e: a `test/jest-e2e.json` `testTimeout` értéke 30 000 ms, mert a párhuzamos `AppModule` bootstrap (~3,5 s/suite) alatt az 5 s-os Jest-alapérték 96 tesztet buktatott el; a `[app-module-gate]` / `[database-gate]` skip `CI=true` alatt immár **hibát** ad, nem zöld futást — §2.1.1
 **Previous update:** 2026-11-07 — a `pnpm dev:local` script javítva: a PowerShell-only `$env:APP_ENV='local'; pnpm dev` test helyett `cross-env APP_ENV=local pnpm dev` fut, mert a `package.json` scripteket nem PowerShell, hanem az OS shellje futtatja — Windows-on `cmd.exe`, POSIX-on `/bin/sh`; §5 és §6.6 a `pnpm dev:local`-t ajánlja.
 **Status:** living spec
 **Last updated:** 2026-11-05 — §5 "Common pitfalls" now separates the two `pnpm install` `os error 32` shapes (a _transient_ collision on a first-time virtual-store folder vs a real lock), documents the `WARN Ignoring broken lockfile` trap, which makes pnpm silently drop pinning and re-resolve the whole graph, and documents the `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` prompt: pnpm appends the exemptions itself, but the run that appended them still fails — the retry is the fix.
@@ -107,8 +108,10 @@ plan), which:
   context that the droplet never needs;
 - publishes the `api` service on host port `3000` — reachable at
   `http://localhost:3000`;
-- publishes the `postgres` service on host port `5432` — `psql` from the
-  developer machine;
+- publishes the `postgres` service on host port `5432`, bound to
+  `127.0.0.1` only — `psql` (and the optional Adminer, see
+  [`Database-Local.md`](Database-Local.md) §7.1) from the developer machine,
+  never from the LAN;
 - disables `caddy` via `profiles: [never]` — no public DNS, no Let's Encrypt,
   no TLS.
 
@@ -167,8 +170,8 @@ publish host port `5432`, and they use **different volumes** (`pgdata_local` vs
 `pgdata`). So:
 
 - a running full stack makes `pnpm db:up` fail with
-  `Bind for 0.0.0.0:5432 failed: port is already allocated` — stop the other one
-  first (`scripts/dev-stack.sh down` / `pnpm db:down`);
+  `Bind for 127.0.0.1:5432 failed: port is already allocated` — stop the other
+  one first (`scripts/dev-stack.sh down` / `pnpm db:down`);
 - data created in the DB-only stack is **not** visible in the full stack, and
   vice versa.
 
@@ -344,7 +347,7 @@ one place, the others propagate.
 
   Start the local flow with **`pnpm dev:local`** — it runs `cross-env APP_ENV=local pnpm dev`,
   so the variable reaches every child process in cmd, PowerShell **and** bash. The old
-  `$env:APP_ENV='local'; pnpm dev` form only works when typed *into a PowerShell prompt*: a
+  `$env:APP_ENV='local'; pnpm dev` form only works when typed _into a PowerShell prompt_: a
   `package.json` script is executed by the OS shell (`cmd.exe` on Windows, `/bin/sh` elsewhere),
   so that body fails with `The filename, directory name, or volume label syntax is incorrect.`
   and `APP_ENV` is never set. Plain `pnpm dev` still means "no `APP_ENV`" on purpose — it is the
@@ -517,7 +520,10 @@ pnpm db:up      # csak a Postgres (infra/docker-compose.db.yml) — a hoston fut
 docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml ps
 ```
 
-Várt: `infra-postgres-1 … Up (healthy)`, `0.0.0.0:5432->5432/tcp`. A séma-ellenőrzés:
+Várt: `infra-postgres-1 … Up (healthy)`, `127.0.0.1:5432->5432/tcp` (loopback-only —
+a hálózatról nem érhető el). Böngészős kliens: `pnpm db:gui` → <http://localhost:8081>
+(lásd [`Database-Local.md`](Database-Local.md) §7.1); terminálos: `pnpm db:psql`.
+A séma-ellenőrzés:
 
 ```bash
 docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml \

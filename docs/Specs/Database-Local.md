@@ -2,6 +2,7 @@
 
 **Státusz:** Élő
 
+**Utolsó frissítés:** 2026-11-25 (lokális DB-kliens: `pnpm db:psql` és `pnpm db:gui` — Adminer a <http://localhost:8081>-en, külön [`infra/docker-compose.tools.yml`](../../infra/docker-compose.tools.yml) fájlban, `tools` profile alatt. A kliens **soha** nem kerül a droplet-stackbe, és minden lokális port `127.0.0.1`-re szűkült, hogy a fejlesztői DB ne legyen elérhető a LAN-ról — §1, §5, §7, §7.1, §11)
 **Utolsó frissítés:** 2026-11-25 (e2e: a naplósorokat jelölő user agent mostantól a stabil prefix **plusz a futás uuid-je** — a `customer-contacts` suite táblaszintű számlálója így nem számolja a korábbi futások sorait, ami ismételt `pnpm test:e2e` mellett elszállt; a §10.1 purge recept `LIKE '%e2e%'` szűrője változatlanul működik)
 
 **Utolsó frissítés:** 2026-11-24 (AIS-189: a `0008` migráció a lokális dev DB-re alkalmazva; közben kiderült, hogy a korábbi lokális volume tábláit a `postgres` superuser hozta létre, ezért az `aisztens` nem tudta `ALTER TABLE`-ezni őket — a tünet a Drizzle elrejtett `Failed query: ALTER TABLE …` üzenete, a javítás a §8.1-ben)
@@ -34,7 +35,7 @@
 | Volume (compose kulcs)  | `pgdata_local` (külön!)                                            | `pgdata`                                                                                                                                |
 | Tényleges Docker volume | `infra_pgdata_local`                                               | `aisztens_pgdata`                                                                                                                       |
 | Konténer neve           | `infra-postgres-1`                                                 | `aisztens-postgres-1`                                                                                                                   |
-| Host port               | `5432`                                                             | `5432`                                                                                                                                  |
+| Host port               | `127.0.0.1:5432` (loopback)                                        | `127.0.0.1:5432` (loopback)                                                                                                             |
 | Mire való               | csak az API fut a hoston (`pnpm --filter @callback/api start:dev`) | api + web + admin konténerben, Caddy kikapcsolva                                                                                        |
 | Init scriptek           | ugyanaz a bind mount                                               | ugyanaz a bind mount                                                                                                                    |
 
@@ -51,6 +52,13 @@ viszont `name: aisztens`-t deklarál ([`infra/docker-compose.yml`](../../infra/d
    csak az egyik legyen futva.
 2. **Külön adat.** A `pgdata_local` és a `pgdata` **nem** ugyanaz a volume. Egy
    DB-only stackben létrehozott sor nem látszik a teljes stack Postgres-ében.
+
+> **A publikált port loopback-only.** Mindkét fájl `127.0.0.1:5432`-re köt
+> (`docker ps`: `127.0.0.1:5432->5432/tcp`), nem `0.0.0.0`-ra: a fejlesztői
+> adatbázis így nem érhető el a helyi hálózatról, és a portütközés hibaüzenete is
+> `Bind for 127.0.0.1:5432 failed` alakú lesz. Ez szándékos szűkítés (ugyanaz a
+> szabály, mint [`Docker-Debug-Playbook.md`](Docker-Debug-Playbook.md) §2.8-ban) —
+> ne lazítsd vissza `0.0.0.0`-ra.
 
 ---
 
@@ -123,7 +131,7 @@ Gyakori okok:
 | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL is not set or blank`, a kulcs **hiányzik** az `apps/api/.env.local`-ból | a fájlt csak `PORT` / `CORS_ORIGINS` sorokkal hozták létre                         | írd be a §3 szerinti sort, a jelszót az `infra/.env.local` `AISZTENS_DB_PASSWORD` értékéből                                   |
 | Ugyanez, a kulcs **ott van**                                                          | üres érték (`DATABASE_URL=`) vagy `.env`-be írt, nem process env-be tett `APP_ENV` | töltsd ki az értéket; az `APP_ENV`-et a shell exportálja (a `app-env.ts` importkor olvassa, a `.env` fájl már későn töltődne) |
-| Bootol, de a böngésző CORS-hibát kap                                                  | `APP_ENV` nélkül `dev` módban fut, a `CORS_ORIGINS` a dropletről jön               | indítsd `pnpm dev:local`-lal (minden shell alatt, `APP_ENV=local`) — lásd [`Local-Development.md`](Local-Development.md) §5    |
+| Bootol, de a böngésző CORS-hibát kap                                                  | `APP_ENV` nélkül `dev` módban fut, a `CORS_ORIGINS` a dropletről jön               | indítsd `pnpm dev:local`-lal (minden shell alatt, `APP_ENV=local`) — lásd [`Local-Development.md`](Local-Development.md) §5   |
 | Bootol, de `ECONNREFUSED` / `password authentication failed`                          | konténer áll, vagy a jelszó nem egyezik az `infra/.env.local`-lal                  | `pnpm db:up`, illetve a két jelszó szinkronizálása                                                                            |
 
 A teljes fejlesztői ciklus — séma módosítás → `db:generate` → `db:migrate` → API + admin indítás →
@@ -144,7 +152,7 @@ sorrendben**:
 | Script                                                     | Mit hoz létre                                                                                                                                                                                                                     |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`01-roles.sh`](../../infra/postgres/init/01-roles.sh)     | `aisztens` (app), `tkovari` (owner), `krak` (operátor) role; a database tulajdonosa `aisztens`; `GRANT CONNECT` az operátoroknak; séma-szintű grantok `\gexec`-guarddal (friss initen no-op, mert a sémák ekkor még nem léteznek) |
-| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `platform`, `email`, `customer`, `iam`, `activity`, `audit` sémák (`CREATE SCHEMA IF NOT EXISTS`) + a grant-mátrix                                                                                                                  |
+| [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) | `platform`, `email`, `customer`, `iam`, `activity`, `audit` sémák (`CREATE SCHEMA IF NOT EXISTS`) + a grant-mátrix                                                                                                                |
 
 Grant-mátrix (a két script és az [`Infrastructure-Docker.md`](Infrastructure-Docker.md) §6.2
 ugyanezt írja le):
@@ -193,30 +201,30 @@ Két új séma, hét táblával. A séma-határ itt is modulhatár: a `customer`
 A `platform.api_keys` mintáját követi: minden oszlopnév kiírva (`snake_case`),
 `timestamptz(3)` időbélyegek, soft delete `deleted_at`-tel.
 
-| Séma       | Tábla           | Mire való                                                                          |
-| ---------- | --------------- | ---------------------------------------------------------------------------------- |
-| `iam`      | `operators`     | a szolgáltató munkatársai (`superadmin` / `operator`) — nem ügyfél-felhasználók     |
-| `customer` | `customers`     | a cég törzsadatai (22 oszlop; **nincs** `note` és **nincs** számlázási oszlop)      |
-| `customer` | `tags`          | újrahasználható címke-katalógus (`premium`, `vip`, …)                               |
-| `customer` | `customer_tags` | cégenként mely címkék (összetett PK: `customer_id` + `tag_id`)                      |
-| `iam`      | `customer_users`| cégenkénti belépő felhasználók, `ON DELETE CASCADE` a cégről                        |
-| `customer` | `contacts`      | kapcsolattartók, opcionális `customer_user_id` hivatkozással                        |
-| `customer` | `contact_roles` | `primary` / `technical` / `alerting`; cégenként egy `primary`                       |
+| Séma       | Tábla            | Mire való                                                                       |
+| ---------- | ---------------- | ------------------------------------------------------------------------------- |
+| `iam`      | `operators`      | a szolgáltató munkatársai (`superadmin` / `operator`) — nem ügyfél-felhasználók |
+| `customer` | `customers`      | a cég törzsadatai (22 oszlop; **nincs** `note` és **nincs** számlázási oszlop)  |
+| `customer` | `tags`           | újrahasználható címke-katalógus (`premium`, `vip`, …)                           |
+| `customer` | `customer_tags`  | cégenként mely címkék (összetett PK: `customer_id` + `tag_id`)                  |
+| `iam`      | `customer_users` | cégenkénti belépő felhasználók, `ON DELETE CASCADE` a cégről                    |
+| `customer` | `contacts`       | kapcsolattartók, opcionális `customer_user_id` hivatkozással                    |
+| `customer` | `contact_roles`  | `primary` / `technical` / `alerting`; cégenként egy `primary`                   |
 
 A kényszerek, amiket érdemes ismerni (mind a `0005` migrációban):
 
-| Kényszer                                                                  | Miért így                                                                                                                                                    |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `customers_customer_number_key` (UNIQUE)                                  | a generált `AIS-ÉÉÉÉHH-NNN` egyedi; a `23505` → `409` mappelés ezt a **nevet** használja                                                                     |
-| `customers_tax_number_key` (UNIQUE INDEX, `WHERE tax_number IS NOT NULL AND deleted_at IS NULL`) | az adószám csak az **élő** sorok között egyedi; a hiányzó (`NULL`) érték legális, ezért nem sima `UNIQUE`                                    |
-| `customers_tax_number_format_check` (`^\d{8}-[1-5]-\d{2}$`)               | a shared `huTaxNumberSchema` szabálya a tárhelyen is érvényes                                                                                                |
-| `contact_roles_primary_key` (UNIQUE INDEX, `WHERE role = 'primary'`)      | cégenként egy elsődleges kapcsolattartó — a `customer_id` ezért van denormalizálva a szerep-táblába, trigger nélkül                                          |
-| `customer_users_customer_owner_key` (UNIQUE INDEX, `WHERE role = 'owner' AND status = 'active'`) | cégenként egy aktív tulajdonos                                                                                                        |
-| `customer_users_email_key` (UNIQUE INDEX `lower(email)`)                  | a belépés e-mail alapú, ezért a kis/nagybetűtől függetlenül egyedi                                                                                           |
-| `contacts_customer_user_id_fkey`: (`customer_id`,`customer_user_id`) → `iam.customer_users` | `CHECK` nem tud másik táblát olvasni, ezért összetett FK; `customer_user_id IS NULL` esetén a MATCH SIMPLE miatt nem ellenőriz („nem belépő felhasználó”) |
-| `contact_roles_contact_id_fkey`: (`contact_id`,`customer_id`) → `customer.contacts (id, customer_id)` | ugyanaz a trükk: a szerep sora nem hivatkozhat más cégre, mint a szülő kontakt                                                              |
-| `contacts_customer_id_customers_id_fk`, a `customer_tags_*` FK-k, `customer_users_customer_id_customers_id_fk` (`ON DELETE CASCADE`) | a cég törlésével a gyerek sorok is mennek                                                                |
-| `customer_users_invited_by_operator_id_operators_id_fk` (`ON DELETE SET NULL`) | a kilépő munkatárs nem viszi magával a belépő felhasználót; a cég felelős operátorának FK-ja 2026-11-24-én megszűnt a `0008` migrációval |
+| Kényszer                                                                                                                             | Miért így                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customers_customer_number_key` (UNIQUE)                                                                                             | a generált `AIS-ÉÉÉÉHH-NNN` egyedi; a `23505` → `409` mappelés ezt a **nevet** használja                                                                  |
+| `customers_tax_number_key` (UNIQUE INDEX, `WHERE tax_number IS NOT NULL AND deleted_at IS NULL`)                                     | az adószám csak az **élő** sorok között egyedi; a hiányzó (`NULL`) érték legális, ezért nem sima `UNIQUE`                                                 |
+| `customers_tax_number_format_check` (`^\d{8}-[1-5]-\d{2}$`)                                                                          | a shared `huTaxNumberSchema` szabálya a tárhelyen is érvényes                                                                                             |
+| `contact_roles_primary_key` (UNIQUE INDEX, `WHERE role = 'primary'`)                                                                 | cégenként egy elsődleges kapcsolattartó — a `customer_id` ezért van denormalizálva a szerep-táblába, trigger nélkül                                       |
+| `customer_users_customer_owner_key` (UNIQUE INDEX, `WHERE role = 'owner' AND status = 'active'`)                                     | cégenként egy aktív tulajdonos                                                                                                                            |
+| `customer_users_email_key` (UNIQUE INDEX `lower(email)`)                                                                             | a belépés e-mail alapú, ezért a kis/nagybetűtől függetlenül egyedi                                                                                        |
+| `contacts_customer_user_id_fkey`: (`customer_id`,`customer_user_id`) → `iam.customer_users`                                          | `CHECK` nem tud másik táblát olvasni, ezért összetett FK; `customer_user_id IS NULL` esetén a MATCH SIMPLE miatt nem ellenőriz („nem belépő felhasználó”) |
+| `contact_roles_contact_id_fkey`: (`contact_id`,`customer_id`) → `customer.contacts (id, customer_id)`                                | ugyanaz a trükk: a szerep sora nem hivatkozhat más cégre, mint a szülő kontakt                                                                            |
+| `contacts_customer_id_customers_id_fk`, a `customer_tags_*` FK-k, `customer_users_customer_id_customers_id_fk` (`ON DELETE CASCADE`) | a cég törlésével a gyerek sorok is mennek                                                                                                                 |
+| `customer_users_invited_by_operator_id_operators_id_fk` (`ON DELETE SET NULL`)                                                       | a kilépő munkatárs nem viszi magával a belépő felhasználót; a cég felelős operátorának FK-ja 2026-11-24-én megszűnt a `0008` migrációval                  |
 
 > A `contact_roles` szándékosan **nem** visz `deleted_at`-et: a szerepek nem
 > történet. Kontakt soft delete esetén a szerep-sorok törlődnek (AIS-178),
@@ -233,10 +241,10 @@ a **csak hozzáfűzhető** változás-napló. A kettő szándékosan külön él
 szemantikájuk: a feed üzleti tartalom (szerkeszthető, soft delete-elhető), a
 napló bizonyíték (soha nem módosul).
 
-| Séma       | Tábla           | Mire való                                                                                     |
-| ---------- | --------------- | --------------------------------------------------------------------------------------------- |
-| `activity` | `activities`    | cégenkénti bejegyzések: `note` / `call` / `email` / `meeting` / `status_change` / `system`      |
-| `audit`    | `audit_logs`    | egy sor minden auditált írásról: ki, mikor, mit, milyen előtte/utána értékkel                  |
+| Séma       | Tábla        | Mire való                                                                                  |
+| ---------- | ------------ | ------------------------------------------------------------------------------------------ |
+| `activity` | `activities` | cégenkénti bejegyzések: `note` / `call` / `email` / `meeting` / `status_change` / `system` |
+| `audit`    | `audit_logs` | egy sor minden auditált írásról: ki, mikor, mit, milyen előtte/utána értékkel              |
 
 Négy új enum típus: `activity.activity_type`, `activity.author_type`,
 `audit.audit_operation`, `audit.audit_source`. Az `audit.audit_logs.actor_type`
@@ -245,30 +253,30 @@ tábla, nincs drift.
 
 A fontosabb kényszerek (a `0006` migrációban):
 
-| Kényszer                                                             | Miért így                                                                                                                                  |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `activities_author_reference_check` (`CHECK`)                        | pontosan egy szerző-hivatkozás: `system` / `api_key` → egyik FK sem, `operator` → csak `operator_id`, `customer_user` → csak `customer_user_id`. Az `api_key` ág azért kell, mert a befagyasztott AIS-16 szerződés négy értéket ismer |
-| `activities_operator_id_operators_id_fk` és `activities_customer_user_id_customer_users_id_fk` (`NO ACTION`) | nem `SET NULL` (a `CHECK` miatt lehetetlen) és nem `RESTRICT` (soronkénti ellenőrzés miatt megtörné a `customers → customer_users` cascade-et); a `NO ACTION` a statement végén ellenőriz, ezért a kétágú cascade lefut |
-| `activities_customer_id_customers_id_fk` (`ON DELETE CASCADE`)        | a cég hard delete-je magával viszi a feedet; a napló FK nélkül megmarad                                                                     |
-| `activities_customer_created_idx` (partial index, `WHERE deleted_at IS NULL`) | a feed lekérdezése mindig „egy cég élő sorai, legújabb elöl”                                                                        |
-| `audit_logs` **minden FK nélkül**                                     | a napló akkor is olvasható, ha a cég anonimizált (`customer_id` → `NULL`), a rekord törölt, a szerző távozott                               |
-| `audit_logs.record_id` nullable                                       | a `customer_tags` összetett PK-jú, uuid azonosító nélkül — a join-sor auditja `NULL` `record_id`-t és a párt az `after_data`-ban hozza      |
-| `audit_logs.id` (`bigint GENERATED ALWAYS AS IDENTITY`)               | a napló monoton sorrendű és csak bővül, ezért sorozat a természetes kulcs                                                                   |
+| Kényszer                                                                                                     | Miért így                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activities_author_reference_check` (`CHECK`)                                                                | pontosan egy szerző-hivatkozás: `system` / `api_key` → egyik FK sem, `operator` → csak `operator_id`, `customer_user` → csak `customer_user_id`. Az `api_key` ág azért kell, mert a befagyasztott AIS-16 szerződés négy értéket ismer |
+| `activities_operator_id_operators_id_fk` és `activities_customer_user_id_customer_users_id_fk` (`NO ACTION`) | nem `SET NULL` (a `CHECK` miatt lehetetlen) és nem `RESTRICT` (soronkénti ellenőrzés miatt megtörné a `customers → customer_users` cascade-et); a `NO ACTION` a statement végén ellenőriz, ezért a kétágú cascade lefut               |
+| `activities_customer_id_customers_id_fk` (`ON DELETE CASCADE`)                                               | a cég hard delete-je magával viszi a feedet; a napló FK nélkül megmarad                                                                                                                                                               |
+| `activities_customer_created_idx` (partial index, `WHERE deleted_at IS NULL`)                                | a feed lekérdezése mindig „egy cég élő sorai, legújabb elöl”                                                                                                                                                                          |
+| `audit_logs` **minden FK nélkül**                                                                            | a napló akkor is olvasható, ha a cég anonimizált (`customer_id` → `NULL`), a rekord törölt, a szerző távozott                                                                                                                         |
+| `audit_logs.record_id` nullable                                                                              | a `customer_tags` összetett PK-jú, uuid azonosító nélkül — a join-sor auditja `NULL` `record_id`-t és a párt az `after_data`-ban hozza                                                                                                |
+| `audit_logs.id` (`bigint GENERATED ALWAYS AS IDENTITY`)                                                      | a napló monoton sorrendű és csak bővül, ezért sorozat a természetes kulcs                                                                                                                                                             |
 
 **Írásvédelem (a `0007` kézi migráció).** A migrációt futtató app role a tábla
 **tulajdonosa**, ezért a `GRANT`/`REVOKE` önmagában nem tudja megakadályozni az
 `UPDATE`/`DELETE`-et. A tényleges kényszerítő erő a
 `audit.reject_audit_mutation()` függvény és a két trigger:
 
-| Objektum                          | Mit blokkol                                                             |
-| --------------------------------- | ----------------------------------------------------------------------- |
-| `audit_logs_append_only_row`      | `BEFORE UPDATE OR DELETE ... FOR EACH ROW` → `append-only` kivétel       |
-| `audit_logs_append_only_statement`| `BEFORE TRUNCATE ... FOR EACH STATEMENT` — a sorszintű trigger ezt nem látná |
+| Objektum                           | Mit blokkol                                                                  |
+| ---------------------------------- | ---------------------------------------------------------------------------- |
+| `audit_logs_append_only_row`       | `BEFORE UPDATE OR DELETE ... FOR EACH ROW` → `append-only` kivétel           |
+| `audit_logs_append_only_statement` | `BEFORE TRUNCATE ... FOR EACH STATEMENT` — a sorszintű trigger ezt nem látná |
 
 Emellett `GRANT SELECT, INSERT ON audit.audit_logs TO CURRENT_USER` és
 `REVOKE ALL ... FROM PUBLIC` fut (a szerepnév nincs beégetve, mert a
 `AISZTENS_DB_USER` környezetenként változik); a `SELECT` azért kell, mert a
-*Napló* fül (`GET /:id/audit-logs`, AIS-178) ebből a táblából olvas.
+_Napló_ fül (`GET /:id/audit-logs`, AIS-178) ebből a táblából olvas.
 
 > **A `0007`-et soha nem szabad újragenerálni.** A `drizzle-kit` nem tud
 > függvényt, triggert vagy grantot generálni (ezért készült `--custom`-ként), a
@@ -287,9 +295,15 @@ Emellett `GRANT SELECT, INSERT ON audit.audit_logs TO CURRENT_USER` és
 ## 5. Indítás és leállítás
 
 ```bash
-# DB-only (API a hoston)
-pnpm db:up        # docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml up -d
-pnpm db:down      # leállítja a konténert, a pgdata_local volume MEGMARAD
+# DB-only (API a hoston). A script a tools fájlt is merge-öli, hogy a projekt
+# modellje teljes legyen — `tools` profile nélkül az Adminer NEM indul el.
+pnpm db:up        # docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml -f infra/docker-compose.tools.yml up -d
+pnpm db:down      # leállítja a konténereket (az Adminert is), a pgdata_local volume MEGMARAD
+
+# Kliens — részletek: §7 (psql) és §7.1 (Adminer)
+pnpm db:psql      # psql -U aisztens -d aisztens_db a futó konténerben
+pnpm db:gui       # Adminer: http://localhost:8081
+pnpm db:gui:down  # Adminer leállítása — a Postgres futva marad
 
 # Teljes lokális stack (api/web/admin konténerben, Caddy off)
 scripts/dev-stack.sh up
@@ -300,7 +314,9 @@ Teljes törlés (adat is elvész):
 
 ```bash
 # DB-only stack: a `down -v` a hozzá tartozó `infra_pgdata_local` volume-ot törli
-docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml down -v
+docker compose --env-file infra/.env.local \
+  -f infra/docker-compose.db.yml -f infra/docker-compose.tools.yml \
+  --profile tools down -v
 
 # Teljes stack: a `down` megtartja a volume-ot, ezért külön kell törölni
 scripts/dev-stack.sh down
@@ -403,16 +419,74 @@ Ugyanezt a mátrixot ellenőrzi a `pnpm test:stack` is a `postgres-schemas`,
 
 ## 7. Kapcsolódás
 
-| Honnan                               | Hogyan                                                                         |
-| ------------------------------------ | ------------------------------------------------------------------------------ |
-| Konténerből (ajánlott)               | `docker compose ... exec -T postgres psql -U <role> -d aisztens_db`            |
-| Hostról, `psql` klienssel            | `psql "postgres://aisztens:<AISZTENS_DB_PASSWORD>@localhost:5432/aisztens_db"` |
-| Hostról, GUI-val (DataGrip, DBeaver) | host `localhost`, port `5432`, DB `aisztens_db`, user `aisztens`               |
-| Hoston futó API                      | `DATABASE_URL` a [`apps/api/.env.local`](../../apps/api/.env.example) fájlban  |
+| Honnan                              | Hogyan                                                                             |
+| ----------------------------------- | ---------------------------------------------------------------------------------- |
+| Konténerből, egy paranccsal         | `pnpm db:psql` → `psql -U aisztens -d aisztens_db` a futó konténerben              |
+| Konténerből, kézzel                 | `docker compose … exec -T postgres psql -U <role> -d aisztens_db`                  |
+| Böngészőből (Adminer)               | `pnpm db:gui` → <http://localhost:8081> — részletek: §7.1                          |
+| Hostról, `psql` klienssel           | `psql "postgres://aisztens:<AISZTENS_DB_PASSWORD>@127.0.0.1:5432/aisztens_db"`     |
+| Hostról, GUI-val (DBeaver, pgAdmin) | host `127.0.0.1`, port `5432`, DB `aisztens_db`, user `aisztens` — részletek: §7.2 |
+| Hoston futó API                     | `DATABASE_URL` a [`apps/api/.env.local`](../../apps/api/.env.example) fájlban      |
 
 Megjegyzés: a `postgres` superuser csak a bootstraphez és a diagnosztikához kell; az
 alkalmazás **mindig** az `aisztens` role-lal kapcsolódik. A `postgres` role
 `DATABASE_URL`-be tétele elfedné a grant-hibákat.
+
+> **A `pnpm db:psql` a DB-only stackre mutat** (`-f infra/docker-compose.db.yml`). A **teljes**
+> lokális stack konténere `aisztens-postgres-1`, és más compose-hívást igényel:
+>
+> ```bash
+> docker compose --env-file infra/.env.local \
+>   -f infra/docker-compose.yml -f infra/docker-compose.local.yml \
+>   exec postgres psql -U aisztens -d aisztens_db
+> ```
+
+### 7.1 GUI — Adminer (`pnpm db:gui`)
+
+A böngészős kliens egy **opcionális, kizárólag fejlesztői** konténer: az
+[`infra/docker-compose.tools.yml`](../../infra/docker-compose.tools.yml) fájlban él, és a DB-only
+stackre van mergelve. Nem hoz létre adatbázist és nem tart adatot — kliens, ugyanaz, mint a
+`psql`, csak böngészővel. Ez az a réteg, ami miatt a setup **replikálható**: a kliens
+definíciója a repóban van, nem a fejlesztő gépén.
+
+| Művelet          | Parancs            | Mit csinál                                                |
+| ---------------- | ------------------ | --------------------------------------------------------- |
+| indítás          | `pnpm db:gui`      | elindítja az Adminert a <http://localhost:8081>-en        |
+| leállítás        | `pnpm db:gui:down` | leállítja az Adminert — a Postgres futva marad            |
+| teljes takarítás | `pnpm db:down`     | mindkettőt eltávolítja (a `pgdata_local` volume megmarad) |
+
+Belépés a <http://localhost:8081>-en:
+
+| Mező     | Érték                                                                          |
+| -------- | ------------------------------------------------------------------------------ |
+| System   | `PostgreSQL`                                                                   |
+| Server   | `postgres` (a compose service-név — **nem** `localhost`)                       |
+| Username | `aisztens` (az app role; a `postgres` superuser csak diagnosztikához kell, §7) |
+| Password | `AISZTENS_DB_PASSWORD` az `infra/.env.local`-ból                               |
+| Database | `aisztens_db`                                                                  |
+
+**Három szabály, ami szándékos és nem lazítható:**
+
+1. **Soha nem kerül a dropletre.** A deploy-útvonalak (`deploy/deploy.sh`,
+   `.github/workflows/deploy.yml`, `scripts/test/*`) mindig explicit az
+   [`infra/docker-compose.yml`](../../infra/docker-compose.yml)-t nevezik meg, `infra/*.yml`
+   glob sehol nincs — ez a fájl tehát nem tud bekerülni a futó stackbe. Ne mozdíts service-t bele.
+2. **`profiles: ['tools']`.** Egy sima `up` akkor sem indítja el, ha a fájl véletlenül bekerül a
+   merge-be; a profile-t csak a `db:gui` kéri.
+3. **Loopback-only port** (`127.0.0.1:8081`), sosem `0.0.0.0` — egy LAN-ról elérhető
+   adatbázis-UI sebezhetőség, nem kényelem.
+
+> **A teljes lokális stackhez nem kötjük be.** Ott az `api`/`postgres` a saját `internal`
+> hálózatán fut, ahova az Adminer nem kapcsolódik, a `db:psql` pedig a DB-only projektet célozza —
+> arra az esetre a §7-es kézi `exec` parancs való. A GUI tudatosan a „API a hoston” workflow
+> kényelmi eszköze.
+
+### 7.2 Host-oldali kliens (opcionális)
+
+Mivel a port loopbackre van kötve, bármely Windows-os kliens csatlakozik a hoston publikált
+Postgreshez: host `127.0.0.1`, port `5432`, DB `aisztens_db`, user `aisztens`. A DBeaver /
+pgAdmin / DataGrip mind működik — de **ez nem része a repónak**: gépenként újra kell telepíteni és
+kézzel konfigurálni, ezért nem ez a replikálható út. Az a §7.1 `pnpm db:gui`-ja.
 
 ---
 
@@ -581,11 +655,11 @@ Két ismert korlát tartozik ide:
 | `FATAL: password authentication failed for user "aisztens"`             | az `AISZTENS_DB_PASSWORD` az `infra/.env.local`-ban más, mint amivel kapcsolódsz — vagy a role-t egy korábbi, más jelszóval inicializált volume hozta létre                                                                   | `$DC exec -T postgres bash /docker-entrypoint-initdb.d/01-roles.sh` (a script `ALTER ROLE … PASSWORD`-öt is futtat), vagy `down -v` + `pnpm db:up` |
 | `FATAL: role "aisztens" does not exist`                                 | az init nem futott le (nem üres volume), vagy `01-roles.sh` hibával elhalt                                                                                                                                                    | nézd a `logs postgres`-t; futtasd kézzel a `01-roles.sh`-t                                                                                         |
 | `Skipping initialization` a logban                                      | a volume már inicializált                                                                                                                                                                                                     | ez nem hiba; új scripthez lásd §8                                                                                                                  |
-| `permission denied for schema <név>`                                    | hiányzik a `CREATE` grant — `callback` esetén AIS-35 előtt, `customer`/`iam` esetén AIS-18 előtt inicializált volume                                                                                                         | §8 a) vagy b)                                                                                                                                      |
+| `permission denied for schema <név>`                                    | hiányzik a `CREATE` grant — `callback` esetén AIS-35 előtt, `customer`/`iam` esetén AIS-18 előtt inicializált volume                                                                                                          | §8 a) vagy b)                                                                                                                                      |
 | `FATAL: the database system is shutting down`                           | az entrypoint **ideiglenes** init-szervere áll le, miközben te már kérdezel                                                                                                                                                   | várj a `PostgreSQL init process complete` markerre, utána kérdezz                                                                                  |
 | a `db:migrate` „lefut”, de a tábla nem jelenik meg                      | a runner a `drizzle/` mappát a **cwd**-hez képest keresi, tehát `pnpm --filter @callback/api db:migrate`-tel (cwd = `apps/api`) kell futtatni; közvetlen `node dist/migrate.js` máshonnan a repó gyökeréből nézve nem találja | futtasd `pnpm --filter @callback/api db:migrate`-tel                                                                                               |
 | `password authentication failed for user "aisztens"` a `db:migrate`-nél | a `DATABASE_URL` nem oldható fel, és a config az `infra/.env.local`-ból komponál — de az `AISZTENS_DB_PASSWORD` más, mint amivel a volume inicializálódott                                                                    | lásd a fenti sort: `01-roles.sh` újrafuttatás vagy `down -v`                                                                                       |
-| `db:migrate` `Failed query: ALTER TABLE …` (a valódi ok rejtve)        | a táblákat egy korábbi migráció a `postgres` superuserrel futtatta, ezért az `aisztens` nem tulajdonos → `must be owner of table …`                                                                                         | §8.1 (tulajdonjog-átírás + `02-schemas.sh` újrafuttatás)                                                                                            |
+| `db:migrate` `Failed query: ALTER TABLE …` (a valódi ok rejtve)         | a táblákat egy korábbi migráció a `postgres` superuserrel futtatta, ezért az `aisztens` nem tulajdonos → `must be owner of table …`                                                                                           | §8.1 (tulajdonjog-átírás + `02-schemas.sh` újrafuttatás)                                                                                           |
 
 ---
 
@@ -636,9 +710,12 @@ Ez a dokumentum **élő**. Frissíteni kell, ha változik:
 
 - az [`infra/docker-compose.db.yml`](../../infra/docker-compose.db.yml) `postgres`
   service bármely mezője (port, volume, init mount, env kulcsok),
+- az [`infra/docker-compose.tools.yml`](../../infra/docker-compose.tools.yml) bármely mezője
+  (adminer image, port, profile) — a három szabály a §7.1-ben él,
 - az [`infra/postgres/init/`](../../infra/postgres/init/) bármely scriptje (role-ok,
   sémák, grantok),
-- a lokális DB-t érintő `package.json` script (`db:up` / `db:down` / `db:migrate`),
+- a lokális DB-t érintő `package.json` script (`db:up` / `db:down` / `db:psql` / `db:gui` /
+  `db:gui:down` / `db:migrate`),
 - az [`apps/api/src/db/schema.ts`](../../apps/api/src/db/schema.ts) vagy a generált
   `apps/api/drizzle/` tartalma (új tábla/oszlop → új szakasz a §9 „megvan” táblájában) —
   ilyenkor a [`Database-Schema.md`](Database-Schema.md)-t is újra kell generálni

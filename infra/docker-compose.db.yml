@@ -35,7 +35,10 @@ services:
       POSTGRES_EFFECTIVE_CACHE_SIZE: 512MB
       POSTGRES_WORK_MEM: 4MB
     ports:
-      - '5432:5432'
+      # Loopback only. The client (psql, Adminer, DBeaver) runs on this same
+      # machine, so publishing on 0.0.0.0 would put the dev database on the LAN
+      # for no benefit — and the passwords here are the local ones.
+      - '127.0.0.1:5432:5432'
     volumes:
       - pgdata_local:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro

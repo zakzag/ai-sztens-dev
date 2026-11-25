@@ -61,8 +61,9 @@ services:
 
   postgres:
     # Optional: allow local psql clients (Windows / WSL) to reach Postgres.
+    # Loopback only — a developer machine needs no LAN-wide database port.
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
 
   caddy:
     # No public DNS or Let's Encrypt on a local machine — keep Caddy off.

@@ -1,7 +1,7 @@
 # Local Development — AIsztens
 
-**Utolsó frissítés:** 2026-11-07 (a `pnpm dev:local` script javítva: a PowerShell-only `$env:APP_ENV='local'; pnpm dev` test helyett `cross-env APP_ENV=local pnpm dev` fut, mert a `package.json` scripteket nem PowerShell, hanem az OS shellje futtatja — Windows-on `cmd.exe`, POSIX-on `/bin/sh`; §5 és §6.6 mostantól a `pnpm dev:local`-t ajánlja)
-**Previous update:** 2026-11-05 — AIS-133: a header egységesítve a `quality:docs` kapuhoz; a tartalom változatlan.
+**Utolsó frissítés:** 2026-11-25 (e2e: a `test/jest-e2e.json` `testTimeout` értéke 30 000 ms, mert a párhuzamos `AppModule` bootstrap (~3,5 s/suite) alatt az 5 s-os Jest-alapérték 96 tesztet buktatott el; a `[app-module-gate]` / `[database-gate]` skip `CI=true` alatt immár **hibát** ad, nem zöld futást — §2.1.1)
+**Previous update:** 2026-11-07 — a `pnpm dev:local` script javítva: a PowerShell-only `$env:APP_ENV='local'; pnpm dev` test helyett `cross-env APP_ENV=local pnpm dev` fut, mert a `package.json` scripteket nem PowerShell, hanem az OS shellje futtatja — Windows-on `cmd.exe`, POSIX-on `/bin/sh`; §5 és §6.6 a `pnpm dev:local`-t ajánlja.
 **Status:** living spec
 **Last updated:** 2026-11-05 — §5 "Common pitfalls" now separates the two `pnpm install` `os error 32` shapes (a _transient_ collision on a first-time virtual-store folder vs a real lock), documents the `WARN Ignoring broken lockfile` trap, which makes pnpm silently drop pinning and re-resolve the whole graph, and documents the `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` prompt: pnpm appends the exemptions itself, but the run that appended them still fails — the retry is the fix.
 **Previous update:** 2026-11-02 — **Node 24.9+ is a hard requirement**: §2.1 documents the `>=24.9.0` `engines` field and the `.node-version` pin (fnm/nvm), because the `apps/api` e2e suites that boot `AppModule` **silently self-skip** on older runtimes instead of failing.
@@ -68,6 +68,22 @@ pnpm --filter @callback/api test:e2e
 
 A run is only meaningful when the summary says `Tests: N passed` with **no** `skipped` line in
 the console output.
+
+#### 2.1.1 Timeout and skip policy
+
+**Timeout.** [`apps/api/test/jest-e2e.json`](../../apps/api/test/jest-e2e.json) sets
+`"testTimeout": 30000`. Each app-module suite dynamically imports `src/app.module.js`, which
+makes ts-jest transform the whole application graph inside that Jest worker and then compiles
+and initialises Nest — ~3.5 s on an idle machine. With one worker per CPU core doing that
+simultaneously, the 5 s Jest default was exceeded and **96 tests failed with
+`Exceeded timeout of 5000 ms` before a single assertion ran** (2026-11-25 diagnosis). The 30 s
+budget keeps an ~8× margin without hiding a genuine hang.
+
+**Skip policy.** A skip is a **local convenience only**.
+[`apps/api/test/lib/skip-policy.ts`](../../apps/api/test/lib/skip-policy.ts) implements it once:
+`reportSkip()` warns when `CI` is unset and **throws** when `CI=true`. Both gates use it
+(`loadAppModuleOrSkip()` → `[app-module-gate]`, `reportDatabaseSkip()` → `[database-gate]`),
+so CI can never report a green run whose tests were all skipped.
 
 The local stack is started with one command. Its subcommands, pre-flight checks
 and exact compose invocation are documented in

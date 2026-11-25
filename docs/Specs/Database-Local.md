@@ -2,6 +2,8 @@
 
 **Státusz:** Élő
 
+**Utolsó frissítés:** 2026-11-25 (e2e: a naplósorokat jelölő user agent mostantól a stabil prefix **plusz a futás uuid-je** — a `customer-contacts` suite táblaszintű számlálója így nem számolja a korábbi futások sorait, ami ismételt `pnpm test:e2e` mellett elszállt; a §10.1 purge recept `LIKE '%e2e%'` szűrője változatlanul működik)
+
 **Utolsó frissítés:** 2026-11-24 (AIS-189: a `0008` migráció a lokális dev DB-re alkalmazva; közben kiderült, hogy a korábbi lokális volume tábláit a `postgres` superuser hozta létre, ezért az `aisztens` nem tudta `ALTER TABLE`-ezni őket — a tünet a Drizzle elrejtett `Failed query: ALTER TABLE …` üzenete, a javítás a §8.1-ben)
 
 **Utolsó frissítés:** 2026-11-23 (AIS-178/f: a napló olvasása él — `GET /api/admin/customers/:id/audit-logs` —, és mivel az `audit.audit_logs` append-only, az e2e suite-ok által hagyott sorok kitakarításának receptje a §10.1-ben van)
@@ -593,9 +595,12 @@ Az `audit.audit_logs` **append-only**: a `0007_audit_immutability.sql` `BEFORE U
 `BEFORE DELETE` / `BEFORE TRUNCATE` triggerei elutasítják a módosítást, az app role pedig csak
 `SELECT` + `INSERT` jogot kap. Az e2e suite-ok ezért **nem** takarítják el a napló soraikat: a
 business sorok `afterAll`-ben törlődnek (a customer cascade viszi a gyerekeket), a napló sorok
-megmaradnak, és a suite fix `user-agent`-jével vannak megjelölve
-(`customer-contacts-e2e/1.0 (AIS-178 d)`, `customer-activity-e2e/1.0 (AIS-178 f)`,
-`customer-audit-logs-e2e/1.0 (AIS-178 f)`).
+megmaradnak, és a suite `user-agent`-jével vannak megjelölve:
+`<suite>-e2e/1.0 (<ticket>) <futás-uuid>` — például
+`customer-contacts-e2e/1.0 (AIS-178 d) 4f1c…`. A stabil prefix a purge recepthez kell, a
+futásonkénti uuid pedig ahhoz, hogy egy ismételt futás ne lássa a korábbi futás sorait (a
+`customer-contacts` suite `contact_roles` számlálója táblaszintű, mert ezeknek a soroknak nincs
+`record_id`-ja).
 
 Takarításhoz **superuser** session kell (nem az app role), amelyben a triggerek ki vannak kapcsolva:
 

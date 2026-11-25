@@ -19,6 +19,7 @@ import {
   CUSTOMERS_CREATE_ROUTE_PATH,
   CUSTOMERS_LIST_ROUTE_PATH,
   CUSTOMER_DETAIL_ROUTE_PATH,
+  CUSTOMER_EDIT_ROUTE_PATH,
 } from '../../pages/customers/customers.const.js';
 import {
   APP_API_PATH_PREFIX,
@@ -124,6 +125,30 @@ describe('route registry', () => {
     expect(detail?.breadcrumbLabel).toBeNull();
     expect(detail?.breadcrumbParentPath).toBe(APP_ROUTE_CUSTOMERS_PATH);
     expect(detail?.resolveBreadcrumbLabel?.({ id: 'abc' })).toBe('abc');
+  });
+
+  it('mounts the customer edit page as a sibling with a resolved crumb', () => {
+    // AIS-21: editing replaces the read-only page instead of floating above it,
+    // so it is a sibling entry of the detail — not a child — and its crumb text
+    // comes from the same `:id` segment, derived from the URL only.
+    const edit = ALL_ROUTE_ENTRIES.find(
+      (route) => route.path === CUSTOMER_EDIT_ROUTE_PATH,
+    );
+
+    expect(edit).toBeDefined();
+    expect(edit?.navLabel).toBeNull();
+    expect(edit?.protected).toBe(true);
+    expect(edit?.breadcrumbLabel).toBeNull();
+    expect(edit?.breadcrumbParentPath).toBe(APP_ROUTE_CUSTOMERS_PATH);
+    expect(edit?.resolveBreadcrumbLabel?.({ id: 'abc' })).toBe('abc');
+
+    const detail = ALL_ROUTE_ENTRIES.find(
+      (route) => route.path === CUSTOMER_DETAIL_ROUTE_PATH,
+    );
+
+    // Sibling, not child: the detail entry declares no `children`, so the two
+    // entries answer two independent addresses.
+    expect(detail?.children ?? []).toHaveLength(0);
   });
 
   it('keeps the identifier parameter on the overlay children only', () => {

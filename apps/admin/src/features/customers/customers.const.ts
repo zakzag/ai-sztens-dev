@@ -12,12 +12,14 @@
  */
 
 import {
+  API_ERROR_CODE,
   LIST_QUERY_DEFAULT_LIMIT,
   LIST_QUERY_MAX_LIMIT,
   type Customer,
   type CustomerListQuery,
 } from '@callback/shared';
 import { createEntityQueryKeys } from '../api/create-entity-query-keys.js';
+import type { CustomerUpdateFieldName } from './customers.interface.js';
 
 /**
  * Cache keys of the `customers` queries.
@@ -53,3 +55,58 @@ export const CUSTOMERS_LIMIT_OPTIONS: readonly number[] = Object.freeze([
  * `meta.successMessage` once.
  */
 export const CUSTOMERS_ARCHIVE_SUCCESS_MESSAGE = 'A cég archiválva.';
+
+/**
+ * Success copy of the field update (AIS-21).
+ *
+ * Handed to `useAppForm`'s notify port — **not** to the mutation's `meta`: a page
+ * never sets `meta.successMessage` (`New-Admin-Page.md` step 15 / AIS-136), the
+ * form's port owns the announcement, and the two must not both speak.
+ */
+export const CUSTOMERS_UPDATE_SUCCESS_MESSAGE = 'A cég adatai mentve.';
+
+/** Success copy of the dedicated status change (AIS-21). */
+export const CUSTOMERS_STATUS_SUCCESS_MESSAGE = 'A cég státusza módosítva.';
+
+/**
+ * Every input the **edit** form owns, in visual order (AIS-21).
+ *
+ * The order is the contract of the focus behaviour: server errors are applied in
+ * this order and only the first one takes focus (AIS-111 `D3`), so a component
+ * cannot change the outcome by reordering its markup.
+ *
+ * The read-only-by-contract fields (`customerNumber`, `status`, `createdAt`,
+ * `updatedAt`, `hasMissingData`) are absent — the request schema is `.strict()`
+ * and rejects them, so they can never be an error target.
+ */
+export const CUSTOMER_UPDATE_FIELD_PATHS: readonly CustomerUpdateFieldName[] =
+  Object.freeze([
+    'type',
+    'legalName',
+    'shortName',
+    'taxNumber',
+    'euVatNumber',
+    'companyRegistrationNumber',
+    'legalForm',
+    'registeredAddressZip',
+    'registeredAddressCity',
+    'registeredAddressLine',
+    'registeredAddressCountry',
+    'industry',
+    'headcountRange',
+    'source',
+  ]);
+
+/**
+ * Path a code blames when the response carried no `details[]` (AIS-21).
+ *
+ * Only the duplicate tax number has an input to blame. `STALE_WRITE` is not
+ * listed: the path it would blame (`updatedAt`) is rendered nowhere, which is
+ * exactly why the form answers it with a page-level notice instead of a field
+ * message.
+ */
+export const CUSTOMER_UPDATE_DEFAULT_PATH_BY_CODE: Readonly<
+  Record<string, CustomerUpdateFieldName>
+> = Object.freeze({
+  [API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT]: 'taxNumber',
+});

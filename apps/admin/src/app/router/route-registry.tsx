@@ -15,9 +15,11 @@ import {
   CUSTOMERS_CREATE_ROUTE_PATH,
   CUSTOMER_DETAIL_PARAM,
   CUSTOMER_DETAIL_ROUTE_PATH,
+  CUSTOMER_EDIT_ROUTE_PATH,
 } from '../../pages/customers/customers.const.js';
 import { CustomerCreatePage } from '../../pages/customers/CustomerCreatePage.js';
 import { CustomerDetailPage } from '../../pages/customers/CustomerDetailPage.js';
+import { CustomerEditPage } from '../../pages/customers/CustomerEditPage.js';
 import { CustomersPage } from '../../pages/customers/CustomersPage.js';
 import { LoginPage } from '../../pages/LoginPage.js';
 import { NotFoundPage } from '../../pages/not-found/NotFoundPage.js';
@@ -164,6 +166,21 @@ export const PROTECTED_ROUTE_ENTRIES: readonly RouteEntry[] = [
     // No static cell: the crumb text is the `:id` segment. The breadcrumb is
     // derived from the URL only and must not read data, so it shows the id the
     // address carries (screen contract §1).
+    breadcrumbLabel: null,
+    breadcrumbParentPath: APP_ROUTE_CUSTOMERS_PATH,
+    resolveBreadcrumbLabel: (params) => params[CUSTOMER_DETAIL_PARAM],
+  },
+  {
+    // The edit page (AIS-21) is another **sibling** of the list, not a child of
+    // the detail: editing replaces the read-only page instead of floating above
+    // it (screen contract `D5`/`D14`). The list row's *Szerkesztés* item and the
+    // detail header's link both point here through `toCustomerEditRoute()`.
+    path: CUSTOMER_EDIT_ROUTE_PATH,
+    navLabel: null,
+    element: <CustomerEditPage />,
+    protected: true,
+    // Same rule as the detail entry: a parameterised crumb comes from a resolver,
+    // and the breadcrumb is derived from the URL only, never from data.
     breadcrumbLabel: null,
     breadcrumbParentPath: APP_ROUTE_CUSTOMERS_PATH,
     resolveBreadcrumbLabel: (params) => params[CUSTOMER_DETAIL_PARAM],

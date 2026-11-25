@@ -137,10 +137,105 @@ export const CUSTOMER_FIXTURE: Customer = VALID_CUSTOMER;
 export const CUSTOMER_DETAIL_FIXTURE: CustomerDetail = VALID_CUSTOMER_DETAIL;
 
 /**
+ * Path template of the dedicated status route, as MSW matches it (AIS-21).
+ *
+ * A route of its own: the server also writes `statusChangedAt` and records a
+ * separate audit entry, so it is never part of the field `PATCH`.
+ */
+export const CUSTOMERS_STATUS_PATH_PATTERN = `${CUSTOMERS_PATH}/:id/status`;
+
+/**
+ * `200` field update (`PATCH /:id`) — answers the current fixture row (AIS-21).
+ *
+ * The request body is not asserted here: a test that cares about the payload
+ * attaches `createRequestRecorder()` and reads the recorded request, which is the
+ * same place every other write's body is checked.
+ */
+export const customersUpdateSuccess = http.patch(
+  CUSTOMERS_DETAIL_PATH_PATTERN,
+  () => successResponse(VALID_CUSTOMER),
+);
+
+/**
+ * `422 SEMANTIC_VALIDATION_FAILED` naming one input (`legalName`).
+ *
+ * The `details[].path` is what the form maps onto a control, so this handler is
+ * the proof of the `details → input` contract, not of any copy.
+ */
+export const customersUpdateValidationError = http.patch(
+  CUSTOMERS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(
+      API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED,
+      'Legal name is not acceptable',
+      {
+        details: [{ path: 'legalName', message: 'Legal name is not acceptable' }],
+        path: CUSTOMERS_DETAIL_PATH_PATTERN,
+      },
+    ),
+);
+
+/**
+ * `409 CUSTOMER_TAX_NUMBER_CONFLICT` with the addressable path the contract sends.
+ *
+ * `details[0].path === 'taxNumber'` is part of the published contract
+ * (`customers.interface.ts` of `@callback/api-client`), so the handler carries it:
+ * the surface stays `field` and the form puts the copy under the input instead of
+ * raising a page-level alert.
+ */
+export const customersUpdateTaxConflict = http.patch(
+  CUSTOMERS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(
+      API_ERROR_CODE.CUSTOMER_TAX_NUMBER_CONFLICT,
+      'Tax number is already in use',
+      {
+        details: [{ path: 'taxNumber', message: 'Tax number is already in use' }],
+        path: CUSTOMERS_DETAIL_PATH_PATTERN,
+      },
+    ),
+);
+
+/** `409 STALE_WRITE` — the row was saved by somebody else after the read. */
+export const customersUpdateStaleWrite = http.patch(
+  CUSTOMERS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.STALE_WRITE, 'The row was modified meanwhile', {
+      path: CUSTOMERS_DETAIL_PATH_PATTERN,
+    }),
+);
+
+/** `500` on the field update. */
+export const customersUpdateServerError = http.patch(
+  CUSTOMERS_DETAIL_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.INTERNAL_ERROR, 'Internal server error', {
+      requestId: 'req-customer-update-server',
+      path: CUSTOMERS_DETAIL_PATH_PATTERN,
+    }),
+);
+
+/** `200` status change (`PATCH /:id/status`). */
+export const customersStatusSuccess = http.patch(
+  CUSTOMERS_STATUS_PATH_PATTERN,
+  () => successResponse(VALID_CUSTOMER),
+);
+
+/** `409 STALE_WRITE` on the status change. */
+export const customersStatusStaleWrite = http.patch(
+  CUSTOMERS_STATUS_PATH_PATTERN,
+  () =>
+    errorResponse(API_ERROR_CODE.STALE_WRITE, 'The row was modified meanwhile', {
+      path: CUSTOMERS_STATUS_PATH_PATTERN,
+    }),
+);
+
+/**
  * Default handler set registered by the global server.
  *
  * The detail read is part of it: the detail page is mounted by the router, so a
  * test that mounts the app (not just one page) must find a working detail
- * endpoint by default instead of a network error.
+ * endpoint by default instead of a network error. The **write** handlers are not:
+ * a test that writes registers exactly the outcome it asserts (AIS-21).
  */
 export const customersHandlers = [customersListSuccess, customersDetailSuccess];

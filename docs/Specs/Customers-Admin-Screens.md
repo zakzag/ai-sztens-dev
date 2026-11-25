@@ -1,6 +1,10 @@
 # Customers admin screens — screen contract (list, detail, wizard, edit)
 
-**Utolsó frissítés: 2026-11-25** (AIS-20: a cég **adatlap** váza — fejléc + `StatusBadge`, hat fül
+**Utolsó frissítés: 2026-11-25** (AIS-21: a cég **szerkesztő oldala** — `/customers/:id/edit` testvér
+útvonal, `useAppForm` a szerződésből származtatott sémával, négy `FormSection`, mezőnkénti hibák a
+`details[].path`-ból, a `409 STALE_WRITE` oldalszintű figyelmeztetés újratöltés gombbal, valamint a
+detail fejléc írási műveletei (*Szerkesztés*, *Státusz váltása*, *Archiválás*) — leszállítva; a
+**címke-chip sáv külön follow-up ticketre** került. Előző, 2026-11-25 — AIS-20: a cég **adatlap** váza — fejléc + `StatusBadge`, hat fül
 `?tab=`-bal az URL-ben, `Áttekintés` és `Cégadatok` tartalommal, öt felület (loading / `404` /
 `banner`-tier / hiba / siker) — leszállítva; a négy későbbi fül panelje a
 `ui/customer-tab-panels.tsx` totális `Record`-jában már helyet kapott, a §10 fájltérkép ✅ jelölése ezt
@@ -292,6 +296,23 @@ half-created customer behind.
 Read-only-by-contract fields are **not** inputs: `customerNumber` (generated), `status`
 (`PATCH /:id/status`, its own action), `createdAt`/`updatedAt` (server), `hasMissingData` (derived).
 
+**Delivered by AIS-21 (2026-11-25), verified against the tree:** the page is
+`pages/customers/CustomerEditPage.tsx` (read through `useCustomerDetail` + the **reused** pure
+`toCustomerDetailState`, five surfaces: loading / `404` / banner-tier / error / success) and the form is
+`pages/customers/ui/CustomerEditForm.tsx`, mounted **keyed by `updatedAt`** so a re-read reaches the
+inputs through a remount. The derived schema, the record → values mapping, the payload builder and the
+country list live in the pure `pages/customers/customer-edit.logic.ts`; the writes are
+`use-update-customer.ts` and `use-update-customer-status.ts` in `features/customers/`. The header's
+`ui/CustomerDetailHeaderActions.tsx` renders the edit link plus the action menu, and its two dialogs
+(`CustomerStatusDialog`, the reused `ArchiveCustomerDialog`) are **non-navigable modals** whose open flag
+is local `useState` — the AIS-173 exception, applied consistently to both items.
+
+Two deviations from the wave plan are deliberate and recorded here: the submit body carries **every**
+editable field plus `updatedAt` (not only the changed ones — the form shows the whole record, and the
+server's audit writer keeps only the keys that changed), and the **tags chip bar belongs to a follow-up
+ticket** (`createTag` / `detachTag` wiring is untouched; `attachTag` stays unused until a tag catalogue
+read exists).
+
 ---
 
 ## 6. The state-plan row (goes into `UI-Architecture.md` §5)
@@ -374,8 +395,8 @@ packages/api-client/src/customers/               AIS-178: customers.service.ts, 
 apps/admin/src/features/customers/               AIS-19 ✅: use-customers-list.ts, use-archive-customer.ts,
                                                  customers.const.ts, customers.logic.ts, customers.interface.ts
                                                  AIS-20 ✅: use-customer-detail.ts
-                                                 AIS-21: use-update-customer.ts, use-update-customer-status.ts,
-                                                 use-customer-tags.ts
+                                                 AIS-21 ✅: use-update-customer.ts, use-update-customer-status.ts
+                                                 (a use-customer-tags.ts a follow-up ticketé)
                                                  AIS-179: use-customer-contacts.ts, use-customer-users.ts
                                                  AIS-181: use-customer-activities.ts, use-customer-audit-logs.ts
                                                  AIS-182: use-create-customer.ts
@@ -386,15 +407,17 @@ apps/admin/src/features/api/use-tab-param.ts     AIS-19 ✅ **created** it (firs
                                                  .logic.ts + tests); AIS-20 reuses it for `?tab=`
 apps/admin/src/entities/customer/                AIS-19: customer.interface.ts, customer.mapper.ts,
                                                  customer.const.ts (labels, status variants), components/
-apps/admin/src/pages/customers/                  AIS-19 ✅ / AIS-20 ✅ / AIS-21/179/181:
+apps/admin/src/pages/customers/                  AIS-19 ✅ / AIS-20 ✅ / AIS-21 ✅ / AIS-179/181:
                                                  CustomersPage.tsx, CustomerCreatePage.tsx, CustomerDetailPage.tsx,
-                                                 CustomerEditPage.tsx, customers.const.ts, customers.interface.ts,
-                                                 customers.logic.ts, customers-wizard.store.ts (+ provider),
-                                                 customers-wizard.logic.ts, ui/*
+                                                 CustomerEditPage.tsx, customer-edit.logic.ts, customers.const.ts,
+                                                 customers.interface.ts, customers.logic.ts,
+                                                 customers-wizard.store.ts (+ provider), customers-wizard.logic.ts,
+                                                 ui/* (AIS-21 ✅: CustomerEditForm, CustomerDetailHeaderActions,
+                                                 CustomerStatusDialog)
 apps/admin/src/app/app.const.ts                  AIS-19 ✅: APP_ROUTE_CUSTOMERS_PATH, APP_CUSTOMERS_LABEL
 apps/admin/src/app/router/route-registry.tsx     AIS-19 ✅ (`/customers`, `/customers/new`) —
                                                  AIS-20 ✅: the detail entry (sibling, resolved crumb),
-                                                 AIS-21: the edit entry
+                                                 AIS-21 ✅: the edit entry (sibling, resolved crumb)
 docs/Specs/UI-Architecture.md §5                 AIS-19 ✅: the row of §6 above, `zustand` row flipped
 ```
 
@@ -417,7 +440,17 @@ the entity additions (`CustomerDetailViewModel`/`CustomerDetailGroup` in `custom
 Two decisions of this ticket are recorded here rather than in a rule file: **the `Szerkesztés` link and
 the status/archive header menu stay in AIS-21** (they would point at a route that does not exist yet),
 and **the page folder stays flat** (`pages/customers/`, no `customer/` subfolder), superseding the
-`customer/…` paths of the wave plan for AIS-21 / AIS-179 / AIS-181 as well.
+`customer/…` paths of the wave plan for AIS-179 / AIS-181 as well.
+
+**Delivered by AIS-21 (2026-11-25), verified against the tree:** `pages/customers/customer-edit.logic.ts`
+(derived edit schema, status schema, record → values, values → payload, country options, read-only
+summary), `CustomerEditPage.tsx`, `ui/CustomerEditForm.tsx`, `ui/CustomerDetailHeaderActions.tsx`,
+`ui/CustomerStatusDialog.tsx`, the `CUSTOMER_EDIT_*` / `CUSTOMER_DETAIL_ACTION*` / `CUSTOMERS_STATUS_*`
+copy in `customers.const.ts`, the extended `customers.interface.ts`, `toCustomerEditRoute` rebuilt on
+`CUSTOMER_EDIT_ROUTE_PATH`, the edit route entry and the write MSW handlers (200, `422`, `409`
+tax-number conflict, `409 STALE_WRITE`, `500`, plus the status route). The ticket's DoD is satisfied:
+`useAppForm` only, field errors from `details[].path`, the stale write as a page-level notice with a
+reload action, a success toast plus invalidation, and the panel/state row in `UI-Architecture.md` §5.
 
 ---
 

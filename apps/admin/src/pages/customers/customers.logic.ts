@@ -19,6 +19,7 @@ import {
 import { isNotFoundFailure } from '../../lib/error-surface.logic.js';
 import {
   CUSTOMER_DETAIL_ROUTE_PATH,
+  CUSTOMER_EDIT_ROUTE_PATH,
   CUSTOMERS_EMPTY_DESCRIPTION_FILTERED,
   CUSTOMERS_EMPTY_DESCRIPTION_UNFILTERED,
 } from './customers.const.js';
@@ -43,13 +44,17 @@ export function toCustomerDetailRoute(id: string): string {
 }
 
 /**
- * Builds the edit route of one row (mounted by AIS-21).
+ * Builds the edit route of one row (AIS-21).
+ *
+ * From the same template the registry mounts, like
+ * {@link toCustomerDetailRoute}: a row menu or a header link can therefore never
+ * point at a path the router does not serve.
  *
  * @param id - the customer's uuid.
  * @returns `/customers/<id>/edit`.
  */
 export function toCustomerEditRoute(id: string): string {
-  return `${toCustomerDetailRoute(id)}/edit`;
+  return CUSTOMER_EDIT_ROUTE_PATH.replace(':id', encodeURIComponent(id));
 }
 
 /**

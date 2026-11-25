@@ -1,6 +1,11 @@
 # UI Architecture — `@callback/ui`, tokens and admin app layers
 
-**Utolsó frissítés: 2026-11-25 — AIS-191: a **glass család** saját sarok-létrát kapott (`0.25rem`
+**Utolsó frissítés: 2026-11-25 — AIS-21: a `pages/customers` **szerkesztő oldala**
+(`/customers/:id/edit`, testvér útvonal) — olvasás `useCustomerDetail`-dal és a **újrahasznált** tiszta
+`toCustomerDetailState`-tel, űrlap `useAppForm`-mal a szerződésből származtatott sémán, `key={updatedAt}`
+remounttal; a `409 STALE_WRITE` **oldalszintű figyelmeztetés újratöltés gombbal** (nem mezőhiba), a detail
+fejléc két írási ablaka pedig **nem navigálható modal** — a §5 sora és a §6.3 AIS-173 kivétele szerint.
+Előző, 2026-11-25 — AIS-191: a **glass család** saját sarok-létrát kapott (`0.25rem`
 control / `0.33rem` surface), a `dark` / `light` / `ambient` a lágy `0.625rem / 1rem` értéken maradt —
 a shape ezzel a thickness létra párja lett, és a négy lebegő felület (tooltip, dropdown, combobox
 listbox, log JSON blokk) `rounded-card`-ra került — lásd §3.2 és §3.3. Előző, 2026-11-25 — AIS-20: a
@@ -1012,6 +1017,28 @@ already part of that frame: `pages/customers/ui/customer-tab-panels.tsx` is a **
 never touch `CustomerDetailPage.tsx`. The strip itself stays a page part (`ui/CustomerTabs.tsx`) and is
 a labelled `<nav>` of `Button`s with `aria-current="page"` — not a `packages/ui` primitive and not a
 `tablist`, because every tab has an address of its own (screen contract `D16`).
+
+**The customer edit page (AIS-21) — the second half of that row.** `/customers/:id/edit` is a
+**sibling** of the detail entry (`D5`/`D14`), so editing replaces the read-only page instead of floating
+above it. It reads through the same `useCustomerDetail` and decides its surface through the same pure
+`toCustomerDetailState`, then mounts `ui/CustomerEditForm.tsx` **keyed by `data.updatedAt`**: the form's
+values are seeded on mount only, so a re-read can reach the inputs through a remount and by no other
+route. The form uses `useAppForm` with a schema **derived** from `updateCustomerSchema` (only `''` as the
+“no value” state of an optional format field is restated), sends every editable field with the
+`updatedAt` token, and maps failures through `toFieldErrors` — field paths in visual order, the
+tax-number conflict via `defaultPathByCode`. The **`409 STALE_WRITE` is a page-level notice**, not a
+field message: the path it would blame is the hidden token, so the form renders a warning `Alert` with a
+reload action that re-reads the record (`isStaleWriteFailure` lives in `lib/error-surface.logic.ts`).
+Routing stays with the page: `onLeave` navigates to the detail route on cancel and on success alike, and
+the mutation invalidates the whole `customers` prefix — never a hand-patched entry.
+
+The detail header's write actions (`ui/CustomerDetailHeaderActions.tsx`) are the other AIS-21 surface:
+the edit `Link` and a `DropdownMenu` with *Státusz váltása* and *Archiválás*. Both open a **non-navigable
+modal** — nothing links to them, nothing reloads into them — so their open flag is local `useState` in
+that component, exactly the AIS-173 exception the archive confirmation already used in the list (§6.3).
+The status change is its own mutation over `PATCH /:id/status` with its own one-field form, so it can
+never ride the field `PATCH`; the archive reuses `useArchiveCustomerMutation` and leaves for the list,
+because the row the page showed no longer exists.
 
 **Every admin page renders through `PageShell` (AIS-171, §4).** The frame — the `space-y-6` section,
 the header row, the page's single `h1`, the optional subtitle, the optional back link above the title

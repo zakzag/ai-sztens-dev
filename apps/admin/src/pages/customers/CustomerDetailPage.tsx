@@ -21,7 +21,7 @@
 
 import { EmptyState, PageShell, Skeleton } from '@callback/ui';
 import { useMemo, type ReactNode } from 'react';
-import { Link, Outlet, useParams } from 'react-router-dom';
+import { Link, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { PageErrorState } from '../../components/error/PageErrorState.js';
 import { CustomerStatusBadge } from '../../entities/customer/components/CustomerStatusBadge.js';
 import { toCustomerDetailViewModel } from '../../entities/customer/customer.mapper.js';
@@ -44,6 +44,7 @@ import {
 } from './customers.const.js';
 import { toCustomerDetailState } from './customers.logic.js';
 import type { CustomerTab } from './customers.interface.js';
+import { CustomerDetailHeaderActions } from './ui/CustomerDetailHeaderActions.js';
 import { CustomerTabs } from './ui/CustomerTabs.js';
 import { CUSTOMER_TAB_PANELS } from './ui/customer-tab-panels.js';
 
@@ -53,6 +54,7 @@ import { CUSTOMER_TAB_PANELS } from './ui/customer-tab-panels.js';
 export function CustomerDetailPage() {
   const params = useParams();
   const id = params[CUSTOMER_DETAIL_PARAM];
+  const navigate = useNavigate();
 
   const detail = useCustomerDetail(id);
 
@@ -154,8 +156,25 @@ export function CustomerDetailPage() {
         </Link>
       }
       actions={
-        viewModel === null ? undefined : (
-          <CustomerStatusBadge status={viewModel.status} />
+        viewModel === null || data === null ? undefined : (
+          /*
+            AIS-21 takes over this group: the badge (AIS-20), then the write
+            actions — the edit link and the status/archive menu. A successful
+            archive leaves for the list, because the row this page shows no
+            longer exists.
+          */
+          <div className="flex items-center gap-3">
+            <CustomerStatusBadge status={viewModel.status} />
+            <CustomerDetailHeaderActions
+              customerId={data.id}
+              displayName={viewModel.displayName}
+              status={viewModel.status}
+              updatedAt={data.updatedAt}
+              onArchived={() => {
+                navigate(CUSTOMERS_LIST_ROUTE_PATH);
+              }}
+            />
+          </div>
         )
       }
     >

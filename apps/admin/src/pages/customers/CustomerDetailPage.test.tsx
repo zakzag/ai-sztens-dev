@@ -29,6 +29,8 @@ import {
 } from '../../test/mocks/handlers/customers.handlers.js';
 import { CustomerDetailPage } from './CustomerDetailPage.js';
 import {
+  CUSTOMER_DETAIL_ACTIONS_TRIGGER_LABEL,
+  CUSTOMER_DETAIL_EDIT_LABEL,
   CUSTOMER_DETAIL_ERROR_TITLE,
   CUSTOMER_DETAIL_LOADING_MESSAGE,
   CUSTOMER_DETAIL_NOT_FOUND_TITLE,
@@ -92,6 +94,24 @@ describe('CustomerDetailPage', () => {
     expect(
       screen.getByRole('button', { name: labelOf('overview') }),
     ).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('renders the write actions next to the status badge', async () => {
+    // AIS-21 took over the `actions` slot: the badge stays, and the edit link plus
+    // the status/archive menu join it.
+    renderPage();
+
+    await screen.findByRole('heading', {
+      level: 1,
+      name: VALID_CUSTOMER.shortName ?? VALID_CUSTOMER.legalName,
+    });
+
+    expect(
+      screen.getByRole('link', { name: CUSTOMER_DETAIL_EDIT_LABEL }),
+    ).toHaveAttribute('href', `/customers/${VALID_CUSTOMER_DETAIL.id}/edit`);
+    expect(
+      screen.getByRole('button', { name: CUSTOMER_DETAIL_ACTIONS_TRIGGER_LABEL }),
+    ).toBeInTheDocument();
   });
 
   it('renders the not-found copy instead of a generic error', async () => {

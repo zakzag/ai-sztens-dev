@@ -5,13 +5,18 @@
  */
 
 import type { ReactNode } from 'react';
-import type { CustomerListQuery } from '@callback/shared';
+import type {
+  CustomerDetail,
+  CustomerListQuery,
+  CustomerStatus,
+} from '@callback/shared';
 import type { DataTableSort } from '@callback/ui';
 import type {
   CustomerDetailViewModel,
   CustomerRowViewModel,
   CustomerRowViewModels,
 } from '../../entities/customer/customer.interface.js';
+import type { CustomerUpdateFieldName } from '../../features/customers/customers.interface.js';
 import type { ErrorSurface } from '../../lib/error-surface.interface.js';
 import type { CustomerWizardStep } from './customers-wizard.interface.js';
 
@@ -172,4 +177,91 @@ export interface CustomerDetailStateInput {
   readonly errorSurface: ErrorSurface | null;
   /** `true` when a payload has arrived. */
   readonly hasData: boolean;
+}
+
+/**
+ * The values the edit form holds (AIS-21).
+ *
+ * A **total** record over the feature's field union, with `string` in every slot:
+ * the form shows a text control for every editable field, so `null` and “absent”
+ * are modelled as the empty string here and converted back to the wire shape by
+ * `toUpdateCustomerPayload()`. A field added to the union without a value in the
+ * page's defaults is a compile error, which is what keeps the two in step.
+ */
+export type CustomerEditValues = Readonly<
+  Record<CustomerUpdateFieldName, string>
+>;
+
+/**
+ * Props of the edit form.
+ *
+ * The form owns no read and no routing: the page fetched the record and passes
+ * it down, and the two callbacks are the only ways out — `onCancel` for the
+ * *Mégse* action and `onReload` for the stale-write notice's reload button.
+ */
+export interface CustomerEditFormProps {
+  /** The record the inputs are seeded from (the mapper's raw source). */
+  readonly customer: CustomerDetail;
+  /**
+   * Leaves the form for the customer's own page.
+   *
+   * Used by both the *Mégse* button and a successful save: the form itself never
+   * navigates (ticket key decision 4), and the detail page is the destination of
+   * both paths.
+   */
+  readonly onLeave: () => void;
+  /** Re-reads the record after a `409 STALE_WRITE`. */
+  readonly onReload: () => void;
+}
+
+/**
+ * Props of the detail header's write actions (AIS-21).
+ *
+ * Only the four values the actions need: the edit link and the archive dialog
+ * want the name, the status dialog wants the current status and the version it
+ * must send back as the concurrency token.
+ */
+export interface CustomerDetailHeaderActionsProps {
+  /** The customer's uuid — the edit link's segment and the mutations' target. */
+  readonly customerId: string;
+  /** `shortName ?? legalName`, already resolved by the mapper. */
+  readonly displayName: string;
+  /** The status the dialog preselects. */
+  readonly status: CustomerStatus;
+  /** The version the status change must send as `updatedAt`. */
+  readonly updatedAt: string;
+  /** Reports a successful archive; the page leaves the now-dead detail page. */
+  readonly onArchived: () => void;
+}
+
+/**
+ * Values of the status-change form.
+ *
+ * One field, and it is a real form: `useAppForm` gives it the same validation,
+ * failure mapping, first-error focus and single announcement the edit form has,
+ * so the header action cannot invent a second submit path.
+ */
+export interface CustomerStatusFormValues {
+  /** The status the operator chose. */
+  readonly status: CustomerStatus;
+}
+
+/**
+ * Props of the status-change window.
+ *
+ * A **non-navigable modal** (AIS-173 exception): nothing links to it and nothing
+ * reloads into it, so its open flag is local `useState` in the header actions —
+ * exactly like the archive confirmation AIS-19 already ships. The owner mounts
+ * the component **only while the window is open**, which is what re-seeds the
+ * form's values on every opening (react-hook-form reads `defaultValues` on mount).
+ */
+export interface CustomerStatusDialogProps {
+  /** The customer the new status belongs to. */
+  readonly customerId: string;
+  /** The status the select starts on. */
+  readonly currentStatus: CustomerStatus;
+  /** The version the `PATCH /:id/status` body must carry. */
+  readonly updatedAt: string;
+  /** Called on every dismissal (cancel, `Esc`, outside click, success). */
+  readonly onClose: () => void;
 }

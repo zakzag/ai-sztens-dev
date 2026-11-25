@@ -14,10 +14,13 @@ import {
   CUSTOMER_SOURCE_VALUES,
   CUSTOMER_STATUS_VALUES,
   CUSTOMER_TYPE_VALUES,
+  HEADCOUNT_RANGE_VALUES,
   type CustomerListQuery,
 } from '@callback/shared';
 import type { RadioOption, SelectOption } from '@callback/ui';
 import {
+  CUSTOMER_DETAIL_GROUP_TITLES,
+  CUSTOMER_HEADCOUNT_RANGE_LABELS,
   CUSTOMER_SOURCE_LABELS,
   CUSTOMER_STATUS_LABELS,
   CUSTOMER_TYPE_LABELS,
@@ -44,6 +47,17 @@ export const CUSTOMERS_CREATE_ROUTE_PATH = '/customers/new';
  * first consumer.
  */
 export const CUSTOMER_DETAIL_ROUTE_PATH = '/customers/:id';
+
+/**
+ * Route template of the edit page (AIS-21).
+ *
+ * A **sibling** of the detail entry, not a child: editing replaces the read-only
+ * page instead of floating above it (screen contract `D5`/`D14`). Both
+ * `toCustomerEditRoute()` and the route registry read this one literal, so the
+ * list row's *Szerkesztés* menu item and the detail header's link can never point
+ * at a path the router does not serve.
+ */
+export const CUSTOMER_EDIT_ROUTE_PATH = '/customers/:id/edit';
 
 /** Page header. */
 export const CUSTOMERS_PAGE_TITLE = 'Cégek';
@@ -314,3 +328,171 @@ export const CUSTOMER_DETAIL_TAB_PLACEHOLDER_TITLE =
   'Ez a fül még nem érhető el';
 export const CUSTOMER_DETAIL_TAB_PLACEHOLDER_DESCRIPTION =
   'Ez a fül a következő fejlesztésben érkezik.';
+
+/** Page header of the edit surface (AIS-21). */
+export const CUSTOMER_EDIT_PAGE_TITLE = 'Cég szerkesztése';
+
+/** Back link above the edit title; goes to the customer's own page. */
+export const CUSTOMER_EDIT_BACK_LABEL = 'Vissza az adatlapra';
+
+/** Announced by screen readers while the edit page's read is in flight. */
+export const CUSTOMER_EDIT_LOADING_MESSAGE = 'A szerkesztő űrlap betöltése…';
+
+/** Page-level failure of the read behind the form. Retry copy comes from `lib/`. */
+export const CUSTOMER_EDIT_ERROR_TITLE =
+  'A cég adatlapjának betöltése nem sikerült.';
+
+/** Action row of the edit form. */
+export const CUSTOMER_EDIT_SUBMIT_LABEL = 'Mentés';
+export const CUSTOMER_EDIT_CANCEL_LABEL = 'Mégse';
+
+/**
+ * Title of the form's residue alert.
+ *
+ * Shown only when a **field**-tier failure carried a path the form does not own
+ * (`useAppForm` rule); every other tier already has its own surface.
+ */
+export const CUSTOMER_EDIT_FORM_ERROR_TITLE = 'A mentés nem sikerült.';
+
+/**
+ * Headings of the four `FormSection`s, in render order.
+ *
+ * The first three are the detail page's own group headings (`D12`), reused so the
+ * read-only and the editable view of the same record cannot name a group
+ * differently; only the fourth is edit-specific (the detail calls it *Egyéb*).
+ */
+export const CUSTOMER_EDIT_SECTION_TITLES = {
+  identifiers: CUSTOMER_DETAIL_GROUP_TITLES.identifiers,
+  legal: CUSTOMER_DETAIL_GROUP_TITLES.legal,
+  address: CUSTOMER_DETAIL_GROUP_TITLES.address,
+  classification: 'Besorolás',
+} as const;
+
+/** DOM ids of the edit inputs (also their `htmlFor` targets). */
+export const CUSTOMER_EDIT_FIELD_IDS = {
+  type: 'customer-edit-type',
+  legalName: 'customer-edit-legal-name',
+  shortName: 'customer-edit-short-name',
+  taxNumber: 'customer-edit-tax-number',
+  euVatNumber: 'customer-edit-eu-vat-number',
+  companyRegistrationNumber: 'customer-edit-registration-number',
+  legalForm: 'customer-edit-legal-form',
+  registeredAddressZip: 'customer-edit-zip',
+  registeredAddressCity: 'customer-edit-city',
+  registeredAddressLine: 'customer-edit-address-line',
+  registeredAddressCountry: 'customer-edit-country',
+  industry: 'customer-edit-industry',
+  headcountRange: 'customer-edit-headcount',
+  source: 'customer-edit-source',
+} as const;
+
+/**
+ * Hints under the three format-bearing inputs.
+ *
+ * Deliberately only three: a hint on every field would turn the form into a
+ * manual, and the optional ones are recognisable by their empty state.
+ */
+export const CUSTOMER_EDIT_FIELD_HINTS = {
+  taxNumber: 'Formátum: 12345678-1-23.',
+  registeredAddressZip: 'Négy számjegy.',
+  registeredAddressCountry: 'Kétbetűs országkód, például HU.',
+} as const;
+
+/**
+ * The stale-write notice (AIS-21 key decision 2).
+ *
+ * This failure is **not** a field error: the blamed path is the hidden `updatedAt`
+ * token, so the only useful affordance is “reload, then save again” — the notice
+ * carries that action instead of pointing at an input.
+ */
+export const CUSTOMER_EDIT_STALE_TITLE =
+  'A céget közben más módosította.';
+export const CUSTOMER_EDIT_STALE_DESCRIPTION =
+  'A mentés nem történt meg, mert az adatok időközben megváltoztak. Töltse újra az adatokat, majd mentse újra.';
+export const CUSTOMER_EDIT_STALE_RELOAD_LABEL = 'Adatok újratöltése';
+
+/**
+ * Countries the edit form offers.
+ *
+ * Not a contract enum: the wire value is a free ISO 3166-1 alpha-2 code, and this
+ * list is a convenience for the market the operators work in. A customer whose
+ * country is not listed keeps its value — `toCountryOptions()` appends it — so the
+ * form can never silently lose data.
+ */
+export const CUSTOMER_COUNTRY_OPTIONS: readonly SelectOption[] = Object.freeze([
+  { value: 'HU', label: 'Magyarország (HU)' },
+  { value: 'AT', label: 'Ausztria (AT)' },
+  { value: 'SK', label: 'Szlovákia (SK)' },
+  { value: 'RO', label: 'Románia (RO)' },
+  { value: 'HR', label: 'Horvátország (HR)' },
+  { value: 'SI', label: 'Szlovénia (SI)' },
+  { value: 'RS', label: 'Szerbia (RS)' },
+  { value: 'UA', label: 'Ukrajna (UA)' },
+  { value: 'CZ', label: 'Csehország (CZ)' },
+  { value: 'PL', label: 'Lengyelország (PL)' },
+  { value: 'DE', label: 'Németország (DE)' },
+]);
+
+/**
+ * Visible label of the “not set” option on the optional selects.
+ *
+ * An **option**, not a `placeholder`: `Select` renders its placeholder disabled,
+ * which would make an optional field impossible to clear once it had a value.
+ */
+export const CUSTOMER_EDIT_NONE_LABEL = 'Nincs megadva';
+
+/** Headcount bands as select options, with a clearable empty entry first. */
+export const CUSTOMER_EDIT_HEADCOUNT_OPTIONS: readonly SelectOption[] =
+  Object.freeze([
+    { value: '', label: CUSTOMER_EDIT_NONE_LABEL },
+    ...HEADCOUNT_RANGE_VALUES.map((value) => ({
+      value,
+      label: CUSTOMER_HEADCOUNT_RANGE_LABELS[value],
+    })),
+  ]);
+
+/** Acquisition channels as select options, with a clearable empty entry first. */
+export const CUSTOMER_EDIT_SOURCE_OPTIONS: readonly SelectOption[] =
+  Object.freeze([
+    { value: '', label: CUSTOMER_EDIT_NONE_LABEL },
+    ...CUSTOMER_SOURCE_VALUES.map((value) => ({
+      value,
+      label: CUSTOMER_SOURCE_LABELS[value],
+    })),
+  ]);
+
+/** Header of the detail page: the edit link (AIS-21). */
+export const CUSTOMER_DETAIL_EDIT_LABEL = 'Szerkesztés';
+
+/** Accessible name of the detail header's action menu. */
+export const CUSTOMER_DETAIL_ACTIONS_LABEL = 'A cég műveletei';
+
+/** Visible label of the detail header's action trigger. */
+export const CUSTOMER_DETAIL_ACTIONS_TRIGGER_LABEL = 'Műveletek';
+
+/** Stable ids of the header action items — what the menu reports back. */
+export const CUSTOMER_DETAIL_ACTION_IDS = {
+  status: 'status',
+  archive: 'archive',
+} as const;
+
+/** Labels of the two header action items. */
+export const CUSTOMER_DETAIL_ACTION_LABELS = {
+  status: 'Státusz váltása',
+  archive: 'Archiválás',
+} as const;
+
+/** Status-change window of the detail header. */
+export const CUSTOMERS_STATUS_DIALOG_TITLE = 'Státusz váltása';
+export const CUSTOMERS_STATUS_DIALOG_DESCRIPTION =
+  'A státuszváltás saját naplóbejegyzést kap, és frissíti a státuszváltás dátumát is.';
+export const CUSTOMERS_STATUS_FIELD_ID = 'customer-status';
+export const CUSTOMERS_STATUS_FIELD_LABEL = 'Új státusz';
+export const CUSTOMERS_STATUS_SUBMIT_LABEL = 'Mentés';
+
+/** The seven statuses as select options, built from the contract's closed set. */
+export const CUSTOMERS_STATUS_OPTIONS: readonly SelectOption[] =
+  CUSTOMER_STATUS_VALUES.map((value) => ({
+    value,
+    label: CUSTOMER_STATUS_LABELS[value],
+  }));

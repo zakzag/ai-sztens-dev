@@ -5,11 +5,42 @@
  * renders, so a mistake in the page cannot reach the query object.
  */
 
-import type { Customer } from '@callback/shared';
+import type {
+  Customer,
+  UpdateCustomerInput,
+  UpdateCustomerStatusInput,
+} from '@callback/shared';
 import type {
   ApiErrorView,
   PaginatedMeta,
 } from '../api/api-hooks.interface.js';
+
+/**
+ * Every input the customer **edit** form owns (AIS-21).
+ *
+ * A closed union instead of a string: the field-path list, the default
+ * path-by-code table and the page's form-value record are all checked against
+ * it, so a renamed field breaks the build instead of silently losing focus.
+ *
+ * The read-only-by-contract fields (`customerNumber`, `status`, `createdAt`,
+ * `updatedAt`, `hasMissingData`) are deliberately absent — `updateCustomerSchema`
+ * is `.strict()` and rejects them, so they can never be an error target.
+ */
+export type CustomerUpdateFieldName =
+  | 'type'
+  | 'legalName'
+  | 'shortName'
+  | 'taxNumber'
+  | 'euVatNumber'
+  | 'companyRegistrationNumber'
+  | 'legalForm'
+  | 'registeredAddressZip'
+  | 'registeredAddressCity'
+  | 'registeredAddressLine'
+  | 'registeredAddressCountry'
+  | 'industry'
+  | 'headcountRange'
+  | 'source';
 
 /**
  * Result of {@link useCustomersList}.
@@ -42,5 +73,34 @@ export interface UseArchiveCustomerResult extends ApiErrorView {
   /** Performs the archive (soft delete) of one customer. */
   readonly archiveCustomer: (id: string) => Promise<null>;
   /** `true` while the write is in flight; disables the confirm button. */
+  readonly isPending: boolean;
+}
+
+/**
+ * Result of {@link useUpdateCustomerMutation} (AIS-21).
+ *
+ * The id is bound by the hook, not passed through the variables: the body schema
+ * is `.strict()` and must never carry the resource's own address.
+ */
+export interface UseUpdateCustomerResult extends ApiErrorView {
+  /** Sends the partial body (always with `updatedAt`) to `PATCH /:id`. */
+  readonly updateCustomer: (input: UpdateCustomerInput) => Promise<Customer>;
+  /** `true` while the write is in flight; disables the save button. */
+  readonly isPending: boolean;
+}
+
+/**
+ * Result of {@link useUpdateCustomerStatusMutation} (AIS-21).
+ *
+ * A route of its own (`PATCH /:id/status`): the status change also writes
+ * `statusChangedAt` and is audited as its own operation, so it must not travel
+ * inside the field update.
+ */
+export interface UseUpdateCustomerStatusResult extends ApiErrorView {
+  /** Sends the new status plus the required concurrency token. */
+  readonly updateCustomerStatus: (
+    input: UpdateCustomerStatusInput,
+  ) => Promise<Customer>;
+  /** `true` while the write is in flight; disables the save button. */
   readonly isPending: boolean;
 }

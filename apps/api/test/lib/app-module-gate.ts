@@ -26,7 +26,14 @@
  *
  * On Node >= 24.9 — or in CI once the runner uses a modern Node — the tests
  * execute for real; nothing else needs to change.
+ *
+ * **The skip is local-only.** In CI the gate throws instead of skipping (see
+ * `skip-policy.ts`), because a run that reports `18 passed` while all 140 tests
+ * skipped is not a verification — it is exactly how 96 real failures stayed
+ * invisible until the same command ran on a modern Node.
  */
+
+import { reportSkip } from './skip-policy.js';
 
 const [NODE_MAJOR, NODE_MINOR] = process.versions.node
   .split('.')
@@ -44,12 +51,14 @@ export const APP_MODULE_SKIP_REASON =
 /**
  * Dynamically imports `AppModule`, or returns `null` when the current runtime
  * cannot load it under Jest (see the file docblock).
+ *
+ * @throws {Error} in CI, where a skip must fail the run instead of hiding it.
  */
 export async function loadAppModuleOrSkip(): Promise<
   typeof import('../../src/app.module.js').AppModule | null
 > {
   if (!JEST_CAN_REQUIRE_ESM) {
-    console.warn(`[app-module-gate] ${APP_MODULE_SKIP_REASON}`);
+    reportSkip('[app-module-gate]', APP_MODULE_SKIP_REASON);
     return null;
   }
   const { AppModule } = await import('../../src/app.module.js');

@@ -6,7 +6,6 @@
  * one place (plan `D4`, `D11`). The server's `message` is never used as copy.
  */
 
-import { API_ERROR_CODE } from '@callback/shared';
 import {
   SERVICE_UNAVAILABLE_MESSAGE,
   SESSION_EXPIRED_MESSAGE,
@@ -34,17 +33,6 @@ export const BANNER_DISMISS_LABEL = 'Értesítés bezárása';
 /** Default labels of `PageErrorState`. */
 export const PAGE_ERROR_RETRY_LABEL = 'Újrapróbálás';
 export const PAGE_ERROR_RETRY_PENDING_LABEL = 'Próbálkozás…';
-
-/**
- * The only error codes that may claim “this input is wrong” (plan `D1`).
- *
- * Single source of truth: `features/api-keys/api-keys.const.ts` re-exports it as
- * `FIELD_ERROR_CODES`, so the classifier and the form mapping cannot drift.
- */
-export const FIELD_SURFACE_CODES: readonly string[] = Object.freeze([
-  API_ERROR_CODE.VALIDATION_FAILED,
-  API_ERROR_CODE.API_KEY_IDENTIFIER_CONFLICT,
-]);
 
 /**
  * Resolved copy per banner condition.

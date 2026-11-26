@@ -65,8 +65,8 @@ export function toIssueDetails(error: z.ZodError): readonly ApiErrorDetail[] {
  * @param schema - the endpoint's `data` schema (what the service expects).
  * @param body - untrusted body of a 2xx response, or `null` when it was empty
  *   or not JSON.
- * @returns `{ ok: true, data }` on success, `{ ok: false, issues, cause }` on
- *   envelope **or** payload drift — never `undefined` for either.
+ * @returns `{ ok: true, data, meta }` on success, `{ ok: false, issues, cause }`
+ *   on envelope **or** payload drift — never `undefined` for either.
  */
 export function unwrapEnvelope<T>(
   schema: z.ZodType<T>,
@@ -92,5 +92,5 @@ export function unwrapEnvelope<T>(
     };
   }
 
-  return { ok: true, data: payload.data };
+  return { ok: true, data: payload.data, meta: envelope.data.meta };
 }

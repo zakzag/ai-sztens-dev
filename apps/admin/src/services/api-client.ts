@@ -17,12 +17,15 @@
 
 import {
   createApiKeysService,
+  createCustomersService,
   createHttpClient,
   type ApiKeysService,
+  type CustomersService,
   type HttpClient,
 } from '@callback/api-client';
 import { readSessionToken } from '../auth/session-token.js';
 import { DEFAULT_API_BASE_URL } from './api-client.const.js';
+import { getHttpEventListener } from './http-events.js';
 
 /**
  * @returns `VITE_API_BASE_URL` when it is a non-empty string, otherwise
@@ -38,11 +41,31 @@ function resolveBaseUrl(): string {
   return DEFAULT_API_BASE_URL;
 }
 
-/** Shared transport: one instance, so the token hook is evaluated per request. */
+/**
+ * Shared transport: one instance, so the token hook is evaluated per request.
+ *
+ * `onEvent` forwards every finished attempt to whoever registered a listener
+ * (the notification capture, AIS-84). The lookup happens **per request**, so the
+ * app can register after this module was imported, and an unregistered app is a
+ * no-op instead of a crash.
+ */
 export const httpClient: HttpClient = createHttpClient({
   baseUrl: resolveBaseUrl(),
   getToken: readSessionToken,
+  onEvent: (event) => {
+    getHttpEventListener()?.(event);
+  },
 });
 
 /** `api-keys` service consumed by `features/api-keys`. */
 export const apiKeysService: ApiKeysService = createApiKeysService(httpClient);
+
+/**
+ * `customers` service consumed by `features/customers` (AIS-19).
+ *
+ * One instance over the shared transport, exactly like `apiKeysService`: the
+ * query hooks depend on this object (or a double of it), never on `fetch`. The
+ * service was delivered by AIS-178; this line is the only wiring it needed.
+ */
+export const customersService: CustomersService =
+  createCustomersService(httpClient);

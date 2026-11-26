@@ -1,0 +1,12 @@
+/*
+ * Negative palette fixture — a stylesheet with a literal, a functional
+ * notation and an `@apply` palette utility.
+ */
+.legacy {
+  background-color: #101010;
+  color: rgb(255 255 255);
+}
+
+.legacy-applied {
+  @apply bg-slate-950 text-slate-100;
+}

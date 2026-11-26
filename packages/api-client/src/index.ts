@@ -46,18 +46,82 @@ export { createHttpClient, joinUrl } from './http-client.js';
 export {
   InvalidEndpointPathError,
   UnknownEndpointError,
+  UnresolvedPathParameterError,
+  assertNoUnresolvedPathParameter,
   clientPathOf,
+  hasUnresolvedPathParameter,
   toClientPath,
 } from './endpoint-path.js';
 
 export type {
+  AttemptOutcome,
+  AttemptRequest,
   HttpClient,
   HttpClientConfig,
+  HttpEvent,
+  HttpEventResponseMeta,
+  ListRequest,
   RequestOptions,
 } from './http-client.interface.js';
 
-export { API_KEYS_PATH } from './api-keys/api-keys.const.js';
+export { toQueryString } from './query-string.logic.js';
+
+export type {
+  QueryDefaults,
+  QueryFilters,
+  QueryScalar,
+  QueryValue,
+} from './query-string.interface.js';
+
+export { unwrapPaginatedEnvelope } from './paginated-envelope.logic.js';
+
+export type {
+  PaginatedUnwrapResult,
+  PaginatedUnwrapSuccess,
+} from './paginated-envelope.logic.interface.js';
+
+export {
+  API_KEYS_DETAIL_PATH,
+  API_KEYS_PATH,
+  API_KEY_LIST_QUERY_DEFAULTS,
+} from './api-keys/api-keys.const.js';
+
+export { toApiKeyDetailPath } from './api-keys/api-keys.path.js';
 
 export { createApiKeysService } from './api-keys/api-keys.service.js';
 
 export type { ApiKeysService } from './api-keys/api-keys.interface.js';
+
+export {
+  CUSTOMERS_ACTIVITIES_PATH,
+  CUSTOMERS_ACTIVITY_PATH,
+  CUSTOMERS_AUDIT_LOGS_PATH,
+  CUSTOMERS_CONTACTS_PATH,
+  CUSTOMERS_CONTACT_PATH,
+  CUSTOMERS_DETAIL_PATH,
+  CUSTOMERS_PATH,
+  CUSTOMERS_STATUS_PATH,
+  CUSTOMERS_TAGS_PATH,
+  CUSTOMERS_TAG_PATH,
+  CUSTOMERS_USERS_PATH,
+  CUSTOMERS_USER_PATH,
+  CUSTOMER_LIST_QUERY_DEFAULTS,
+} from './customers/customers.const.js';
+
+export {
+  toCustomerActivitiesPath,
+  toCustomerActivityPath,
+  toCustomerAuditLogsPath,
+  toCustomerContactPath,
+  toCustomerContactsPath,
+  toCustomerDetailPath,
+  toCustomerStatusPath,
+  toCustomerTagPath,
+  toCustomerTagsPath,
+  toCustomerUserPath,
+  toCustomerUsersPath,
+} from './customers/customers.path.js';
+
+export { createCustomersService } from './customers/customers.service.js';
+
+export type { CustomersService } from './customers/customers.interface.js';

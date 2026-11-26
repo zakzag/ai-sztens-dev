@@ -1,5 +1,7 @@
 # AI Szolgáltató Startup - Brainstorming meeting
 
+**Utolsó frissítés:** 2026-11-05 (AIS-133: a header pótolva a `quality:docs` kapuhoz; a tartalom változatlan)
+
 **Dátum:** 2026-09-15
 **Résztvevők:** Rák Kálmán, Kővári Tamás
 **Cél:** Az üzleti modell alapköveinek megbeszélése, az MVP (Minimum Viable Product) meghatározása és megállapodása az első lépésekről.

@@ -5,7 +5,10 @@ import {
   APP_ERROR_BOUNDARY_RELOAD_LABEL,
   APP_ERROR_BOUNDARY_TITLE,
 } from '../app.const.js';
-import type { AppErrorBoundaryProps } from './app-error-boundary.interface.js';
+import type {
+  AppErrorBoundaryProps,
+  AppRenderErrorReport,
+} from './app-error-boundary.interface.js';
 
 /** State of {@link AppErrorBoundary}. */
 interface AppErrorBoundaryState {
@@ -31,6 +34,12 @@ interface AppErrorBoundaryState {
  * - tier 3 is the *app-level banner* — a persistent condition (offline,
  *   expired session);
  * - tier 4 is this boundary — a one-off crash of a component.
+ *
+ * Since AIS-136 the crash is also **reported**, not only rendered: the injected
+ * `onError` port receives it exactly once, so the notification log and the toast
+ * stack learn about a failure that no query callback would ever see. The port is
+ * injected rather than imported (`D3`) because a class component cannot use a
+ * hook and the DI rule forbids reaching for the store singleton here.
  */
 export class AppErrorBoundary extends Component<
   AppErrorBoundaryProps,
@@ -45,6 +54,16 @@ export class AppErrorBoundary extends Component<
     return { hasError: true };
   }
 
+  /**
+   * Reports the crash to the developer console **and** to the injected port.
+   *
+   * React calls this once per error that reaches the boundary, so the port never
+   * sees a duplicate. The call is guarded: if the emitter itself throws, the user
+   * must still get the fallback UI instead of a second, uncaught crash.
+   *
+   * @param error - the thrown value React caught.
+   * @param errorInfo - React's component trace.
+   */
   public override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // The error boundary is the last resort: there is no error-reporting
     // service in the app yet, so the error is logged for the developer.
@@ -53,6 +72,38 @@ export class AppErrorBoundary extends Component<
       error,
       errorInfo.componentStack,
     );
+
+    this.reportError({
+      error,
+      componentStack:
+        typeof errorInfo.componentStack === 'string'
+          ? errorInfo.componentStack
+          : null,
+    });
+  }
+
+  /**
+   * Hands one report to the caller's port, never letting it break the fallback.
+   *
+   * @param report - the caught error and React's component trace.
+   */
+  private reportError(report: AppRenderErrorReport): void {
+    const { onError } = this.props;
+
+    if (onError === undefined) {
+      return;
+    }
+
+    try {
+      onError(report);
+    } catch (emitterError) {
+      // Intentional: a broken notification emitter must not turn a handled
+      // render error into an unhandled one. It is still logged for diagnosis.
+      console.error(
+        '[AppErrorBoundary] the error port threw',
+        emitterError,
+      );
+    }
   }
 
   public override render(): ReactNode {

@@ -1,0 +1,14 @@
+/**
+ * Positive palette fixture — the token file is exempt from the colour-literal
+ * rule (it *is* the palette) but not from the palette-utility rule.
+ */
+@theme {
+  --color-surface-base: oklch(0.17 0.008 250);
+  --color-text-primary: oklch(0.95 0.004 250);
+  --shadow-focus-ring: 0 0 0 3px oklch(0.72 0.14 195 / 0.35);
+}
+
+body {
+  background-color: var(--color-surface-base);
+  color: var(--color-text-primary);
+}

@@ -1,7 +1,12 @@
 # Local Development — AIsztens
 
+**Utolsó frissítés:** 2026-11-25 (párhuzamos `tsc` memória-kimerülés javítva: a `workspaceConcurrency: 1` a `pnpm-workspace.yaml`-ben, illetve a `typecheck`/`build` scriptekben egyidejűleg egy workspace fut, így a memóriacsúcs a legnagyobb workspace és nem az összeg, §5; lokális DB-kliens: `pnpm db:psql` és `pnpm db:gui` (Adminer) — a DB-topic részletei a [`Database-Local.md`](Database-Local.md) §7.1-ben; a `5432` host port mindkét lokális stackben `127.0.0.1`-re szűkült, ezért a `docker ps` kimenete `127.0.0.1:5432->5432/tcp` — §2, §2b.2, §6.2)
+**Previous update:** 2026-11-25 — e2e: a `test/jest-e2e.json` `testTimeout` értéke 30 000 ms, mert a párhuzamos `AppModule` bootstrap (~3,5 s/suite) alatt az 5 s-os Jest-alapérték 96 tesztet buktatott el; a `[app-module-gate]` / `[database-gate]` skip `CI=true` alatt immár **hibát** ad, nem zöld futást — §2.1.1
+**Previous update:** 2026-11-07 — a `pnpm dev:local` script javítva: a PowerShell-only `$env:APP_ENV='local'; pnpm dev` test helyett `cross-env APP_ENV=local pnpm dev` fut, mert a `package.json` scripteket nem PowerShell, hanem az OS shellje futtatja — Windows-on `cmd.exe`, POSIX-on `/bin/sh`; §5 és §6.6 a `pnpm dev:local`-t ajánlja.
 **Status:** living spec
-**Last updated:** 2026-10-21 — AIS-42: új **§6 end-to-end how-to** (séma módosítás → `db:generate` → `db:migrate` → API + admin indítás → API-kulcs felvétele az oldalon), lépésenként lefuttatott parancsokkal és a tényleges kimenetekkel.
+**Last updated:** 2026-11-05 — §5 "Common pitfalls" now separates the two `pnpm install` `os error 32` shapes (a _transient_ collision on a first-time virtual-store folder vs a real lock), documents the `WARN Ignoring broken lockfile` trap, which makes pnpm silently drop pinning and re-resolve the whole graph, and documents the `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` prompt: pnpm appends the exemptions itself, but the run that appended them still fails — the retry is the fix.
+**Previous update:** 2026-11-02 — **Node 24.9+ is a hard requirement**: §2.1 documents the `>=24.9.0` `engines` field and the `.node-version` pin (fnm/nvm), because the `apps/api` e2e suites that boot `AppModule` **silently self-skip** on older runtimes instead of failing.
+**Previous update:** 2026-10-21 — AIS-42: új **§6 end-to-end how-to** (séma módosítás → `db:generate` → `db:migrate` → API + admin indítás → API-kulcs felvétele az oldalon), lépésenként lefuttatott parancsokkal és a tényleges kimenetekkel.
 **Previous update:** 2026-10-21 — host-run API boot: `pnpm dev` leaves `APP_ENV` unset, so NestJS falls back to `dev`, reads `apps/api/.env.dev` **first**, and therefore needs (a) `DATABASE_URL` in `apps/api/.env.local` and (b) an explicit `APP_ENV=local` to serve the localhost CORS list — otherwise the admin SPA on `http://localhost:5174` is rejected by CORS. §3 and §5 document the trap and the verification commands.
 **Previous update:** 2026-10-21 — Windows install recovery: an IDE language service (or any other process) holding a handle inside `node_modules` makes `pnpm install` abort with `Failed to create symlink … os error 32`; §5 documents the diagnosis, the kill-then-rerun recovery and why `--force` makes it worse.
 **Previous update:** 2026-10-19 — per-context Postgres schemas: the init directory now ships two idempotent scripts ([`01-roles.sh`](../../infra/postgres/init/01-roles.sh) for roles and schema grants, [`02-schemas.sh`](../../infra/postgres/init/02-schemas.sh) for the `platform` / `callback` / `email` schemas), and both run only on a fresh `pgdata` volume (AIS-35). §2b now carries the mandatory env keys, the verification queries, the stop/wipe semantics and the 5432 port collision; the DB topic has its own spec, [`Database-Local.md`](Database-Local.md).
@@ -39,6 +44,48 @@ and `infra/.env.{local,dev,prod}` paths in addition to the existing `.env`.
 
 ## 2. Starting the local stack
 
+### 2.1 Node.js version (≥ 24.9)
+
+The repo pins **Node 24** two ways, and both matter:
+
+| Artefact                                                                   | Purpose                                                                                                      |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [`package.json`](../../package.json) → `"engines": { "node": ">=24.9.0" }` | documents the requirement; `pnpm` warns (`ERR_PNPM_UNSUPPORTED_ENGINE`) when the shell runs an older runtime |
+| [`.node-version`](../../.node-version) (`24.22.2`)                         | what `fnm` / `nvm` switch to; `fnm use` and `fnm install` read it                                            |
+
+Why it is not cosmetic: Jest runs these apps in **native ESM**, and only Node ≥ 24.9 can
+`require()` the CommonJS-only `@nestjs/config`. Below that, every e2e suite that boots
+`AppModule` prints `[app-module-gate] skipped: …` and **passes without asserting anything** —
+a green run that proves nothing. The same trap exists for Postgres: without a reachable DB the
+persistence suites print `[database-gate] skipped: …`.
+
+```bash
+fnm install          # reads .node-version
+fnm use              # switches this shell to 24.22.2
+node --version       # v24.22.2
+pnpm db:up           # Postgres for the persistence e2e suites
+pnpm --filter @callback/api test:e2e
+```
+
+A run is only meaningful when the summary says `Tests: N passed` with **no** `skipped` line in
+the console output.
+
+#### 2.1.1 Timeout and skip policy
+
+**Timeout.** [`apps/api/test/jest-e2e.json`](../../apps/api/test/jest-e2e.json) sets
+`"testTimeout": 30000`. Each app-module suite dynamically imports `src/app.module.js`, which
+makes ts-jest transform the whole application graph inside that Jest worker and then compiles
+and initialises Nest — ~3.5 s on an idle machine. With one worker per CPU core doing that
+simultaneously, the 5 s Jest default was exceeded and **96 tests failed with
+`Exceeded timeout of 5000 ms` before a single assertion ran** (2026-11-25 diagnosis). The 30 s
+budget keeps an ~8× margin without hiding a genuine hang.
+
+**Skip policy.** A skip is a **local convenience only**.
+[`apps/api/test/lib/skip-policy.ts`](../../apps/api/test/lib/skip-policy.ts) implements it once:
+`reportSkip()` warns when `CI` is unset and **throws** when `CI=true`. Both gates use it
+(`loadAppModuleOrSkip()` → `[app-module-gate]`, `reportDatabaseSkip()` → `[database-gate]`),
+so CI can never report a green run whose tests were all skipped.
+
 The local stack is started with one command. Its subcommands, pre-flight checks
 and exact compose invocation are documented in
 [`scripts/README.md`](../../scripts/README.md).
@@ -61,8 +108,10 @@ plan), which:
   context that the droplet never needs;
 - publishes the `api` service on host port `3000` — reachable at
   `http://localhost:3000`;
-- publishes the `postgres` service on host port `5432` — `psql` from the
-  developer machine;
+- publishes the `postgres` service on host port `5432`, bound to
+  `127.0.0.1` only — `psql` (and the optional Adminer, see
+  [`Database-Local.md`](Database-Local.md) §7.1) from the developer machine,
+  never from the LAN;
 - disables `caddy` via `profiles: [never]` — no public DNS, no Let's Encrypt,
   no TLS.
 
@@ -121,8 +170,8 @@ publish host port `5432`, and they use **different volumes** (`pgdata_local` vs
 `pgdata`). So:
 
 - a running full stack makes `pnpm db:up` fail with
-  `Bind for 0.0.0.0:5432 failed: port is already allocated` — stop the other one
-  first (`scripts/dev-stack.sh down` / `pnpm db:down`);
+  `Bind for 127.0.0.1:5432 failed: port is already allocated` — stop the other
+  one first (`scripts/dev-stack.sh down` / `pnpm db:down`);
 - data created in the DB-only stack is **not** visible in the full stack, and
   vice versa.
 
@@ -283,6 +332,25 @@ one place, the others propagate.
 
 ## 5. Common pitfalls
 
+- **`pnpm -r <script>` deliberately runs ONE workspace at a time.** Every workspace starts its
+  own memory-hungry compiler (`tsc --noEmit`, `nest build`, `vite build`), and at pnpm's default
+  concurrency (4, or the CPU count) a machine that also runs the dev server or the IDE's
+  language service died with a V8 crash **instead of a type error** — `apps/api`, `apps/web` and
+  `packages/notifications` aborted between 150 and 290 MB, while the very same sources passed one
+  at a time:
+
+  ```text
+  FATAL ERROR: Zone Allocation failed - process out of memory
+  ```
+
+  The cap is set twice on purpose. `pnpm-workspace.yaml` declares `workspaceConcurrency: 1`, which
+  covers every manual `pnpm -r …` in the repo (that is where pnpm 10+ reads workspace settings
+  from — the same `.npmrc` key is **not** honoured: `pnpm config get workspace-concurrency`
+  returns `undefined`), and the `typecheck` / `build` scripts pass `--workspace-concurrency=1`
+  explicitly, so the ceiling survives a pnpm version that stops reading the setting. The peak is
+  then the largest single workspace instead of the sum of them. Raise it only for a command you
+  know the machine can take: `pnpm -r --workspace-concurrency=4 typecheck`.
+
 - **`pnpm dev` does not set `APP_ENV`, so the API runs in `dev` mode.** Two
   consequences on a developer machine:
 
@@ -296,9 +364,15 @@ one place, the others propagate.
      `DatabaseConfigurationError: DATABASE_URL is not set or blank` — by design
      (AIS-56), there is no silent fallback.
 
-  Start the local flow as `set "APP_ENV=local" && pnpm dev` (cmd) or
-  `$env:APP_ENV='local'; pnpm dev` (PowerShell); the boot banner must then say
-  `APP_ENV=local … CORS origins: http://localhost:5173,…`. Verify with:
+  Start the local flow with **`pnpm dev:local`** — it runs `cross-env APP_ENV=local pnpm dev`,
+  so the variable reaches every child process in cmd, PowerShell **and** bash. The old
+  `$env:APP_ENV='local'; pnpm dev` form only works when typed _into a PowerShell prompt_: a
+  `package.json` script is executed by the OS shell (`cmd.exe` on Windows, `/bin/sh` elsewhere),
+  so that body fails with `The filename, directory name, or volume label syntax is incorrect.`
+  and `APP_ENV` is never set. Plain `pnpm dev` still means "no `APP_ENV`" on purpose — it is the
+  generic, env-agnostic entry point.
+
+  The boot banner must say `APP_ENV=local … CORS origins: http://localhost:5173,…`. Verify with:
 
   ```bash
   curl -s -D - -o NUL -X OPTIONS http://localhost:3000/api/api-keys \
@@ -382,6 +456,55 @@ process`). pnpm's `node_modules/.pnpm` layout is a tree of symlinks, so any
   whole `node_modules` tree, which maximises the window in which a locked file
   can abort the run.
 
+  **Two failure shapes — decide which one you have before fixing anything.**
+  If the failing path sits inside a virtual folder that pnpm was creating **in
+  that same run** (typically a dependency freshly added to a `package.json`,
+  e.g. `@radix-ui+react-dropdown-me_<hash>` → `@radix-ui/react-menu`) and the
+  command was a _plain_ install, then nothing is being deleted and no process
+  holds that entry: it is a **transient collision** between pnpm's parallel link
+  workers on the shared parent directory (`node_modules/@radix-ui`), sometimes
+  aggravated by a real-time scanner or the Windows indexer. Kill the IDE
+  helpers, retry once, and the run finishes. If the abort repeats at the **same**
+  path, it is a real lock — find the holder with the commands above.
+
+  **`WARN Ignoring broken lockfile … expected a single document in the stream,
+but found more` is a second bug, never noise.** It means `pnpm-lock.yaml`
+  contains more than one YAML document (a hand-written or tool-prepended block),
+  so pnpm discards the whole file and **re-resolves the dependency graph**:
+  pinning is lost, the run relinks every package (maximising the collision
+  window above), and the rewritten file bumps packages inside their semver
+  ranges. Recovery and proof:
+
+  ```powershell
+  # after the install finished, drop the re-resolved file and re-pin the tree
+  git restore --staged --worktree --source=HEAD pnpm-lock.yaml
+  pnpm install        # expect: "Lockfile is up to date, resolution step is skipped"
+  git status --porcelain -- pnpm-lock.yaml   # expect: empty
+  ```
+
+  `Lockfile is up to date, resolution step is skipped` proves the lockfile is
+  honoured; a run that instead prints `resolved N … added M` on a clean checkout
+  is re-resolving and will leave unreviewed version bumps. Never edit
+  `pnpm-lock.yaml` into a second document, and never accept those bumps as part
+  of a tooling fix.
+
+  **`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` after answering `yes` to the
+  prompt is expected — rerun the command.** pnpm 12 shows
+  `? Add to minimumReleaseAgeExclude in pnpm-workspace.yaml and proceed with the
+install?` and on `yes` it does append the `name@exact-version` entries, but the
+  install it then runs still verifies against the policy **loaded at startup**,
+  so it aborts with the same 12 entries it just wrote. Nothing is broken:
+
+  ```powershell
+  pnpm install        # run 1: writes the exemptions, fails on the stale policy
+  pnpm install        # run 2: "✓ Lockfile passes supply-chain policies"
+  ```
+
+  Do not "fix" it by downgrading packages, by raising `minimumReleaseAge`, or by
+  `pnpm clean --lockfile` (that re-resolves and bumps unrelated packages). Keep
+  pnpm's `name@version` format — a bare package name would exempt **every future
+  release** of that package, not just the one that reached the lockfile.
+
 ---
 
 ## 6. End-to-end how-to: séma → migráció → API → admin API-kulcs oldal
@@ -416,7 +539,10 @@ pnpm db:up      # csak a Postgres (infra/docker-compose.db.yml) — a hoston fut
 docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml ps
 ```
 
-Várt: `infra-postgres-1 … Up (healthy)`, `0.0.0.0:5432->5432/tcp`. A séma-ellenőrzés:
+Várt: `infra-postgres-1 … Up (healthy)`, `127.0.0.1:5432->5432/tcp` (loopback-only —
+a hálózatról nem érhető el). Böngészős kliens: `pnpm db:gui` → <http://localhost:8081>
+(lásd [`Database-Local.md`](Database-Local.md) §7.1); terminálos: `pnpm db:psql`.
+A séma-ellenőrzés:
 
 ```bash
 docker compose --env-file infra/.env.local -f infra/docker-compose.db.yml \
@@ -482,15 +608,18 @@ deploy épül.
 ### 6.6 API + admin indítása
 
 ```bash
-# cmd
-set "APP_ENV=local" && pnpm dev
-# PowerShell
-$env:APP_ENV='local'; pnpm dev
+# minden shell alatt (cmd / PowerShell / bash):
+pnpm dev:local
+
+# kézi megfelelője csak akkor, ha közvetlenül egy interaktív shellbe írod:
+#   cmd        set "APP_ENV=local" && pnpm dev
+#   PowerSh.   $env:APP_ENV='local'; pnpm dev
 ```
 
 Az `APP_ENV=local` nem elhagyható: enélkül a NestJS `dev`-re esik vissza, a `.env.dev`-et olvassa
 előbb, és a **droplet** CORS-listáját szolgálja ki — a böngészőből érkező kérés így elhasal
-(részletek a §5-ben).
+(részletek a §5-ben). A `pnpm dev:local` a [`cross-env`](https://github.com/kentcdodds/cross-env)
+fejlesztői függőségen keresztül állítja be a változót, ezért nem shell-specifikus.
 
 Várt sorok a kimenetben:
 

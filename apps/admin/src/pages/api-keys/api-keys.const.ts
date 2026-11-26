@@ -6,7 +6,14 @@
  * same constant the UI renders instead of a hard-coded string.
  */
 
-import type { ApiKeyFormFieldName } from '../../features/api-keys/api-keys.interface.js';
+import {
+  LIST_QUERY_DEFAULT_LIMIT,
+  LIST_QUERY_MAX_LIMIT,
+} from '@callback/shared';
+import type {
+  ApiKeyEditFieldName,
+  ApiKeyFormFieldName,
+} from '../../features/api-keys/api-keys.interface.js';
 import type { ApiKeyFormValues } from './api-keys.interface.js';
 
 /** Page header. */
@@ -14,11 +21,23 @@ export const API_KEYS_PAGE_TITLE = 'API kulcsok';
 export const API_KEYS_PAGE_SUBTITLE =
   'A külső szolgáltatók (pl. hangasszisztens) hozzáférési kulcsai. A kulcs értéke a mentés után nem jelenik meg újra.';
 
+/**
+ * Header action of the list (AIS-155).
+ *
+ * The label is both the visible text and the accessible name — no separate
+ * `aria-label`, so what a screen reader announces is exactly what the user sees
+ * (WCAG 2.5.3). The route literal lives here for the same reason the detail
+ * template does: the page must not import `app`, and the registry mounts exactly
+ * this string.
+ */
+export const API_KEYS_CREATE_LABEL = 'Új API kulcs';
+export const API_KEYS_CREATE_ROUTE_PATH = '/api-keys/new';
+
 /** Table section. */
 export const API_KEYS_TABLE_TITLE = 'Tárolt kulcsok';
 export const API_KEYS_LOADING_MESSAGE = 'API kulcsok betöltése…';
 export const API_KEYS_EMPTY_MESSAGE =
-  'Még nincs tárolt API kulcs. Vedd fel az elsőt a lenti űrlapon.';
+  'Még nincs tárolt API kulcs. Hozd létre az elsőt az „Új API kulcs” gombbal.';
 /**
  * Title of the page-level error state. The retry labels are owned by
  * `lib/error-surface.const.ts`, because every page's retry button reads the same.
@@ -33,10 +52,34 @@ export const API_KEY_COLUMNS = {
   expiresAt: 'Lejárat',
 } as const;
 
-/** Form section. */
-export const API_KEY_FORM_TITLE = 'Új API kulcs felvitele';
-export const API_KEY_FORM_SUBMIT_LABEL = 'Kulcs mentése';
-export const API_KEY_FORM_PENDING_LABEL = 'Mentés…';
+/**
+ * Page sizes the pager offers: the contract default, a middle value and the
+ * contract maximum.
+ *
+ * Declared by the **page**, not by `@callback/ui`: the primitive must not import
+ * `@callback/shared`, so the numbers are injected here, where the contract is
+ * already known (AIS-116 §7.3).
+ */
+export const API_KEYS_LIMIT_OPTIONS: readonly number[] = Object.freeze([
+  LIST_QUERY_DEFAULT_LIMIT,
+  50,
+  LIST_QUERY_MAX_LIMIT,
+]);
+
+/**
+ * Create overlay (AIS-155).
+ *
+ * The form lives **inside** the overlay body, so it carries no title of its own:
+ * the window title is the heading, and the submit button sits in the overlay
+ * footer and submits this form by its id.
+ */
+export const API_KEY_CREATE_DIALOG_TITLE = 'Új API kulcs';
+export const API_KEY_CREATE_DIALOG_SUBTITLE =
+  'A kulcs értéke a mentés után nem jelenik meg újra, ezért előbb szerezd be a szolgáltatótól.';
+/** DOM id of the create form — the target of the footer submit button. */
+export const API_KEY_CREATE_FORM_ID = 'api-key-create-form';
+export const API_KEY_CREATE_SUBMIT_LABEL = 'Létrehozás';
+export const API_KEY_CREATE_PENDING_LABEL = 'Mentés…';
 export const API_KEY_FORM_SUCCESS_MESSAGE = 'Az új API kulcs elmentve.';
 export const API_KEY_FORM_ERROR_TITLE = 'Az API kulcs mentése nem sikerült.';
 
@@ -93,15 +136,126 @@ export const API_KEY_FORM_DEFAULTS: ApiKeyFormValues = {
   expiresAt: '',
 };
 
-/** Validation messages, mapped to the fields by `apiKeyFormSchema`. */
-export const API_KEY_FORM_VALIDATION_MESSAGES = {
-  nameRequired: 'A név megadása kötelező.',
-  nameTooLong: 'A név legfeljebb 200 karakter lehet.',
-  identifierRequired: 'Az azonosító megadása kötelező.',
-  identifierInvalid:
-    'Az azonosító csak betűt, számot, pontot, kötőjelet és aláhúzást tartalmazhat (legfeljebb 200 karakter).',
-  descriptionTooLong: 'A leírás legfeljebb 2000 karakter lehet.',
-  apiKeyRequired: 'Az API kulcs értékének megadása kötelező.',
-  apiKeyTooLong: 'Az API kulcs értéke legfeljebb 4000 karakter lehet.',
-  expiresAtInvalid: 'Érvényes dátumot adj meg (éééé-hh-nn), vagy hagyd üresen.',
+/**
+ * Route template of the read-only overlay (AIS-155), the section's only detail
+ * surface since AIS-173 retired the legacy `/api-keys/:identifier` page.
+ *
+ * Declared here, not in `app/app.const.ts`: the **table** links to it and a page
+ * must not import `app`, while the route registry (which may import a page)
+ * mounts exactly the same literal. The parameter name matches the API route
+ * (`/api/api-keys/:identifier`), so the overlay can pass it straight through.
+ */
+export const API_KEY_VIEW_ROUTE_PATH = '/api-keys/:identifier/view';
+
+/**
+ * Route template of the edit overlay (AIS-172).
+ *
+ * The third child of the list route: editing is a URL like creating and
+ * viewing, so the window is linkable, reloadable and closable with `replace` —
+ * and the legacy detail page stops being the editor.
+ */
+export const API_KEY_EDIT_ROUTE_PATH = '/api-keys/:identifier/edit';
+
+/** Name of the detail route's URL parameter, shared by the router and the page. */
+export const API_KEY_DETAIL_PARAM = 'identifier';
+
+/**
+ * Read-only overlay copy (AIS-155).
+ *
+ * The dismiss label differs from the header `X`'s `Bezárás` on purpose: two
+ * controls with the same accessible name are indistinguishable for a screen
+ * reader user, and this one also says where it goes.
+ *
+ * The footer carries two left-hand actions since AIS-173: the edit overlay's
+ * `Módosítás` link and the destructive `Kulcs törlése` button, whose label is
+ * distinct from the confirmation's own `Törlés` so the two controls never share
+ * an accessible name.
+ */
+export const API_KEY_VIEW_DIALOG_TITLE = 'API kulcs';
+export const API_KEY_VIEW_CLOSE_LABEL = 'Vissza a listához';
+/** Opens the edit overlay of the same key. */
+export const API_KEY_VIEW_EDIT_LINK_LABEL = 'Módosítás';
+
+/** Label/state texts of the single-resource read, shared by every overlay. */
+export const API_KEY_DETAIL_LOADING_MESSAGE = 'API kulcs betöltése…';
+export const API_KEY_DETAIL_ERROR_TITLE =
+  'Az API kulcs betöltése nem sikerült.';
+export const API_KEY_DETAIL_NOT_FOUND_TITLE = 'Az API kulcs nem található.';
+export const API_KEY_DETAIL_NOT_FOUND_MESSAGE =
+  'Lehet, hogy közben törölték. Térj vissza a listához, és ellenőrizd az azonosítót.';
+export const API_KEY_DETAIL_BACK_LABEL = 'Vissza a listához';
+
+/** Labels of the `DescriptionList` rows, in render order. */
+export const API_KEY_DETAIL_FIELD_LABELS = {
+  name: 'Név',
+  identifier: 'Azonosító',
+  description: 'Leírás',
+  expiresAt: 'Lejárat',
+  expiry: 'Állapot',
+  createdAt: 'Létrehozva',
+  updatedAt: 'Utoljára módosítva',
 } as const;
+
+/**
+ * Delete affordance of the read-only overlay's footer (AIS-131, moved there in
+ * AIS-173). It opens the confirmation; the `Törlés` below is that window's
+ * confirm label.
+ */
+export const API_KEY_DELETE_LABEL = 'Kulcs törlése';
+export const API_KEY_DELETE_DIALOG_TITLE =
+  'Biztosan törlöd ezt az API kulcsot?';
+export const API_KEY_DELETE_DIALOG_DESCRIPTION =
+  'A kulcs azonnal érvénytelenné válik, és a listából is eltűnik. Ez a művelet nem vonható vissza.';
+export const API_KEY_DELETE_CONFIRM_LABEL = 'Törlés';
+export const API_KEY_DELETE_CANCEL_LABEL = 'Mégsem';
+
+/**
+ * Edit overlay (AIS-172).
+ *
+ * The window carries the title and the footer submit, exactly like the create
+ * overlay: the `<form>` inside the body has no heading and no submit of its own,
+ * it only carries the id the footer button targets.
+ */
+export const API_KEY_EDIT_DIALOG_TITLE = 'API kulcs szerkesztése';
+/** DOM id of the edit form — the target of the footer submit button. */
+export const API_KEY_EDIT_DIALOG_FORM_ID = 'api-key-edit-form';
+export const API_KEY_EDIT_DIALOG_SUBMIT_LABEL = 'Módosítás';
+export const API_KEY_EDIT_DIALOG_PENDING_LABEL = 'Mentés…';
+export const API_KEY_EDIT_FORM_SUCCESS_MESSAGE = 'A módosítások elmentve.';
+export const API_KEY_EDIT_FORM_ERROR_TITLE =
+  'A módosítások mentése nem sikerült.';
+
+/** DOM ids of the edit controls — also the `htmlFor`/`error` wiring keys. */
+export const API_KEY_EDIT_FORM_FIELD_IDS: Readonly<
+  Record<ApiKeyEditFieldName, string>
+> = {
+  name: 'api-key-edit-name',
+  description: 'api-key-edit-description',
+  expiresAt: 'api-key-edit-expires-at',
+};
+
+/** Visible labels, one per edit field. */
+export const API_KEY_EDIT_FORM_LABELS: Readonly<
+  Record<ApiKeyEditFieldName, string>
+> = {
+  name: 'Név',
+  description: 'Leírás',
+  expiresAt: 'Lejárat',
+};
+
+/** Helper texts under the edit fields, mirroring the create form. */
+export const API_KEY_EDIT_FORM_HINTS: Readonly<
+  Record<ApiKeyEditFieldName, string>
+> = {
+  name: 'Emberi olvasásra szánt név, legfeljebb 200 karakter.',
+  description: 'Opcionális, legfeljebb 2000 karakter.',
+  expiresAt: 'Opcionális. Üresen hagyva a kulcs nem jár le.',
+};
+
+/**
+ * List route the overlays return to after a close or a delete.
+ *
+ * A page must not import `app`, so the literal is repeated here; the route
+ * registry test pins it to `APP_ROUTE_API_KEYS_PATH`, so the two cannot drift.
+ */
+export const API_KEYS_LIST_ROUTE_PATH = '/api-keys';

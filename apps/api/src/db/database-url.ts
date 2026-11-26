@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseEnv } from 'node:util';
 
 /**
  * Resolving `DATABASE_URL` for tools that do not read dotenv files.
@@ -18,8 +19,16 @@ import { join } from 'node:path';
  *      `AISZTENS_DB_PASSWORD`, `POSTGRES_DB`). This keeps a single source of
  *      truth for the local database password.
  *
- * Node's built-in `process.loadEnvFile()` is used, so no dependency is added.
- * Values already present in `process.env` win over file contents.
+ * No dependency is added: `node:util`'s `parseEnv()` parses the file and the
+ * result is assigned into `process.env`. `process.loadEnvFile()` would look
+ * simpler but is **unusable under Jest** — the test environment hands the spec a
+ * *copy* of `process`, while the native loader writes into the real process
+ * env, so the copy the test reads stays empty. That is exactly how
+ * `audit-immutability.e2e-spec.ts` skipped on a machine with a valid
+ * `apps/api/.env.local` (2026-11-25 diagnosis).
+ *
+ * Values already present in `process.env` win over file contents — the same
+ * precedence `process.loadEnvFile()` has.
  */
 
 const LOCAL_HOST = 'localhost';
@@ -49,18 +58,29 @@ const REPO_DIR = join(API_DIR, '..', '..');
 /**
  * Load a dotenv file into `process.env` when it exists.
  *
+ * @param filePath - absolute path of the dotenv file.
  * @returns `true` when a file was found and loaded, `false` when it is absent.
  * @throws When the file exists but cannot be parsed (misconfiguration must not
  * be swallowed — a silent half-loaded environment is worse than a hard stop).
  */
 export function loadEnvFileIfPresent(filePath: string): boolean {
   if (!existsSync(filePath)) return false;
+
+  let parsed: Record<string, string | undefined>;
+
   try {
-    process.loadEnvFile(filePath);
+    parsed = parseEnv(readFileSync(filePath, 'utf8'));
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(`Could not read ${filePath}: ${reason}`);
   }
+
+  for (const [key, value] of Object.entries(parsed)) {
+    if (value !== undefined && process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+
   return true;
 }
 

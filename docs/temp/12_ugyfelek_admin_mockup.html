@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIsztens System Admin – Ügyfelek (teljes mockup)</title>
+<style>
+:root{
+  --bg:#f4f5f7;--panel:#fff;--ink:#1d2330;--muted:#6b7385;--line:#e3e6ec;--acc:#2f5bea;--acc-soft:#e8eefe;
+  --ok:#1f8a4c;--ok-s:#e3f5ea;--warn:#a86200;--warn-s:#fff2dc;--bad:#b42318;--bad-s:#fde8e6;--gray-s:#eef0f3;
+  --purple:#7c3aed;--purple-s:#ede9fe;
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+/* --- NAV --- */
+nav{background:#141a29;color:#c9cfdc;padding:18px 12px;display:flex;flex-direction:column}
+nav .logo{font-weight:700;color:#fff;font-size:16px;margin:0 8px 4px}
+nav .sub{font-size:11px;color:#8a93a8;margin:0 8px 20px;text-transform:uppercase;letter-spacing:.06em}
+nav a{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:6px;color:inherit;text-decoration:none;margin-bottom:2px;font-size:13px}
+nav a.on{background:#26304a;color:#fff}nav a.off{opacity:.45;pointer-events:none}
+nav a small{font-size:10px}
+nav .sep{border-top:1px solid #26304a;margin:8px 8px 4px}
+nav .role{font-size:11px;padding:8px 10px;color:#8a93a8;margin-top:auto}
+nav .role b{color:#c9cfdc;display:block}
+/* --- MAIN --- */
+main{padding:22px 28px;min-width:0}
+h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 12px}h3{font-size:14px;margin:0 0 10px}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.top .sp{flex:1}
+button{font:inherit;border:1px solid var(--line);background:#fff;padding:7px 14px;border-radius:6px;cursor:pointer;white-space:nowrap}
+button:hover{background:#f7f8fa}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}button.pri:hover{background:#2651d6}
+button.danger{color:var(--bad);border-color:var(--bad)}button.danger:hover{background:var(--bad-s)}
+button.small{font-size:12px;padding:4px 10px}
+/* --- FILTERS --- */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+input,select,textarea{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:#fff}
+textarea{resize:vertical;min-height:60px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(47,91,234,.12)}
+.chip{padding:5px 10px;border-radius:99px;background:#fff;border:1px solid var(--line);cursor:pointer;font-size:13px;user-select:none}
+.chip.on{background:var(--acc-soft);border-color:var(--acc);color:var(--acc)}
+/* --- CARDS & TABLE --- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.card.p{padding:16px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:600;background:#fafbfc;position:sticky;top:0;z-index:1}
+tr.r:hover{background:#f7f9ff;cursor:pointer}
+tr.r.selected{background:var(--acc-soft)}
+/* --- BADGES --- */
+.b{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.s-aktiv{background:var(--ok-s);color:var(--ok)}
+.s-proba{background:var(--acc-soft);color:var(--acc)}
+.s-regisztralt{background:var(--warn-s);color:var(--warn)}
+.s-felfuggesztett{background:var(--bad-s);color:var(--bad)}
+.s-megszunt,.s-erdeklodo{background:var(--gray-s);color:var(--muted)}
+.s-anonimizalt{background:var(--gray-s);color:var(--muted)}
+.mod{font-size:11px;padding:2px 6px;border:1px solid var(--line);border-radius:4px;margin-right:4px;color:var(--muted)}
+.mod.role-elso{background:var(--acc-soft);border-color:var(--acc);color:var(--acc)}
+.mod.role-szerz{background:var(--purple-s);border-color:var(--purple);color:var(--purple)}
+/* --- UTILS --- */
+.warn{color:var(--warn);font-weight:600}.muted{color:var(--muted)}.ok{color:var(--ok)}
+.scroll{overflow-x:auto}.hidden{display:none!important}
+.hd{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap}.hd .sp{flex:1}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tabs div{padding:9px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs div.on{color:var(--ink);border-color:var(--acc);font-weight:600}
+.tabs div .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;background:var(--warn);vertical-align:middle;position:relative;top:-1px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+dl{display:grid;grid-template-columns:150px 1fr;gap:6px 10px;margin:0}
+dt{color:var(--muted);font-size:13px}dd{margin:0}
+.todo{background:var(--warn-s);border:1px solid #f3d7a6;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px}
+.todo b{color:var(--warn)}
+.kpi{font-size:24px;font-weight:700}
+a.back{color:var(--acc);cursor:pointer;text-decoration:none;font-size:13px}
+.feed > div{padding:12px 0;border-bottom:1px solid var(--line)}
+.feed .meta{font-size:12px;color:var(--muted)}
+/* --- MODALS --- */
+.modal-overlay{position:fixed;inset:0;background:rgba(20,26,41,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100}
+.modal-overlay .card{width:min(720px,100%);max-height:90vh;display:flex;flex-direction:column}
+.modal-overlay .card .body{padding:20px;overflow-y:auto}
+.modal-overlay .card .foot{display:flex;gap:8px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--line);background:#fafbfc;border-radius:0 0 10px 10px}
+.steps{display:flex;gap:6px;margin:10px 0 16px;flex-wrap:wrap}
+.steps span{font-size:12px;padding:5px 10px;border-radius:4px;background:var(--gray-s);color:var(--muted);cursor:default}
+.steps span.on{background:var(--acc);color:#fff}.steps span.done{background:var(--ok-s);color:var(--ok);cursor:pointer}
+.f{display:grid;gap:10px}
+.f label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.f label span.req::after{content:" *";color:var(--bad)}
+.f .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.radio-group{display:grid;gap:8px}
+.radio-group label{display:flex;gap:10px;align-items:flex-start;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer}
+.radio-group label:hover{border-color:var(--acc)}
+.radio-group label.sel{border-color:var(--acc);background:var(--acc-soft)}
+.radio-group label.dis{opacity:.5;cursor:not-allowed;background:var(--gray-s)}
+.radio-group label .desc{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.hint{font-size:12px;color:var(--muted);padding:6px 10px;background:var(--gray-s);border-radius:6px}
+.hint.ok{background:var(--ok-s);color:var(--ok)}
+.hint.warn{background:var(--warn-s);color:var(--warn)}
+.hint.bad{background:var(--bad-s);color:var(--bad)}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;background:var(--gray-s);font-size:12px}
+.tag .rem{cursor:pointer;opacity:.5}.tag .rem:hover{opacity:1;color:var(--bad)}
+.verziok{font-size:13px;color:var(--muted)}
+.verziok span{display:block;padding:3px 0}
+.verziok span.akt{color:var(--ok);font-weight:600}
+/* --- SECTIONS --- */
+.sect{margin-bottom:16px}
+/* --- TOAST --- */
+.toast{position:fixed;bottom:20px;right:20px;background:#141a29;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:200;animation:fadeIn .3s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:760px){
+  .app{grid-template-columns:1fr}nav{display:none}main{padding:16px}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .f .row,.f .row3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<!-- ====== NAV ====== -->
+<nav>
+  <div class="logo">AIsztens</div><div class="sub">System Admin</div>
+  <a class="on" href="#" onclick="show('list');return false">Ügyfelek</a>
+  <a class="off" href="#">Operátorok <small>később</small></a>
+  <a class="off" href="#">Előfizetések <small>később</small></a>
+  <a class="off" href="#">Számlázás <small>később</small></a>
+  <div class="sep"></div>
+  <a class="off" href="#">Rendszerállapot <small>később</small></a>
+  <a class="off" href="#">Napló <small>később</small></a>
+  <a class="off" href="#">Beállítások <small>később</small></a>
+  <div class="role">Bejelentkezve mint <b>Kálmán</b> superadmin</div>
+</nav>
+
+<main>
+<!-- ====== ÜGYFÉLLISTA ====== -->
+<section id="list">
+  <div class="top">
+    <h1>Ügyfelek</h1>
+    <span class="muted" id="cnt"></span>
+    <div class="sp"></div>
+    <button onclick="exportCSV()">⭳ CSV export</button>
+    <button class="pri" onclick="openWizard()">+ Új ügyfél</button>
+  </div>
+  <div class="filters">
+    <input id="q" placeholder="Keresés: név, adószám, AIS-szám, e-mail…" style="min-width:280px" oninput="renderList()">
+    <select id="fs" onchange="renderList()">
+      <option value="">Minden státusz</option>
+      <option>erdeklodo</option><option>regisztralt</option><option>proba</option><option>aktiv</option><option>felfuggesztett</option><option>megszunt</option>
+    </select>
+    <select id="ft" onchange="renderList()">
+      <option value="">Minden típus</option><option value="ceg">Cég</option><option value="egyeni_vallalkozo">Egyéni vállalkozó</option><option value="szervezet">Szervezet</option><option value="adoszamos_maganszemely">Adószámos magánszemély</option>
+    </select>
+    <select id="fm" onchange="renderList()" style="width:130px">
+      <option value="">Minden modul</option><option value="Email">Email</option><option value="Voice">Voice</option><option value="Admin">Admin</option>
+    </select>
+    <span class="chip" id="ch1" onclick="togChip(this)">⚠ Hiányos adat</span>
+    <span class="chip" id="ch2" onclick="togChip(this)">⏳ Próba ≤7 nap</span>
+  </div>
+  <div class="card scroll" style="max-height:calc(100vh - 240px)">
+    <table><thead><tr>
+      <th>Ügyfélszám</th><th>Név</th><th>Típus</th><th>Adószám</th><th>Státusz</th><th>Modulok</th><th>Kapcsolattartó</th><th>Havi díj</th><th>Utolsó aktivitás</th>
+    </tr></thead><tbody id="rows"></tbody></table>
+  </div>
+  <p class="note muted" style="margin-top:8px">Mockup – fiktív adatok illusztrációként. Sorra kattintva nyílik az adatlap.</p>
+</section>
+
+<!-- ====== ÜGYFÉL-ADATLAP ====== -->
+<section id="detail" class="hidden">
+  <a class="back" onclick="show('list');return false">← Ügyfelek</a>
+  <div class="hd" style="margin-top:8px">
+    <div><h1 id="dn"></h1><div class="muted" id="dsub" style="margin-top:2px"></div></div>
+    <div class="sp"></div>
+    <button onclick="addNote()">+ Megjegyzés</button>
+    <select id="statusChange" onchange="changeStatus()" style="font-size:13px">
+      <option value="">Státusz váltása…</option><option value="regisztralt">Regisztrált</option><option value="proba">Próba</option><option value="aktiv">Aktív</option><option value="felfuggesztett">Felfüggesztett</option><option value="megszunt">Megszűnt</option>
+    </select>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div id="tab"></div>
+</section>
+</main>
+</div>
+
+<!-- ====== ÚJ ÜGYFÉL VARÁZSLÓ ====== -->
+<div class="modal-overlay hidden" id="wizard"><div class="card">
+  <div class="body">
+    <h1 id="wizTitle">Új ügyfél</h1>
+    <div class="steps" id="stepper">
+      <span class="on">1 Típus</span><span>2 Adószám &amp; név</span><span>3 Cím &amp; számlázás</span><span>4 Kapcsolattartó</span><span>5 Ellenőrzés</span>
+    </div>
+    <div id="wizBody"></div>
+  </div>
+  <div class="foot" id="wizFoot"></div>
+</div></div>
+
+<!-- ====== MEGJEGYZÉS MODAL ====== -->
+<div class="modal-overlay hidden" id="noteModal"><div class="card">
+  <div class="body">
+    <h2>Új megjegyzés</h2>
+    <div class="f" style="margin-top:12px">
+      <label>Típus<select id="noteType"><option>megjegyzes</option><option>hivas</option><option>email</option><option>talalkozo</option></select></label>
+      <label>Szöveg<textarea id="noteText" rows="3"></textarea></label>
+    </div>
+  </div>
+  <div class="foot"><button onclick="closeModal('noteModal')">Mégse</button><button class="pri" onclick="saveNote()">Mentés</button></div>
+</div></div>
+
+<!-- ====== TOAST CONTAINER ====== -->
+<div id="toastContainer"></div>
+
+<script>
+// ===== ADATOK =====
+const T={ceg:'Cég',egyeni_vallalkozo:'Egyéni vállalkozó',szervezet:'Szervezet',adoszamos_maganszemely:'Adószámos magánszemély'};
+const S={erdeklodo:'Érdeklődő',regisztralt:'Regisztrált',proba:'Próba',aktiv:'Aktív',felfuggesztett:'Felfüggesztett',megszunt:'Megszűnt',anonimizalt:'Anonimizált'};
+
+let customers = [
+  {
+    id:'AIS-202609-001', tipus:'ceg', nev:'Bükkfa Ingatlaniroda Kft.', rovidNev:'Bükkfa Kft.',
+    adoszam:'27654327-2-43', kozossegiAdoszam:'HU27654327', cjsz:'01-09-123456',
+    szekhely:{irsz:'1105',telepules:'Budapest',cim:'Példa utca 1.',orszag:'HU'},
+    iparag:'Ingatlan', letszam:'2-5', forras:'weboldal', felelos:'Kálmán', cimkek:['prémium'],
+    statusz:'aktiv',statuszValtozott:'2026-10-01', probaVege:null, megjegyzes:'',
+    szamlazasiAdatok:[
+      {nev:'Bükkfa Ingatlaniroda Kft.',adoszam:'27654327-2-43',irsz:'1105',telepules:'Budapest',cim:'Példa utca 1.',email:['szamla@pelda.hu'],fizetesiMod:'atutalas',hatarido:8,penznem:'HUF',ervenyesTol:'2026-10-01',ervenyesIg:null}
+    ],
+    kapcsolattartok:[
+      {nev:'Varga Eszter',beosztas:'ügyvezető',email:'kapcsolat@pelda.hu',telefon:'+36 30 123 4567',szerepek:['elsodleges','szerzodeses','riasztasi'],felhasznalo:true}
+    ],
+    felhasznalok:[{nev:'Varga Eszter',email:'kapcsolat@pelda.hu',szerep:'tulajdonos',statusz:'aktiv',utolsoBelepes:'ma 09:12'}],
+    modulok:['Email'],haviDij:'14 900 Ft',
+    tevekenyseg:[
+      {tipus:'megjegyzes',operator:'Kálmán',idopont:'2026-10-14 11:20',szoveg:'Telefonon egyeztettünk, a hírlevél-szűrést szigorúbbra kérte.'},
+      {tipus:'statuszvaltas',operator:'Kálmán',idopont:'2026-10-01 10:05',szoveg:'próba → aktív (első számla kiállítva).'},
+      {tipus:'hivas',operator:'Kálmán',idopont:'2026-09-24 15:00',szoveg:'Bemutató és onboarding közösen.'}
+    ],
+    szerzodesek:[
+      {dok:'ÁSZF (csak vállalkozásoknak)',verzio:'2026-11-01',elfogadta:'Varga Eszter',mod:'online',idopont:'2026-10-01 10:02',ip:'198.51.100.14'},
+      {dok:'Adatfeldolgozói szerződés (DPA)',verzio:'2026-11-01',elfogadta:'Varga Eszter',mod:'online',idopont:'2026-10-01 10:02',ip:'198.51.100.14'},
+      {dok:'Üzleti célú nyilatkozat',verzio:'—',elfogadta:'Varga Eszter',mod:'online',idopont:'2026-10-01 10:01',ip:'198.51.100.14'}
+    ],
+    auditNaplo:[
+      {idopont:'2026-10-14 11:20',ki:'operator',kiNev:'Kálmán',tabla:'kapcsolattarto',rekordId:'uuid-1',muvelet:'update',regi:null,uj:{telefon:'+36 30 123 4567'}},
+      {idopont:'2026-10-01 10:05',ki:'rendszer',kiNev:'—',tabla:'ugyfel',rekordId:'uuid-0',muvelet:'update',regi:{statusz:'proba'},uj:{statusz:'aktiv'}},
+      {idopont:'2026-10-01 10:02',ki:'felhasznalo',kiNev:'Varga Eszter',tabla:'szerzodes_elfogadas',rekordId:'uuid-2',muvelet:'insert',regi:null,uj:{dok:'ÁSZF 2026-11-01'}},
+      {idopont:'2026-10-01 10:01',ki:'felhasznalo',kiNev:'Varga Eszter',tabla:'szerzodes_elfogadas',rekordId:'uuid-3',muvelet:'insert',regi:null,uj:{dok:'Üzleti célú nyilatkozat'}},
+      {idopont:'2026-09-24 15:00',ki:'operator',kiNev:'Kálmán',tabla:'ugyfel',rekordId:'uuid-0',muvelet:'update',regi:{statusz:'regisztralt'},uj:{statusz:'proba'}}
+    ]
+  },
+  {
+    id:'AIS-202609-002', tipus:'egyeni_vallalkozo', nev:'Halmi Gábor EV', rovidNev:'Halmi EV',
+    adoszam:'68123457-1-33', kozossegiAdoszam:null, cjsz:'EV-12345678',
+    szekhely:{irsz:'9024',telepules:'Győr',cim:'Szabadság út 45.',orszag:'HU'},
+    iparag:'IT szolgáltatás', letszam:'egyeni', forras:'ajanlas', felelos:'Kálmán', cimkek:[],
+    statusz:'proba',statuszValtozott:'2026-09-20', probaVege:'2026-10-25', megjegyzes:'',
+    szamlazasiAdatok:[
+      {nev:'Halmi Gábor EV',adoszam:'68123457-1-33',irsz:'9024',telepules:'Győr',cim:'Szabadság út 45.',email:['halmi.gabor@pelda.hu'],fizetesiMod:'atutalas',hatarido:8,penznem:'HUF',ervenyesTol:'2026-09-20',ervenyesIg:null}
+    ],
+    kapcsolattartok:[
+      {nev:'Halmi Gábor',beosztas:'tulajdonos',email:'halmi.gabor@pelda.hu',telefon:'+36 20 987 6543',szerepek:['elsodleges','szerzodeses','szamlazasi','technikai'],felhasznalo:true}
+    ],
+    felhasznalok:[{nev:'Halmi Gábor',email:'halmi.gabor@pelda.hu',szerep:'tulajdonos',statusz:'aktiv',utolsoBelepes:'tegnap 14:22'}],
+    modulok:['Email'],haviDij:'9 900 Ft',
+    tevekenyseg:[
+      {tipus:'megjegyzes',operator:'Kálmán',idopont:'2026-10-18',szoveg:'Próbaidő 7 nap múlva jár le. Küldjünk emlékeztetőt, kérdezzünk vissza.'},
+      {tipus:'email',operator:'Kálmán',idopont:'2026-09-20',szoveg:'Onboarding email kiküldve, próbaidő elindítva.'}
+    ],
+    szerzodesek:[
+      {dok:'ÁSZF (csak vállalkozásoknak)',verzio:'2026-09-01',elfogadta:'Halmi Gábor',mod:'online',idopont:'2026-09-20 10:30',ip:'203.0.113.42'}
+    ],
+    auditNaplo:[
+      {idopont:'2026-10-18 09:00',ki:'operator',kiNev:'Kálmán',tabla:'ugyfel_tevekenyseg',rekordId:'uuid-4',muvelet:'insert',regi:null,uj:{tipus:'megjegyzes'}},
+      {idopont:'2026-09-20 10:30',ki:'felhasznalo',kiNev:'Halmi Gábor',tabla:'szerzodes_elfogadas',rekordId:'uuid-5',muvelet:'insert',regi:null,uj:{dok:'ÁSZF 2026-09-01'}}
+    ]
+  },
+  {
+    id:'AIS-202609-003', tipus:'szervezet', nev:'Dr. Sólyom Ügyvédi Iroda', rovidNev:'Sólyom Iroda',
+    adoszam:'18765432-2-41', kozossegiAdoszam:null, cjsz:'ÜI-87654321',
+    szekhely:{irsz:'1054',telepules:'Budapest',cim:'Szabadság tér 12. II/5.',orszag:'HU'},
+    iparag:'Jog', letszam:'2-5', forras:'szemelyes', felelos:'Kálmán', cimkek:['prémium','VIP'],
+    statusz:'aktiv',statuszValtozott:'2026-09-15', probaVege:null, megjegyzes:'',
+    szamlazasiAdatok:[
+      {nev:'Dr. Sólyom Ügyvédi Iroda',adoszam:'18765432-2-41',irsz:'1054',telepules:'Budapest',cim:'Szabadság tér 12. II/5.',email:['iroda@solyom-ugyved.hu'],fizetesiMod:'atutalas',hatarido:15,penznem:'HUF',ervenyesTol:'2026-09-15',ervenyesIg:null}
+    ],
+    kapcsolattartok:[
+      {nev:'Dr. Sólyom Anna',beosztas:'irodavezető',email:'a.solyom@pelda.hu',telefon:'+36 30 555 1234',szerepek:['elsodleges','szerzodeses','riasztasi'],felhasznalo:true},
+      {nev:'Kiss Péter',beosztas:'asszisztens',email:'penzugy@solyom-ugyved.hu',telefon:'+36 70 111 2222',szerepek:['szamlazasi','technikai'],felhasznalo:false}
+    ],
+    felhasznalok:[{nev:'Dr. Sólyom Anna',email:'a.solyom@pelda.hu',szerep:'tulajdonos',statusz:'aktiv',utolsoBelepes:'2026-10-14 16:45'}],
+    modulok:['Email','Voice'],haviDij:'39 000 Ft',
+    tevekenyseg:[
+      {tipus:'megjegyzes',operator:'Kálmán',idopont:'2026-10-14 16:50',szoveg:'Voice modult is bekötöttük, teszthívás sikeres.'},
+      {tipus:'statuszvaltas',operator:'Kálmán',idopont:'2026-09-15 11:00',szoveg:'regisztrált → aktív (személyes szerződéskötés után).'}
+    ],
+    szerzodesek:[
+      {dok:'ÁSZF (csak vállalkozásoknak)',verzio:'2026-09-01',elfogadta:'Dr. Sólyom Anna',mod:'alairt_pdf',idopont:'2026-09-15 11:00',ip:null}
+    ],
+    auditNaplo:[
+      {idopont:'2026-10-14 16:50',ki:'operator',kiNev:'Kálmán',tabla:'ugyfel_tevekenyseg',rekordId:'uuid-6',muvelet:'insert',regi:null,uj:{tipus:'megjegyzes'}},
+      {idopont:'2026-09-15 11:00',ki:'operator',kiNev:'Kálmán',tabla:'ugyfel',rekordId:'uuid-7',muvelet:'update',regi:{statusz:'regisztralt'},uj:{statusz:'aktiv'}}
+    ]
+  },
+  {
+    id:'AIS-202610-001', tipus:'ceg', nev:'Kék Kilincs Bt.', rovidNev:'Kék Kilincs',
+    adoszam:'', kozossegiAdoszam:null, cjsz:'',
+    szekhely:{irsz:'',telepules:'',cim:'',orszag:'HU'},
+    iparag:'', letszam:null, forras:'weboldal', felelos:'Kálmán', cimkek:[],
+    statusz:'regisztralt',statuszValtozott:'2026-10-05', probaVege:null, megjegyzes:'Weboldalon keresztül jelentkezett.',
+    szamlazasiAdatok:[],
+    kapcsolattartok:[
+      {nev:'Nagy Béla',beosztas:'tulajdonos',email:'nagy.bela@pelda.hu',telefon:'+36 30 999 8888',szerepek:['elsodleges'],felhasznalo:false}
+    ],
+    felhasznalok:[],
+    modulok:[],haviDij:'—',
+    tevekenyseg:[
+      {tipus:'megjegyzes',operator:'Kálmán',idopont:'2026-10-15',szoveg:'Visszahívtuk, jövő héten küldi az adószámot.'}
+    ],
+    szerzodesek:[],
+    auditNaplo:[
+      {idopont:'2026-10-05 14:00',ki:'operator',kiNev:'Kálmán',tabla:'ugyfel',rekordId:'uuid-8',muvelet:'insert',regi:null,uj:{nev:'Kék Kilincs Bt.',statusz:'erdeklodo'}},
+      {idopont:'2026-10-05 14:01',ki:'operator',kiNev:'Kálmán',tabla:'ugyfel',rekordId:'uuid-8',muvelet:'update',regi:{statusz:'erdeklodo'},uj:{statusz:'regisztralt'}}
+    ]
+  },
+  {
+    id:'AIS-202610-002', tipus:'ceg', nev:'Pannon Szerviz Kft.', rovidNev:'Pannon Szerviz',
+    adoszam:'25432109-2-13', kozossegiAdoszam:null, cjsz:'08-05-678901',
+    szekhely:{irsz:'8000',telepules:'Székesfehérvár',cim:'Ipar út 3.',orszag:'HU'},
+    iparag:'Járműszerviz', letszam:'6-20', forras:'partner', felelos:'Kálmán', cimkek:[],
+    statusz:'felfuggesztett',statuszValtozott:'2026-10-01', probaVege:null, megjegyzes:'Nemfizetés miatt felfüggesztve.',
+    szamlazasiAdatok:[
+      {nev:'Pannon Szerviz Kft.',adoszam:'25432109-2-13',irsz:'8000',telepules:'Székesfehérvár',cim:'Ipar út 3.',email:['szamla@pannon-szerviz.hu'],fizetesiMod:'atutalas',hatarido:8,penznem:'HUF',ervenyesTol:'2026-09-01',ervenyesIg:'2026-10-01'},
+      {nev:'Pannon Szerviz Kft.',adoszam:'25432109-2-13',irsz:'8000',telepules:'Székesfehérvár',cim:'Ipar út 3.',email:['penzugy@pannon-szerviz.hu'],fizetesiMod:'atutalas',hatarido:8,penznem:'HUF',ervenyesTol:'2026-10-01',ervenyesIg:null}
+    ],
+    kapcsolattartok:[
+      {nev:'Kis Ádám',beosztas:'ügyvezető',email:'kis.adam@pelda.hu',telefon:'+36 20 333 4444',szerepek:['elsodleges','szerzodeses'],felhasznalo:true}
+    ],
+    felhasznalok:[{nev:'Kis Ádám',email:'kis.adam@pelda.hu',szerep:'tulajdonos',statusz:'aktiv',utolsoBelepes:'2026-09-30'}],
+    modulok:['Email'],haviDij:'9 900 Ft',
+    tevekenyseg:[
+      {tipus:'statuszvaltas',operator:'Kálmán',idopont:'2026-10-01',szoveg:'aktív → felfüggesztett (szeptemberi számla határidőn túl, fizetési felszólítás kiküldve).'},
+      {tipus:'email',operator:'Kálmán',idopont:'2026-09-25',szoveg:'Fizetési emlékeztető kiküldve.'}
+    ],
+    szerzodesek:[
+      {dok:'ÁSZF (csak vállalkozásoknak)',verzio:'2026-09-01',elfogadta:'Kis Ádám',mod:'online',idopont:'2026-09-01',ip:'198.51.100.55'}
+    ],
+    auditNaplo:[
+      {idopont:'2026-10-01 08:00',ki:'operator',kiNev:'Kálmán',tabla:'ugyfel',rekordId:'uuid-9',muvelet:'update',regi:{statusz:'aktiv'},uj:{statusz:'felfuggesztett'}},
+      {idopont:'2026-10-01 08:01',ki:'operator',kiNev:'Kálmán',tabla:'szamlazasi_adat',rekordId:'uuid-10',muvelet:'update',regi:{ervenyesIg:null},uj:{ervenyesIg:'2026-10-01'}},
+      {idopont:'2026-10-01 08:01',ki:'operator',kiNev:'Kálmán',tabla:'szamlazasi_adat',rekordId:'uuid-11',muvelet:'insert',regi:null,uj:{email:['penzugy@pannon-szerviz.hu']}}
+    ]
+  },
+  {
+    id:'AIS-202610-003', tipus:'ceg', nev:'Fenyő Dental Kft.', rovidNev:'Fenyő Dental',
+    adoszam:'', kozossegiAdoszam:null, cjsz:'',
+    szekhely:{irsz:'',telepules:'',cim:'',orszag:'HU'},
+    iparag:'Fogászat', letszam:null, forras:'kerdoiv', felelos:'Kálmán', cimkek:[],
+    statusz:'erdeklodo',statuszValtozott:'2026-10-02', probaVege:null, megjegyzes:'Kérdőíven keresztül érdeklődött.',
+    szamlazasiAdatok:[],
+    kapcsolattartok:[{nev:'Fenyő Lilla',beosztas:'rendelővezető',email:'lilla@fenyodental.hu',telefon:'+36 30 777 6666',szerepek:['elsodleges'],felhasznalo:false}],
+    felhasznalok:[],modulok:[],haviDij:'—',
+    tevekenyseg:[{tipus:'megjegyzes',operator:'Kálmán',idopont:'2026-10-02',szoveg:'Kitöltötte a kérdőívet. Email-modul érdekli, 2-5 fős rendelő.'}],
+    szerzodesek:[],auditNaplo:[]
+  },
+  {
+    id:'AIS-202610-004', tipus:'ceg', nev:'Tóth és Társa Könyvelő Kft.', rovidNev:'Tóth Könyvelő',
+    adoszam:'23456780-2-42', kozossegiAdoszam:'HU23456780', cjsz:'01-09-987654',
+    szekhely:{irsz:'1132',telepules:'Budapest',cim:'Váci út 78. III/12.',orszag:'HU'},
+    iparag:'Könyvelés', letszam:'6-20', forras:'szemelyes', felelos:'Kálmán', cimkek:['könyvelő partner'],
+    statusz:'proba',statuszValtozott:'2026-10-20', probaVege:'2026-11-19', megjegyzes:'Több ügyfelet is hozhat (könyvelői csatorna).',
+    szamlazasiAdatok:[
+      {nev:'Tóth és Társa Könyvelő Kft.',adoszam:'23456780-2-42',irsz:'1132',telepules:'Budapest',cim:'Váci út 78. III/12.',email:['szamla@totheskonyvelo.hu'],fizetesiMod:'atutalas',hatarido:15,penznem:'HUF',ervenyesTol:'2026-10-20',ervenyesIg:null}
+    ],
+    kapcsolattartok:[
+      {nev:'Tóth Márta',beosztas:'ügyvezető',email:'marta@totheskonyvelo.hu',telefon:'+36 30 111 2222',szerepek:['elsodleges','szerzodeses','szamlazasi'],felhasznalo:true},
+      {nev:'Szabó Dávid',beosztas:'IT vezető',email:'david@totheskonyvelo.hu',telefon:'+36 70 333 4444',szerepek:['technikai','riasztasi'],felhasznalo:false}
+    ],
+    felhasznalok:[{nev:'Tóth Márta',email:'marta@totheskonyvelo.hu',szerep:'tulajdonos',statusz:'aktiv',utolsoBelepes:'ma 08:40'}],
+    modulok:['Email'],haviDij:'9 900 Ft',
+    tevekenyseg:[
+      {tipus:'statuszvaltas',operator:'Kálmán',idopont:'2026-10-20',szoveg:'regisztrált → próba. Könyvelői csatorna, hosszú távú potenciál.'},
+      {tipus:'megjegyzes',operator:'Kálmán',idopont:'2026-10-19',szoveg:'Személyes találkozó, referenciák átadva.'}
+    ],
+    szerzodesek:[
+      {dok:'ÁSZF (csak vállalkozásoknak)',verzio:'2026-11-01',elfogadta:'Tóth Márta',mod:'online',idopont:'2026-10-20 09:00',ip:'203.0.113.99'}
+    ],
+    auditNaplo:[
+      {idopont:'2026-10-20 09:00',ki:'felhasznalo',kiNev:'Tóth Márta',tabla:'szerzodes_elfogadas',rekordId:'uuid-12',muvelet:'insert',regi:null,uj:{dok:'ÁSZF 2026-11-01'}}
+    ]
+  },
+  {
+    id:'AIS-202610-005', tipus:'adoszamos_maganszemely', nev:'Kovács János', rovidNev:'Kovács J.',
+    adoszam:'34567890-1-42', kozossegiAdoszam:null, cjsz:null,
+    szekhely:{irsz:'6720',telepules:'Szeged',cim:'Kárász utca 15.',orszag:'HU'},
+    iparag:'Ingatlan-bérbeadás', letszam:'egyeni', forras:'weboldal', felelos:'Kálmán', cimkek:[],
+    statusz:'aktiv',statuszValtozott:'2026-10-15', probaVege:null, megjegyzes:'Üzleti célú nyilatkozat aláírva (SA-D13).',
+    szamlazasiAdatok:[
+      {nev:'Kovács János',adoszam:'34567890-1-42',irsz:'6720',telepules:'Szeged',cim:'Kárász utca 15.',email:['kovacs.janos@pelda.hu'],fizetesiMod:'atutalas',hatarido:8,penznem:'HUF',ervenyesTol:'2026-10-15',ervenyesIg:null}
+    ],
+    kapcsolattartok:[
+      {nev:'Kovács János',beosztas:'tulajdonos',email:'kovacs.janos@pelda.hu',telefon:'+36 20 555 6666',szerepek:['elsodleges','szerzodeses','szamlazasi'],felhasznalo:true}
+    ],
+    felhasznalok:[{nev:'Kovács János',email:'kovacs.janos@pelda.hu',szerep:'tulajdonos',statusz:'aktiv',utolsoBelepes:'2026-10-15'}],
+    modulok:['Admin'],haviDij:'5 900 Ft',
+    tevekenyseg:[
+      {tipus:'statuszvaltas',operator:'Kálmán',idopont:'2026-10-15',szoveg:'regisztrált → aktív. Üzleti célú nyilatkozat rendben.'}
+    ],
+    szerzodesek:[
+      {dok:'ÁSZF (csak vállalkozásoknak)',verzio:'2026-10-15',elfogadta:'Kovács János',mod:'online',idopont:'2026-10-15 14:00',ip:'198.51.100.77'},
+      {dok:'Üzleti célú nyilatkozat',verzio:'—',elfogadta:'Kovács János',mod:'online',idopont:'2026-10-15 14:00',ip:'198.51.100.77'}
+    ],
+    auditNaplo:[]
+  }
+];
+
+const TABS=['Áttekintés','Cég- és számlázási adatok','Kapcsolattartók','Felhasználók','Szolgáltatások','Szerződések és DPA','Tevékenység','Napló'];
+let curCustomer = null;
+let wizardStep = 0;
+let wizardData = {};
+let nextWizId = 6; // for new customer ids
+
+// ===== UTILS =====
+const $=id=>document.getElementById(id);
+function fmtDate(d){if(!d)return'—';const p=Date.parse(d);if(isNaN(p))return d;return new Date(p).toISOString().slice(0,10)}
+function jsonDiff(regi,uj){
+  if(!regi&&!uj)return'—';
+  if(!regi)return '— → '+Object.entries(uj).map(([k,v])=>k+': '+v).join(', ');
+  if(!uj)return Object.entries(regi).map(([k,v])=>k+': '+v).join(', ')+' → —';
+  const changes=[];
+  for(const k of new Set([...Object.keys(regi),...Object.keys(uj)])){
+    if(JSON.stringify(regi[k])!==JSON.stringify(uj[k])) changes.push(k+': '+(regi[k]||'—')+' → '+(uj[k]||'—'));
+  }
+  return changes.join('; ')||'nincs változás';
+}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3000)}
+function closeModal(id){$(id).classList.add('hidden')}
+
+// ===== LISTA =====
+function getHianyos(c){
+  if(c.statusz==='erdeklodo'||c.statusz==='megszunt'||c.statusz==='anonimizalt')return false;
+  return !c.adoszam || !c.szekhely.irsz || c.szamlazasiAdatok.length===0;
+}
+function getProbaKozel(c){return c.probaVege && new Date(c.probaVege) <= new Date(Date.now()+7*86400000)}
+function getUtolsoAktivitas(c){
+  if(c.tevekenyseg.length===0)return'—';
+  return c.tevekenyseg[0].idopont;
+}
+function renderList(){
+  const q=$('q').value.toLowerCase(), fs=$('fs').value, ft=$('ft').value, fm=$('fm').value;
+  const h=$('ch1').classList.contains('on'), p=$('ch2').classList.contains('on');
+  let filtered=customers.filter(c=>{
+    if(q && !(c.nev+' '+c.adoszam+' '+c.id+' '+(c.kapcsolattartok[0]?.email||'')).toLowerCase().includes(q)) return false;
+    if(fs && c.statusz!==fs) return false;
+    if(ft && c.tipus!==ft) return false;
+    if(fm && !c.modulok.includes(fm)) return false;
+    if(h && !getHianyos(c)) return false;
+    if(p && !getProbaKozel(c)) return false;
+    return true;
+  });
+  $('cnt').textContent=filtered.length+' ügyfél';
+  $('rows').innerHTML=filtered.map(c=>{
+    const hianyos=getHianyos(c);
+    const aktivitas=getUtolsoAktivitas(c);
+    const elsoKontakt=c.kapcsolattartok.find(k=>k.szerepek.includes('elsodleges'));
+    return `<tr class="r" onclick="openDetail('${c.id}')">
+      <td>${c.id}</td>
+      <td><b>${c.rovidNev||c.nev}</b>${hianyos?' <span class="warn" title="Hiányos adat">⚠</span>':''}</td>
+      <td>${T[c.tipus]}</td>
+      <td>${c.adoszam||'<span class="warn">hiányzik</span>'}</td>
+      <td><span class="b s-${c.statusz}">${S[c.statusz]}</span></td>
+      <td>${c.modulok.map(m=>`<span class="mod">${m}</span>`).join('')||'<span class="muted">—</span>'}</td>
+      <td>${elsoKontakt?elsoKontakt.nev+'<div class="muted" style="font-size:11px">'+elsoKontakt.email+'</div>':'<span class="muted">—</span>'}</td>
+      <td>${c.haviDij}</td>
+      <td class="muted">${aktivitas}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ===== DETAIL =====
+function openDetail(id){
+  curCustomer=customers.find(c=>c.id===id);
+  if(!curCustomer)return;
+  $('dn').textContent=curCustomer.nev;
+  const elsoKontakt=curCustomer.kapcsolattartok.find(k=>k.szerepek.includes('elsodleges'));
+  $('dsub').innerHTML=`${curCustomer.id} · ${T[curCustomer.tipus]} · <span class="b s-${curCustomer.statusz}">${S[curCustomer.statusz]}</span>${elsoKontakt?' · '+elsoKontakt.nev+' · '+elsoKontakt.email:''}`;
+  $('tabs').innerHTML=TABS.map((t,i)=>`<div class="${i===0?'on':''}" onclick="renderTab(${i})">${t}</div>`).join('');
+  $('statusChange').value='';
+  renderTab(0);
+  show('detail');
+}
+
+function renderTab(i){
+  [...$('tabs').children].forEach((e,j)=>e.classList.toggle('on',i===j));
+  const c=curCustomer; if(!c)return;
+  let h='';
+  if(i===0){
+    // Áttekintés
+    const teendok=[];
+    if(getHianyos(c)) teendok.push('Hiányzó adatok: '+[!c.adoszam&&'adószám',!c.szekhely.irsz&&'székhely',c.szamlazasiAdatok.length===0&&'számlázási adatok'].filter(Boolean).join(', ')+' — élesítés előtt kötelező.');
+    if(getProbaKozel(c)){const nap=Math.ceil((new Date(c.probaVege)-Date.now())/86400000);teendok.push('A próbaidő '+(nap<=0?'ma':'<b>'+nap+' nap</b>')+' múlva lejár ('+c.probaVege+').');}
+    const elsoKontakt=c.kapcsolattartok.find(k=>k.szerepek.includes('elsodleges'));
+    h=`${teendok.map(t=>'<div class="todo"><b>Teendő:</b> '+t+'</div>').join('')}
+    <div class="grid3">
+      <div class="card p"><h3>Státusz</h3><div class="kpi"><span class="b s-${c.statusz}">${S[c.statusz]}</span></div><div class="muted" style="margin-top:4px">${c.statuszValtozott} óta</div>${c.probaVege?'<div class="muted">Próbaidő vége: '+c.probaVege+'</div>':''}</div>
+      <div class="card p"><h3>Szolgáltatások</h3>${c.modulok.map(m=>'<div style="margin-bottom:4px"><span class="mod">'+m+'</span> '+(m==='Email'?'1 postafiók · Telegram párosítva':m==='Voice'?'1 Voice Agent · +36 1 234 5678':m==='Admin'?'Admin csomag':'')+'</div>').join('')||'<span class="muted">Nincs aktív előfizetés</span>'}</div>
+      <div class="card p"><h3>Kapcsolattartó</h3>${elsoKontakt?'<b>'+elsoKontakt.nev+'</b><div>'+elsoKontakt.beosztas+'</div><div class="muted">'+elsoKontakt.email+' · '+elsoKontakt.telefon+'</div>':'<span class="warn">Nincs elsődleges kapcsolattartó</span>'}</div>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div class="card p"><h3>Havi díj</h3><div class="kpi">${c.haviDij}</div>${c.modulok.includes('Email')?'<div class="muted">feldolgozott levél e hónapban: '+Math.floor(Math.random()*500+100)+'</div>':''}</div>
+      <div class="card p"><h3>Utolsó aktivitás</h3>${c.tevekenyseg.length>0?'<div><b>'+c.tevekenyseg[0].tipus+'</b></div><div>'+c.tevekenyseg[0].szoveg+'</div><div class="muted">'+c.tevekenyseg[0].idopont+' · '+c.tevekenyseg[0].operator+'</div>':'<span class="muted">Nincs rögzített tevékenység</span>'}</div>
+    </div>`;
+  }else if(i===1){
+    // Cég- és számlázási adatok
+    const aktSzamla=c.szamlazasiAdatok.find(s=>s.ervenyesIg===null);
+    const regiSzamlak=c.szamlazasiAdatok.filter(s=>s.ervenyesIg!==null);
+    h=`<div class="grid2">
+      <div class="card p"><h3>Törzsadatok</h3><dl>
+        <dt>Hivatalos név</dt><dd>${c.nev}</dd>
+        <dt>Rövid név</dt><dd>${c.rovidNev||'—'}</dd>
+        <dt>Típus</dt><dd>${T[c.tipus]}</dd>
+        <dt>Jogi forma</dt><dd>${c.tipus==='ceg'?'Kft.':c.tipus==='egyeni_vallalkozo'?'EV':c.tipus==='szervezet'?'Ügyvédi iroda':'—'}</dd>
+        <dt>Adószám</dt><dd>${c.adoszam||'<span class="warn">hiányzik</span>'}</dd>
+        <dt>Közösségi adószám</dt><dd>${c.kozossegiAdoszam||'—'}</dd>
+        <dt>Cégjegyzékszám</dt><dd>${c.cjsz||'—'}</dd>
+        <dt>Székhely</dt><dd>${c.szekhely.irsz?'<span>'+[c.szekhely.irsz,c.szekhely.telepules,c.szekhely.cim].filter(Boolean).join(', ')+'</span>':'<span class="warn">hiányzik</span>'}</dd>
+        <dt>Iparág</dt><dd>${c.iparag||'—'}</dd>
+        <dt>Létszám</dt><dd>${c.letszam||'—'}</dd>
+        <dt>Forrás</dt><dd>${c.forras||'—'}</dd>
+        <dt>Felelős operátor</dt><dd>${c.felelos||'—'}</dd>
+        <dt>Címkék</dt><dd>${c.cimkek.length?c.cimkek.map(t=>'<span class="tag">'+t+'</span>').join(' '):'—'}</dd>
+        <dt>Megjegyzés</dt><dd>${c.megjegyzes||'—'}</dd>
+      </dl></div>
+      <div><div class="card p" style="margin-bottom:14px"><h3>Számlázási adatok (aktuális)${aktSzamla?'<span class="muted" style="font-weight:400;font-size:12px"> · érvényes '+aktSzamla.ervenyesTol+'-tól</span>':''}</h3>
+      ${aktSzamla?`<dl>
+        <dt>Számlázási név</dt><dd>${aktSzamla.nev}</dd>
+        <dt>Adószám</dt><dd>${aktSzamla.adoszam}</dd>
+        <dt>Cím</dt><dd>${aktSzamla.irsz} ${aktSzamla.telepules}, ${aktSzamla.cim}</dd>
+        <dt>Számla e-mail</dt><dd>${aktSzamla.email.join(', ')}</dd>
+        <dt>Fizetési mód</dt><dd>${aktSzamla.fizetesiMod==='atutalas'?'Átutalás':'Kártya'}, ${aktSzamla.hatarido} nap</dd>
+        <dt>Pénznem</dt><dd>${aktSzamla.penznem}</dd>
+      </dl><p style="margin-top:10px"><button class="small" onclick="editSzamla()">Szerkesztés (új verzió)</button></p>`:'<div class="muted">Nincs rögzített számlázási adat. <button class="small" onclick="editSzamla()">Rögzítés</button></div>'}
+      </div>
+      ${regiSzamlak.length>0?`<div class="card p"><h3>Korábbi verziók <span class="muted" style="font-weight:400;font-size:12px">(SA-D11: verziózott számlázási adatok)</span></h3>
+        ${regiSzamlak.map(s=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div><b>${s.nev}</b> · ${s.irsz} ${s.telepules}, ${s.cim}</div><div class="muted">${s.email.join(', ')} · Érvényes: ${s.ervenyesTol} – ${s.ervenyesIg} · <button class="small" style="font-size:11px" onclick="toast('Számlázási verzió megtekintése (read-only)')">Részletek</button></div></div>`).join('')}
+      </div>`:''}</div>
+    </div>`;
+  }else if(i===2){
+    // Kapcsolattartók
+    h=`<div class="card scroll"><table><thead><tr><th>Név</th><th>Beosztás</th><th>E-mail</th><th>Telefon</th><th>Szerepek (SA-D20)</th><th>Belépő felhasználó?</th><th></th></tr></thead><tbody>
+    ${c.kapcsolattartok.map(k=>`<tr>
+      <td><b>${k.nev}</b></td><td>${k.beosztas||'—'}</td><td>${k.email||'—'}</td><td>${k.telefon||'—'}</td>
+      <td>${k.szerepek.map(s=>`<span class="mod role-${s==='elsodleges'?'elso':s==='szerzodeses'?'szerz':''}">${s}</span>`).join('')}</td>
+      <td>${k.felhasznalo?'igen':'nem'}</td>
+      <td><button class="small" onclick="toast('Kapcsolattartó szerkesztése (mockup)')">Szerkeszt</button></td>
+    </tr>`).join('')}
+    </tbody></table></div>
+    <p style="margin-top:10px"><button onclick="toast('Új kapcsolattartó felvétele (mockup)')">+ Kapcsolattartó</button>
+    <span class="muted" style="margin-left:10px;font-size:12px">Egy személy több szerepet is kaphat (SA-D20).</span></p>`;
+  }else if(i===3){
+    // Felhasználók
+    h=`<div class="card scroll"><table><thead><tr><th>Felhasználó</th><th>Szerep</th><th>Státusz</th><th>Utolsó belépés</th><th></th></tr></thead><tbody>
+    ${c.felhasznalok.map(f=>`<tr><td><b>${f.nev}</b><div class="muted" style="font-size:12px">${f.email}</div></td><td><span class="b s-aktiv">${f.szerep}</span></td><td>${f.statusz}</td><td>${f.utolsoBelepes}</td><td>${f.szerep!=='tulajdonos'?'<button class="small" onclick="toast(\'Szerep módosítása / eltávolítás (mockup)\')">⋯</button>':''}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="note muted" style="margin-top:8px">⏸ Tagság és felhasználó-meghívás a külön ügyfél-környezettel együtt (SA-D8, SA-D18).<br>
+    Egy felhasználó több ügyfélhez tartozhat; ügyfelenként pontosan egy tulajdonos (SA-D8 — javaslat).</p>`;
+  }else if(i===4){
+    // Szolgáltatások
+    h=`<div class="card p" style="margin-bottom:14px">
+      <h3>Előfizetések</h3>
+      <p class="muted">A 30_Elofizetesek témában lesz tervezve. Itt jelennek meg: modul-előfizetések (Email, Voice, Admin), csomag, státusz, havi díj, számlázási ciklus, usage-metrikák.</p>
+      ${c.modulok.length>0?c.modulok.map(m=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span class="mod">${m}</span> <b>${m==='Email'?'Email-modul':m==='Voice'?'Voice Agent':m} — Alap csomag</b> · ${m==='Email'?'9 900 Ft/hó':m==='Voice'?'29 000 Ft/hó':m==='Admin'?'5 900 Ft/hó':'—'}<div class="muted" style="font-size:12px">${m==='Email'?'1 postafiók · Telegram párosítva · feldolgozott: 412 levél/hó':m==='Voice'?'1 Voice Agent · +36 1 234 5678 · fogadott: 38 hívás/hó':m==='Admin'?'Admin csomag':''}</div></div>`).join(''):'<div class="muted">Nincs aktív előfizetés.</div>'}
+    </div>`;
+  }else if(i===5){
+    // Szerződések és DPA
+    h=`<div class="card scroll"><table><thead><tr><th>Dokumentum</th><th>Verzió</th><th>Elfogadta</th><th>Mód</th><th>Időpont</th><th>IP</th></tr></thead><tbody>
+    ${c.szerzodesek.length>0?c.szerzodesek.map(s=>`<tr><td><b>${s.dok}</b></td><td>${s.verzio}</td><td>${s.elfogadta}</td><td>${s.mod==='online'?'online':s.mod==='alairt_pdf'?'aláírt PDF':s.mod}</td><td>${s.idopont}</td><td>${s.ip||'—'}</td></tr>`).join(''):'<tr><td colspan="6" class="muted">Nincs rögzített szerződés-elfogadás.</td></tr>'}
+    </tbody></table></div>
+    <p style="margin-top:10px"><button class="small" onclick="toast('Dokumentum verzió rögzítése (mockup)')">+ Elfogadás rögzítése</button></p>`;
+  }else if(i===6){
+    // Tevékenység
+    h=`<div style="display:flex;gap:8px;margin-bottom:12px"><button class="small pri" onclick="addNote()">+ Megjegyzés</button><button class="small" onclick="addNote()">+ Hívás</button><button class="small" onclick="addNote()">+ E-mail</button></div>
+    <div class="card p feed">${c.tevekenyseg.length>0?c.tevekenyseg.map(t=>`<div><div class="meta"><b>${t.tipus==='megjegyzes'?'📝 Megjegyzés':t.tipus==='hivas'?'📞 Hívás':t.tipus==='email'?'✉️ E-mail':t.tipus==='statuszvaltas'?'🔄 Státuszváltás':t.tipus} · ${t.operator}</b> · ${t.idopont}</div><div>${t.szoveg}</div></div>`).join(''):'<div class="muted">Nincs rögzített tevékenység.</div>'}</div>`;
+  }else if(i===7){
+    // Audit napló (SA-D12)
+    const naplo=c.auditNaplo||[];
+    h=`<div class="card scroll"><table><thead><tr><th>Időpont</th><th>Ki</th><th>Tábla</th><th>Művelet</th><th>Régi → Új</th></tr></thead><tbody>
+    ${naplo.length>0?naplo.map(a=>`<tr>
+      <td class="muted">${a.idopont}</td>
+      <td><span class="b s-${a.ki==='operator'?'aktiv':a.ki==='rendszer'?'proba':''}">${a.ki==='operator'?'operátor: '+a.kiNev:a.ki==='felhasznalo'?'felhasználó: '+a.kiNev:'rendszer'}</span></td>
+      <td>${a.tabla}</td><td>${a.muvelet}</td>
+      <td class="muted" style="white-space:normal;max-width:320px">${jsonDiff(a.regi,a.uj)}</td>
+    </tr>`).join(''):'<tr><td colspan="5" class="muted">Nincs audit bejegyzés.</td></tr>'}
+    </tbody></table></div>
+    <p class="note muted" style="margin-top:8px">SA-D12: minden ügyféladat-módosítás automatikusan az audit naplóba kerül (ki, mikor, mit, régi → új).</p>`;
+  }
+  $('tab').innerHTML=h;
+}
+
+function show(section){
+  $('list').classList.toggle('hidden',section!=='list');
+  $('detail').classList.toggle('hidden',section!=='detail');
+}
+
+function togChip(el){el.classList.toggle('on');renderList()}
+
+// ===== STATUS CHANGE =====
+function changeStatus(){
+  const uj=$('statusChange').value;
+  if(!uj||!curCustomer)return;
+  if(uj===curCustomer.statusz){$('statusChange').value='';return}
+  const regi=curCustomer.statusz;
+  curCustomer.statusz=uj;
+  curCustomer.statuszValtozott=new Date().toISOString().slice(0,10);
+  if(uj==='proba'&&!curCustomer.probaVege){
+    const d=new Date();d.setDate(d.getDate()+30);curCustomer.probaVege=d.toISOString().slice(0,10);
+  }
+  curCustomer.tevekenyseg.unshift({tipus:'statuszvaltas',operator:'Kálmán',idopont:new Date().toISOString().slice(0,16).replace('T',' '),szoveg:regi+' → '+uj+'.'});
+  curCustomer.auditNaplo.unshift({idopont:new Date().toISOString().slice(0,16).replace('T',' '),ki:'operator',kiNev:'Kálmán',tabla:'ugyfel',rekordId:'uuid-'+curCustomer.id,muvelet:'update',regi:{statusz:regi},uj:{statusz:uj}});
+  $('dsub').innerHTML=curCustomer.id+' · '+T[curCustomer.tipus]+' · <span class="b s-'+curCustomer.statusz+'">'+S[curCustomer.statusz]+'</span>';
+  const aktivTab=$('tabs').querySelector('.on');
+  const tabIdx=aktivTab?[...$('tabs').children].indexOf(aktivTab):0;
+  renderTab(tabIdx);
+  renderList();
+  $('statusChange').value='';
+  toast('Státusz frissítve: '+S[regi]+' → '+S[uj]);
+}
+
+// ===== NOTE =====
+let noteTarget=null;
+function addNote(){noteTarget=curCustomer;$('noteModal').classList.remove('hidden');$('noteType').value='megjegyzes';$('noteText').value=''}
+function saveNote(){
+  if(!noteTarget||!$('noteText').value.trim())return;
+  const tipus=$('noteType').value;
+  noteTarget.tevekenyseg.unshift({tipus,operator:'Kálmán',idopont:new Date().toISOString().slice(0,16).replace('T',' '),szoveg:$('noteText').value.trim()});
+  noteTarget.auditNaplo.unshift({idopont:new Date().toISOString().slice(0,16).replace('T',' '),ki:'operator',kiNev:'Kálmán',tabla:'ugyfel_tevekenyseg',rekordId:'uuid-'+noteTarget.id,muvelet:'insert',regi:null,uj:{tipus}});
+  closeModal('noteModal');
+  if(curCustomer===noteTarget){const aktivTab=$('tabs').querySelector('.on');renderTab(aktivTab?[...$('tabs').children].indexOf(aktivTab):0)}
+  renderList();
+  toast('Megjegyzés mentve.');
+}
+
+// ===== EDIT SZÁMLÁZÁS (SA-D11 verziózás demo) =====
+function editSzamla(){
+  if(!curCustomer)return;
+  const akt=c.szamlaszadatok.find(s=>s.ervenyesIg===null);
+  toast(akt?'Számlázási adatok szerkesztése → új verzió jön létre (SA-D11). A régi lezárásra kerül. (mockup)':'Új számlázási adatok rögzítése. (mockup)');
+  // Mock: create a new version
+  if(akt){
+    akt.nev=curCustomer.nev;
+    akt.email=[curCustomer.kapcsolattartok[0]?.email||'szamla@pelda.hu'];
+    curCustomer.auditNaplo.unshift({idopont:new Date().toISOString().slice(0,16).replace('T',' '),ki:'operator',kiNev:'Kálmán',tabla:'szamlazasi_adat',rekordId:'uuid-szamla',muvelet:'update',regi:{ervenyesIg:null},uj:{ervenyesIg:new Date().toISOString().slice(0,10)}});
+    toast('Számlázási verzió frissítve. Régi verzió lezárva: '+akt.ervenyesTol+' – '+(akt.ervenyesIg||'ma')+'.');
+  }
+  const aktivTab=$('tabs').querySelector('.on');renderTab(aktivTab?[...$('tabs').children].indexOf(aktivTab):1);
+}
+
+// ===== WIZARD =====
+function openWizard(){
+  wizardStep=0;wizardData={tipus:'ceg'};
+  $('wizard').classList.remove('hidden');
+  renderWizard();
+}
+
+function closeWizard(){$('wizard').classList.add('hidden')}
+
+function renderWizard(){
+  $('wizTitle').textContent='Új ügyfél';
+  const steps=$('stepper').children;
+  for(let i=0;i<steps.length;i++){steps[i].className=i<wizardStep?'done':i===wizardStep?'on':'';if(i<wizardStep)steps[i].onclick=()=>{wizardStep=i;renderWizard()}}
+  let body='', foot='';
+  if(wizardStep===0){
+    // Step 1: Típus
+    body=`<div class="radio-group">
+      <label class="${wizardData.tipus==='ceg'?'sel':''}" onclick="wizardData.tipus='ceg';renderWizard()"><input type="radio" name="t" ${wizardData.tipus==='ceg'?'checked':''}> <div><b>Gazdasági társaság</b><span class="desc">Kft., Bt., Zrt., Kkt., Nyrt. — adószám + cégjegyzékszám</span></div></label>
+      <label class="${wizardData.tipus==='egyeni_vallalkozo'?'sel':''}" onclick="wizardData.tipus='egyeni_vallalkozo';renderWizard()"><input type="radio" name="t" ${wizardData.tipus==='egyeni_vallalkozo'?'checked':''}> <div><b>Egyéni vállalkozó</b><span class="desc">Természetes személy, üzleti célra — adószám + nyilvántartási szám</span></div></label>
+      <label class="${wizardData.tipus==='szervezet'?'sel':''}" onclick="wizardData.tipus='szervezet';renderWizard()"><input type="radio" name="t" ${wizardData.tipus==='szervezet'?'checked':''}> <div><b>Egyéb szervezet</b><span class="desc">Ügyvédi iroda, alapítvány, egyesület, közjegyző</span></div></label>
+      <label class="${wizardData.tipus==='adoszamos_maganszemely'?'sel':''}" onclick="wizardData.tipus='adoszamos_maganszemely';renderWizard()"><input type="radio" name="t" ${wizardData.tipus==='adoszamos_maganszemely'?'checked':''}> <div><b>Adószámos magánszemély</b><span class="desc">Pl. ingatlan-bérbeadó — üzleti célú nyilatkozattal (SA-D13)</span></div></label>
+      <label class="dis"><input type="radio" name="t" disabled> <div><b>Magánszemély (fogyasztó)</b><span class="desc">Jelenleg nem engedélyezett (Beállítások › fogyasztói ügyfél = false, SA-D6)</span></div></label>
+    </div>`;
+    foot=`<button onclick="closeWizard()">Mégse</button><button class="pri" onclick="wizardStep=1;renderWizard()">Tovább</button>`;
+  }else if(wizardStep===1){
+    // Step 2: Adószám & név
+    const showCjsz=wizardData.tipus==='ceg'||wizardData.tipus==='egyeni_vallalkozo'||wizardData.tipus==='szervezet';
+    body=`<div class="f">
+      <label><span class="req">Adószám</span><input id="wAdoszam" placeholder="12345678-1-42" value="${wizardData.adoszam||''}" oninput="wizardData.adoszam=this.value;validateAdoszam()"></label>
+      <div id="adoszamHint"></div>
+      <div class="row"><label><span class="req">Hivatalos név</span><input id="wNev" placeholder="Példa Kft." value="${wizardData.nev||''}" oninput="wizardData.nev=this.value"></label>
+      <label>Rövid név<input id="wRovidNev" placeholder="Példa" value="${wizardData.rovidNev||''}" oninput="wizardData.rovidNev=this.value"></label></div>
+      ${showCjsz?`<label>${wizardData.tipus==='ceg'?'Cégjegyzékszám':wizardData.tipus==='egyeni_vallalkozo'?'Nyilvántartási szám':'Nyilvántartási szám'}<input id="wCjsz" placeholder="${wizardData.tipus==='ceg'?'01-09-123456':''}" value="${wizardData.cjsz||''}" oninput="wizardData.cjsz=this.value"></label>`:''}
+      <label>Jogi forma<input id="wJogi" placeholder="${wizardData.tipus==='ceg'?'Kft.':wizardData.tipus==='egyeni_vallalkozo'?'EV':''}" value="${wizardData.jogiForma||''}" oninput="wizardData.jogiForma=this.value"></label>
+    </div>`;
+    foot=`<button onclick="wizardStep=0;renderWizard()">← Vissza</button><button class="pri" onclick="if(!wizardData.nev){toast('A hivatalos név kötelező.');return}wizardStep=2;renderWizard()">Tovább</button>`;
+  }else if(wizardStep===2){
+    // Step 3: Cím & számlázás
+    body=`<div class="f">
+      <h3 style="font-size:14px;margin:0">Székhely</h3>
+      <div class="row3"><label>Irányítószám<input id="wIrsz" placeholder="1105" value="${wizardData.irsz||''}" oninput="wizardData.irsz=this.value"></label>
+      <label>Település<input id="wTelepules" placeholder="Budapest" value="${wizardData.telepules||''}" oninput="wizardData.telepules=this.value"></label>
+      <label>Ország<input value="HU" disabled></label></div>
+      <label>Közterület, házszám<input id="wCim" placeholder="Példa utca 1." value="${wizardData.cim||''}" oninput="wizardData.cim=this.value"></label>
+      <hr style="border:0;border-top:1px solid var(--line);margin:8px 0">
+      <h3 style="font-size:14px;margin:0">Számlázási adatok</h3>
+      <div class="hint">Alapértelmezés szerint megegyezik a törzsadatokkal. Eltérő cím esetén módosítható.</div>
+      <label>Számlázási név<input id="wSzNev" placeholder="${wizardData.nev||'Példa Kft.'}" value="${wizardData.szamlazasiNev||''}" oninput="wizardData.szamlazasiNev=this.value"></label>
+      <label>Számla e-mail<input id="wSzEmail" placeholder="szamla@pelda.hu" value="${wizardData.szamlazasiEmail||''}" oninput="wizardData.szamlazasiEmail=this.value"></label>
+      <div class="row"><label>Fizetési mód<select id="wFizMod" onchange="wizardData.fizetesiMod=this.value"><option value="atutalas">Átutalás</option><option value="kartya">Kártya</option></select></label>
+      <label>Fizetési határidő (nap)<input id="wHat" type="number" min="1" max="60" value="8" oninput="wizardData.fizetesiHatarido=this.value"></label></div>
+    </div>`;
+    foot=`<button onclick="wizardStep=1;renderWizard()">← Vissza</button><button class="pri" onclick="wizardStep=3;renderWizard()">Tovább</button>`;
+  }else if(wizardStep===3){
+    // Step 4: Kapcsolattartó
+    body=`<div class="f">
+      <div class="hint">Legalább egy kapcsolattartó kötelező. A szerepekhez lásd SA-D20: elsődleges, szerződéses, számlázási, technikai, riasztási.</div>
+      <div class="row"><label>Név<input id="wKNev" placeholder="Teljes név" value="${wizardData.kNev||''}" oninput="wizardData.kNev=this.value"></label>
+      <label>Beosztás<input id="wKBeo" placeholder="ügyvezető" value="${wizardData.kBeo||''}" oninput="wizardData.kBeo=this.value"></label></div>
+      <div class="row"><label>E-mail<input id="wKEmail" type="email" placeholder="nev@pelda.hu" value="${wizardData.kEmail||''}" oninput="wizardData.kEmail=this.value"></label>
+      <label>Telefon<input id="wKTel" placeholder="+36 30 123 4567" value="${wizardData.kTel||''}" oninput="wizardData.kTel=this.value"></label></div>
+      <label>Szerepek<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${['elsodleges','szerzodeses','szamlazasi','technikai','riasztasi'].map(s=>{
+          const selected=wizardData.kSzerepek||['elsodleges'];
+          return `<span class="chip ${selected.includes(s)?'on':''}" onclick="const a=wizardData.kSzerepek||['elsodleges'];const i=a.indexOf('${s}');i>-1?a.splice(i,1):a.push('${s}');renderWizard()">${s}</span>`;
+        }).join('')}
+      </div></label>
+    </div>`;
+    foot=`<button onclick="wizardStep=2;renderWizard()">← Vissza</button><button class="pri" onclick="if(!wizardData.kNev){toast('A kapcsolattartó neve kötelező.');return}wizardStep=4;renderWizard()">Tovább</button>`;
+  }else if(wizardStep===4){
+    // Step 5: Ellenőrzés
+    const kSzerepek=wizardData.kSzerepek||['elsodleges'];
+    body=`<div class="grid2">
+      <div class="card p"><h3>Ügyfél adatai</h3><dl>
+        <dt>Típus</dt><dd>${T[wizardData.tipus]}</dd>
+        <dt>Név</dt><dd><b>${wizardData.nev||'—'}</b></dd>
+        <dt>Rövid név</dt><dd>${wizardData.rovidNev||'—'}</dd>
+        <dt>Adószám</dt><dd>${wizardData.adoszam||'<span class="warn">nincs megadva</span>'}</dd>
+        <dt>Székhely</dt><dd>${[wizardData.irsz,wizardData.telepules,wizardData.cim].filter(Boolean).join(', ')||'—'}</dd>
+        <dt>Számlázási név</dt><dd>${wizardData.szamlazasiNev||wizardData.nev||'—'}</dd>
+      </dl></div>
+      <div class="card p"><h3>Kapcsolattartó</h3><dl>
+        <dt>Név</dt><dd>${wizardData.kNev||'—'}</dd>
+        <dt>Beosztás</dt><dd>${wizardData.kBeo||'—'}</dd>
+        <dt>E-mail</dt><dd>${wizardData.kEmail||'—'}</dd>
+        <dt>Telefon</dt><dd>${wizardData.kTel||'—'}</dd>
+        <dt>Szerepek</dt><dd>${kSzerepek.map(s=>`<span class="mod">${s}</span>`).join('')}</dd>
+      </dl></div>
+    </div>
+    <div class="hint warn" style="margin-top:14px"><b>Ellenőrzés:</b> az ügyfél létrehozása után az ügyfélszám automatikusan generálódik (AIS-ÉÉÉÉHH-NNN). Az adószám egyedisége ellenőrzésre kerül. A státusz kezdetben „regisztrált”.</div>`;
+    foot=`<button onclick="wizardStep=3;renderWizard()">← Vissza</button><button class="pri" onclick="createCustomer()">Ügyfél létrehozása</button>`;
+  }
+  $('wizBody').innerHTML=body;
+  $('wizFoot').innerHTML=foot;
+  if(wizardStep===1) validateAdoszam();
+}
+
+function validateAdoszam(){
+  const a=wizardData.adoszam||'';
+  const ok=/^\d{8}-[1-5]-\d{2}$/.test(a);
+  const hint=$('adoszamHint');
+  if(!a)hint.innerHTML='';
+  else if(ok)hint.innerHTML='<div class="hint ok">✓ Formátum rendben. Később: NAV-lekérdezés → név és székhely automatikus kitöltése.</div>';
+  else hint.innerHTML='<div class="hint bad">✗ Érvénytelen formátum. Helyes: 12345678-1-42 (8 számjegy, kötőjel, 1-5, kötőjel, 2 számjegy).</div>';
+}
+
+function createCustomer(){
+  if(!wizardData.nev||!wizardData.kNev){toast('Név és kapcsolattartó kötelező.');return}
+  const now=new Date().toISOString();
+  const honap=now.slice(0,7).replace('-','');
+  const id=`AIS-${honap}-${String(nextWizId++).padStart(3,'0')}`;
+  const kSzerepek=wizardData.kSzerepek||['elsodleges'];
+  const uj={
+    id, tipus:wizardData.tipus, nev:wizardData.nev, rovidNev:wizardData.rovidNev||wizardData.nev,
+    adoszam:wizardData.adoszam||'', kozossegiAdoszam:wizardData.adoszam?'HU'+wizardData.adoszam.slice(0,8):null,
+    cjsz:wizardData.cjsz||null,
+    szekhely:{irsz:wizardData.irsz||'',telepules:wizardData.telepules||'',cim:wizardData.cim||'',orszag:'HU'},
+    iparag:'', letszam:null, forras:'manualis', felelos:'Kálmán', cimkek:[],
+    statusz:'regisztralt',statuszValtozott:now.slice(0,10), probaVege:null, megjegyzes:'',
+    szamlazasiAdatok:wizardData.szamlazasiNev||wizardData.irsz?[{
+      nev:wizardData.szamlazasiNev||wizardData.nev,adoszam:wizardData.adoszam||'',
+      irsz:wizardData.irsz||'',telepules:wizardData.telepules||'',cim:wizardData.cim||'',
+      email:[wizardData.szamlazasiEmail||wizardData.kEmail||''].filter(Boolean),
+      fizetesiMod:wizardData.fizetesiMod||'atutalas',hatarido:parseInt(wizardData.fizetesiHatarido)||8,penznem:'HUF',
+      ervenyesTol:now.slice(0,10),ervenyesIg:null
+    }]:[],
+    kapcsolattartok:[{nev:wizardData.kNev,beosztas:wizardData.kBeo||'',email:wizardData.kEmail||'',telefon:wizardData.kTel||'',szerepek:kSzerepek,felhasznalo:false}],
+    felhasznalok:[],modulok:[],haviDij:'—',
+    tevekenyseg:[{tipus:'statuszvaltas',operator:'Kálmán',idopont:now.slice(0,16).replace('T',' '),szoveg:'Létrehozva varázslóval. Státusz: regisztrált.'}],
+    szerzodesek:[],auditNaplo:[{
+      idopont:now.slice(0,16).replace('T',' '),ki:'operator',kiNev:'Kálmán',
+      tabla:'ugyfel',rekordId:'uuid-'+id,muvelet:'insert',regi:null,uj:{nev:wizardData.nev,statusz:'regisztralt'}
+    }]
+  };
+  customers.unshift(uj);
+  closeWizard();
+  renderList();
+  openDetail(id);
+  toast('Ügyfél létrehozva: '+id);
+}
+
+function exportCSV(){
+  const rows=customers.map(c=>{
+    const elsoKontakt=c.kapcsolattartok.find(k=>k.szerepek.includes('elsodleges'));
+    return [c.id,`"${c.nev}"`,T[c.tipus],c.adoszam,S[c.statusz],c.modulok.join(';'),elsoKontakt?elsoKontakt.email:'',c.haviDij].join(',');
+  });
+  const csv='Ügyfélszám,Név,Típus,Adószám,Státusz,Modulok,Kapcsolattartó e-mail,Havi díj\n'+rows.join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ugyfelek-export.csv';a.click();
+  toast('CSV exportálva ('+customers.length+' ügyfél)');
+}
+
+// ===== INIT =====
+renderList();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+/**
+ * Negative theme fixture (AIS-168).
+ *
+ * `light` forgets a token the default declares, `ambient` invents one that does
+ * not exist there — the two ways a new appearance goes wrong in practice.
+ */
+
+@theme {
+  --color-primary: oklch(0.66 0.14 195);
+  --color-surface-base: oklch(0.17 0.008 250);
+  --radius-card: 1rem;
+}
+
+:root[data-theme='light'] {
+  --color-primary: oklch(0.5 0.13 195);
+  --radius-card: 1rem;
+}
+
+:root[data-theme='ambient'] {
+  --color-primary: oklch(0.78 0.13 70);
+  --color-surface-base: oklch(0.2 0.018 40);
+  --radius-card: 1rem;
+  --color-accent-glow: oklch(0.9 0.1 80);
+}

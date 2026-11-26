@@ -25,16 +25,40 @@ import {
 } from '@asteasolutions/zod-to-openapi';
 import {
   HTTP_STATUS,
+  activityListSchema,
+  activitySchema,
   apiErrorDetailSchema,
   apiErrorEnvelopeSchema,
   apiKeyListSchema,
   apiKeySchema,
+  attachCustomerTagSchema,
+  auditLogListSchema,
+  auditLogSchema,
+  createActivitySchema,
   createApiKeySchema,
+  createCustomerSchema,
+  createCustomerTagSchema,
+  contactListSchema,
+  contactSchema,
+  createContactSchema,
+  customerDetailSchema,
+  customerListSchema,
+  customerSchema,
+  customerTagSchema,
+  customerUserSchema,
+  inviteCustomerUserSchema,
+  noPayloadSchema,
   paginationMetaSchema,
+  updateActivitySchema,
+  updateContactSchema,
   responseMetaSchema,
   resolveApiErrorStatus,
+  updateApiKeySchema,
+  updateCustomerSchema,
+  updateCustomerUserSchema,
+  updateCustomerStatusSchema,
 } from '@callback/shared';
-import type { ApiErrorCode } from '@callback/shared';
+import type { ApiEndpointContract, ApiErrorCode } from '@callback/shared';
 import { UnregisteredPayloadSchemaError } from './openapi.errors.js';
 import type {
   OpenApiParameter,
@@ -94,6 +118,45 @@ const PAYLOAD_COMPONENTS: ReadonlyMap<z.ZodTypeAny, string> = new Map<
   [apiKeySchema, 'ApiKey'],
   [apiKeyListSchema, 'ApiKeyList'],
   [createApiKeySchema, 'CreateApiKey'],
+  // The `customers` aggregate (AIS-178): one component per published schema, so
+  // the list, the detail and the three request bodies each have their own name.
+  [customerSchema, 'Customer'],
+  [customerListSchema, 'CustomerList'],
+  [customerDetailSchema, 'CustomerDetail'],
+  // The contact aggregate (AIS-178, slice d): the row, its page and its two
+  // request bodies.
+  [contactSchema, 'Contact'],
+  [contactListSchema, 'ContactList'],
+  [createContactSchema, 'CreateContact'],
+  [updateContactSchema, 'UpdateContact'],
+  // The tag and customer-user resources (AIS-178, slice e): two payload rows and
+  // the four request bodies. `createTag` and `attachTag` share the row component
+  // because both answer with the catalogue row.
+  [customerTagSchema, 'CustomerTag'],
+  [customerUserSchema, 'CustomerUser'],
+  [createCustomerTagSchema, 'CreateCustomerTag'],
+  [attachCustomerTagSchema, 'AttachCustomerTag'],
+  [inviteCustomerUserSchema, 'InviteCustomerUser'],
+  [updateCustomerUserSchema, 'UpdateCustomerUser'],
+  // The activity feed and the audit read (AIS-178, slice f): two payload rows,
+  // their two pages and the two activity request bodies. The ledger has **no**
+  // request component, because nothing but `AuditWriter` may append to it.
+  [activitySchema, 'Activity'],
+  [activityListSchema, 'ActivityList'],
+  [createActivitySchema, 'CreateActivity'],
+  [updateActivitySchema, 'UpdateActivity'],
+  [auditLogSchema, 'AuditLog'],
+  [auditLogListSchema, 'AuditLogList'],
+  [createCustomerSchema, 'CreateCustomer'],
+  [updateCustomerSchema, 'UpdateCustomer'],
+  [updateCustomerStatusSchema, 'UpdateCustomerStatus'],
+  // `UpdateApiKey` is a **request** component (AIS-108): `envelopeOf()` never
+  // wraps it, but `payloadComponentName()` resolves the request body's `$ref`
+  // through this same table, so it has to be named here.
+  [updateApiKeySchema, 'UpdateApiKey'],
+  // `NoPayload` is the `null` of a call that has nothing to return, e.g. the
+  // `DELETE` payload — see `no-payload.schema.ts`.
+  [noPayloadSchema, 'NoPayload'],
 ]);
 
 /**
@@ -278,4 +341,28 @@ export function pathParameters(path: string): OpenApiParameter[] {
       required: true,
       schema: { type: 'string' as const },
     }));
+}
+
+/**
+ * Declares the query-string parameters a registry entry accepts (AIS-107).
+ *
+ * The descriptors come from the shared contract, not from the validation
+ * schema: the list query ends in a `transform`, which cannot be rendered as a
+ * parameter, and the descriptors are built from the same constants the schema
+ * uses. One documented cast, here at the boundary — `@callback/shared` has no
+ * dependency on an OpenAPI library and must not grow one.
+ *
+ * @param entry - registry entry being documented.
+ * @returns one `in: query` parameter per descriptor, in publication order.
+ */
+export function queryParametersOf(
+  entry: ApiEndpointContract,
+): OpenApiParameter[] {
+  return (entry.queryParameters ?? []).map((parameter) => ({
+    in: 'query' as const,
+    name: parameter.name,
+    description: parameter.description,
+    required: parameter.required,
+    schema: parameter.schema,
+  }));
 }

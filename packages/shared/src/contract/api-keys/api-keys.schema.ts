@@ -21,22 +21,31 @@
  */
 
 import { z } from 'zod';
+import {
+  identifierSchema,
+  nonEmptyTextSchema,
+  trimmedStringSchema,
+} from '../common/text.schema.js';
 import { isoDateTimeSchema } from '../datetime.schema.js';
 import {
   API_KEY_DESCRIPTION_MAX_LENGTH,
+  API_KEY_IDENTIFIER_MAX_LENGTH,
   API_KEY_IDENTIFIER_PATTERN,
   API_KEY_NAME_MAX_LENGTH,
   API_KEY_VALUE_MAX_LENGTH,
 } from './api-keys.const.js';
 
-/** Message shown when the identifier violates the URL-safe pattern. */
-export const API_KEY_IDENTIFIER_MESSAGE =
-  'identifier must be 1-200 characters of letters, digits, dot, dash or underscore';
-
-/** Unique, URL-safe lookup key. */
-export const apiKeyIdentifierSchema = z
-  .string()
-  .regex(API_KEY_IDENTIFIER_PATTERN, API_KEY_IDENTIFIER_MESSAGE);
+/**
+ * Unique, URL-safe lookup key.
+ *
+ * Built from the shared {@link identifierSchema}, so the pattern and the
+ * rejection copy live in the contract (AIS-112) and the admin form inherits
+ * both by deriving its own schema from this one.
+ */
+export const apiKeyIdentifierSchema = identifierSchema({
+  pattern: API_KEY_IDENTIFIER_PATTERN,
+  max: API_KEY_IDENTIFIER_MAX_LENGTH,
+});
 
 /** A single stored key, as returned by every `api-keys` endpoint. */
 export const apiKeySchema = z.object({
@@ -69,10 +78,12 @@ export const apiKeyListSchema = z.array(apiKeySchema);
  */
 export const createApiKeySchema = z
   .object({
-    name: z.string().min(1).max(API_KEY_NAME_MAX_LENGTH),
+    name: nonEmptyTextSchema({ max: API_KEY_NAME_MAX_LENGTH }),
     identifier: apiKeyIdentifierSchema,
-    description: z.string().max(API_KEY_DESCRIPTION_MAX_LENGTH).optional(),
-    apiKey: z.string().min(1).max(API_KEY_VALUE_MAX_LENGTH),
+    description: trimmedStringSchema({
+      max: API_KEY_DESCRIPTION_MAX_LENGTH,
+    }).optional(),
+    apiKey: nonEmptyTextSchema({ max: API_KEY_VALUE_MAX_LENGTH }),
     expiresAt: isoDateTimeSchema.optional(),
   })
   .strict();

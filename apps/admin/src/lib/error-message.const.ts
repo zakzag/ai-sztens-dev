@@ -52,6 +52,79 @@ export const IDENTIFIER_CONFLICT_MESSAGE =
 export const API_KEY_IDENTIFIER_FIELD_MESSAGE =
   'Ez az identifier már foglalt. Adj meg egyedit.';
 
+/** `CUSTOMER_NUMBER_CONFLICT` (AIS-178) — the generated number collided. */
+export const CUSTOMER_NUMBER_CONFLICT_MESSAGE =
+  'Az ügyfélszám generálása ütközött. Próbáld újra.';
+
+/** `CUSTOMER_TAX_NUMBER_CONFLICT` (AIS-178) — one live customer per tax number. */
+export const CUSTOMER_TAX_NUMBER_CONFLICT_MESSAGE =
+  'Ezzel az adószámmal már létezik élő ügyfél.';
+
+/**
+ * Field-level copy of a duplicate tax number (AIS-178, tier 1).
+ *
+ * The tax number is a form input, so the message is rendered under it — the
+ * generic sentence above stays for the page-level alert.
+ */
+export const CUSTOMER_TAX_NUMBER_FIELD_MESSAGE =
+  'Ez az adószám már egy másik ügyfélnél szerepel.';
+
+/**
+ * `CUSTOMER_PRIMARY_CONTACT_CONFLICT` (AIS-178, slice d) — one primary contact.
+ *
+ * A customer may have exactly one `primary` contact; the second one is refused by
+ * the database, so the message tells the user what to do instead of only what
+ * went wrong.
+ */
+export const CUSTOMER_PRIMARY_CONTACT_CONFLICT_MESSAGE =
+  'Ennél az ügyfélnél már van elsődleges kapcsolattartó. Előbb vedd le róla a jelölést.';
+
+/**
+ * Field-level copy of the primary-contact conflict (AIS-178, slice d, tier 1).
+ *
+ * The role picker is an input, so the message is rendered next to it — the
+ * generic sentence above stays for the page-level alert.
+ */
+export const CUSTOMER_PRIMARY_CONTACT_FIELD_MESSAGE =
+  'Már van elsődleges kapcsolattartó ennél az ügyfélnél.';
+
+/**
+ * `CUSTOMER_USER_EMAIL_CONFLICT` (AIS-178, slice e) — the address is taken.
+ *
+ * `customer_users_email_key` is a **global**, case-insensitive unique index, so
+ * one address can hold at most one login across **every** customer. The sentence
+ * says that, because "already exists at this customer" would send the operator
+ * looking in the wrong place.
+ */
+export const CUSTOMER_USER_EMAIL_CONFLICT_MESSAGE =
+  'Ezzel az e-mail-címmel már létezik belépő felhasználó. Egy cím csak egy belépéshez tartozhat.';
+
+/** Field-level copy of the duplicate login e-mail (AIS-178, slice e, tier 1). */
+export const CUSTOMER_USER_EMAIL_FIELD_MESSAGE =
+  'Ez az e-mail-cím már foglalt.';
+
+/**
+ * `CUSTOMER_OWNER_CONFLICT` (AIS-178, slice e) — one active owner per customer.
+ *
+ * Raised when a second login user is **activated** as `owner`; the message names
+ * the action that resolves it instead of only the rule that was violated.
+ */
+export const CUSTOMER_OWNER_CONFLICT_MESSAGE =
+  'Ennél az ügyfélnél már van aktív tulajdonos. Előbb a jelenlegi tulajdonost kell lefokozni.';
+
+/** Field-level copy of the owner conflict (AIS-178, slice e, tier 1). */
+export const CUSTOMER_OWNER_FIELD_MESSAGE =
+  'Már van aktív tulajdonos ennél az ügyfélnél.';
+
+/**
+ * `CUSTOMER_USER_IN_USE_CONFLICT` (AIS-178, slice e) — still referenced.
+ *
+ * A login user referenced by a contact or an activity cannot be deleted without
+ * destroying that history, so the row must be deactivated instead.
+ */
+export const CUSTOMER_USER_IN_USE_CONFLICT_MESSAGE =
+  'A felhasználóhoz még kapcsolattartó vagy tevékenység tartozik, ezért nem törölhető. Előbb szüntesd meg a hivatkozást, vagy állítsd inaktívra.';
+
 /**
  * `VALIDATION_FAILED` on an identified field (plan `D11`, tier 1).
  *
@@ -74,28 +147,34 @@ export const RATE_LIMITED_MESSAGE =
 export const SERVICE_UNAVAILABLE_MESSAGE =
   'A szolgáltatás átmenetileg nem elérhető. Próbáld újra később.';
 
+/**
+ * `STALE_WRITE` — the payload was written against a version that no longer
+ * exists, so applying it would overwrite somebody else's change (AIS-108).
+ *
+ * Deliberately not a field error: the server blames `updatedAt`, a hidden
+ * concurrency token the user cannot edit, so the only useful action is a reload.
+ */
+export const STALE_WRITE_MESSAGE =
+  'Az adatot közben valaki más módosította. Töltsd újra az oldalt, majd próbáld újra.';
+
+/**
+ * `SEMANTIC_VALIDATION_FAILED` — the shape is valid, the content is not
+ * (AIS-108), e.g. an `expiresAt` in the past. Rendered on the offending field
+ * when the envelope names one, page-level otherwise.
+ */
+export const SEMANTIC_VALIDATION_FAILED_MESSAGE =
+  'A megadott érték tartalmilag nem megfelelő. Ellenőrizd az adatokat.';
+
 /** `UNEXPECTED_PAYLOAD` — the client could not parse a contract-conform body. */
 export const UNEXPECTED_PAYLOAD_USER_MESSAGE =
   'A szerver váratlan választ adott. Próbáld újra később.';
 
 /**
- * `code` → Hungarian user copy.
+ * The `code` → copy table itself lives in
+ * [`api-error-code.const.ts`](./api-error-code.const.ts:1) as
+ * `ERROR_CODE_MESSAGE`, derived from `ERROR_CODE_CATALOGUE`.
  *
- * The keys are the values of `API_ERROR_CODE` from `@callback/shared` plus the
- * client-side `UNEXPECTED_PAYLOAD`; the type stays `string` on purpose, because
- * a code from a newer server must degrade to the status fallback instead of
- * failing to compile.
+ * This file stays the **only** home of Hungarian literals: the catalogue only
+ * wires codes to these symbols, so a new server code cannot introduce copy that
+ * nobody reviewed.
  */
-export const ERROR_CODE_MESSAGE: Readonly<Record<string, string>> = {
-  VALIDATION_FAILED: VALIDATION_MESSAGE,
-  UNAUTHENTICATED: SESSION_EXPIRED_MESSAGE,
-  FORBIDDEN: FORBIDDEN_MESSAGE,
-  NOT_FOUND: NOT_FOUND_MESSAGE,
-  CONFLICT: CONFLICT_MESSAGE,
-  PAYLOAD_TOO_LARGE: PAYLOAD_TOO_LARGE_MESSAGE,
-  RATE_LIMITED: RATE_LIMITED_MESSAGE,
-  INTERNAL_ERROR: SERVER_ERROR_MESSAGE,
-  SERVICE_UNAVAILABLE: SERVICE_UNAVAILABLE_MESSAGE,
-  API_KEY_IDENTIFIER_CONFLICT: IDENTIFIER_CONFLICT_MESSAGE,
-  UNEXPECTED_PAYLOAD: UNEXPECTED_PAYLOAD_USER_MESSAGE,
-};

@@ -10,12 +10,13 @@
  */
 
 import { ApiError, HTTP_STATUS } from '@callback/api-client';
+import { API_ERROR_CODE } from '@callback/shared';
+import { FIELD_SURFACE_CODES } from './api-error-code.const.js';
 import {
   ABORT_LIKE_ERROR_NAMES,
   BANNER_CONDITION_PRIORITY,
   BANNER_COPY,
   BANNER_DISMISS_LABEL,
-  FIELD_SURFACE_CODES,
 } from './error-surface.const.js';
 import type {
   BannerCondition,
@@ -48,6 +49,41 @@ export function isAbortLike(error: unknown): boolean {
  */
 export function toApiError(error: unknown): ApiError | null {
   return error instanceof ApiError ? error : null;
+}
+
+/**
+ * Recognises “this resource does not exist” (AIS-131).
+ *
+ * A detail read of an unknown identifier is a `404`, not an empty result: the
+ * page has to branch on it to say “not found” and offer a way back, instead of
+ * rendering an empty description list that looks like a page still loading.
+ *
+ * @param error - anything a query rejected with.
+ * @returns `true` when the server answered `404`.
+ */
+export function isNotFoundFailure(error: unknown): boolean {
+  return toApiError(error)?.status === HTTP_STATUS.NOT_FOUND;
+}
+
+/**
+ * Recognises the one conflict the user can actually resolve (AIS-131).
+ *
+ * `STALE_WRITE` is a `409` the server raises when the `updatedAt` the client
+ * sent is no longer current, i.e. somebody else saved the row first. It is
+ * deliberately **not** a field error (`ERROR_CODE_CATALOGUE` gives it no
+ * `fieldMessage`): the blamed path is a hidden concurrency token, so the only
+ * useful affordance is “reload and try again” — which the page can only show if
+ * it can recognise the case.
+ *
+ * Lives here, in an allowlisted decision module, instead of in a component:
+ * `apps/admin/src/** / *.logic.ts` may branch on an error, a component may not
+ * (`.roo/rules/react.coding-standards.md` §5, `pnpm quality:field-errors`).
+ *
+ * @param error - anything a mutation rejected with.
+ * @returns `true` when the write was refused because its version was stale.
+ */
+export function isStaleWriteFailure(error: unknown): boolean {
+  return toApiError(error)?.code === API_ERROR_CODE.STALE_WRITE;
 }
 
 /**

@@ -150,6 +150,28 @@ describe('ApiExceptionFilter', () => {
       expect(JSON.stringify(body)).not.toContain('SELECT');
     });
 
+    it('appends the cause chain of a wrapped 5xx to the log line', () => {
+      const reply = createReply();
+      const errors = captureLogger('error');
+      const cause = Object.assign(new Error('invalid input syntax for uuid'), {
+        name: 'PostgresError',
+        code: '22P02',
+      });
+      const exception = Object.assign(new Error('Failed query: select 1'), {
+        cause,
+      });
+
+      createFilter().catch(exception, createHost(reply));
+
+      // The driver's answer lives only in `cause`; without it the 5xx line names
+      // the statement but not the reason (AIS-14 R1).
+      expect(errors.messages[0]).toContain(
+        '<- PostgresError: invalid input syntax for uuid (22P02)',
+      );
+      // …and it must never travel to the client.
+      expect(JSON.stringify(readBody(reply))).not.toContain('22P02');
+    });
+
     it('sanitises a 5xx HttpException as well', () => {
       const reply = createReply();
       captureLogger('error');

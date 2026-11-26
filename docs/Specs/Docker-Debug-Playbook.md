@@ -1,5 +1,7 @@
 # Docker Debug Playbook — AIsztens
 
+**Utolsó frissítés:** 2026-11-24 (a `Caddyfile.rendered` hivatkozás már nem link, mert a fájl csak deploy után létezik; a leírás változatlan)
+
 A scenario-driven, copy-paste-ready playbook for debugging the AIsztens
 production stack ([`infra/docker-compose.yml`](../../infra/docker-compose.yml):
 `api`, `web`, `admin`, `postgres`, `caddy`, `monitor`) and the droplet that
@@ -955,7 +957,7 @@ and attach it. The bundle removes ~90 % of the back-and-forth.
 - [`infra/app/Dockerfile`](../../infra/app/Dockerfile) — runtime image; the
   `node apps/api/dist/main.js` CMD that bypasses `pnpm-native`.
 - [`infra/caddy/Caddyfile`](../../infra/caddy/Caddyfile) and
-  [`infra/caddy/Caddyfile.rendered`](../../infra/caddy/Caddyfile.rendered) —
+  `infra/caddy/Caddyfile.rendered` (generated at deploy time, gitignored — not a link) —
   template vs rendered.
 - [`deploy/deploy.sh`](../../deploy/deploy.sh) — `prune_legacy_stack()`,
   `render_caddyfile()`, `upload()` flow.

@@ -4,6 +4,42 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AIsztens — Admin</title>
+    <!--
+      Flash-free appearance boot (AIS-165).
+
+      The token blocks in `theme.css` are selected by `data-theme` on <html>, so
+      the attribute has to be on the element before the first paint. Waiting for
+      the React bundle would show the default (dark) appearance for one frame and
+      then repaint — the "theme flash". This inline script is the same decision
+      the ThemeProvider makes, executed synchronously before the module loads.
+
+      The storage key and the value list are duplicated from
+      `src/app/theme/theme.const.ts` and `THEME_NAMES` in `@callback/ui`; the
+      engine's tests assert both, so the two sides cannot drift unnoticed. The
+      script holds no colour: it only names appearances.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('aisztens.theme');
+          var implemented = [
+            'light',
+            'dark',
+            'ambient',
+            'glass',
+            'glass-frost',
+            'glass-crystal',
+            'glass-smoke',
+          ];
+          document.documentElement.setAttribute(
+            'data-theme',
+            implemented.indexOf(stored) === -1 ? 'dark' : stored,
+          );
+        } catch (error) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

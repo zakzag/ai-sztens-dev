@@ -1,0 +1,485 @@
+# Vapi
+
+Instructions for AI Agents:
+
+- For clean Markdown of any page, append `.md` to the page URL
+- For section-specific indexes, append `/llms.txt` to any section URL
+- For AI client integration (Claude Code, Cursor, etc.), connect to the MCP server at https://docs.vapi.ai/_mcp/server
+
+## Docs
+
+- [Introduction](https://docs.vapi.ai/quickstart/introduction.md): Get started with Vapi, the developer platform for building voice AI agents that make and receive phone calls, handling the infrastructure so you can build.
+- [Phone calls](https://docs.vapi.ai/quickstart/phone.md): Make your first Vapi phone call in minutes, creating a voice agent in the Dashboard or programmatically and talking to it over the phone.
+- [Web calls](https://docs.vapi.ai/quickstart/web.md): Build voice interfaces and backend integrations with Vapi's Web and Server SDKs, covering client-side voice apps and server-side call management.
+- [Guides](https://docs.vapi.ai/guides.md): Browse real-world, cloneable Vapi examples that build voice agents with assistants and squads, from appointment booking to multilingual support routing.
+- [Composer](https://docs.vapi.ai/composer.md): Build and configure Vapi voice agents through natural conversation with Composer, which creates assistants, sets up numbers and integrations, and troubleshoots.
+- [Vapi CLI](https://docs.vapi.ai/cli.md): Command-line interface for building voice AI applications faster
+- [Agent skills](https://docs.vapi.ai/agent-skills.md): Learn how to install agent skills for Vapi and use them with AI coding assistants to create assistants, configure tools, place calls, and run Simulations.
+- [Config as code (GitOps)](https://docs.vapi.ai/config-as-code.md): Use Vapi GitOps to manage assistants, squads, tools, structured outputs, simulations, and evals as code, then review and promote changes across environments.
+- [Path to production](https://docs.vapi.ai/quickstart/path-to-production.md): Take a Vapi assistant from a first test call to production. Choose a model preset, publish a version, test it with Simulations, and monitor live calls.
+- [Assistants quickstart](https://docs.vapi.ai/assistants/quickstart.md): Build your first Vapi assistant, connect it to a phone number, and make a call, working through the steps in the Dashboard or with the Vapi API.
+- [Transient vs permanent configurations](https://docs.vapi.ai/assistants/concepts/transient-vs-permanent-configurations.md): Choose between transient inline and permanent stored assistant configurations in Vapi, and learn when each fits for flexibility, reusability, and management.
+- [Assistant overrides](https://docs.vapi.ai/assistants/assistant-overrides.md): Use assistantOverrides to change a saved assistant's settings per call, batch customer, inbound request, squad member, or handoff, and learn how overrides merge and which level wins.
+- [Variables](https://docs.vapi.ai/assistants/dynamic-variables.md): Personalize Vapi assistant prompts and messages with dynamic variables in double curly braces, setting values at call time through assistantOverrides.
+- [Multilingual support](https://docs.vapi.ai/customization/multilingual.md): Configure multilingual voice AI agents with automatic language detection, cross-language conversation, and localized voices
+- [Personalization with user information](https://docs.vapi.ai/assistants/personalization.md): Personalize Vapi conversations with customer-specific data your server supplies at call time, tailoring responses for support, account management, and more.
+- [Voice formatting plan](https://docs.vapi.ai/assistants/voice-formatting-plan.md): Format Vapi LLM output for natural-sounding speech, expanding numbers, currency, and symbols so text-to-speech reads them clearly, enabled by default.
+- [Flush syntax](https://docs.vapi.ai/assistants/flush-syntax.md): Force immediate voice transmission with VAPI's flush syntax for real-time interactions
+- [Background messages](https://docs.vapi.ai/assistants/background-messages.md): Silently add information to a Vapi call's chat history without notifying the user, logging button presses, actions, or context updates during the conversation.
+- [Idle messages](https://docs.vapi.ai/assistants/idle-messages.md): Keep users engaged during Vapi call pauses with idle messages that trigger on customer silence, using fixed text or model-generated prompts via assistant hooks.
+- [Assistant hooks](https://docs.vapi.ai/assistants/assistant-hooks.md): Automate actions on Vapi call events like ending and speech interruptions, using assistant hooks to transfer calls, run functions, or send messages.
+- [Call timeout settings](https://docs.vapi.ai/documentation/assistants/conversation-behavior/call-timeout-settings.md): Configure silence and maximum-duration timeouts for assistants, distinguish inactivity from total call duration, and troubleshoot timeout call endings.
+- [Keypad input settings](https://docs.vapi.ai/documentation/assistants/conversation-behavior/keypad-input-settings.md): Keypad input settings let assistants collect keys callers press. Configure timeouts and delimiters for menus, codes, and account information during calls.
+- [End call phrases](https://docs.vapi.ai/documentation/assistants/conversation-behavior/end-call-phrases.md): End call phrases let assistants end calls after saying configured text. Choose reliable phrases and prevent unintended transcript matches during calls.
+- [Background speech denoising](https://docs.vapi.ai/documentation/assistants/conversation-behavior/background-speech-denoising.md): Filter out noise and background speech while users are talking
+- [Pronunciation dictionaries](https://docs.vapi.ai/assistants/pronunciation-dictionaries.md): Control how a Vapi assistant pronounces specific words, names, and acronyms using pronunciation dictionaries with phoneme and alias rules by voice provider.
+- [Email address reading](https://docs.vapi.ai/assistants/email-address-reading.md): Get a Vapi voice agent to collect, read back, and confirm email addresses clearly, using built-in TTS formatting, prompting, and confirmation techniques.
+- [Speech configuration](https://docs.vapi.ai/customization/speech-configuration.md): Control when a Vapi assistant starts and stops speaking, tuning speech settings to sound natural, avoid interrupting the customer, and reduce awkward pauses.
+- [Voice pipeline configuration](https://docs.vapi.ai/customization/voice-pipeline-configuration.md): Complete guide to configuring VAPI's voice pipeline for optimal conversation timing and interruption handling
+- [Voice fallback configuration](https://docs.vapi.ai/voice-fallback-plan.md): Configure an ordered voice fallback plan in the Dashboard or API, test backup voices, and troubleshoot calls that end before fallback activates.
+- [Transcriber fallback configuration](https://docs.vapi.ai/customization/transcriber-fallback-plan.md): Configure fallback transcribers so calls keep working if your primary speech-to-text provider fails. Covers automatic fallback, manual fallback, and HIPAA-compliant provider options.
+- [Model fallback configuration](https://docs.vapi.ai/customization/model-fallback-plan.md): Configure fallbackModels for OpenAI and Anthropic Bedrock models in the Dashboard or API, and compare model fallback with voice and transcriber fallback.
+- [OpenAI Realtime](https://docs.vapi.ai/openai-realtime.md): Build Vapi voice assistants on OpenAI's Realtime speech-to-speech models for low latency, covering model choice, configuration, and production best practices.
+- [Provider Keys](https://docs.vapi.ai/customization/provider-keys.md): Connect provider credentials in Vapi and find configuration details for transcriber, model, voice, and cloud providers.
+- [Versioning](https://docs.vapi.ai/assistants/versioning.md): Versioning saves published assistant and tool configurations so you can make changes in a draft, review their history, and restore an earlier version.
+- [Versioning with assistants](https://docs.vapi.ai/assistants/versioning/versioning-assistants.md): Publish assistant changes, review version history, restore an earlier configuration as a new current version, and select the published assistant version for a call.
+- [Versioning with tools](https://docs.vapi.ai/assistants/versioning/versioning-tools.md): Publish tool changes, review version history, restore an earlier configuration to the draft, and select the specific tool version that an assistant uses.
+- [How versioning works with assistants and tools](https://docs.vapi.ai/assistants/versioning/versioning-with-assistants-and-tools.md): Select a specific or latest tool version for an assistant, and learn how restoring an assistant also restores the tool version selections saved with it.
+- [How squad versioning works with assistant versions](https://docs.vapi.ai/assistants/versioning/versioning-with-squads.md): Create and review squad versions, pin members to specific published assistant versions or use Latest, and choose a squad version for outbound calls.
+- [Traffic splitting](https://docs.vapi.ai/assistants/versioning/traffic-splitting.md): Split live call traffic between published assistant versions by percentage, so you can canary a new version, run experiments, and roll back instantly.
+- [Compare versions on the Traffic tab](https://docs.vapi.ai/assistants/versioning/traffic-tab.md): Compare assistant versions on the Traffic tab or metrics API by call volume, configured and actual share, duration, cost per minute, latency, and ended reasons.
+- [Review traffic history](https://docs.vapi.ai/assistants/versioning/traffic-history.md): Review every traffic split change for an assistant, with its shares, note, author, and time, then open a split's metrics or list the history from the API.
+- [Model Intelligence for transcribers, models, and voices](https://docs.vapi.ai/assistants/model-intelligence/overview.md): Model Intelligence helps you choose transcribers, models, and voices with curated presets and weekly refreshed performance metrics for latency, cost, and quality.
+- [Model Presets for transcribers, models, and voices](https://docs.vapi.ai/assistants/model-intelligence/presets.md): Model presets optimize for balanced performance, reasoning, low latency, or low cost. Learn when to use each preset and how to apply or customize its configuration.
+- [Performance metrics and methodology reference](https://docs.vapi.ai/assistants/model-intelligence/metrics-methodology.md): The performance metrics reference explains how Vapi sources and calculates latency, cost, and quality data for each supported transcriber, model, and voice.
+- [How voice agent component costs and estimates work](https://docs.vapi.ai/assistants/model-intelligence/understanding-cost.md): Understand how Vapi estimates transcriber, model, and voice costs per minute, including prompt caching assumptions and the effects of conversation history.
+- [How voice-to-voice latency works in voice agents](https://docs.vapi.ai/assistants/model-intelligence/understanding-latency.md): Understand voice-to-voice latency, the per-turn latency fields each call records, Vapi performance metrics, and how model capability, endpointing, and transport affect response time.
+- [GPT-Live](https://docs.vapi.ai/gpt-live/overview.md): Learn what GPT-Live changes for a Vapi assistant, how its speaker and reasoner work together, whether it fits your use case, and where to start.
+- [GPT-Live quickstart](https://docs.vapi.ai/gpt-live/quickstart.md): Create a GPT-Live assistant in the Vapi dashboard or API with no custom backend, talk to it in the browser, and check the call record for the end-call action.
+- [Design GPT-Live conversations](https://docs.vapi.ai/gpt-live/design.md): Design GPT-Live conversations around the caller's aim, with speaking and listening happening while the reasoner and tools work. Covers dependencies, useful waiting, returning results, corrections, speaking style, personality packs, idle callers, and paired prompts.
+- [Build with tools](https://docs.vapi.ai/gpt-live/tools.md): How GPT-Live uses tools. Design tool inputs and results, handle actions that change state, return results correctly, handle slow and external work, and connect retrieval, transfers, and MCP tools.
+- [Reasoner skills](https://docs.vapi.ai/gpt-live/skills.md): Use reasoner skills in GPT-Live to group a procedure with its tools, so the reasoner loads the right instructions for each task while the caller hears one assistant.
+- [Migrate to GPT-Live](https://docs.vapi.ai/gpt-live/migrate.md): Migrate a Vapi assistant or squad to GPT-Live. Check fit, convert a copy, split prompts between the speaker and reasoner, map squad members to reasoner skills, compare results, and roll back safely.
+- [Test and improve GPT-Live assistants](https://docs.vapi.ai/gpt-live/testing.md): Test GPT-Live assistants with representative scenarios, Voice Simulations, and call records. Measure latency and cost, monitor production calls, and troubleshoot common symptoms.
+- [GPT-Live settings and compatibility](https://docs.vapi.ai/gpt-live/configuration.md): Reference for GPT-Live in Vapi. Feature compatibility, speaker and reasoner fields, reasoner skills, personality packs, voices with previews, greetings, idle-message hooks, call connections, and live call control.
+- [Keywords and keyterm prompting](https://docs.vapi.ai/customization/custom-keywords.md): Boost Vapi transcription accuracy for domain terms and proper nouns using Deepgram keyword boosting, AssemblyAI keyterm prompting, and OpenAI keywords on your assistant.
+- [Custom voices](https://docs.vapi.ai/customization/custom-voices/custom-voice.md): Use a custom voice from any supported provider in Vapi by setting the voice property in your assistant configuration with the provider's voice details.
+- [ElevenLabs](https://docs.vapi.ai/customization/custom-voices/elevenlabs.md): Set up a custom or cloned ElevenLabs voice in Vapi, subscribing to an ElevenLabs API plan and adding your API key and voice ID to your assistant.
+- [Cartesia](https://docs.vapi.ai/customization/custom-voices/cartesia.md): Use a custom Cartesia voice in Vapi by connecting your Cartesia API key and selecting your voice.
+- [Gandr](https://docs.vapi.ai/customization/custom-voices/gandr.md): Wire Gandr, a text to speech API for voice agents, into Vapi with the custom-voice provider and Custom Credentials.
+- [Custom transcriber](https://docs.vapi.ai/customization/custom-transcriber.md): Integrate your own transcription service with Vapi instead of a built-in provider, using a custom transcriber, shown here with a Deepgram setup.
+- [Gradium](https://docs.vapi.ai/customization/custom-transcriber/gradium.md): Stream Vapi call audio to Gradium's real-time speech-to-text over a WebSocket bridge.
+- [Custom TTS integration](https://docs.vapi.ai/customization/custom-voices/custom-tts.md): Integrate your own text-to-speech system with Vapi for full control over voice synthesis, using any TTS provider while keeping real-time performance.
+- [Gradium](https://docs.vapi.ai/customization/custom-tts/gradium.md): Connect the Gradium text-to-speech API to Vapi through a custom voice endpoint.
+- [Fine-tuned OpenAI models](https://docs.vapi.ai/customization/custom-llm/fine-tuned-openai-models.md): Use fine-tuned or OpenAI-compatible models as your Vapi LLM, connecting endpoints like OpenRouter, Together AI, or your own server to power an assistant.
+- [Connecting Your Custom LLM to Vapi: A Comprehensive Guide](https://docs.vapi.ai/customization/custom-llm/using-your-server.md): Connect your own server as a custom LLM in Vapi, walking through an OpenAI-compatible setup with Ngrok to handle the request and response flow end to end.
+- [Custom LLM Tool Calling Integration](https://docs.vapi.ai/customization/tool-calling-integration.md): Add tool calling to a custom LLM in Vapi so your model can trigger external functions and actions mid-conversation, with the request and response format.
+- [Appointment scheduling assistant](https://docs.vapi.ai/assistants/examples/appointment-scheduling.md): Build a voice AI appointment scheduling assistant with Google Calendar integration, availability checking, and automated confirmations using Vapi Assistants.
+- [Lead qualification assistant](https://docs.vapi.ai/assistants/examples/lead-qualification.md): Build a voice AI outbound sales assistant with BANT data capture, CRM integration, objection handling, and automated follow-ups using Vapi Assistants.
+- [Inbound customer support](https://docs.vapi.ai/assistants/examples/inbound-support.md): Build a Vapi inbound support demo with a Query tool and sample CSV files, then configure prompts and test account, balance, and transaction retrieval.
+- [Web Snippet](https://docs.vapi.ai/assistants/examples/voice-widget.md): Add the Vapi Voice Widget to your website so visitors can talk to a voice assistant, using a copy-paste snippet or a custom implementation.
+- [Documentation agent](https://docs.vapi.ai/assistants/examples/docs-agent.md): Build a Vapi voice assistant that answers questions about your documentation, step by step, using the Dashboard or the API to configure and deploy it.
+- [Customer support escalation system](https://docs.vapi.ai/assistants/examples/support-escalation.md): Build a voice AI customer support system with dynamic escalation that routes calls based on customer data, issue type, and real-time agent availability using transfer tools and webhooks.
+- [Multilingual support agent](https://docs.vapi.ai/assistants/examples/multilingual-agent.md): Build a multilingual Vapi support demo with transcription, voice settings, prompts, and a Query tool for sample customer, product, and support article data.
+- [Tools](https://docs.vapi.ai/tools.md): Learn what a Vapi tool is, how a tool call flows between the model, Vapi, and your server, which tool types exist, and the configuration every tool shares.
+- [Built-in tools](https://docs.vapi.ai/tools/default-tools.md): Add Vapi's built-in default tools to assistants, including transfer call, hang up, SMS, DTMF keypad, and API request, through the API or dashboard.
+- [When to use API Request or Function tools](https://docs.vapi.ai/tools/api-request-vs-function.md): Compare Vapi's API Request and Function tools, choosing API Request for direct HTTPS APIs and Function for tool-calls webhooks or async and client-side execution.
+- [API Request tool](https://docs.vapi.ai/tools/api-request.md): Learn when to use an API Request Tool, how requests move between an assistant and an HTTP endpoint, and how to build your first working integration with Vapi.
+- [API Request tool quickstart](https://docs.vapi.ai/tools/api-request/quickstart.md): Build a coffee-order assistant that sends confirmed orders to a public endpoint and reads the server-calculated total and order number back to the caller.
+- [Customize API Request tool requests](https://docs.vapi.ai/tools/api-request/configuration.md): Configure an API Request Tool's URL, method, model-generated body, request headers, static body fields, and Liquid values with Dashboard and cURL examples.
+- [Get order status](https://docs.vapi.ai/tools/api-request/order-status.md): Add an order-status API Request Tool to the coffee-order assistant, update its opening and system prompt, and verify status lookup across two inbound calls.
+- [Handle API Request Tool latency and retries](https://docs.vapi.ai/tools/api-request/reliability.md): Learn how API Request Tool timeouts and failed HTTP requests behave, keep callers informed, and handle safe retries in a service you control.
+- [Handle API Request tool responses and errors](https://docs.vapi.ai/tools/api-request/response-handling.md): Handle successful and failed API Request Tool responses, test structured errors, guide assistant recovery, and inspect call results in the Dashboard or with cURL.
+- [Use API Request tool response data](https://docs.vapi.ai/tools/api-request/response-data.md): Use API Request Tool JSON responses immediately, extract response fields with schemas or aliases, and pass extracted variables to subsequent tools.
+- [Function tools](https://docs.vapi.ai/tools/custom-tools.md): Create and manage Function tools through the Vapi dashboard or API, connect them to server-side logic, test webhooks locally, and reuse them across assistants.
+- [Transfer Call tool](https://docs.vapi.ai/tools/transfer-call.md): How the Vapi transfer call tool routes a phone call to a phone number or SIP URI, how each transfer mode behaves, what the destination receives, and how failed transfers end.
+- [Set up the Transfer Call tool](https://docs.vapi.ai/tools/transfer-call/setup.md): Create a Vapi transfer call tool in the Dashboard or API, add phone-number and SIP destinations, configure transfer and refusal messages, and assign it to an assistant.
+- [Configure blind transfer modes](https://docs.vapi.ai/tools/transfer-call/blind-transfer.md): Configure blind call transfers in the Vapi Dashboard or API, choose a SIP transfer method, add a summary header, verify routing, and diagnose failures.
+- [Configure warm transfer modes](https://docs.vapi.ai/tools/transfer-call/warm-transfer.md): Configure traditional warm transfer modes in the Vapi Dashboard or API, including messages, summaries, operator-first timing, TwiML, and timeouts.
+- [Configure assistant-based warm transfer](https://docs.vapi.ai/calls/assistant-based-warm-transfer.md): Configure an assistant-based warm transfer in the Vapi Dashboard or API, including operator prompts, fallback behavior, summaries, custom audio, and testing.
+- [Hang Up tool](https://docs.vapi.ai/tools/hang-up.md): Learn what the Hang Up tool does, when to use it instead of end call phrases, and how an assistant ends a call with a configured goodbye message.
+- [Hang Up tool quickstart](https://docs.vapi.ai/tools/hang-up/quickstart.md): Build an assistant for the Vapi hardware store that answers a caller's question, confirms they have nothing else to ask, says goodbye, and ends the call with the Hang Up tool.
+- [Configure the Hang Up tool](https://docs.vapi.ai/tools/hang-up/configuration.md): Configure the Hang Up tool's goodbye message, attach it to an assistant, write prompt rules, add a rejection plan, and confirm how calls end with Dashboard and cURL examples.
+- [Handoff tool](https://docs.vapi.ai/squads/handoff.md): Transfer a Vapi call between assistants with the handoff tool, covering destination types, context management, and configuration for multi-agent squads.
+- [Configure handoff destinations](https://docs.vapi.ai/squads/handoff/destinations.md): Declare handoff destinations by assistant ID or name, offer the model several options, resolve one at runtime by webhook, or hand off to a whole squad.
+- [Pass context and variables](https://docs.vapi.ai/squads/handoff/context-and-variables.md): Choose the conversation history a destination receives and pass variables through handoff arguments, tool results, or extraction.
+- [Configure messages and rejection rules](https://docs.vapi.ai/squads/handoff/messages-and-rejection.md): Set the messages an assistant speaks at each phase of a handoff, and block handoff attempts using regex, Liquid, or grouped conditions on conversation state.
+- [Troubleshoot handoffs](https://docs.vapi.ai/squads/handoff/troubleshooting.md): Fix handoffs that never fire or route to the wrong assistant, starting with the system prompt instructions that tell the model when to call the handoff tool.
+- [Voicemail tool](https://docs.vapi.ai/tools/voicemail-tool.md): Give a Vapi assistant direct control over voicemail with the voicemail tool, deciding when it reaches voicemail to leave a message or end the call.
+- [Configure the Voicemail tool](https://docs.vapi.ai/tools/voicemail-tool/configure.md): Create a Vapi voicemail tool in the Dashboard or API, attach it to an assistant, prompt for voicemail detection, and set the message for each behavior mode.
+- [DTMF tool](https://docs.vapi.ai/tools/dtmf.md): Use the Vapi DTMF tool to let an assistant send keypad tones during a phone call to navigate phone menus, enter IDs, or accept forwarded calls.
+- [Configure the DTMF tool](https://docs.vapi.ai/tools/dtmf/configure.md): Configure the Vapi DTMF tool in the dashboard or API, with key strings by provider, prompt rules, tool messages, SIP INFO, and tone checks.
+- [SIP Request tool](https://docs.vapi.ai/tools/sip-request.md): Use the SIP Request tool to let a Vapi assistant send SIP INFO, MESSAGE, or NOTIFY requests mid-call to your PBX, SBC, or contact center platform on SIP calls.
+- [Configure the SIP Request tool](https://docs.vapi.ai/tools/sip-request/configure.md): Configure the Vapi SIP Request tool in the dashboard or API, prompt the assistant, send requests from hooks, set tool messages and variables, and verify delivery.
+- [Client-side tools (Web SDK)](https://docs.vapi.ai/tools/client-side-websdk.md): Handle Vapi tool calls entirely in the browser with the Web SDK, triggering UI side effects like notifications or state changes without a server URL.
+- [Knowledge bases](https://docs.vapi.ai/knowledge-base.md): Create and integrate knowledge bases into Vapi voice agents so they retrieve information from your documents to answer questions accurately during a call.
+- [Query tool](https://docs.vapi.ai/knowledge-base/using-query-tool.md): Configure the Vapi query tool to give an assistant access to a knowledge base, retrieving information from your files by ID for accurate, grounded responses.
+- [Custom knowledge base](https://docs.vapi.ai/knowledge-base/custom-knowledge-base.md): Build a custom knowledge base in Vapi with your own retrieval server, using your vector database or search logic to control how an assistant finds answers.
+- [Implement the custom endpoint](https://docs.vapi.ai/knowledge-base/implement-custom-endpoint.md): Handle the Vapi knowledge base request on your own server, return documents or a direct answer, integrate a vector database, and harden the endpoint.
+- [MCP tools](https://docs.vapi.ai/tools/mcp.md): Learn what the Vapi MCP tool does, when to use it, how Vapi fetches and calls an MCP server's tools, and how to create an MCP tool in the Dashboard or with cURL.
+- [Configure MCP tools](https://docs.vapi.ai/tools/mcp/configure.md): Configure a Vapi MCP tool's fields, header or credential authentication, context headers, variables, argument encryption, tool names, and transport.
+- [MCP tool messages and results](https://docs.vapi.ai/tools/mcp/messages-and-results.md): Set spoken messages for all or individual MCP tools in Vapi, and learn how an MCP server's content, structuredContent, and isError reach the model.
+- [Troubleshoot MCP tools](https://docs.vapi.ai/tools/mcp/troubleshooting.md): Troubleshoot Vapi MCP tools, including missing tools, failed tool list requests, unfilled variables, credential and encryption errors, and messages that don't play.
+- [MCP providers](https://docs.vapi.ai/tools/mcp/providers.md): Connect a Vapi MCP tool to Zapier, Composio, or Make MCP servers, with the server URL, auth header, and links to each provider's setup documentation.
+- [Integrations](https://docs.vapi.ai/tools/integrations.md): Connect a Vapi assistant to external services using prebuilt integrations or service guides for API Request, Model Context Protocol (MCP), and Function tools.
+- [Choose a Make integration pattern](https://docs.vapi.ai/tools/integrations/make.md): Choose a Make integration pattern for an assistant: API Request for webhooks, Model Context Protocol (MCP) for discovered tools, or Function for call context.
+- [n8n](https://docs.vapi.ai/tools/integrations/n8n.md): Connect Vapi to n8n with an API Request tool and a published Webhook workflow. Run the business-hours starter, verify JSON responses, and diagnose setup issues.
+- [Google Calendar](https://docs.vapi.ai/tools/google-calendar.md): Connect a Vapi assistant to Google Calendar to create events by voice and check availability, letting it schedule appointments during a call.
+- [Google Sheets](https://docs.vapi.ai/tools/google-sheets.md): Connect a Vapi assistant to Google Sheets to add new rows during phone calls, recording caller information and data directly into your spreadsheets.
+- [Slack](https://docs.vapi.ai/tools/slack.md): Connect a Vapi assistant to Slack to send messages to a configured channel during phone calls, notifying your team or sharing updates in real time.
+- [GoHighLevel](https://docs.vapi.ai/tools/go-high-level.md): Connect a Vapi assistant to GoHighLevel to manage appointments, checking contacts, creating leads, querying calendar availability, and booking events.
+- [Static variables and aliases](https://docs.vapi.ai/tools/static-variables-and-aliases.md): Inject server-controlled values into Vapi tool calls without the LLM, using static variables and aliases to chain data across calls deterministically.
+- [How tool variables work](https://docs.vapi.ai/tools/static-variables-and-aliases/how-variables-work.md): Compare a tool's function.parameters schema against its top-level parameters array, and classify every variable source with Vapi's three-tier trust model.
+- [Set static parameters](https://docs.vapi.ai/tools/static-variables-and-aliases/static-parameters.md): Add static parameters to API Request and Function tools, use them as a security boundary against prompt injection, and set Static Body Fields in the dashboard.
+- [Extract and chain values](https://docs.vapi.ai/tools/static-variables-and-aliases/extract-and-chain.md): Define a variableExtractionPlan with aliases, chain tools so one tool's output feeds the next deterministically, and forward trusted values across handoffs.
+- [Troubleshoot tool variables](https://docs.vapi.ai/tools/static-variables-and-aliases/troubleshooting.md): Fix static parameter and alias failures caused by trusted fields declared in function.parameters, values in body schema defaults, or system prompt passing.
+- [Dynamic tool messages](https://docs.vapi.ai/tools/dynamic-tool-messages.md): Configure bot_say for Function and Handoff tools so an assistant speaks a context-aware message before execution and handles multiple tool calls correctly.
+- [Tool rejection plan](https://docs.vapi.ai/tools/tool-rejection-plan.md): Prevent unintended Vapi tool calls with a rejection plan that evaluates recent conversation state and blocks a tool when your conditions are met.
+- [Tool argument encryption](https://docs.vapi.ai/tools/encryption.md): Encrypt sensitive tool arguments like SSNs and card numbers in Vapi, protecting specific fields before they are sent to your server during a tool call.
+- [Troubleshoot tools](https://docs.vapi.ai/tools/custom-tools-troubleshooting.md): Troubleshoot Function tool integrations in Vapi, including trigger failures, response errors, token truncation, multiple tool responses, and async behavior.
+- [Configuring Inbound and Outbound Calls for Squads](https://docs.vapi.ai/squads-example.md): Configure inbound and outbound calls for Vapi Squads, handling assistant-request payloads with transient assistants or assistant IDs for each call type.
+- [Introduction to Squads (Multi-Assistant Conversations)](https://docs.vapi.ai/squads.md): Break complex workflows into multiple specialized Vapi assistants that hand off during a call, reducing hallucination, cost, and latency versus one assistant.
+- [Passing data between assistants](https://docs.vapi.ai/squads/passing-data-between-assistants.md): Compare handoff arguments, destination extraction, tool-result aliases, and Liquid variables for passing data between assistants.
+- [Clinic triage with handoff tools](https://docs.vapi.ai/squads/examples/clinic-triage-scheduling-handoff-tool.md): Build a multi-assistant clinic experience with specialized assistants for triage, emergency handling, and scheduling using handoff tools.
+- [Clinic triage and scheduling squad](https://docs.vapi.ai/squads/examples/clinic-triage-scheduling.md): Build a multi-assistant clinic experience with specialized assistants for triage, emergency handling, and scheduling using Squads.
+- [E‑commerce order management squad](https://docs.vapi.ai/squads/examples/ecommerce-order-management.md): Build a multi-assistant experience for order tracking, returns processing, and VIP handling using Squads.
+- [Property management routing squad](https://docs.vapi.ai/squads/examples/property-management.md): Build a property management Squad with a router assistant plus maintenance and leasing specialists for accurate transfers.
+- [Multilingual support squad](https://docs.vapi.ai/squads/examples/multilingual-support.md): Build a Squad with dedicated English, Spanish, and French assistants and a language selection entrance flow.
+- [Silent Handoffs](https://docs.vapi.ai/squads/silent-handoffs.md): Hand off a Vapi call between squad assistants silently, so the caller never hears a transfer, by configuring the destination assistant's first message.
+- [Creating Free Phone Numbers](https://docs.vapi.ai/free-telephony.md): Create free US phone numbers on Vapi for your assistants or squads, with your first number available before you add a payment method to your account.
+- [Inbound SMS](https://docs.vapi.ai/phone-numbers/inbound-sms.md): Let Vapi agents auto-start a conversation from an incoming text message, supported for Twilio US numbers with SMS enabled on US-to-US messaging only.
+- [Import number from Twilio](https://docs.vapi.ai/phone-numbers/import-twilio.md): Import a new or existing Twilio phone number into Vapi so your assistants can place and receive calls on it as you scale to other telephony providers.
+- [Import number from Telnyx](https://docs.vapi.ai/telnyx.md): Import and troubleshoot your existing Telnyx phone numbers in Vapi, then enable outbound calling so your assistants or squads can use them to place calls.
+- [Import a number from DIDWW](https://docs.vapi.ai/phone-numbers/didww.md): Import a DIDWW phone number into Vapi as a BYO SIP trunk number. Assign the inbound trunk credential and an assistant, then test inbound and outbound calls.
+- [SIP introduction](https://docs.vapi.ai/advanced/sip.md): Make and test SIP calls to a Vapi assistant from any SIP client or softphone, assigning a SIP phone number and passing template variables through SIP headers.
+- [SIP Trunking](https://docs.vapi.ai/advanced/sip/sip-trunk.md): Integrate your SIP provider with Vapi using SIP trunking, connecting your PBX or VoIP system to the PSTN with the network and allowlist requirements.
+- [SIP networking and firewall configuration](https://docs.vapi.ai/advanced/sip/sip-networking.md): Configure your firewall and network for Vapi SIP trunks, with the IP addresses, ports, and protocols needed to allow SIP signaling and RTP media traffic.
+- [Twilio SIP Integration](https://docs.vapi.ai/advanced/sip/twilio.md): Connect a Twilio SIP trunk to Vapi for inbound and outbound calls, walking through the setup so your AI voice assistants can handle Twilio calls.
+- [Telnyx SIP integration](https://docs.vapi.ai/advanced/sip/telnyx.md): Connect a Telnyx SIP trunk to Vapi for inbound and outbound calls, walking through the full setup so your AI voice assistants can handle calls.
+- [DIDWW SIP integration](https://docs.vapi.ai/advanced/sip/didww.md): Set up DIDWW SIP trunking with Vapi. Create inbound and outbound trunks, allowlist signaling IPs, and configure authenticated SIP REFER call transfers.
+- [didlogic SIP integration](https://docs.vapi.ai/advanced/sip/didlogic.md): Configure didlogic and Vapi for inbound calls, outbound calls, and SIP REFER transfers.
+- [Bitcall SIP integration](https://docs.vapi.ai/advanced/sip/bitcall.md): Configure a Bitcall SIP trunk with username and password authentication so your Vapi assistants can place outbound calls.
+- [Zadarma SIP Integration](https://docs.vapi.ai/advanced/sip/zadarma.md): Connect a Zadarma SIP trunk to Vapi for inbound and outbound calls, walking through the setup so your AI voice assistants can handle Zadarma calls.
+- [Plivo SIP Integration](https://docs.vapi.ai/advanced/sip/plivo.md): Connect a Plivo SIP trunk to your Vapi agents for inbound and outbound calls, covering trunk setup and routing between Plivo and Vapi.
+- [Amazon Chime SDK SIP Integration](https://docs.vapi.ai/advanced/sip/amazon-chime.md): Integrate Amazon Chime SDK Voice Connector with Vapi for inbound and outbound SIP trunking, connecting an AI assistant to a phone number without Lambda logic.
+- [Troubleshoot SIP trunk credential errors](https://docs.vapi.ai/advanced/sip/troubleshoot-sip-trunk-credential-errors.md): Resolve the SIP gateway creation failed error when creating a BYO SIP trunk credential in Vapi, covering the common causes and how to fix each one.
+- [Troubleshoot SIP response codes](https://docs.vapi.ai/advanced/sip/troubleshoot-sip-response-codes.md): Diagnose SIP response codes by response class, failure point, and call direction, then check the relevant Vapi, provider, network, or destination configuration.
+- [Phone Number Hooks](https://docs.vapi.ai/phone-numbers/phone-number-hooks.md): Configure phone number hooks in Vapi to run actions on the call.ringing and call.ending events by defining them in a phone number's hooks array.
+- [Phone Calling](https://docs.vapi.ai/phone-calling.md): Create and configure phone numbers in Vapi. Use a free US number to receive inbound calls, or import a number from a provider to place outbound and international calls.
+- [Outbound Calling](https://docs.vapi.ai/calls/outbound-calling.md): Send outbound calls from Vapi programmatically, placing single or batch calls and scheduling them for reminders, surveys, and automated call campaigns.
+- [WebSocket Transport](https://docs.vapi.ai/calls/websocket-transport.md): Stream audio directly via WebSockets for real-time, bidirectional communication
+- [Live call control](https://docs.vapi.ai/calls/call-features.md): Use a call's controlUrl to speak, add messages, mute, transfer, hand off, or end a live Vapi call from your server.
+- [Listen to live calls](https://docs.vapi.ai/calls/call-listen.md): Use a call's listenUrl to stream live Vapi call audio and real-time events, such as transcripts, over a WebSocket to record, monitor, or analyze calls from your server.
+- [Customer Join Timeout](https://docs.vapi.ai/calls/customer-join-timeout.md): Set maximum time for users to join web calls before automatic termination
+- [Voicemail Detection](https://docs.vapi.ai/calls/voicemail-detection.md): Detect voicemail on outbound Vapi calls to handle it faster and more flexibly, keeping your voice agents efficient when a call reaches an answering machine.
+- [Keypad tones (DTMF)](https://docs.vapi.ai/calls/dtmf.md): Learn the ways a Vapi assistant can send dual-tone multi-frequency (DTMF) keypad tones or receive caller key presses, which one to use, and where each works.
+- [IVR Navigation](https://docs.vapi.ai/ivr-navigation.md): Navigate IVR phone menus reliably with Vapi's DTMF tool, using pauses between keys, provider-specific pause characters, and prompting tips for accurate input.
+- [Dynamic call transfers](https://docs.vapi.ai/calls/call-dynamic-transfers.md): Learn how Vapi's dynamic call transfers work and explore implementation patterns for intelligent call routing.
+- [Transfer calls using API Request and Transfer Call tools](https://docs.vapi.ai/calls/transfer-calls-with-api-lookup.md): Use API Request and Transfer Call tools to look up a branch by ZIP code, get caller consent, transfer to a configured phone number, and test lookup failures.
+- [Call Handling with Vapi and Twilio](https://docs.vapi.ai/calls/call-handling-with-vapi-and-twilio.md): Keep a caller on hold while dialing a specialist using Vapi and Twilio, with a fallback action when the specialist misses the call or it reaches voicemail.
+- [Troubleshoot call transfers](https://docs.vapi.ai/phone-calling/in-call-control/transfer-calls/debug-forwarding-drops.md): Diagnose transfer tool invocation, configuration and message problems, provider routing, busy and unanswered destinations, fallback behavior, and the evidence to send support.
+- [Call queue management with Twilio](https://docs.vapi.ai/calls/call-queue-management.md): Build a call queue system using Twilio to handle large volumes of calls while respecting Vapi concurrency limits, ensuring no calls are dropped.
+- [Understanding Call Concurrency](https://docs.vapi.ai/calls/call-concurrency.md): Learn how concurrency slots work, how to stay within the default limit, and how to raise capacity for larger campaigns.
+- [Call ended reasons](https://docs.vapi.ai/calls/call-ended-reason.md): Understand Vapi endedReason codes that explain why a call ended, where to find them in call logs and the Call object, and how to diagnose each one.
+- [Troubleshoot call errors](https://docs.vapi.ai/calls/troubleshoot-call-errors.md): Diagnose failed Vapi calls by what the caller experienced, with errors organized by symptom so you can jump to the right fix for each call failure.
+- [Troubleshoot call connection errors](https://docs.vapi.ai/calls/troubleshoot-call-connection-errors.md): Troubleshoot inbound and outbound Vapi calls that never connected. Find the ended reason for a failed call and fix provider, phone number, and account causes.
+- [Call analysis](https://docs.vapi.ai/assistants/call-analysis.md): Automatically summarize and evaluate every Vapi call after it ends, using an LLM to generate summaries, extract structured data, and score calls for quality.
+- [Call recording, logging and transcribing](https://docs.vapi.ai/assistants/call-recording.md): Learn how to configure artifact plans to record calls, generate transcripts, and store logs for analysis
+- [Retrieve call artifacts](https://docs.vapi.ai/assistants/retrieve-call-artifacts.md): How to download call recordings and logs from Vapi's private storage using your Private API Key and short-lived, authenticated redirect URLs.
+- [Campaigns overview](https://docs.vapi.ai/outbound-campaigns/overview.md): Learn how outbound campaigns place calls, personalize conversations, control concurrency, and track results for each contact in the Vapi Dashboard.
+- [Campaigns quickstart](https://docs.vapi.ai/outbound-campaigns/quickstart.md): Create an outbound campaign in the Vapi Dashboard or with the API, add contacts with dynamic variables, choose a calling window, and monitor each contact's result.
+- [Build a personalized appointment campaign](https://docs.vapi.ai/outbound-campaigns/build-personalized-appointment-campaign.md): Build a personalized appointment campaign with contact variables, voicemail handling, scheduling, concurrency, and campaign webhooks.
+- [Campaign contact data](https://docs.vapi.ai/outbound-campaigns/contact-data.md): Format campaign CSV files, understand contact limits, add contacts manually, and pass dynamic variables to an assistant or squad.
+- [Campaign scheduling and lifecycle](https://docs.vapi.ai/outbound-campaigns/scheduling-and-lifecycle.md): Schedule campaign calls, set concurrency, understand read-only campaign behavior, and cancel, archive, or duplicate campaigns.
+- [Campaign voicemail and call screening](https://docs.vapi.ai/outbound-campaigns/voicemail-and-call-screening.md): Configure campaign assistants and squads to handle voicemail and automated phone-screening services without premature timeouts.
+- [Warm outbound numbers with campaigns](https://docs.vapi.ai/outbound-campaigns/number-warming.md): Use recurring outbound campaigns to place small batches of real conversations from your production numbers, classify every call with a structured output, and aggregate the results per campaign and per number through the API.
+- [Campaign webhooks](https://docs.vapi.ai/outbound-campaigns/webhooks.md): Configure campaign pre-dial webhooks and server messages, including request, response, and campaign event payload examples.
+- [Chat quickstart](https://docs.vapi.ai/chat/quickstart.md): Create a text chat with a Vapi assistant, send messages through the Chat API, continue conversations, pass variables, and integrate with TypeScript apps.
+- [Streaming chat](https://docs.vapi.ai/chat/streaming.md): Build a streaming Vapi chat integration with server-sent events, display tokens as they arrive, and maintain context across real-time app conversations.
+- [Non-streaming chat](https://docs.vapi.ai/chat/non-streaming.md): Build a non-streaming Vapi chat integration that returns complete responses, maintains conversation context, and supports reliable request-response workflows.
+- [OpenAI compatibility](https://docs.vapi.ai/chat/openai-compatibility.md): Use Vapi through OpenAI-compatible chat interfaces, migrate existing integrations, and support streaming, non-streaming, and common JavaScript frameworks.
+- [Session management](https://docs.vapi.ai/chat/session-management.md): Manage Vapi chat context with previousChatId or sessionId, understand when to use each method, and build persistent multi-turn conversations safely at scale.
+- [Variable substitution in sessions](https://docs.vapi.ai/chat/variable-substitution.md): Use variable substitution in Vapi chat sessions, understand when values are resolved, and choose safe patterns for updating personalized conversation context.
+- [SMS chat](https://docs.vapi.ai/chat/sms-chat.md): Connect a 10DLC-approved Twilio number to a Vapi assistant, receive customer-initiated SMS messages, and maintain context through managed chat sessions.
+- [Web widget](https://docs.vapi.ai/chat/web-widget.md): Add Vapi's web widget to a website for voice and text conversations, configure its appearance and behavior, and meet usage-based chat access requirements.
+- [Workflows migration guide](https://docs.vapi.ai/workflows/legacy-migration.md): Migrate your Vapi Workflows to Squads before Workflows is retired on August 18, 2026.
+- [Server URLs](https://docs.vapi.ai/server-url.md): Set up server URLs so your application receives Vapi call events like status updates, transcripts, function calls, and end-of-call reports, and responds.
+- [Setting server URLs](https://docs.vapi.ai/server-url/setting-server-urls.md): Set Vapi server URLs at multiple levels to handle call events, and learn how priority decides which URL receives a given event.
+- [Server events](https://docs.vapi.ai/server-url/events.md): Reference the events Vapi POSTs to your Server URL, with the shared message body shape and the payload fields that vary by server message type.
+- [Spam call rejection](https://docs.vapi.ai/server-url/spam-call-rejection.md): Screen inbound Vapi calls with your Server URL, checking the caller number on an assistant-request to reject known spam or return an assistant to proceed.
+- [Developing locally](https://docs.vapi.ai/server-url/developing-locally.md): Receive Vapi server events in local development using the Vapi CLI webhook forwarder and a tunneling service to route webhook payloads to your machine.
+- [Server authentication](https://docs.vapi.ai/server-url/server-authentication.md): Authenticate Vapi webhooks to your server with custom credentials referenced by credentialId, reusing them across assistants, phone numbers, and tools.
+- [Evals quickstart](https://docs.vapi.ai/observability/evals-quickstart.md): Set up automated Vapi Evals to test assistants and squads with mock conversations, response validation, tool-call checks, and pass/fail results.
+- [Advanced eval testing](https://docs.vapi.ai/observability/evals-advanced.md): Advanced Vapi Evals strategies for production voice agents, covering smoke, regression, and edge-case tests, performance tuning, and CI/CD integration.
+- [Simulations overview](https://docs.vapi.ai/observability/simulations-overview.md): Simulations test assistants and squads through real conversations with AI testers. Learn how simulations work in Vapi and when to use them instead of Evals.
+- [Simulations quickstart](https://docs.vapi.ai/observability/simulations-quickstart.md): Create a simulation suite for Riley and check whether the conversation reports the requested appointment details.
+- [Simulations advanced](https://docs.vapi.ai/observability/simulations-advanced.md): Configure advanced simulations with variables, tool mocks, lifecycle webhooks, latency limits, and reusable structured outputs for consistent testing.
+- [Generate a simulation suite with the API](https://docs.vapi.ai/observability/simulations-generate-api.md): Use the Simulations onboarding API to draft test requirements from an assistant's prompt and tools, generate a simulation suite with mocked tools, edit it, and run it.
+- [Configure an AI tester](https://docs.vapi.ai/observability/simulations-configure-ai-tester.md): Configure what a simulation AI tester should accomplish and how it behaves, including its model, transcriber, voice, turn-taking, and fallbacks.
+- [Manage simulations](https://docs.vapi.ai/observability/simulations-manage.md): Manage Vapi simulation suites and runs: edit configurations, review and rerun results, develop testing strategies, maintain coverage, and delete suites.
+- [Boards quickstart](https://docs.vapi.ai/observability/boards-quickstart.md): Build a custom analytics dashboard with Vapi Boards, adding charts, time-range filters, and calculated metrics in the Dashboard to track call performance.
+- [Structured outputs](https://docs.vapi.ai/assistants/structured-outputs.md): Extract structured, schema-defined data from voice calls using AI-powered analysis. Covers field types, extraction timing, limitations, and HIPAA storage behavior.
+- [Structured outputs quickstart](https://docs.vapi.ai/assistants/structured-outputs-quickstart.md): Set up structured data extraction from calls in a few minutes. Create a schema, link it to an assistant, test extraction, and configure HIPAA-safe storage settings.
+- [Structured outputs examples](https://docs.vapi.ai/assistants/structured-outputs-examples.md): Production-ready structured outputs examples for Vapi, with complete schemas, configuration, and integration code for common business scenarios.
+- [Scorecard quickstart](https://docs.vapi.ai/observability/scorecard-quickstart.md): Create a Vapi scorecard that grades completed calls from their structured outputs, awarding points per metric and filtering calls by score via the API.
+- [Monitoring quickstart](https://docs.vapi.ai/observability/monitoring-quickstart.md): Create Vapi monitors that evaluate call data against thresholds, open issues when quality drops, and alert your team by email, Slack, or webhook.
+- [Logs overview](https://docs.vapi.ai/observability/logs/overview.md): Compare Calls, Chat, Sessions, Webhooks, and API in Vapi Logs to choose the right log, understand what it records, and find the available access method.
+- [Call logs](https://docs.vapi.ai/observability/logs/call-logs.md): Use Vapi call logs to inspect transcripts, messages, analysis, costs, latency, recordings, and artifacts, then diagnose what happened during a voice call.
+- [Chat logs](https://docs.vapi.ai/observability/logs/chat-logs.md): Use Vapi chat logs to review text conversations, current inputs and outputs, prior message context, costs, session links, and unexpected replies.
+- [Session logs](https://docs.vapi.ai/observability/logs/session-logs.md): Use Vapi session logs to review persistent conversation context, status, messages, assistant details, and expiration behavior, then find individual chats by session ID.
+- [Webhook logs](https://docs.vapi.ai/observability/logs/webhook-logs.md): Use Vapi webhook logs to inspect recorded server-message deliveries, request and response details, status codes, timing, retries, and failed outcomes.
+- [API request logs](https://docs.vapi.ai/observability/logs/api-request-logs.md): Use Vapi API request logs to inspect recorded requests to the Vapi API, review stored request and response details, check status codes, and debug integrations.
+- [Voice AI Prompting Guide](https://docs.vapi.ai/prompting-guide.md): Write effective prompts for Vapi voice AI assistants, with strategies to design, test, and refine prompts that improve reliability and task success.
+- [Debugging voice agents](https://docs.vapi.ai/debugging.md): Diagnose voice assistant issues with call, API request, and webhook logs, component testing, and provider status checks in the Vapi Dashboard.
+- [Testing voice agents](https://docs.vapi.ai/test/voice-testing.md): Learn to use Evals and Simulations to build reliable voice agents
+- [Plan test coverage](https://docs.vapi.ai/test/plan-test-coverage.md): Prioritize test coverage by risk, mapping customer outcomes, critical decisions, failure paths, guardrails, and voice behavior to Evals and Simulations.
+- [Test outcomes with Simulations](https://docs.vapi.ai/test/simulations-best-practices.md): Write Simulation scenarios that give the AI tester a goal, set success criteria two reviewers would score alike, and cover recovery, guardrail, and voice paths.
+- [Test decisions with Evals](https://docs.vapi.ai/test/evals-best-practices.md): Choose Eval checkpoints, give a decision only the context it needs, test both sides of each boundary, and pick the simplest judge that proves the behavior.
+- [Run and maintain tests](https://docs.vapi.ai/test/run-and-maintain-tests.md): Set a release and incident test cadence, triage failures to the right layer, turn production issues into regression tests, and pair automation with call review.
+- [Frequently Asked Questions](https://docs.vapi.ai/faq.md): Answers to common questions about Vapi, covering use-case fit, latency, pricing at volume, concurrency, compliance, security, and deployment options.
+- [Pricing and Success Packages](https://docs.vapi.ai/billing/pricing-and-success-packages.md): Learn how Usage only, optional Success Packages, and add-ons determine usage charges, support, service commitments, and capacity.
+- [Manage Success Packages and add-ons](https://docs.vapi.ai/billing/manage-packages-and-add-ons.md): Learn how to upgrade, downgrade, or remove a Success Package, and buy concurrent call line, organization, and HIPAA add-ons in the Vapi Dashboard.
+- [Manage billing and credits](https://docs.vapi.ai/billing/manage-billing-and-credits.md): Manage billing in the Vapi Dashboard: add a payment method, buy Vapi credits, configure auto-reload, and download statements and invoices.
+- [Manage organizations and capacity](https://docs.vapi.ai/billing/manage-organizations-and-capacity.md): Learn how subscriptions provide organization capacity, how to create and delete organizations, and what to resolve before reducing capacity.
+- [Manage pay-as-you-go billing and credits](https://docs.vapi.ai/billing/manage-pay-as-you-go-billing.md): Manage pay-as-you-go billing in the Vapi Dashboard: add a payment method, buy credits, configure auto reload, and download PDF statements and invoices.
+- [Purchase call concurrency](https://docs.vapi.ai/billing/purchase-call-concurrency.md): Purchase call concurrency from Billing & Add-Ons to increase the number of simultaneous calls available to your Vapi organization. See Vapi pricing for rates.
+- [Core Models](https://docs.vapi.ai/quickstart.md): Understand Vapi's three core components, the transcriber, model, and voice, and how Vapi orchestrates them into a low-latency, human-sounding conversation.
+- [Integrations](https://docs.vapi.ai/providers/integrations.md): Integrations let you connect your own provider accounts to Vapi. Learn what an integration is, when you need one, and how to add provider credentials in the dashboard.
+- [Transcribers (Speech-to-text)](https://docs.vapi.ai/providers/transcriber/overview.md): Reference of every speech-to-text provider Vapi supports, including provider IDs and where to configure each one.
+- [AssemblyAI](https://docs.vapi.ai/providers/transcriber/assembly-ai.md): Configure AssemblyAI speech models, multilingual transcription, language steering, and prompting for a Vapi assistant.
+- [Azure](https://docs.vapi.ai/providers/transcriber/azure.md): Configure Azure Speech as your Vapi assistant's transcriber and select from the languages Vapi supports.
+- [Cartesia](https://docs.vapi.ai/providers/transcriber/cartesia.md): Configure Cartesia as your Vapi assistant's transcriber, including supported languages and transcription options.
+- [Deepgram](https://docs.vapi.ai/providers/transcriber/deepgram.md): Configure Deepgram as your Vapi assistant's transcriber, including supported models and languages.
+- [ElevenLabs](https://docs.vapi.ai/providers/transcriber/elevenlabs.md): Configure ElevenLabs as your Vapi assistant's transcriber, including Scribe models and supported languages.
+- [Gladia](https://docs.vapi.ai/providers/transcriber/gladia.md): Configure a Gladia transcription model, language, and provider settings for a Vapi assistant.
+- [Google](https://docs.vapi.ai/providers/transcriber/google.md): Configure Google as your Vapi assistant's transcriber, including Gemini transcription models and supported languages.
+- [OpenAI](https://docs.vapi.ai/providers/transcriber/openai.md): Configure OpenAI as your Vapi assistant's transcriber, including transcription models and supported languages.
+- [Reson8](https://docs.vapi.ai/providers/transcriber/reson8.md): Configure Reson8 as your Vapi assistant's transcriber, including supported languages, keyterms, custom models, and turn detection settings.
+- [Soniox](https://docs.vapi.ai/providers/transcriber/soniox.md): Connect Soniox to a Vapi assistant and configure Soniox real-time speech-to-text models for low-latency, multilingual transcription and endpointing.
+- [Speechmatics](https://docs.vapi.ai/providers/transcriber/speechmatics.md): Configure Speechmatics as your Vapi assistant's transcriber and review setup guidance and supported options.
+- [xAI](https://docs.vapi.ai/providers/transcriber/xai.md): Configure xAI as your Vapi assistant's transcriber, including supported models, languages, and transcription options.
+- [Model providers](https://docs.vapi.ai/providers/model/overview.md): Reference of every large language model provider Vapi supports, including provider IDs and where to configure each one.
+- [Anthropic](https://docs.vapi.ai/providers/model/anthropic.md): Connect Anthropic to Vapi to use Claude models as your voice agent's language model. Covers the supported Claude models and how to use them in the API.
+- [Anthropic Bedrock](https://docs.vapi.ai/providers/model/anthropic-bedrock.md): Connect AWS Bedrock credentials to Vapi and use Anthropic Claude models with your AWS account, regions, rate limits, and data controls.
+- [Anyscale](https://docs.vapi.ai/providers/model/anyscale.md): Connect an Anyscale account to Vapi and configure an assistant with the exact model ID available through your Anyscale account.
+- [Azure OpenAI](https://docs.vapi.ai/providers/model/azure-openai.md): Connect an Azure OpenAI resource to Vapi. Configure credentials, deployment names, supported models, regions, and endpoints.
+- [Cerebras](https://docs.vapi.ai/providers/model/cerebras.md): Connect a Cerebras API key to Vapi and configure an assistant with an exact model ID from your Cerebras account.
+- [DeepInfra](https://docs.vapi.ai/providers/model/deepinfra.md): Connect a DeepInfra account to Vapi and configure an assistant with an exact model ID from DeepInfra's current model catalog.
+- [DeepSeek](https://docs.vapi.ai/providers/model/deepseek.md): Connect a DeepSeek API key to Vapi and configure an assistant with a supported DeepSeek model.
+- [Google](https://docs.vapi.ai/providers/model/gemini.md): Configure Google Gemini as your Vapi assistant's language model and choose from the models Vapi supports.
+- [Groq](https://docs.vapi.ai/providers/model/groq.md): Connect Groq to Vapi, choose a supported model, and configure it as your assistant's language model.
+- [Inflection AI](https://docs.vapi.ai/providers/model/inflection-ai.md): Connect an Inflection AI API key to Vapi and configure an assistant with a supported Inflection AI model.
+- [MiniMax](https://docs.vapi.ai/providers/model/minimax.md): Configure MiniMax as your Vapi assistant's language model and choose from the models Vapi supports.
+- [Mistral](https://docs.vapi.ai/providers/model/mistral.md): Connect Mistral to Vapi to use Mistral Large and Mistral Small as your voice agent's language model. Configure it in the dashboard.
+- [OpenAI](https://docs.vapi.ai/providers/model/openai.md): Configure OpenAI as your Vapi assistant's language model and choose from the GPT models Vapi supports.
+- [OpenRouter](https://docs.vapi.ai/providers/model/openrouter.md): Connect an OpenRouter account to Vapi and configure an assistant with an exact model ID from OpenRouter's current model catalog.
+- [Perplexity](https://docs.vapi.ai/providers/model/perplexity.md): Connect a Perplexity account to Vapi and configure an assistant with an exact model ID supported by the Perplexity Sonar API.
+- [The Grid](https://docs.vapi.ai/customization/custom-llm/thegrid.md): Wire The Grid, an OpenAI-compatible inference marketplace, into Vapi with the custom-llm provider and Custom Credentials.
+- [Together AI](https://docs.vapi.ai/providers/model/togetherai.md): Connect a Together AI account to Vapi and configure an assistant with an exact model ID from Together AI's current serverless catalog.
+- [xAI](https://docs.vapi.ai/providers/model/xai.md): Configure xAI as your Vapi assistant's language model and choose from the Grok models Vapi supports.
+- [Voices (Text-to-speech)](https://docs.vapi.ai/providers/voice/overview.md): Find, preview, and use text-to-speech voices from any Vapi-supported provider, and look up a voiceId in the Vapi dashboard.
+- [Vapi Voices](https://docs.vapi.ai/providers/voice/vapi-voices.md): Browse Vapi's curated voices, preview voice samples, review language support, and configure a Vapi voice on an assistant.
+- [Legacy voice migration guide](https://docs.vapi.ai/providers/voice/vapi-voices/legacy-migration.md): Migrate from legacy Vapi Voices retired on March 1, 2026, seeing which voices were removed, the new human voice clones, and how to update your assistants.
+- [Azure](https://docs.vapi.ai/providers/voice/azure.md): Configure Azure Speech as your Vapi assistant's text-to-speech provider and select an Azure voice.
+- [Cartesia](https://docs.vapi.ai/providers/voice/cartesia.md): Configure Cartesia as your Vapi assistant's text-to-speech provider, including supported languages and voice options.
+- [Deepgram](https://docs.vapi.ai/providers/voice/deepgram.md): Configure Deepgram as your Vapi assistant's text-to-speech provider and select a Deepgram Aura voice.
+- [ElevenLabs](https://docs.vapi.ai/providers/voice/elevenlabs.md): Configure ElevenLabs as your Vapi assistant's text-to-speech provider and select an ElevenLabs voice.
+- [Hume](https://docs.vapi.ai/providers/voice/hume.md): Connect Hume to Vapi to use its expressive Octave text-to-speech voices for your voice agent. Covers the models and how to select a voice in the API.
+- [Inworld](https://docs.vapi.ai/providers/voice/inworld.md): Configure Inworld text-to-speech models, voices, languages, and synthesis options for a Vapi assistant.
+- [LMNT](https://docs.vapi.ai/providers/voice/imnt.md): Configure an LMNT voice for a Vapi assistant and find its voice ID in the Vapi Voice Library.
+- [MiniMax](https://docs.vapi.ai/providers/voice/minimax.md): Configure MiniMax as your Vapi assistant's text-to-speech provider, including voice models, voice IDs, and subtitle timing.
+- [Neuphonic](https://docs.vapi.ai/providers/voice/neuphonic.md): Connect Neuphonic to Vapi to use its text-to-speech voices for your voice agent. Covers how to select a Neuphonic voice in the API.
+- [OpenAI](https://docs.vapi.ai/providers/voice/openai.md): Configure OpenAI as your Vapi assistant's text-to-speech provider, including TTS models and voice selection.
+- [Rime AI](https://docs.vapi.ai/providers/voice/rimeai.md): Configure a Rime AI model and voice for a Vapi assistant and find its voice ID in the Vapi Voice Library.
+- [Smallest AI](https://docs.vapi.ai/providers/voice/smallest-ai.md): Connect Smallest AI to Vapi to use its low-latency text-to-speech voices for your voice agent. Covers the model and how to select a voice in the API.
+- [WellSaid](https://docs.vapi.ai/providers/voice/wellsaid.md): Connect WellSaid Labs to Vapi to use its studio-quality text-to-speech voices for your voice agent. Covers the models and how to select a voice in the API.
+- [xAI](https://docs.vapi.ai/providers/voice/xai.md): Configure xAI as your Vapi assistant's text-to-speech provider, including supported voices, languages, and voice options.
+- [AWS S3](https://docs.vapi.ai/providers/cloud/s3.md): Store Vapi call recordings in AWS S3 by configuring your S3 credential and bucket in Cloud Providers, uploading recordings when each conversation ends.
+- [GCP Cloud Storage](https://docs.vapi.ai/providers/cloud/gcp.md): Store Vapi call recordings in Google Cloud Storage by configuring your GCP credential and bucket in Cloud Providers, uploading recordings when a call ends.
+- [Cloudflare R2](https://docs.vapi.ai/providers/cloud/cloudflare.md): Store Vapi call recordings in Cloudflare R2 by configuring your R2 credential and bucket in Cloud Providers, uploading recordings when each conversation ends.
+- [Azure Blob Storage](https://docs.vapi.ai/providers/cloud/azure.md): Store Vapi call recordings in Azure Blob Storage by configuring your connection string and container in Cloud Providers, uploading recordings when each conversation ends.
+- [Supabase S3 Storage](https://docs.vapi.ai/providers/cloud/supabase.md): Store Vapi call recordings in Supabase Storage by configuring your Supabase credential and bucket in Cloud Providers, uploading recordings when a call ends.
+- [Langfuse Integration with Vapi](https://docs.vapi.ai/providers/observability/langfuse.md): Integrate Vapi with Langfuse for enhanced voice AI telemetry monitoring, enabling improved performance and reliability of your AI applications.
+- [Voiceflow](https://docs.vapi.ai/providers/voiceflow.md): Connect Vapi with Voiceflow by hosting a proxy that routes Voiceflow requests to Vapi's text completion API and returns responses to your Voiceflow agent.
+- [ChatDash Integration with Vapi](https://docs.vapi.ai/providers/chat-dash.md): Integrate ChatDash with Vapi to give AI agent agencies a white-label dashboard with analytics, call logs, and Stripe billing using your Agent ID and API key.
+- [Vapify Integration with Vapi](https://docs.vapi.ai/providers/vapify.md): Integrate Vapify with Vapi to run a white-label voice AI agency without code, giving your clients a branded dashboard and the tools to sell and deliver agents.
+- [Voicerr AI - Whitelabel AI Voice Agents](https://docs.vapi.ai/providers/voicerr-ai.md): Voicerr AI is a Vapi-powered voice platform that lets agencies brand dashboards, automate billing, launch campaigns, and run full call-center operations at unlimited scale.
+- [VoiceAIWrapper Integration with Vapi](https://docs.vapi.ai/providers/voiceaiwrapper.md): Integrate VoiceAIWrapper with Vapi to launch a white-label voice AI agency, adding client onboarding, billing, and campaign management on top of Vapi's APIs.
+- [Sympana Connector](https://docs.vapi.ai/providers/sympana-connector.md): Connect Vapi agents to GoHighLevel with Sympana Connector, a managed automation layer for outbound sequences, inbound routing, and CRM syncing inside GHL.
+- [Support](https://docs.vapi.ai/support.md): Get help with your Vapi projects through the Discord developer community, email support, and the channels included with Success Packages.
+- [How to Report Issues Effectively](https://docs.vapi.ai/issue-reporting.md): Report Vapi issues effectively by including the right call IDs, timestamps, and reproduction details so support can diagnose and resolve them faster.
+- [Definitions](https://docs.vapi.ai/glossary.md): Definitions of key voice AI and Vapi terms, from transcription, LLM, and TTS to backchanneling, endpointing, and other concepts used across the docs.
+- [RSS Feed](https://docs.vapi.ai/rss-feed.md): Subscribe to Vapi's status RSS feed to track the latest incidents from Vapi and underlying providers, including how to add the feed in Slack.
+- [Data Flow](https://docs.vapi.ai/security-and-privacy/data-flow.md): How data flows through Vapi's voice pipeline. What's processed in real time, what's stored by default, and how custom storage or custom model servers change where data lives.
+- [EU region and data residency](https://docs.vapi.ai/security-and-privacy/eu-region.md): Build in Vapi's EU region: the EU dashboard, API, and SIP endpoints, the outbound IP addresses to allowlist, and keeping your organization in-region.
+- [API keys](https://docs.vapi.ai/security-and-privacy/api-keys.md): API keys authenticate requests to Vapi. Learn where to find public and private keys, choose the correct type, restrict access, and store each key securely.
+- [Single Sign-On (SSO)](https://docs.vapi.ai/security-and-privacy/sso.md): Let your team sign in to Vapi through your identity provider with SAML or OIDC, an enterprise feature supporting Google Workspace, Microsoft Entra ID, and Okta.
+- [JWT authentication](https://docs.vapi.ai/customization/jwt-authentication.md): Create public and private Vapi JWTs signed with HS256 and your private API key, set the required claims, restrict origins and assistants, and fix 401 and 403 errors.
+- [Recording consent plan](https://docs.vapi.ai/security-and-privacy/recording-consent-plan.md): Learn how to configure recording consent plans to ensure compliance with privacy laws and regulations
+- [GDPR Compliance](https://docs.vapi.ai/security-and-privacy/GDPR.md): How Vapi handles personal data under GDPR, covering data processing, legal bases, data subject rights, and the security measures protecting user data.
+- [HIPAA Compliance](https://docs.vapi.ai/security-and-privacy/hipaa.md): HIPAA on Vapi. Enable organization-wide compliance mode, use approved LLM, voice, and transcriber providers, and control how call recordings and logs are stored.
+- [Zero Data Retention (ZDR)](https://docs.vapi.ai/security-and-privacy/zero-data-retention.md): Learn what Zero Data Retention keeps in Vapi, how to retrieve recordings, transcripts, and logs from your own storage, and what to check when files are missing.
+- [PCI Compliance](https://docs.vapi.ai/security-and-privacy/pci.md): How Vapi handles payment data securely on its voice AI platform, explaining PCI compliance and the practices that protect sensitive financial information.
+- [SOC 2 Type II Compliance](https://docs.vapi.ai/security-and-privacy/soc.md): Vapi is SOC 2 Type II attested, covering security, availability, and confidentiality for all customers. Request the report from the Vapi Customer Trust Portal.
+- [Proxy server guide](https://docs.vapi.ai/security-and-privacy/proxy-server.md): Keep Vapi assistant configs and API keys on your backend by routing Web SDK calls through a proxy server that maps frontend data to Vapi API calls.
+- [Static IP addresses](https://docs.vapi.ai/security-and-privacy/static-ip-addresses.md): Route Vapi's outbound HTTP requests through a fixed set of static IP addresses, so you can allowlist them and apply strict firewall and network rules.
+- [TCPA Consent Guide](https://docs.vapi.ai/tcpa-consent.md): Understand TCPA consent requirements for outbound Vapi calls, including prior express written consent for marketing and prior express consent for other calls.
+- [Vapi MCP server](https://docs.vapi.ai/sdk/mcp-server.md): Connect Claude, Codex, Cursor, VS Code, Hermes, and other MCP clients to the hosted Vapi MCP server, sign in with your Vapi account, and search the docs or manage assistants, calls, tools, and simulations.
+- [Ecosystem](https://docs.vapi.ai/resources.md): Explore the Vapi ecosystem in one place, with links to the CLI, client and server SDKs, code examples, MCP server, API reference, and community resources.
+- [Project integration](https://docs.vapi.ai/cli/init.md): Initialize Vapi in your existing projects with intelligent auto-detection
+- [Local webhook testing](https://docs.vapi.ai/cli/webhook.md): Forward webhooks to your local development server with vapi listen
+- [Authentication management](https://docs.vapi.ai/cli/auth.md): Manage multiple Vapi accounts and environments with the CLI
+- [What's New?](https://docs.vapi.ai/whats-new.md)
+- [What's New? (all entries)](https://docs.vapi.ai/whats-new/llms.txt)
+
+## API Docs
+
+- [List Assistants](https://docs.vapi.ai/api-reference/assistants/list.md): API reference > Assistants
+- [Create Assistant](https://docs.vapi.ai/api-reference/assistants/create.md): API reference > Assistants
+- [Get Assistant](https://docs.vapi.ai/api-reference/assistants/get.md): API reference > Assistants
+- [Delete Assistant](https://docs.vapi.ai/api-reference/assistants/delete.md): API reference > Assistants
+- [Update Assistant](https://docs.vapi.ai/api-reference/assistants/update.md): API reference > Assistants
+- [List Squads](https://docs.vapi.ai/api-reference/squads/list.md): API reference > Squads
+- [Create Squad](https://docs.vapi.ai/api-reference/squads/create.md): API reference > Squads
+- [Get Squad](https://docs.vapi.ai/api-reference/squads/get.md): API reference > Squads
+- [Delete Squad](https://docs.vapi.ai/api-reference/squads/delete.md): API reference > Squads
+- [Update Squad](https://docs.vapi.ai/api-reference/squads/update.md): API reference > Squads
+- [List Calls](https://docs.vapi.ai/api-reference/calls/list.md): API reference > Calls
+- [Create Call](https://docs.vapi.ai/api-reference/calls/create.md): API reference > Calls
+- [Get Call](https://docs.vapi.ai/api-reference/calls/get.md): API reference > Calls
+- [Delete Call](https://docs.vapi.ai/api-reference/calls/delete.md): API reference > Calls
+- [Update Call](https://docs.vapi.ai/api-reference/calls/update.md): API reference > Calls
+- [Download Call Mono Recording](https://docs.vapi.ai/api-reference/calls/call-artifact-controller-mono-recording-download.md): API reference > Calls
+- [Download Call Stereo Recording](https://docs.vapi.ai/api-reference/calls/call-artifact-controller-stereo-recording-download.md): API reference > Calls
+- [Download Call Video Recording](https://docs.vapi.ai/api-reference/calls/call-artifact-controller-video-recording-download.md): API reference > Calls
+- [Download Call Customer Recording](https://docs.vapi.ai/api-reference/calls/call-artifact-controller-customer-recording-download.md): API reference > Calls
+- [Download Call Assistant Recording](https://docs.vapi.ai/api-reference/calls/call-artifact-controller-assistant-recording-download.md): API reference > Calls
+- [Download Call Packet Capture (pcap)](https://docs.vapi.ai/api-reference/calls/call-artifact-controller-pcap-download.md): API reference > Calls
+- [Download Call Logs](https://docs.vapi.ai/api-reference/calls/call-artifact-controller-call-logs-download.md): API reference > Calls
+- [List Chats](https://docs.vapi.ai/api-reference/chats/list.md): API reference > Chats
+- [Create Chat](https://docs.vapi.ai/api-reference/chats/create.md): API reference > Chats
+- [Get Chat](https://docs.vapi.ai/api-reference/chats/get.md): API reference > Chats
+- [Delete Chat](https://docs.vapi.ai/api-reference/chats/delete.md): API reference > Chats
+- [Create Chat (OpenAI Compatible)](https://docs.vapi.ai/api-reference/chats/create-response.md): API reference > Chats
+- [List Campaigns](https://docs.vapi.ai/api-reference/campaigns/campaign-controller-find-all.md): API reference > Campaigns
+- [Create Campaign](https://docs.vapi.ai/api-reference/campaigns/campaign-controller-create.md): API reference > Campaigns
+- [List Campaigns V2](https://docs.vapi.ai/api-reference/campaigns/campaign-controller-find-all-v-2.md): API reference > Campaigns
+- [Create Campaign V2](https://docs.vapi.ai/api-reference/campaigns/campaign-controller-create-v-2.md): API reference > Campaigns
+- [Get Campaign V2](https://docs.vapi.ai/api-reference/campaigns/campaign-controller-find-one-v-2.md): API reference > Campaigns
+- [Delete Campaign](https://docs.vapi.ai/api-reference/campaigns/campaign-controller-remove-v-2.md): API reference > Campaigns
+- [Update Campaign](https://docs.vapi.ai/api-reference/campaigns/campaign-controller-update-v-2.md): API reference > Campaigns
+- [Get Campaign](https://docs.vapi.ai/api-reference/campaigns/campaign-controller-find-one.md): API reference > Campaigns
+- [Get Campaign V2 Contacts](https://docs.vapi.ai/api-reference/campaigns/campaign-controller-get-campaign-v-2-contacts.md): API reference > Campaigns
+- [List Sessions](https://docs.vapi.ai/api-reference/sessions/list.md): API reference > Sessions
+- [Create Session](https://docs.vapi.ai/api-reference/sessions/create.md): API reference > Sessions
+- [Get Session](https://docs.vapi.ai/api-reference/sessions/get.md): API reference > Sessions
+- [Delete Session](https://docs.vapi.ai/api-reference/sessions/delete.md): API reference > Sessions
+- [Update Session](https://docs.vapi.ai/api-reference/sessions/update.md): API reference > Sessions
+- [List traffic allocations](https://docs.vapi.ai/api-reference/traffic-allocations/traffic-allocation-controller-find-all-paginated.md): API reference > Traffic Allocations
+- [Create traffic allocation](https://docs.vapi.ai/api-reference/traffic-allocations/traffic-allocation-controller-create.md): API reference > Traffic Allocations
+- [Get latest traffic allocation](https://docs.vapi.ai/api-reference/traffic-allocations/traffic-allocation-controller-latest-get.md): API reference > Traffic Allocations
+- [Get traffic split metrics](https://docs.vapi.ai/api-reference/traffic-allocations/traffic-allocation-controller-metrics-get.md): API reference > Traffic Allocations
+- [Get traffic allocation](https://docs.vapi.ai/api-reference/traffic-allocations/traffic-allocation-controller-find-one.md): API reference > Traffic Allocations
+- [List Phone Numbers](https://docs.vapi.ai/api-reference/phone-numbers/list.md): API reference > Phone Numbers
+- [Create Phone Number](https://docs.vapi.ai/api-reference/phone-numbers/create.md): API reference > Phone Numbers
+- [Get Phone Number](https://docs.vapi.ai/api-reference/phone-numbers/get.md): API reference > Phone Numbers
+- [Delete Phone Number](https://docs.vapi.ai/api-reference/phone-numbers/delete.md): API reference > Phone Numbers
+- [Update Phone Number](https://docs.vapi.ai/api-reference/phone-numbers/update.md): API reference > Phone Numbers
+- [List Tools](https://docs.vapi.ai/api-reference/tools/list.md): API reference > Tools
+- [Create Tool](https://docs.vapi.ai/api-reference/tools/create.md): API reference > Tools
+- [Get Tool](https://docs.vapi.ai/api-reference/tools/get.md): API reference > Tools
+- [Delete Tool](https://docs.vapi.ai/api-reference/tools/delete.md): API reference > Tools
+- [Update Tool](https://docs.vapi.ai/api-reference/tools/update.md): API reference > Tools
+- [List Files](https://docs.vapi.ai/api-reference/files/list.md): API reference > Files
+- [Upload File](https://docs.vapi.ai/api-reference/files/create.md): API reference > Files
+- [Get File](https://docs.vapi.ai/api-reference/files/get.md): API reference > Files
+- [Delete File](https://docs.vapi.ai/api-reference/files/delete.md): API reference > Files
+- [Update File](https://docs.vapi.ai/api-reference/files/update.md): API reference > Files
+- [List Knowledge Bases V2](https://docs.vapi.ai/api-reference/knowledge-bases-v-2/knowledge-base-v-2-controller-find-all.md): API reference > Knowledge Bases V2
+- [Create a Knowledge Base V2](https://docs.vapi.ai/api-reference/knowledge-bases-v-2/knowledge-base-v-2-controller-create.md): API reference > Knowledge Bases V2
+- [List files in a Knowledge Base V2](https://docs.vapi.ai/api-reference/knowledge-bases-v-2/knowledge-base-v-2-controller-files-get.md): API reference > Knowledge Bases V2
+- [Attach and ingest a file](https://docs.vapi.ai/api-reference/knowledge-bases-v-2/knowledge-base-v-2-controller-file-attach.md): API reference > Knowledge Bases V2
+- [Detach a file](https://docs.vapi.ai/api-reference/knowledge-bases-v-2/knowledge-base-v-2-controller-file-detach.md): API reference > Knowledge Bases V2
+- [Retry indexing a failed file](https://docs.vapi.ai/api-reference/knowledge-bases-v-2/knowledge-base-v-2-controller-file-retry.md): API reference > Knowledge Bases V2
+- [Get a Knowledge Base V2](https://docs.vapi.ai/api-reference/knowledge-bases-v-2/knowledge-base-v-2-controller-find-one.md): API reference > Knowledge Bases V2
+- [Delete a Knowledge Base V2](https://docs.vapi.ai/api-reference/knowledge-bases-v-2/knowledge-base-v-2-controller-remove.md): API reference > Knowledge Bases V2
+- [Update a Knowledge Base V2](https://docs.vapi.ai/api-reference/knowledge-bases-v-2/knowledge-base-v-2-controller-update.md): API reference > Knowledge Bases V2
+- [List Structured Outputs](https://docs.vapi.ai/api-reference/structured-outputs/structured-output-controller-find-all.md): API reference > Structured Outputs
+- [Create Structured Output](https://docs.vapi.ai/api-reference/structured-outputs/structured-output-controller-create.md): API reference > Structured Outputs
+- [Get Structured Output](https://docs.vapi.ai/api-reference/structured-outputs/structured-output-controller-find-one.md): API reference > Structured Outputs
+- [Delete Structured Output](https://docs.vapi.ai/api-reference/structured-outputs/structured-output-controller-remove.md): API reference > Structured Outputs
+- [Update Structured Output](https://docs.vapi.ai/api-reference/structured-outputs/structured-output-controller-update.md): API reference > Structured Outputs
+- [Run Structured Output](https://docs.vapi.ai/api-reference/structured-outputs/structured-output-controller-run.md): API reference > Structured Outputs
+- [List Personalities](https://docs.vapi.ai/api-reference/simulation-personalities/personality-controller-find-all.md): API reference > Simulation Personalities
+- [Create Personality](https://docs.vapi.ai/api-reference/simulation-personalities/personality-controller-create.md): API reference > Simulation Personalities
+- [Get Personality](https://docs.vapi.ai/api-reference/simulation-personalities/personality-controller-find-one.md): API reference > Simulation Personalities
+- [Delete Personality](https://docs.vapi.ai/api-reference/simulation-personalities/personality-controller-remove.md): API reference > Simulation Personalities
+- [Update Personality](https://docs.vapi.ai/api-reference/simulation-personalities/personality-controller-update.md): API reference > Simulation Personalities
+- [List Scenarios](https://docs.vapi.ai/api-reference/simulation-scenarios/scenario-controller-find-all.md): API reference > Simulation Scenarios
+- [Create Scenario](https://docs.vapi.ai/api-reference/simulation-scenarios/scenario-controller-create.md): API reference > Simulation Scenarios
+- [Get Scenario](https://docs.vapi.ai/api-reference/simulation-scenarios/scenario-controller-find-one.md): API reference > Simulation Scenarios
+- [Delete Scenario](https://docs.vapi.ai/api-reference/simulation-scenarios/scenario-controller-remove.md): API reference > Simulation Scenarios
+- [Update Scenario](https://docs.vapi.ai/api-reference/simulation-scenarios/scenario-controller-update.md): API reference > Simulation Scenarios
+- [List Simulation Runs](https://docs.vapi.ai/api-reference/simulation-runs/simulation-run-controller-find-all.md): API reference > Simulation Runs
+- [Create Simulation Run](https://docs.vapi.ai/api-reference/simulation-runs/simulation-run-controller-create.md): API reference > Simulation Runs
+- [Get Simulation Run](https://docs.vapi.ai/api-reference/simulation-runs/simulation-run-controller-find-one.md): API reference > Simulation Runs
+- [Cancel Simulation Run](https://docs.vapi.ai/api-reference/simulation-runs/simulation-run-controller-cancel-group.md): API reference > Simulation Runs
+- [List Simulation Run Items](https://docs.vapi.ai/api-reference/simulation-runs/simulation-run-controller-find-items.md): API reference > Simulation Runs
+- [Get Simulation Run Item](https://docs.vapi.ai/api-reference/simulation-runs/simulation-run-controller-find-item.md): API reference > Simulation Runs
+- [Cancel Simulation Run Item](https://docs.vapi.ai/api-reference/simulation-runs/simulation-run-controller-cancel-item.md): API reference > Simulation Runs
+- [Generate Improvement Suggestions](https://docs.vapi.ai/api-reference/simulation-runs/simulation-run-controller-generate-suggestions.md): API reference > Simulation Runs
+- [List Simulation Suites](https://docs.vapi.ai/api-reference/simulation-suites/simulation-suite-controller-find-all.md): API reference > Simulation Suites
+- [Create Simulation Suite](https://docs.vapi.ai/api-reference/simulation-suites/simulation-suite-controller-create.md): API reference > Simulation Suites
+- [Duplicate simulation suite](https://docs.vapi.ai/api-reference/simulation-suites/simulation-suite-controller-duplicate.md): API reference > Simulation Suites
+- [Get Simulation Suite](https://docs.vapi.ai/api-reference/simulation-suites/simulation-suite-controller-find-one.md): API reference > Simulation Suites
+- [Delete Simulation Suite](https://docs.vapi.ai/api-reference/simulation-suites/simulation-suite-controller-remove.md): API reference > Simulation Suites
+- [Update Simulation Suite](https://docs.vapi.ai/api-reference/simulation-suites/simulation-suite-controller-update.md): API reference > Simulation Suites
+- [Draft simulation requirements](https://docs.vapi.ai/api-reference/simulation-suites/simulation-onboarding-controller-requirements-draft.md): API reference > Simulation Suites
+- [Generate a simulation suite](https://docs.vapi.ai/api-reference/simulation-suites/simulation-onboarding-controller-suite-create.md): API reference > Simulation Suites
+- [Edit a generated simulation suite](https://docs.vapi.ai/api-reference/simulation-suites/simulation-onboarding-controller-suite-update.md): API reference > Simulation Suites
+- [List Simulations](https://docs.vapi.ai/api-reference/simulations/simulation-controller-find-all.md): API reference > Simulations
+- [Create Simulation](https://docs.vapi.ai/api-reference/simulations/simulation-controller-create.md): API reference > Simulations
+- [Get Simulation Concurrency](https://docs.vapi.ai/api-reference/simulations/simulation-controller-get-concurrency.md): API reference > Simulations
+- [Get Simulation](https://docs.vapi.ai/api-reference/simulations/simulation-controller-find-one.md): API reference > Simulations
+- [Delete Simulation](https://docs.vapi.ai/api-reference/simulations/simulation-controller-remove.md): API reference > Simulations
+- [Update Simulation](https://docs.vapi.ai/api-reference/simulations/simulation-controller-update.md): API reference > Simulations
+- [Get Insights](https://docs.vapi.ai/api-reference/insight/insight-controller-find-all.md): API reference > Insight
+- [Create Insight](https://docs.vapi.ai/api-reference/insight/insight-controller-create.md): API reference > Insight
+- [Get Insight](https://docs.vapi.ai/api-reference/insight/insight-controller-find-one.md): API reference > Insight
+- [Delete Insight](https://docs.vapi.ai/api-reference/insight/insight-controller-remove.md): API reference > Insight
+- [Update Insight](https://docs.vapi.ai/api-reference/insight/insight-controller-update.md): API reference > Insight
+- [Run Insight](https://docs.vapi.ai/api-reference/insight/insight-controller-run.md): API reference > Insight
+- [Preview Insight](https://docs.vapi.ai/api-reference/insight/insight-controller-preview.md): API reference > Insight
+- [Get Boards](https://docs.vapi.ai/api-reference/board/board-controller-find-all.md): API reference > Board
+- [Create Board](https://docs.vapi.ai/api-reference/board/board-controller-create.md): API reference > Board
+- [Get Default Metrics Overview Board](https://docs.vapi.ai/api-reference/board/board-controller-metrics-overview-ensure.md): API reference > Board
+- [Get Board](https://docs.vapi.ai/api-reference/board/board-controller-find-one.md): API reference > Board
+- [Delete Board](https://docs.vapi.ai/api-reference/board/board-controller-remove.md): API reference > Board
+- [Update Board](https://docs.vapi.ai/api-reference/board/board-controller-update.md): API reference > Board
+- [List Evals](https://docs.vapi.ai/api-reference/eval/eval-controller-get-paginated.md): API reference > Eval
+- [Create Eval](https://docs.vapi.ai/api-reference/eval/eval-controller-create.md): API reference > Eval
+- [Get Eval](https://docs.vapi.ai/api-reference/eval/eval-controller-get.md): API reference > Eval
+- [Delete Eval](https://docs.vapi.ai/api-reference/eval/eval-controller-remove.md): API reference > Eval
+- [Update Eval](https://docs.vapi.ai/api-reference/eval/eval-controller-update.md): API reference > Eval
+- [Get Eval Run](https://docs.vapi.ai/api-reference/eval/eval-controller-get-run.md): API reference > Eval
+- [Delete Eval Run](https://docs.vapi.ai/api-reference/eval/eval-controller-remove-run.md): API reference > Eval
+- [List Eval Runs](https://docs.vapi.ai/api-reference/eval/eval-controller-get-runs-paginated.md): API reference > Eval
+- [Create Eval Run](https://docs.vapi.ai/api-reference/eval/eval-controller-run.md): API reference > Eval
+- [Get Scorecard](https://docs.vapi.ai/api-reference/observability-scorecard/scorecard-controller-get.md): API reference > Observability Scorecard
+- [Delete Scorecard](https://docs.vapi.ai/api-reference/observability-scorecard/scorecard-controller-remove.md): API reference > Observability Scorecard
+- [Update Scorecard](https://docs.vapi.ai/api-reference/observability-scorecard/scorecard-controller-update.md): API reference > Observability Scorecard
+- [List Scorecards](https://docs.vapi.ai/api-reference/observability-scorecard/scorecard-controller-get-paginated.md): API reference > Observability Scorecard
+- [Create Scorecard](https://docs.vapi.ai/api-reference/observability-scorecard/scorecard-controller-create.md): API reference > Observability Scorecard
+- [List Provider Resources](https://docs.vapi.ai/api-reference/provider-resources/provider-resource-controller-get-provider-resources-paginated.md): API reference > Provider Resources
+- [Create Provider Resource](https://docs.vapi.ai/api-reference/provider-resources/provider-resource-controller-create-provider-resource.md): API reference > Provider Resources
+- [Get Provider Resource](https://docs.vapi.ai/api-reference/provider-resources/provider-resource-controller-get-provider-resource.md): API reference > Provider Resources
+- [Delete Provider Resource](https://docs.vapi.ai/api-reference/provider-resources/provider-resource-controller-delete-provider-resource.md): API reference > Provider Resources
+- [Update Provider Resource](https://docs.vapi.ai/api-reference/provider-resources/provider-resource-controller-update-provider-resource.md): API reference > Provider Resources
+- [Create Analytics Queries](https://docs.vapi.ai/api-reference/analytics/get.md): API reference > Analytics
+- [Server Message](https://docs.vapi.ai/api-reference/webhooks/server-message.md): Webhooks
+- [Client Message](https://docs.vapi.ai/api-reference/webhooks/client-message.md): Webhooks
+
+## OpenAPI Specification
+
+- [OpenAPI JSON](https://docs.vapi.ai/openapi.json): raw OpenAPI 3.1 specification for this API, JSON format
+- [OpenAPI YAML](https://docs.vapi.ai/openapi.yaml): raw OpenAPI 3.1 specification for this API, YAML format

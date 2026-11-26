@@ -153,6 +153,32 @@ describe('buildOpenApiDocument', () => {
     expect(JSON.stringify(operation?.parameters)).toContain('"in":"path"');
   });
 
+  it('declares the list query parameters of the paginated list (AIS-107)', () => {
+    const list = document.paths['/api/api-keys']?.get;
+    const parameters: readonly unknown[] = list?.parameters ?? [];
+    const serialised = JSON.stringify(parameters);
+
+    for (const name of ['page', 'limit', 'sort', 'order', 'q']) {
+      expect(serialised).toContain(`"name":"${name}"`);
+    }
+
+    // Every list parameter is optional; only the path parameter is required.
+    expect(serialised).toContain('"in":"query"');
+    expect(serialised).not.toContain(
+      '"required":true,"schema":{"type":"integer"',
+    );
+  });
+
+  it('shows `meta.pagination` in the published example of the list endpoint', () => {
+    const list = document.paths['/api/api-keys']?.get;
+    const serialised = JSON.stringify(
+      list?.responses?.[String(HTTP_STATUS.OK)],
+    );
+
+    expect(serialised).toContain('"pagination"');
+    expect(serialised).toContain('"totalPages"');
+  });
+
   it('registers the envelope and error components', () => {
     const schemas = document.components?.schemas ?? {};
 

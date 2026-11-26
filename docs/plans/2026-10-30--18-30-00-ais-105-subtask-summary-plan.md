@@ -2,7 +2,7 @@
 
 **Dátum:** 2026-10-30 18:30 (Europe/Budapest)
 **Ticket:** AIS-105 (Story, Highest) — „Admin alkalmazás-alap és minőségkapu: `src/app` réteg, URL-alapú lista-állapot, MSW harness, CI teszt-mátrix és réteg-kapuk"
-**Státusz:** **In Progress** — 2 subtask kész (egyik lezárva, egyik a negatív bizonyítékra vár), 4 hátra
+**Státusz:** **In Progress** — 2 subtask kész és lezárva (AIS-118, AIS-121), 4 hátra
 **Alap-terv:** [`2026-10-30--13-06-00-admin-unified-data-flow-and-ui-foundation-plan.md`](2026-10-30--13-06-00-admin-unified-data-flow-and-ui-foundation-plan.md:1)
 **Bontás + review:** [`…13-40-00…themes-ticket-plan.md`](2026-10-30--13-40-00-admin-foundation-jira-themes-ticket-plan.md:1) · [`…13-50-00…themes-review-plan.md`](2026-10-30--13-50-00-admin-foundation-jira-themes-review-plan.md:1)
 
@@ -21,14 +21,18 @@ leírásban vannak.
 
 ## 2. A subtask-ok lényege
 
-| Ticket      | Prioritás | Státusz            | Egy mondatban                                                                            |
-| ----------- | --------- | ------------------ | ---------------------------------------------------------------------------------------- |
-| **AIS-118** | Highest   | ✅ **Done**        | Az `src/app/` réteg: route registry, layout, provider-lánc, session hely, error boundary |
-| **AIS-119** | High      | ⬜ To Do           | A lista szűrője/rendezése/oldalja **az URL-ben** él (`useListParams`)                    |
-| **AIS-120** | High      | ⬜ To Do           | **MSW** teszt harness — a service-határ a mock pont, nem a `fetch`                       |
-| **AIS-121** | Highest   | 🟡 **In Progress** | A CI a **teljes** unit-mátrixot futtatja a PR-on (nem csak az API unitot)                |
-| **AIS-122** | High      | ⬜ To Do           | Minőségkapuk: réteg-lint, knip, paletta- és mezőhiba-check a CI-ben                      |
-| **AIS-123** | Medium    | ⬜ To Do           | Két új élő spec + az „új admin oldal" checklist                                          |
+| Ticket      | Prioritás | Státusz     | Egy mondatban                                                                            |
+| ----------- | --------- | ----------- | ---------------------------------------------------------------------------------------- |
+| **AIS-118** | Highest   | ✅ **Done** | Az `src/app/` réteg: route registry, layout, provider-lánc, session hely, error boundary |
+| **AIS-119** | High      | ⬜ To Do    | A lista szűrője/rendezése/oldalja **az URL-ben** él (`useListParams`)                    |
+| **AIS-120** | High      | ⬜ To Do    | **MSW** teszt harness — a service-határ a mock pont, nem a `fetch`                       |
+| **AIS-121** | Highest   | ✅ **Done** | A CI a **teljes** unit-mátrixot futtatja a PR-on (nem csak az API unitot)                |
+
+> Az **AIS-105 story** subtaskjai közül kettő kész és lezárva (AIS-118, AIS-121). Az
+> **AIS-102 story** subtaskjai közül az **AIS-106** (közös lista- és paginációs szerződés) is
+> kész — lásd az „Út A" alatt.
+> | **AIS-122** | High | ⬜ To Do | Minőségkapuk: réteg-lint, knip, paletta- és mezőhiba-check a CI-ben |
+> | **AIS-123** | Medium | ⬜ To Do | Két új élő spec + az „új admin oldal" checklist |
 
 ### AIS-118 — `src/app/` réteg ✅ Done
 
@@ -63,7 +67,7 @@ service-változás nem töri a teszteket, és a boríték-kibontás is tesztelve
 
 **Előfeltétel:** AIS-109 (a transport), AIS-114 (a hook réteg).
 
-### AIS-121 — CI teszt-mátrix 🟡 In Progress
+### AIS-121 — CI teszt-mátrix ✅ Done
 
 A CI ma csak az API unit teszteket futtatta — a `shared`, `api-client`, `ui` és `admin` suite
 **halott kód** volt a CI szempontjából. Mostantól a root `pnpm test` fut (a kanonikus belépési
@@ -125,7 +129,8 @@ graph LR
 **Két megjegyzés a sorrendhez:**
 
 1. **Az AIS-105 önmagában nem járhat végig.** Az AIS-106, AIS-109, AIS-111 és AIS-114 az
-   **AIS-102 story** subtaskjai, és mindegyik **To Do**. Az AIS-119 és az AIS-120 ezekre vár.
+   **AIS-102 story** subtaskjai. Az **AIS-106 kész** ✅; a maradék három még **To Do**, és az
+   AIS-119 és az AIS-120 ezekre vár.
 2. **Az AIS-118 és az AIS-121 függetlenek** mindentől — ezért készülhettek meg elsőként.
 
 ---
@@ -150,6 +155,9 @@ graph LR
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `56dd93e` | `docs: plan the admin foundation and break it down into Jira tickets` — a 4 terv, amiből a breakdown készült                                       |
 | `096f6de` | `AIS-121: ci(ci): run the full unit matrix on the PR`                                                                                              |
+| `674cae5` | a negatív bizonyíték PR-je (a szándékos törés + a revert, mergelve)                                                                                |
+| `3edcb16` | `docs: record the AIS-121 negative-proof evidence`                                                                                                 |
+| `66cd964` | `AIS-106: feat(shared): add the list-query and pagination contract`                                                                                |
 | `5e70c39` | `AIS-118: feat(admin): add the src/app layer with a single route registry`                                                                         |
 | `d355100` | `style: format the whole repo with prettier and add a format:check gate` — a teljes repó formázása + a `.prettierignore` + a `format:check` script |
 
@@ -193,23 +201,25 @@ git-hooks quality gate (a `prettier --check` lépés) előfeltétele.
 
 ### Út A — az AIS-102 story (a blokkoló)
 
-Az AIS-106, AIS-109, AIS-111 és AIS-114 **egyetlen** subtaskja sem kész. Ezek nélkül az AIS-119 és
-az AIS-120 nem indulhat.
+Az **AIS-106** (a közös lista- és paginációs szerződés) **kész és lezárva** ✅. A maradék
+AIS-109, AIS-111 és AIS-114 még mind **To Do** — ezek nélkül az AIS-119 és az AIS-120 nem
+indulhat.
 
-**Javasolt sorrend:** AIS-106 → AIS-109 → AIS-114 (ez adja a `useApiList`-ot és a transportot) →
-AIS-111 → AIS-103 (form) → AIS-104 (primitívek).
+**Javasolt sorrend:** ~~AIS-106~~ ✅ → AIS-109 → AIS-114 (ez adja a `useApiList`-ot és a
+transportot) → AIS-111 → AIS-103 (form) → AIS-104 (primitívek).
 
 ### Út B — az AIS-105 maradék
 
-1. **AIS-121 lezárása** — a negatív bizonyíték (eldobható branch + PR).
-2. **AIS-119** — az AIS-106 és az AIS-118 után (mindkettő kész vagy készül).
-3. **AIS-120** — az AIS-109 és az AIS-114 után.
-4. **AIS-122** — az AIS-120 és az AIS-118 után; a **réteg-lint** végre egy létező réteget tud
+1. **AIS-119** — az AIS-106 és az AIS-118 után — **mindkettő kész** ✅, tehát ez indulhat.
+2. **AIS-120** — az AIS-109 és az AIS-114 után.
+3. **AIS-122** — az AIS-120 és az AIS-118 után; a **réteg-lint** végre egy létező réteget tud
    ellenőrizni.
-5. **AIS-123** — a legutolsó, mert a doksi a megvalósult állapotot írja le.
+4. **AIS-123** — a legutolsó, mert a doksi a megvalósult állapotot írja le.
 
-**A legkisebb ráfordítású következő lépés:** az AIS-121 negatív bizonyítéka — egyetlen eldobható
-branch és PR.
+**A legkisebb ráfordítású következő lépés:** az **AIS-119** (URL-alapú lista-állapot) — a route
+registry (AIS-118) és a `listQuerySchema` (AIS-106) **mindkettő kész**, és az AIS-119 az AIS-109
+transportot csak a **query string összeállításához** használja, amit a `toListQueryParams` már
+biztosít.
 
 ---
 

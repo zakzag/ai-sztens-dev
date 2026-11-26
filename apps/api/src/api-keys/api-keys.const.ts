@@ -8,6 +8,10 @@
  * (plan `D6`).
  */
 
+import type { ApiKeySortField } from '@callback/shared';
+import type { PgColumn } from 'drizzle-orm/pg-core';
+import { apiKeys } from '../db/schema.js';
+
 /**
  * DI token of the {@link ApiKeysRepository} implementation.
  *
@@ -35,3 +39,20 @@ export const PG_UNIQUE_VIOLATION_CODE = '23505';
  * conflict. The constraint name is stable because the schema spells it out.
  */
 export const API_KEY_IDENTIFIER_CONSTRAINT = 'api_keys_identifier_key';
+
+/**
+ * The sortable column behind each value of `?sort=` (AIS-107).
+ *
+ * Typed against the **contract's** allow-list, so a column cannot be accepted
+ * by the schema without a column to sort by — adding a field to
+ * `API_KEY_SORT_FIELDS` without adding it here is a compile error, not a `500`
+ * from the database.
+ */
+export const API_KEY_SORT_COLUMNS: Readonly<Record<ApiKeySortField, PgColumn>> =
+  {
+    name: apiKeys.name,
+    identifier: apiKeys.identifier,
+    createdAt: apiKeys.createdAt,
+    updatedAt: apiKeys.updatedAt,
+    expiresAt: apiKeys.expiresAt,
+  };

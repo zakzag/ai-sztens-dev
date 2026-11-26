@@ -1,7 +1,26 @@
 # API Convention — unified request/response contract
 
-**Utolsó frissítés:** 2026-10-29
-**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98
+**Utolsó frissítés:** 2026-11-24 (a `customers` felelős operátor szűrője és mezője megszűnt; előzőleg
+2026-11-23, AIS-178/f + AIS-14 closeout: az aktivitás- és napló-olvasó végpontok élnek, a napló írhatatlan,
+és a `PATCH` státuszkód-döntés rögzítve van a §4.3.1-ben)
+
+**Frissítések**:
+
+- **2026-11-24 — AIS-16 (`responsibleOperatorId` eltávolítás):** a `customers` **felelős operátor** fogalma megszűnt — törölve a `customer.customers.responsible_operator_id` oszlop és a hozzá tartozó FK (`0008` migráció), a `customerSchema` / `createCustomerSchema` / `updateCustomerSchema` mezője, valamint a lista negyedik szűrője; a lista szűrői most `type`, `status`, `source`. Egy régi hivatkozás `?responsibleOperatorId=…` értékét a séma csendben eldobja (`400` helyett), mert egy ismeretlen query-kulcs nem hiba; lásd §4.1
+
+- **2026-11-23 — AIS-14 (closeout, `D1`):** a `PATCH` státuszkód-döntés rögzítve — malformed body → `400`, elavult `updatedAt` → `409 STALE_WRITE`, tartalmilag lehetetlen de jól formált kérés → `422 SEMANTIC_VALIDATION_FAILED` (csak a `customers` gyerek-erőforrásain), üres patch a helyes tokennel → `200` no-op; az AIS-14 DoD „`422` on `PATCH /:id`” szövege ezzel **felülírt**, lásd §4.3.1
+
+- **2026-11-23 - AIS-178/f:** a `customers` **aktivitás** végpontjai és a **napló** olvasása élnek — `GET`/`POST /api/admin/customers/:id/activities`, `PATCH`/`DELETE …/:activityId`, `GET …/audit-logs`; az aktivitás szerzője a szerveroldali `AUDIT_ACTOR_PROVIDER`-ből jön, a token az `updatedAt ?? createdAt`, a napló **írhatatlan**, `from > to` → `422`, lásd §12.3)
+- **2026-11-23 — AIS-178/e:** a `customers` **címke-** és **belépő-felhasználó** végpontjai élnek — `POST`/`PATCH /api/admin/customers/:id/tags`, `DELETE …/:tagId`, `POST`/`PATCH`/`DELETE …/customer-users[/:customerUserId]`; címke create-or-attach név alapján, egy aktív `owner` → `409 CUSTOMER_OWNER_CONFLICT`, globális e-mail → `409 CUSTOMER_USER_EMAIL_CONFLICT`, hivatkozott felhasználó → `409 CUSTOMER_USER_IN_USE_CONFLICT`, lásd §12.2
+- **2026-11-23 — AIS-178/d:** a `customers` **kapcsolattartó** végpontjai élnek — `GET`/`POST /api/admin/customers/:id/contacts`, `PATCH`/`DELETE …/:contactId`, a szerepkör-készlet egy kérésben cserélődik, második `primary` → `409 CUSTOMER_PRIMARY_CONTACT_CONFLICT`, idegen `customerUserId` → `422 SEMANTIC_VALIDATION_FAILED`, lásd §12.1
+- **2026-11-22 — AIS-178/b:** a `customers` végpontok élnek — hat route a `/api/admin/*` alatt, `CUSTOMER_NUMBER_CONFLICT` / `CUSTOMER_TAX_NUMBER_CONFLICT`, `primaryContactName` a wire-en, malformed uuid → `400`, lásd §4.3
+- **2026-11-22 — AIS-16:** a `customers` erőforrás szerződés-sémái a `packages/shared/src/contract/customers/` alatt; a lista a közös lapozás mellé négy szűrőt kap — `type`, `status`, `source`, `responsibleOperatorId` —, lásd §4.1
+- **2026-11-07 — AIS-152:** a `HttpEvent` négy új mezőt hordoz — `requestId`, `query`, maszkolt `bodyPreview`, `responseMeta` —, a token/`Authorization` továbbra sem kerülhet az eseménybe; lásd §9
+- **AIS-136:** a 3. tier — app-szintű banner — a megjelenítés **mellett** toastol is; a `field` tier az egyetlen, amely toast nélkül marad, lásd §10
+- **AIS-112:** közös formátum-sémák a `contract/common/` alatt és **kétnyelvű** validációs copy-katalógus — a `message`/`details[].message` a katalógusból jön, a szerver angol marad, a UI magyar; lásd §1 és §3
+ 
+**Story:** AIS-87 (plan: [`docs/plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md`](../plans/2026-10-26--17-21-00-unified-api-contract-and-envelope-plan.md)); client transport hardening: AIS-94; tier-1 field mapping: AIS-95; generated OpenAPI + Swagger UI + dev response validator: AIS-98; list query + pagination contract: AIS-106; first paginated endpoint (`GET /api/api-keys`): AIS-107; mutation convention (`PATCH` / `DELETE`, `STALE_WRITE`, `SEMANTIC_VALIDATION_FAILED`): AIS-108; full client transport (`PUT`/`PATCH`/`DELETE`, `getList`, query builder, `RequestBodyOf`, `onEvent`): AIS-109; client binding of every registered operation + registry ⇄ service coverage gate + resource template: AIS-110; közös formátum-sémák + kétnyelvű validációs üzenetek: AIS-112
+
 **Status:** living document — this file describes the _current_ state of the API, not a snapshot.
 
 ---
@@ -18,10 +37,28 @@ Every request and response shape is defined **once**, in `packages/shared/src/co
 | `contract/http-status.const.ts`              | `HTTP_STATUS` (shared by server and client)                                       |
 | `contract/api-prefix.const.ts`               | `API_GLOBAL_PREFIX` (`api`) + `API_PATH_PREFIX` (`/api`)                          |
 | `contract/<resource>/<resource>.schema.ts`   | request/response Zod schemas                                                      |
+| `contract/<resource>/<resource>.update.ts`   | `PATCH` body schema of a resource (partial + required `updatedAt`)                |
+| `contract/no-payload.schema.ts`              | `noPayloadSchema` (`z.null()`) — the payload of a “nothing to return” call        |
 | `contract/<resource>/<resource>.contract.ts` | endpoint registry entries (`operationId`, method, path, `tag`, schemas, `errors`) |
 | `contract/endpoint.registry.ts`              | `API_ENDPOINTS` + `ENVELOPE_EXEMPTIONS`                                           |
+| `contract/common/<format>.schema.ts`         | közös formátum-sémák: `email`, `phone` (E.164), `huTaxNumber`, `huPostalCode`, `iban`, `dateOnly`, `url`, `trimmedString`/`nonEmptyText`/`identifier` |
+| `contract/common/validation-message.const.ts`| a validációs copy **egyetlen** katalógusa, `en` + `hu` nyelven                    |
+| `contract/common/validation-error-map.const.ts` | `VALIDATION_ERROR_MAP` — a zod generált issue-jait fordítja az aktív locale-re   |
 
 The same schema drives three artefacts: `z.infer` types, server validation (`ZodBodyPipe`), client parsing (`http-client`). There is no class-validator DTO and no hand-written interface in `apps/api/src/api-keys` any more — and since AIS-93 there is no `class-validator` / `class-transformer` dependency at all, nor a global `ValidationPipe` (see §7).
+
+### 1.0 Rejection copy — one catalogue, two languages
+
+Since AIS-112 a validation message is never a literal in a schema, a form or a component:
+
+| Besorolás | Nyelv | Hol jelenik meg |
+| --------- | ----- | --------------- |
+| **UI copy** | magyar | a böngésző bundle-e: `configureValidationLocale('hu')` a [`apps/admin/src/main.tsx`](../../apps/admin/src/main.tsx:1)-ben, és a `zodResolver(schema, { errorMap: VALIDATION_ERROR_MAP })` |
+| **Internal copy** | angol | a szerver `details[].message` mezője — a locale **default** értéke `en`, és a `apps/api` soha nem hívja a `configureValidationLocale`-t |
+
+Ezért a `message`/`details[].message` ugyanabból a katalógusból származik, de a szerver processzben angolul. A UI továbbra sem **rendereli** a szerver szövegét (§3): a mezőhibát a `code` + `path` alapján maga állítja elő.
+
+Egy szabály-alapú form-séma **származtatva** készül a kérés-sémából (`createApiKeySchema.omit().extend()`), nem újrafogalmazva — így a kliens nem fogadhat el olyat, amit a szerver elutasít.
 
 ### 1.1 Endpoint registry
 
@@ -32,7 +69,7 @@ One `ApiEndpointContract` per operation, typed so a missing or misspelled field 
 | `operationId`    | Stable `<resource>.<action>` key (`apiKeys.list`); never changes when a route moves     |
 | `method`, `path` | Nest route, **including** `API_PATH_PREFIX` (`/api/api-keys/:identifier`)               |
 | `summary`, `tag` | OpenAPI `summary` and grouping (`api-keys`)                                             |
-| `successStatus`  | `200` read, `201` create                                                                |
+| `successStatus`  | `200` read/update/delete, `201` create                                                  |
 | `dataSchema`     | Zod schema of the **payload** (the envelope is added once by `successEnvelopeSchema()`) |
 | `requestSchema`  | Zod schema of the body; absent for bodyless endpoints                                   |
 | `errors`         | Codes from `API_ERROR_CODE` the route can actually answer with                          |
@@ -78,46 +115,244 @@ One `ApiEndpointContract` per operation, typed so a missing or misspelled field 
 
 - `code` — stable, locale independent, **the decision key on the client**.
 - `status` — derived from the code catalogue; never passed in by a service.
-- `message` — English, for developers and logs. **Never rendered as user copy.**
+- `message` — English, for developers and logs. **Never rendered as user copy.** The sentence comes from the shared validation catalogue (`contract/common/validation-message.const.ts`); the server process keeps the default `en` locale, so this field never becomes Hungarian.
 - `details[]` — `{ path, message }` with dot paths (`name`, `lines.2.quantity`); `path: ''` means “whole payload”.
 - 5xx — `message` is the fixed `INTERNAL_ERROR_MESSAGE`; stack, SQL text and constraint names stay in the server log, correlated by `requestId`.
 
 ### Error codes in use
 
-| Code                          | Status               | Emitted by                                                |
-| ----------------------------- | -------------------- | --------------------------------------------------------- |
-| `VALIDATION_FAILED`           | 400                  | `ZodBodyPipe` / `ZodQueryPipe`, Nest `HttpException(400)` |
-| `UNAUTHENTICATED`             | 401                  | auth story (AIS-73/74)                                    |
-| `FORBIDDEN`                   | 403                  | guards                                                    |
-| `NOT_FOUND`                   | 404                  | `NotFoundAppError`                                        |
-| `CONFLICT`                    | 409                  | `ConflictAppError` (generic)                              |
-| `API_KEY_IDENTIFIER_CONFLICT` | 409                  | `api-keys` service (domain-specific)                      |
-| `PAYLOAD_TOO_LARGE`           | 413                  | body-limit handling                                       |
-| `RATE_LIMITED`                | 429                  | rate limiting                                             |
-| `INTERNAL_ERROR`              | 500                  | any unknown throwable                                     |
-| `SERVICE_UNAVAILABLE`         | 503                  | dependency down                                           |
-| `UNEXPECTED_PAYLOAD`          | — (client-side only) | `packages/api-client` on contract drift                   |
+| Code                          | Status               | Emitted by                                                               |
+| ----------------------------- | -------------------- | ------------------------------------------------------------------------ |
+| `VALIDATION_FAILED`           | 400                  | `ZodBodyPipe` / `ZodQueryPipe`, Nest `HttpException(400)`                |
+| `UNAUTHENTICATED`             | 401                  | auth story (AIS-73/74)                                                   |
+| `FORBIDDEN`                   | 403                  | guards                                                                   |
+| `NOT_FOUND`                   | 404                  | `NotFoundAppError`                                                       |
+| `CONFLICT`                    | 409                  | `ConflictAppError` (generic)                                             |
+| `API_KEY_IDENTIFIER_CONFLICT` | 409                  | `api-keys` service (domain-specific)                                     |
+| `STALE_WRITE`                 | 409                  | `StaleWriteAppError` — the `PATCH` version no longer matches (AIS-108)   |
+| `PAYLOAD_TOO_LARGE`           | 413                  | body-limit handling                                                      |
+| `SEMANTIC_VALIDATION_FAILED`  | 422                  | `SemanticValidationAppError` — shape valid, content impossible (AIS-108) |
+| `RATE_LIMITED`                | 429                  | rate limiting                                                            |
+| `INTERNAL_ERROR`              | 500                  | any unknown throwable                                                    |
+| `SERVICE_UNAVAILABLE`         | 503                  | dependency down                                                          |
+| `UNEXPECTED_PAYLOAD`          | — (client-side only) | `packages/api-client` on contract drift                                  |
 
 ---
 
 ## 4. Empty / zero-result rules
 
-| Situation                      | Wire                       | Never                          |
-| ------------------------------ | -------------------------- | ------------------------------ |
-| List with no matches           | `"data": []`, 200          | `null`, `404`, omitted key     |
-| Single resource missing        | `404` + error envelope     | `200` with `data: null`        |
-| Optional scalar absent         | present as `null`          | missing key, `undefined`, `''` |
-| Counter                        | `0` as number              | `"0"`, `null`                  |
-| Nested object absent           | `{}` present               | omitted key                    |
-| Success with nothing to return | `"data": null`, 200        | `204`                          |
-| Duplicate                      | `409` + `code: *_CONFLICT` | silent overwrite               |
-| Validation                     | `400` + `details[]`        | one concatenated string        |
+| Situation                      | Wire                                       | Never                          |
+| ------------------------------ | ------------------------------------------ | ------------------------------ |
+| List with no matches           | `"data": []`, 200                          | `null`, `404`, omitted key     |
+| Single resource missing        | `404` + error envelope                     | `200` with `data: null`        |
+| Optional scalar absent         | present as `null`                          | missing key, `undefined`, `''` |
+| Counter                        | `0` as number                              | `"0"`, `null`                  |
+| Nested object absent           | `{}` present                               | omitted key                    |
+| Success with nothing to return | `"data": null`, 200                        | `204`                          |
+| Duplicate                      | `409` + `code: *_CONFLICT`                 | silent overwrite               |
+| Stale version (`PATCH`)        | `409` + `code: STALE_WRITE`                | silent last-write-wins         |
+| Shape valid, value impossible  | `422` + `code: SEMANTIC_VALIDATION_FAILED` | `400`, `500`                   |
+| Validation                     | `400` + `details[]`                        | one concatenated string        |
+
+---
+
+## 4.1 List query (the shared paging contract)
+
+Every paginated list endpoint takes the **same** query shape, validated by the same schema on the
+server (`ZodQueryPipe`) and built by the same helper on the client.
+
+| Field   | Type            | Default           | Range / rule                                                                           |
+| ------- | --------------- | ----------------- | -------------------------------------------------------------------------------------- |
+| `page`  | number          | `1`               | integer, ≥ 1. Coerced from the query string.                                           |
+| `limit` | number          | `20`              | integer, 1…100. Coerced from the query string.                                         |
+| `sort`  | string          | resource-specific | **enum over the resource's allow-list** — an unknown column is a `400`, never a `500`. |
+| `order` | `asc` \| `desc` | `desc`            | enum.                                                                                  |
+| `q`     | string          | absent            | free-text search, trimmed, max 200 chars. An empty term means **no filter**.           |
+
+**The schema lives in `@callback/shared`** (`listQuerySchema`, plus `createListQuerySchema(sortBy)`
+for the resource-specific `sort` allow-list), so the browser and the server cannot enforce two
+different sets of numbers.
+
+```ts
+// server: the resource schema validates (and defaults) the query string
+@Get()
+async list(
+  @Query(new ZodQueryPipe(apiKeyListQuerySchema)) query: ApiKeyListQuery,
+  @ReqCtx() ctx: RequestContext,
+): Promise<ApiEnvelope<readonly ApiKey[]>> {
+  const { items, pagination } = await this.apiKeys.list(query);
+  return this.responses.ok(items, ctx, pagination);
+}
+
+// client: the same shape, with the defaults left out of the URL
+const params = toListQueryParams(query); // → '?page=3&limit=50' — never '?page=1'
+```
+
+**Per-resource sort allow-list (as of today).**
+
+| Resource    | `sort` values                                                                                     | Default     | `q` matches                                                     |
+| ----------- | ------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------- |
+| `api-keys`  | `name`, `identifier`, `createdAt`, `updatedAt`, `expiresAt`                                       | `createdAt` | `name` **or** `identifier` (ILIKE)                              |
+| `customers` | `customerNumber`, `legalName`, `shortName`, `status`, `createdAt`, `updatedAt`, `lastActivityAt`  | `createdAt` | `legalName` **or** `taxNumber` **or** `customerNumber` (ILIKE)  |
+
+**Resource-specific filters (AIS-16).** A resource may extend the shared query with **optional**
+filters; they are plain optional fields on its own schema (`listQuerySchema.extend({ … })`), never a
+change to the shared one, and an absent filter means “no filter”. `customers` is the first resource
+that uses this: `type`, `status` and `source`, each an enum over the contract's value set.
+`lastActivityAt` is sortable although it is **derived**
+(`max(activities.created_at)`) — derived values are allowed in `sort` and in the response, never as
+stored columns.
+
+**The response.** The wire format does **not** change: `data` stays an array and `meta.pagination`
+carries the paging block (see §2). What the client gets is a **type**: `ApiResult<TRows>` pairs
+the rows with a **mandatory** `meta.pagination`, so `total` and `totalPages` are reachable without
+digging through the envelope and without a type assertion. A paginated response **without**
+`meta.pagination` is a contract violation — the parse fails rather than silently treating it as a
+single page.
+
+**Server-side paging is real.** `GET /api/api-keys` is the reference implementation (AIS-107):
+
+- the repository exposes `findPage(query)` → `{ rows, total }` (a `count(*)` over the **same**
+  filter plus a `limit`/`offset` slice), so `findAll` no longer exists;
+- every `orderBy` ends with `asc(id)` as a tie-breaker, so a page boundary never skips or repeats
+  a row when two rows share the sort value;
+- `meta.pagination` is computed by the pure `toPaginationMeta(query, total)` helper — the same
+  function the client pager uses, so the two cannot disagree;
+- an empty result is `200` + `data: []` + `total: 0` / `totalPages: 0`, never a `404`;
+- an unknown `sort`, `limit=0`, `limit=101` or a fractional `page` is a `400`
+  `VALIDATION_FAILED` with the offending field in `details[].path`.
+
+The generated OpenAPI document lists the five query parameters of a list endpoint. They are
+**descriptors derived from the same constants** the validation schema uses
+(`list-query.parameters.ts`, `api-keys.list-query.ts`) rather than generated from the zod schema:
+the `q` field ends in a `transform`, which cannot be rendered as an OpenAPI parameter.
+
+---
+
+## 4.2 Mutation convention (`PATCH` / `DELETE`)
+
+Every mutable resource follows **one** convention. `api-keys` is the reference implementation (AIS-108).
+
+### 4.2.1 `PATCH /api/<resource>/:identifier` — partial, version-guarded
+
+| Rule                         | Detail                                                                                                                                                                                                                                                                                                     |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Addressed by identifier**  | The route parameter is the resource's own lookup key; `:identifier` is **not** patchable — renaming the address is delete + create.                                                                                                                                                                        |
+| **Partial body**             | Every mutable field is optional. `undefined` = “leave it”, `null` = “clear it” (only for nullable fields).                                                                                                                                                                                                 |
+| **`updatedAt` is required**  | It is the optimistic-concurrency token — the client's last known version. A body without it is a `400`, so `{}` cannot silently no-op.                                                                                                                                                                     |
+| **`.strict()`**              | `id`, `identifier`, `createdAt`, `updatedAt` and any unknown field are a `400 VALIDATION_FAILED`.                                                                                                                                                                                                          |
+| **One atomic guard**         | `UPDATE … SET <only provided columns> WHERE identifier = $1 AND deleted_at IS NULL AND updated_at = $expected RETURNING *`. There is deliberately **no** read-compare-write in the service: that window _is_ the lost update.                                                                              |
+| **Server-owned `updatedAt`** | The column is maintained by the database (`$onUpdate`). The client value is only compared, never written.                                                                                                                                                                                                  |
+| **Millisecond storage**      | The token column is `timestamp(3) with time zone`, i.e. exactly the resolution of `toISOString()`. A microsecond column would store `…123456Z` while the client can only send back `…123Z`, so **every** `WHERE updated_at = $expected` would be a spurious `409` (found live, fixed by migration `0004`). |
+| **`422` before `409`**       | A semantically impossible payload (e.g. `expiresAt` in the past) is a `422` **before** the version guard, so the retry advice stays correct. Boundary: `expiresAt === now` is allowed; strictly earlier is rejected.                                                                                       |
+| **Miss classification**      | A guard that matched nothing costs one extra read (`findAnyByIdentifier`, deleted rows included): absent → `404`, deleted → `404` (a deleted row is invisible, so `409` would confirm its existence), live with another version → `409 STALE_WRITE` with `details[{ path: 'updatedAt' }]`.                 |
+
+```jsonc
+// PATCH /api/api-keys/vapi-prod
+{
+  "name": "Vapi production", // change it
+  "description": null, // clear it
+  "updatedAt": "2026-11-02T10:00:00.000Z", // the version the client last saw
+}
+```
+
+### 4.2.2 `DELETE /api/<resource>/:identifier` — soft delete
+
+| Rule                     | Detail                                                                                                                                                                                    |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Soft delete**          | The row is kept and stamped with `deleted_at`; an audit trail and a future undelete stay possible.                                                                                        |
+| **Invisible everywhere** | Every read and write carries `deleted_at IS NULL` (list, count, lookup, update, delete). A deleted row answers `404`, never `410`.                                                        |
+| **`200` + `data: null`** | Never `204`: a `204` has no body, so it could not carry `meta.requestId`. The payload is described by the shared `noPayloadSchema` (`z.null()`), registered as the `NoPayload` component. |
+| **Idempotency is `404`** | A second `DELETE` of the same identifier answers `404 NOT_FOUND` — the row is already invisible, so reporting success would claim an effect the call did not have.                        |
+
+### 4.2.3 OpenAPI
+
+`PATCH` and `DELETE` are already part of `ApiHttpMethod` and `VERB_BY_METHOD`, so a registry entry is
+enough. The two schemas the mutation needs are named components: `UpdateApiKey` (request) and
+`NoPayload` (`data` of the delete). `envelopeOf()` can only describe a payload with a component name,
+which is why `noPayloadSchema` exists at all.
+
+### 4.3 The `customers` resource (AIS-178) — the first `/api/admin/*` family
+
+Six operations, all mounted under `/api/admin/customers` and implemented by
+[`CustomersController`](../../apps/api/src/customers/customers.controller.ts:1). The prefix carries the
+`admin` segment on purpose: customer data is back-office data and must not be reachable under a
+shorter path.
+
+| operationId             | method   | path                       | success | notes                                                    |
+| ----------------------- | -------- | -------------------------- | ------- | -------------------------------------------------------- |
+| `customers.list`        | `GET`    | `/api/admin/customers`     | `200`   | `meta.pagination`; `q` over legal name / tax no. / number |
+| `customers.findById`    | `GET`    | `/api/admin/customers/:id` | `200`   | parent + tags + live contacts (+roles) + users             |
+| `customers.create`      | `POST`   | `/api/admin/customers`     | `201`   | `customer_number` and the timestamps are server values    |
+| `customers.update`      | `PATCH`  | `/api/admin/customers/:id` | `200`   | `updatedAt` required and never written                    |
+| `customers.updateStatus`| `PATCH`  | `/api/admin/customers/:id/status` | `200` | also writes `status_changed_at`                     |
+| `customers.remove`      | `DELETE` | `/api/admin/customers/:id` | `200`   | soft delete; `data: null`                                 |
+
+**Two `409` codes, both from constraint names** (never a pre-check):
+
+| Code                          | Raised by                                          | `details[0].path` |
+| ----------------------------- | -------------------------------------------------- | ----------------- |
+| `CUSTOMER_NUMBER_CONFLICT`    | `customers_customer_number_key` (or a full month)   | `customerNumber`  |
+| `CUSTOMER_TAX_NUMBER_CONFLICT`| `customers_tax_number_key` (partial: live rows only)| `taxNumber`       |
+
+A `23505` from **any other** constraint stays a `500` — a fabricated business conflict would hide a
+real bug. Classification happens on the error's structured fields (`code` + `constraint_name`), never
+on message text.
+
+**`primaryContactName` is on the wire.** The list and the detail both carry it (plus
+`lastActivityAt` and `hasMissingData`), and all three are **derived, never stored**:
+`max(activities.created_at)` and the name of the live contact holding the `primary` role. They are
+projected by the same round trip as the row, so the list costs the same two queries it did before
+(page + count) and the detail at most four.
+
+**`:id` is validated before it reaches Postgres.** `customerIdSchema` (`z.string().uuid()`) runs in the
+route's `ZodValidationPipe`, so `/api/admin/customers/not-a-uuid` is a `400 VALIDATION_FAILED`. Without
+it, `'not-a-uuid'::uuid` raises SQLSTATE `22P02` and the envelope would answer `500` (plan `D8`).
+A **well-formed but unknown** uuid is still `404 NOT_FOUND`.
+
+**`DELETE` never answers `STALE_WRITE`.** The route carries no body, so there is no token to compare;
+a repeat delete is a `404`, and the archived row keeps its data while freeing its tax number (the
+partial unique index excludes `deleted_at IS NOT NULL`).
+
+**The audience is `admin`, and the audit actor is `system`.** Every mutation writes exactly one
+`audit.audit_logs` row **on the caller's transaction**, with only the changed keys in
+`before_data`/`after_data`. Until the admin auth lands (AIS-73/74), the ledger honestly says
+`actor_type = 'system'` (§7.1); the mutating handlers are the only ones that read the raw request
+(`@Req()` + `toAuditRequestFacts()`), because `ip`, `user-agent` and `source` are not part of the
+envelope context.
+
+#### 4.3.1 `PATCH` status codes — the shape boundary and the `422` rule (AIS-14 `D1`)
+
+The AIS-14 story DoD asked for “`422` semantic error on `PATCH /:id`”. That wording **predates
+AIS-108 and is superseded by this section**: the implementation keeps the AIS-108 convention, because
+a one-off `422` branch on `PATCH /customers/:id` would make this the only resource in the API that
+answers that way, for no client benefit.
+
+| Situation on `PATCH /api/admin/customers/:id` | Answer | Raised by |
+| --- | --- | --- |
+| malformed body, unknown key, non-uuid `:id` | `400 VALIDATION_FAILED` + `details[].path` | the route's `ZodValidationPipe` |
+| valid body, `updatedAt` is not the current version | `409 STALE_WRITE` + `details[{ path: 'updatedAt' }]` | the repository's version guard |
+| valid body, content impossible (foreign `customerUserId`, foreign `tagId`, `from > to`, …) | `422 SEMANTIC_VALIDATION_FAILED` | the child-resource services |
+| empty patch object with the current token | `200`, silent no-op | the service (AIS-108 `D7`) |
+
+**The rule in one line: `PATCH` never answers `422` for a shape or a version problem.** `422` is
+reserved for a *well-formed* request whose content is impossible, and today only the `customers` child
+resources (contacts, tags, customer users, activities, the audit-log range) produce it. Two corollaries:
+
+- the same split applies to the children: `400` for the body's shape, `409 STALE_WRITE` for a stale
+  token, `422` for a reference that cannot exist;
+- `DELETE` never answers `STALE_WRITE` at all (§4.3 above): it carries no body, so there is no token
+  to compare.
+
+The activity feed adds one detail worth knowing: its version token is `updated_at ?? created_at`,
+because `updated_at` is `NULL` until the first edit — the guard compares
+`coalesce(updated_at, created_at)` against the instant the client was shown (§12.3).
 
 ---
 
 ## 5. Status codes
 
-`200` read/update/delete · `201` create · `400` malformed/shape · `401` unauthenticated · `403` forbidden · `404` missing · `409` conflict · `413` payload too large · `422` semantic validation (currently normalised to `VALIDATION_FAILED` → `400`) · `429` rate limited · `500` internal · `503` dependency down.
+`200` read/update/delete · `201` create · `400` malformed/shape · `401` unauthenticated · `403` forbidden · `404` missing · `409` conflict (incl. `STALE_WRITE`) · `413` payload too large · `422` semantic validation (`SEMANTIC_VALIDATION_FAILED`) · `429` rate limited · `500` internal · `503` dependency down.
 
 ---
 
@@ -156,6 +391,22 @@ Errors        ApiExceptionFilter (@Catch(), registered as APP_FILTER in HttpModu
 - `ApiExceptionFilter` normalises **anything** (`AppError`, `ZodError`, Nest `HttpException`, unknown `Error`) into the error envelope, sanitises 5xx, echoes `X-Request-Id` and logs one structured line per failure.
 - There is **no success interceptor** that wraps bodies implicitly; `RequestIdInterceptor` only sets the `X-Request-Id` header.
 
+### 7.1 Admin authentication is deferred — the audit actor is `system`
+
+A `customers` erőforrás (AIS-178) az első `/api/admin/*` végpontcsalád, amely tartósan ír a saját
+adatbázisba, és minden írás audit sort kap. Az admin hitelesítés (AIS-71/72/73 + AIS-74) ezen a
+ágon **még nincs meg**, ezért a következő állapot tudatos és ideiglenes:
+
+| Kérdés | Jelenlegi állapot |
+| ------ | ----------------- |
+| Ki érheti el a `/api/admin/*` végpontokat? | **Bárki, aki eléri az API-t.** A program egyelőre csak a fejlesztő gépén fut; publikálás előtt az AIS-73/74 session guard **és** a Caddy-szintű allow-list kötelező. |
+| Ki szerepel elkövetőként az audit naplóban? | `actor_type = 'system'`, `actor_id = null`, `actor_name = 'system'` — ezt adja vissza az `apps/api/src/audit/audit-actor.provider.ts`, amíg nincs session. |
+| Javítható ez utólag? | **Nem.** Az `audit.audit_logs` append-only (lásd [`Database-Local.md`](Database-Local.md) §4.2), a már beírt `system` sorok visszamenőleg nem attribútálhatók. |
+| Mi a teendő az auth bemergelésekor? | Egyetlen osztály: session-alapú `AuditActorProvider`, és az `AUDIT_ACTOR_PROVIDER` token átkötése az `AuditModule`-ban. A séma és az `AuditWriter` nem változik. |
+
+Ez ugyanaz a minta, mint az `api-keys` végpontoknál (§13): a `401` kód és a banner-viselkedés
+előkészítve van, a login flow viszont hiányzik.
+
 ---
 
 ## 8. Request correlation
@@ -178,10 +429,18 @@ The resolved id appears as `meta.requestId` / `error.requestId` **and** as the `
 
 ## 9. Client transport
 
-- **One unwrap point:** `packages/api-client/src/envelope.logic.ts` — `unwrapEnvelope(schema, body)` returns a discriminated `{ ok: true, data }` / `{ ok: false, issues, cause }`. It is pure (no `Response`, no `fetch`, no `env`), so every drift case is unit-testable without a transport double. `http-client.ts` only reads the body and turns a failed unwrap into an error.
-- Two parses inside the unwrap: `successEnvelopeSchema(callerSchema)` proves the body is `{ data, meta }`, then the bare `callerSchema` re-validates `data` (so `data: null` is only accepted where the caller expects it). Only **`data`** is returned — service signatures are unchanged.
-- A bare payload, a missing `meta`, or a `data: null` where the caller expects a resource becomes `ApiError` with `code: 'UNEXPECTED_PAYLOAD'`, **non-empty `issues[]`** and `details[]` rendered from that same list (`formatIssueLine`), so the two can never disagree.
+- **One unwrap point:** `packages/api-client/src/envelope.logic.ts` — `unwrapEnvelope(schema, body)` returns a discriminated `{ ok: true, data, meta }` / `{ ok: false, issues, cause }`. It is pure (no `Response`, no `fetch`, no `env`), so every drift case is unit-testable without a transport double. `http-client.ts` only reads the body and turns a failed unwrap into an error.
+- Two parses inside the unwrap: `successEnvelopeSchema(callerSchema)` proves the body is `{ data, meta }`, then the bare `callerSchema` re-validates `data` (so `data: null` is only accepted where the caller expects it). The detail verbs (`get`/`post`/`put`/`patch`/`delete`) return **`data` only**; `meta` is validated but not exposed to those services.
+- **Two entry points, on purpose.** A list body is not “an envelope around a payload”: it must carry `meta.pagination`. `getList` therefore uses `paginated-envelope.logic.ts` → `unwrapPaginatedEnvelope(rowsSchema, body)`, which returns `ApiResult<TRows>` (`data` + a **mandatory** `meta.pagination`). `getList` is the only transport method that returns `ApiResult`.
+- A bare payload, a missing `meta`, a missing `meta.pagination`, or a `data: null` where the caller expects a resource becomes `ApiError` with `code: 'UNEXPECTED_PAYLOAD'`, **non-empty `issues[]`** and `details[]` rendered from that same list (`formatIssueLine`), so the two can never disagree. The missing-pagination case is an ordinary zod issue at path `meta.pagination`, so the admin can point at the pager instead of showing a generic panel.
 - `issues[].path` is **payload-relative** (`identifier`, never `data.identifier`) — the envelope wrapper is stripped by `toPayloadRelativePath()`, because that is the form the admin maps onto a field. A payload-level problem (wrong type, `null` body) yields the empty path, i.e. “the whole body”.
+- **Full verb set.** `HttpClient` = `get`, `post`, `put`, `patch`, `delete`, `getList`. `delete` takes **no body** (the convention has no body-carrying delete). `Content-Type: application/json` is sent only when a body exists.
+- **Query building.** `toQueryString(filters, defaults?)` (pure) drops `undefined`/`null`/`''`/empty arrays and values still equal to their default, repeats the key for an array (`tag=a&tag=b`) and returns `''` when nothing is left — never a bare `?`. `getList` instead delegates to the shared `toListQueryParams(...)`, so the “is this field still at its default” rule exists in one place (`page=1`, `limit`, `order`, `q`, resource `sort`).
+- **Typed request body.** `RequestBodyOf<'apiKeys.update'>` (`packages/shared/src/contract/endpoint.body.ts`) derives the body type from the registry `requestSchema` with `z.infer`, so a service that sends a wrong payload fails to compile instead of failing at runtime with a `400`. Both registry arrays are `as const satisfies readonly ApiEndpointContract[]` for that reason: without it `requestSchema` widens to `z.ZodTypeAny`.
+- **Unresolved path guard.** `clientPathOf('apiKeys.remove')` yields `/api-keys/:identifier`; the transport rejects a path that still contains a `:parameter` with `UnresolvedPathParameterError` **before** calling `fetch`, so a forgotten substitution cannot reach the server as a literal `:identifier`.
+- **Service binding (AIS-110).** `createApiKeysService` covers **all five** registered operations (`list`, `findByIdentifier`, `create`, `update`, `remove`). `update`/`remove` reuse the one detail path derived from `apiKeys.findByIdentifier` — a test asserts the three ids resolve to the same template, so a registry divergence fails instead of silently addressing another route. `remove` resolves to `null` because `data` is `null` by convention; a `204`, a missing `data` key or an object payload is an `UNEXPECTED_PAYLOAD` drift.
+- **Coverage gate.** `packages/api-client/test/service-coverage.test.ts` compares `API_ENDPOINTS` with the services built by `src/service.registry.ts`: a registered operation without a service method (`missing`) or a service method without a registered operation (`orphan`) turns the suite red. The expected method name is derived from the `operationId`, so a new resource needs one line in the factory map and no test edit.
+- **`onEvent` (optional).** Every finished attempt may be reported as `HttpEvent { method, path, status, durationMs, outcome, requestId, query, bodyPreview, responseMeta }` (AIS-152). The **token never**: no header value exists on the type and no `Authorization` value is ever read into it; the body travels only as a **masked, truncated prefix** (`HTTP_BODY_PREVIEW_MAX_LENGTH` + `…`, a top-level `token`/`password`/`secret`/`apiKey`/`authorization` key becomes `<redacted>`), the query is emitted unfiltered and only length-clamped (`HTTP_QUERY_MAX_LENGTH`). `requestId` is the `X-Request-Id` header first, then `meta.requestId` (success) or `ApiError.requestId` (failure), `null` without a response; `responseMeta` (`requestId`/`timestamp`/`totalItems`) exists only for a parseable envelope. `outcome: 'success'` requires a parsed body, so a `2xx` contract drift is an `error`. Without a listener the transport behaves exactly as before; a throwing listener never fails a request.
 - `ApiError` carries `status`, `code`, `requestId`, `issues[]` **and** the legacy `details: string[]` (rendered lines), so existing callers keep working.
 - `api-error.const.ts` re-exports `HTTP_STATUS`, `API_ERROR_CODE` and the `ApiErrorCode` type from `@callback/shared`, so a consumer compares `code` against the catalogue instead of re-typing strings.
 - A non-JSON body (Caddy `502`, nginx `504`) still degrades to status-based error — the tolerant path is deliberate.
@@ -191,12 +450,33 @@ The resolved id appears as `meta.requestId` / `error.requestId` **and** as the `
 
 ## 10. Where an error becomes visible (four tiers)
 
-| Tier          | Component                                             | Applies to                                         |
-| ------------- | ----------------------------------------------------- | -------------------------------------------------- |
-| 1. Field      | RHF `setError(path)` from `details[]`                 | `400`/`422`, `409` with a field detail             |
-| 2. Page       | `Alert` in the page content region + retry            | `403`, `404`, `409`, `5xx` on the page's main data |
-| 3. App        | dismissible top banner (session + notification store) | `401`, offline (`status === null`), `503`          |
-| 4. Log drawer | system entries with `code`, `status`, `requestId`     | all `5xx`, schema-drift payloads                   |
+| Tier          | Component                                             | Applies to                                         | Toast (AIS-136) |
+| ------------- | ----------------------------------------------------- | -------------------------------------------------- | --------------- |
+| 1. Field      | RHF `setError(path)` from `details[]`                 | `400`/`422`, `409` with a field detail             | **no**          |
+| 2. Page       | `Alert` in the page content region + retry            | `403`, `404`, `409`, `5xx` on the page's main data | yes             |
+| 3. App        | dismissible top banner (session + notification store) | `401`, offline (`status === null`), `503`          | **yes**         |
+| 4. Log drawer | entries with `code`, `status`, `requestId` and the structured `details` rows | all `5xx`, schema-drift payloads, the expanded request/response trail | n/a             |
+
+Tier 4 is the **diagnostic** tier and since AIS-143 it carries the whole wire context, not just a
+sentence (AIS-152 filled the fields, AIS-153 made the row expandable, AIS-163 added the JSON
+expansion):
+
+| Where | What tier 4 receives |
+| --- | --- |
+| Every finished HTTP attempt | `method`, `path`, `query` (full, no whitelist), `status`, `durationMs`, `outcome`, `requestId` (the `X-Request-Id` response header, falling back to `meta.requestId`), `responseMeta`, and the request body only as a **masked, truncated prefix** (`HTTP_BODY_PREVIEW_MAX_LENGTH` + `…`) |
+| A failed query/mutation | `code`, `status`, `requestId`, `queryKey` / `mutationKey`, the failing `url` with its query string, the error tier (`field` / `banner` / `page`) and every `issues[]` entry as its own row (`path: message`) |
+| A runtime error | the error `name`, the stack (only with `includeDetails`, i.e. DEV) and React's `componentStack` |
+
+The value never re-enters the other tiers: the drawer is read-only, owns no retry and emits nothing,
+so a log entry can never become a second error surface. Redaction happens once, in the notifications
+core (`redactValue`), and a JSON-shaped value is only *displayed* indented — the stored string stays
+exactly what the store saved.
+
+Tier 3 is the only tier that speaks **twice** on purpose: the banner expresses the persistent
+condition (offline / expired session / 503) and survives a dismissed toast, while the toast marks the
+moment the failure happened. Tier 1 stays off the toast channel, because the input keeps focus and
+shows the message; everything else is announced even when the user is looking at another part of the
+screen. The matrix is decided once, in `toFailureToast` (`apps/admin/src/app/notifications/notification-events.logic.ts`).
 
 `toErrorMessage(error)` maps **code first** (`ERROR_CODE_MESSAGE` in `apps/admin/src/lib/error-message.const.ts`), then falls back to the status copy. The server's `message`/`details` are never used as user copy. Its signature (`unknown → string`) is frozen — the notification capture builds on it.
 
@@ -204,7 +484,7 @@ The resolved id appears as `meta.requestId` / `error.requestId` **and** as the `
 
 Implemented by `toFieldErrors(error): { fields, form }` in
 `apps/admin/src/features/<use-case>/<use-case>.logic.ts` (API keys:
-[`api-keys.logic.ts`](../../apps/admin/src/features/api-keys/api-keys.logic.ts:1)). Pure, no React, no I/O.
+[`api-keys.logic.ts`](../../apps/admin/src/pages/api-keys/api-keys.logic.ts:1)). Pure, no React, no I/O.
 
 | Rule                   | Detail                                                                                                                                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -223,14 +503,20 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 
 ## 11. Recipe — adding an endpoint
 
-1. **Schema** in `packages/shared/src/contract/<resource>/<resource>.schema.ts` (request: `.strict()`, response: tolerant).
-2. **Registry entry** in `<resource>.contract.ts` (`operationId: '<resource>.<action>'`, method, path, `tag`, `successStatus`, `dataSchema`, optional `requestSchema`, `errors` from the catalogue) — and a sample payload for it in `packages/shared/test/endpoint-registry.test.ts`.
-3. **Domain service** in `apps/api/src/<feature>/`: returns plain data, throws `AppError` subclasses (add a new subclass or a domain code if the failure mode is new).
-4. **Controller**: `@Body(new ZodBodyPipe(schema))` + `@ReqCtx()`, returns `this.responses.ok(await service…, ctx)`; `@HttpCode(HTTP_STATUS.CREATED)` for a create.
-5. **Client service** in `packages/api-client/src/<resource>/`: the path comes from `clientPathOf('<operationId>')`, never from a literal; then `client.get(path, schema)` / `client.post(path, body, schema)`.
-6. **Query hook** in `apps/admin/src/features/<use-case>/`, page alert from the hook's error state, field errors from `issues[]`.
-7. **Tests**: pipe, service (`AppError` code + status), controller (`data` + `meta`), transport (envelope unwrap, error envelope → `ApiError.code`), hook.
-8. If the route must stay raw: `@SkipEnvelope()` **and** an entry in `ENVELOPE_EXEMPTIONS` with a reason. No silent exemptions.
+The **per-layer file checklist** — shared contract → `api-client` service → Nest module → admin
+feature/entity/page, plus the one mandatory line in `packages/api-client/src/service.registry.ts` —
+lives in one place: [`Admin-Data-Flow.md`](Admin-Data-Flow.md) §3 („New resource template”).
+It is deliberately **not** repeated here; `api-keys` is the reference implementation to copy.
+
+Two rules stay in this document, because they are about the HTTP contract rather than about
+layering:
+
+1. **Raw routes.** If a route must stay raw: `@SkipEnvelope()` **and** an entry in
+   `ENVELOPE_EXEMPTIONS` with a reason. No silent exemptions.
+2. **Mutable resources** (§4.2): add `<resource>.update.ts` with a `.strict()` partial schema whose `updatedAt` is required; add `update`/`remove` registry entries (`successStatus: 200`, delete payload `noPayloadSchema`); give the repository an **atomic** version-guarded `update…` and a `softDelete…`, both filtered on `deleted_at IS NULL`; map a missed guard to `404` (absent/deleted) or `409 STALE_WRITE` (live, other version) with `details[{ path: 'updatedAt' }]`; put impossible values behind a pure `*.logic.ts` rule and answer `422 SEMANTIC_VALIDATION_FAILED` before the guard.
+
+The endpoint is only **done** when the client can actually call it: a registry entry without a
+service method fails `packages/api-client/test/service-coverage.test.ts` (§12).
 
 ---
 
@@ -245,9 +531,13 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 | Same agreement over the discovered `AppModule` controllers                                                                                                    | `apps/api/test/envelope-exemptions.e2e-spec.ts`                                                             |
 | `api-keys` service/controller behaviour                                                                                                                       | `apps/api/src/api-keys/*.spec.ts`                                                                           |
 | Envelope end-to-end (incl. 409 code + `details[0].path`)                                                                                                      | `apps/api/test/api-keys.e2e-spec.ts`                                                                        |
+| Mutation convention (§4.2): `PATCH` version guard, `409 STALE_WRITE`, `422` boundary, soft delete ⇒ `404`, `data: null`                                       | `apps/api/test/api-keys.e2e-spec.ts` (`mutation convention` block)                                          |
+| Pure expiry rule (`isPastDate`, boundary = allowed), patch mapper (`undefined` vs `null`), atomic `update`/`softDelete` SQL                                   | `apps/api/src/api-keys/{api-keys.logic,api-keys.mapper,api-keys.repository}.spec.ts`                        |
+| New error codes resolve to `409` / `422`, every catalogue value has a status                                                                                  | `packages/shared/test/error-code.test.ts`                                                                   |
 | `meta.requestId` ⇄ `X-Request-Id`, inbound pass-through, invalid id replaced, unknown route, `healthz` raw                                                    | `apps/api/test/request-id.e2e-spec.ts`                                                                      |
 | `healthz` / VAPI raw bodies unchanged                                                                                                                         | `apps/api/test/{health,vapi-webhooks}.e2e-spec.ts`                                                          |
 | Client unwrap, drift, legacy fallback                                                                                                                         | `packages/api-client/test/{http-client,api-keys.service}.test.ts`                                           |
+| Registry ⇄ client service coverage (missing method, missing service, orphan method, malformed `operationId`)                                                  | `packages/api-client/test/service-coverage.test.ts`                                                         |
 | Pure envelope unwrap + payload-relative paths                                                                                                                 | `packages/api-client/test/envelope.logic.test.ts`                                                           |
 | Error-body parsing, `details`/`issues` consistency, guards                                                                                                    | `packages/api-client/test/api-error.test.ts`                                                                |
 | Client path derivation from the registry (`toClientPath`, `clientPathOf`)                                                                                     | `packages/api-client/test/endpoint-path.test.ts`                                                            |
@@ -267,11 +557,129 @@ Tiers 1–2 are implemented; tier 3–4 depend on the notification plan
 
 ---
 
+## 12.1 Contact endpoints (AIS-178/d)
+
+A contact belongs to a customer, so every contact route lives **under** the customer path and every
+read is scoped by `customer_id`. Guessing a contact uuid therefore cannot cross the customer boundary:
+the answer is `404`, never someone else's contact.
+
+| operationId                 | verb   | path                                                     | success | notes                                                                    |
+| --------------------------- | ------ | -------------------------------------------------------- | ------- | ------------------------------------------------------------------------ |
+| `customers.listContacts`    | GET    | `/api/admin/customers/:id/contacts`                       | `200` + `meta.pagination` | paged, ordered by `name`, `?q=` searches name/email/phone |
+| `customers.createContact`   | POST   | `/api/admin/customers/:id/contacts`                       | `201`   | `isActive` starts `true`; `roles` is the whole role set                    |
+| `customers.updateContact`   | PATCH  | `/api/admin/customers/:id/contacts/:contactId`            | `200`   | `updatedAt` required; `roles`, when present, **replaces** the set          |
+| `customers.removeContact`   | DELETE | `/api/admin/customers/:id/contacts/:contactId`            | `200`, `data: null` | soft delete + its role rows removed, which frees the `primary` slot |
+
+Three rules are enforced by the **database**, not by a pre-check, and the answers are classified by
+constraint name:
+
+- one `primary` contact per customer (`contact_roles_primary_key`) → `409 CUSTOMER_PRIMARY_CONTACT_CONFLICT`
+  with `details[0].path = "roles"`; a role-set replace is atomic, so "move the flag" is one request;
+- a `customerUserId` of another customer (`contacts_customer_user_id_fkey`) → `422 SEMANTIC_VALIDATION_FAILED`
+  with `details[0].path = "customerUserId"` — the body is well formed, its content is not;
+- the contact row and its role rows share one transaction, and each audit row belongs to the table it
+  describes (`contact_roles` rows carry `recordId: null`, the pair travels in the payload).
+
+A **roles-only** PATCH does not bump `contacts.updated_at`, because the roles live in their own table;
+the concurrency token is still verified against the row that was read, so a stale client still gets
+`409 STALE_WRITE`.
+
+---
+
+## 12.2 Tag and customer-user endpoints (AIS-178/e)
+
+Both are child resources of a customer, so both live under the customer path and every read/write is
+scoped by `customer_id`.
+
+| operationId                       | verb   | path                                                                  | success | notes                                                                 |
+| --------------------------------- | ------ | --------------------------------------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `customers.createTag`             | POST   | `/api/admin/customers/:id/tags`                                        | `201`   | **create-or-attach** by name: an existing label is reused, never duplicated |
+| `customers.attachTag`             | PATCH  | `/api/admin/customers/:id/tags`                                        | `200`   | attaches an existing `tagId`; a repeat is a no-op (no ledger row)      |
+| `customers.detachTag`             | DELETE | `/api/admin/customers/:id/tags/:tagId`                                 | `200`, `data: null` | removes the **link** only — the catalogue row survives     |
+| `customers.inviteCustomerUser`    | POST   | `/api/admin/customers/:id/customer-users`                              | `201`   | the row starts `invited`; no e-mail is sent by this API               |
+| `customers.updateCustomerUser`    | PATCH  | `/api/admin/customers/:id/customer-users/:customerUserId`              | `200`   | `updatedAt` required; `status` accepts `active` / `inactive` only      |
+| `customers.removeCustomerUser`    | DELETE | `/api/admin/customers/:id/customer-users/:customerUserId`              | `200`, `data: null` | **revokes a pending invitation** only (`422` otherwise)    |
+
+Rules a reader should not have to rediscover:
+
+- **The catalogue is shared.** `POST /:id/tags` resolves the name first, inserts only when it is new,
+  and treats a `23505` on `tags_name_key` as a lost race: the loser re-reads the winner's row in a fresh
+  transaction and attaches it. Detaching never deletes the label, so one customer leaving a tag cannot
+  remove it from everybody else.
+- **Attach is idempotent.** `customer_tags` has a composite primary key, and the repository writes with
+  `ON CONFLICT DO NOTHING`: a repeat attach answers `200` without a ledger row. Detaching a link that
+  does not exist is a `404` (§4.2.2).
+- **An unknown or inactive `tagId` is `422 SEMANTIC_VALIDATION_FAILED`** with `details[0].path = "tagId"`:
+  the body is well formed, the value is not.
+- **The invitation is server-written.** `status = invited`, `invitedAt = now`,
+  `invitedByOperatorId = null` (no session until AIS-73/74), `passwordHash = null`. There is no accept
+  endpoint yet — that is the auth story's job.
+- **One active `owner` per customer** is the partial index `customer_users_customer_owner_key`
+  (`role = 'owner' AND status = 'active'`), so the `409 CUSTOMER_OWNER_CONFLICT` surfaces at
+  **activation**, not at invitation: a pending second owner is legal, and the pre-check that would
+  "forbid" it could neither see the status nor survive a race.
+- **The login e-mail is globally unique** (`customer_users_email_key`, case-insensitive): a duplicate is
+  `409 CUSTOMER_USER_EMAIL_CONFLICT` with `details[0].path = "email"`, in any customer.
+- **Only a pending invitation can be revoked.** `iam.customer_users` has no `deleted_at`, and the row is
+  referenced by contacts and activities (`NO ACTION`), so a delete is a hard delete of a row that never
+  became a login. Anything else is `422`, and a still-referenced row is
+  `409 CUSTOMER_USER_IN_USE_CONFLICT` with `details[0].path = "id"` — deactivate it instead.
+- **Tag links are audited with `recordId: null`**: `customer_tags` has a composite key, so the pair
+  travels in `before`/`after` (the same shape `contact_roles` uses).
+
+---
+
+## 12.3 Activity feed and the audit-log read (AIS-178/f)
+
+Two child resources, two very different natures: the feed is a normal, writable child collection, the
+ledger is **append-only and read-only** through the API.
+
+| operationId                  | verb   | path                                                       | success | notes                                                                 |
+| ---------------------------- | ------ | ---------------------------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `customers.listActivities`   | GET    | `/api/admin/customers/:id/activities`                       | `200`   | `created_at` order + `id` tie-breaker; **no `q`, no `sort`**           |
+| `customers.createActivity`   | POST   | `/api/admin/customers/:id/activities`                       | `201`   | the **author is server-side**, `.strict()` rejects one in the body     |
+| `customers.updateActivity`   | PATCH  | `/api/admin/customers/:id/activities/:activityId`            | `200`   | token = `updatedAt ?? createdAt`; an empty patch writes nothing        |
+| `customers.removeActivity`   | DELETE | `/api/admin/customers/:id/activities/:activityId`            | `200`, `data: null` | soft delete; `lastActivityAt` falls back to the previous entry |
+| `customers.listAuditLogs`    | GET    | `/api/admin/customers/:id/audit-logs`                        | `200`   | four filters + `occurred_at` order; **there is no write route at all** |
+
+Rules a reader should not have to rediscover:
+
+- **The author never comes from the request.** `createActivity` writes `authorType` / `authorName` /
+  `operatorId` / `customerUserId` from `AUDIT_ACTOR_PROVIDER` — the same seam the ledger uses. Today that
+  is `system`/`system`/`null`/`null`; AIS-73/74 swaps one binding and both the feed and the ledger follow.
+- **The concurrency token is the last write instant.** `activity.activities.updated_at` is **nullable**
+  ("never edited"), so the guard compares `coalesce(updated_at, created_at) = $token` and the write sets
+  `updated_at = now`. A plain `updated_at` compare would reject the *first* edit of every entry.
+- **A token-only `PATCH` is a no-op.** `200` with the current row, no `UPDATE`, **no** ledger row (§4.2.1).
+- **`metadata` keeps `undefined` and `null` apart**: absent leaves the column alone, `null` clears it.
+- **The feed has exactly one meaningful order**, so `q` and `sort` are *removed* from its query schema
+  rather than accepted and ignored; the page and the `count(*)` share one `WHERE`, so `meta.pagination`
+  can never count rows the page does not show.
+- **The ledger is read-only by construction.** `apps/api/src/customers/customers-audit-logs.repository.ts`
+  exposes `findPage` and nothing else, and `audit.audit_logs` refuses `UPDATE`/`DELETE`/`TRUNCATE` by
+  trigger (`0007`). The read is scoped by `customer_id` and has **no** soft-delete branch — the ledger has
+  no `deleted_at`.
+- **Filters:** `tableName` (closed enum = `AUDIT_LOG_TABLE_VALUES`), `operation`
+  (`AUDIT_OPERATION_VALUES`), `actorId` (uuid), and `from`/`to` bounding `occurredAt` inclusively. An
+  unknown enum value is `400 VALIDATION_FAILED`; a well-formed but inverted window is
+  `422 SEMANTIC_VALIDATION_FAILED` with `details[0].path = "from"`.
+- **Order is `occurred_at` + `id`**, and the tie-breaker follows the requested direction: `id` is the
+  identity sequence, so in `desc` it *is* the append order and two rows of the same millisecond stay
+  stable across pages.
+- **Reading the ledger is not an audited event.** No `AuditWriter` call, no transaction — and no way to
+  add one by accident.
+
+---
+
 ## 13. Known gaps / follow-ups
 
-- `422` has no dedicated code yet; a semantic-validation failure reports `VALIDATION_FAILED` / `400`.
+- The transport is complete (`PUT`/`PATCH`/`DELETE`, `getList`, `toQueryString`, `RequestBodyOf`, `onEvent` — AIS-109) and `ApiKeysService` now covers **every** registered operation (`list`, `findByIdentifier`, `create`, `update`, `remove` — AIS-110), kept in sync by the coverage gate (§12). What is still missing is the **consumer**: the admin has no edit/delete UI yet, so `update`/`remove` are bound and tested at the service layer only. `ETag`/`If-Match`, bulk mutations and idempotency keys are deliberately not part of the `updatedAt` convention.
+- A `customers` gyerek-erőforrásai mind a szerződésben és a kliensben élnek (§12.1–§12.3), de az admin **felülete** még nem fogyasztja őket: az `activity` és a `Napló` fül az AIS-181 dolga. A naplónak szándékosan nincs írási végponta, ezért a felület csak olvashatja.
+- Soft-deleted rows have no undelete endpoint and no purge job; they stay in `platform.api_keys` with a `deleted_at` stamp.
+- The admin's tier-1 field mapping (§10.1) still only accepts `VALIDATION_FAILED` and `API_KEY_IDENTIFIER_CONFLICT`, so a `422` / `409 STALE_WRITE` currently surfaces as a page `Alert`. Extending the gate (`expiresAt` / `updatedAt`) belongs to the admin edit UI (AIS-109 and later).
 - API-key value masking (**show-once**) is a separate security task (AIS-75); these endpoints still return the token.
 - The `api-keys` routes are unauthenticated until AIS-73/74; the `401` code and banner behaviour are prepared but the login flow is not.
+- A `/api/admin/customers` (AIS-178) ugyanígy hitelesítés nélkül fut, és amíg nincs session, **minden audit sora `system` aktorral** íródik (§7.1). A napló append-only, tehát ez az időszak visszamenőleg nem javítható — az auth bemergelése ezért nem csak biztonsági, hanem adatminőségi határidő is.
 - `/api/openapi.json` is generated from the registry (AIS-98) and served in every env; the Swagger UI at `/api/docs` is mounted only when `isOpenApiDocsEnabled()` (never in prod). The committed baseline + CI drift gate is AIS-99.
 - The dev response validator (`ResponseAssertInterceptor`) only runs outside prod, and only for routes present in `API_ENDPOINTS`; an exempt route or a plugin-served asset is passed through untouched.
 - e2e suites self-skip on Node < 24.9 (CommonJS `@nestjs/config` + Jest ESM); run `pnpm start` + curl for a manual verification in that case.

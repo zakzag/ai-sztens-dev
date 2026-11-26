@@ -2,7 +2,10 @@ import { API_ENDPOINTS, API_PATH_PREFIX } from '@callback/shared';
 import {
   InvalidEndpointPathError,
   UnknownEndpointError,
+  UnresolvedPathParameterError,
+  assertNoUnresolvedPathParameter,
   clientPathOf,
+  hasUnresolvedPathParameter,
   toClientPath,
 } from '../src/endpoint-path.js';
 
@@ -102,6 +105,65 @@ describe('clientPathOf', () => {
       // The prefix itself must be gone, not merely present as a substring:
       // `/api-keys` is fine, `/api/api-keys` would be a doubled prefix.
       expect(clientPath.startsWith(`${API_PATH_PREFIX}/`)).toBe(false);
+    }
+  });
+});
+
+/**
+ * The placeholder guard (AIS-109).
+ *
+ * `clientPathOf` returns `/api-keys/:identifier` for the single-resource routes;
+ * the service substitutes the identifier (AIS-110). Until it does, the transport
+ * must not send a literal `:identifier`, because the failure it produces (a
+ * `400`/`404` about a weird key) hides the real bug.
+ */
+describe('hasUnresolvedPathParameter', () => {
+  it('detects a placeholder after a slash', () => {
+    expect(hasUnresolvedPathParameter('/api-keys/:identifier')).toBe(true);
+  });
+
+  it('detects a placeholder at the start of the path', () => {
+    expect(hasUnresolvedPathParameter(':identifier')).toBe(true);
+  });
+
+  it('accepts a fully substituted path', () => {
+    expect(hasUnresolvedPathParameter('/api-keys/vapi-prod')).toBe(false);
+  });
+
+  it('ignores a colon inside the query string', () => {
+    expect(hasUnresolvedPathParameter('/events?since=12:30')).toBe(false);
+  });
+
+  it('ignores a colon inside a value', () => {
+    expect(hasUnresolvedPathParameter('/events/12:30')).toBe(false);
+  });
+});
+
+describe('assertNoUnresolvedPathParameter', () => {
+  it('accepts a substituted path', () => {
+    expect(() =>
+      assertNoUnresolvedPathParameter('/api-keys/vapi-prod'),
+    ).not.toThrow();
+  });
+
+  it('throws for an unsubstituted placeholder', () => {
+    expect(() =>
+      assertNoUnresolvedPathParameter('/api-keys/:identifier'),
+    ).toThrow(UnresolvedPathParameterError);
+  });
+
+  it('reports the offending path on the error', () => {
+    try {
+      assertNoUnresolvedPathParameter('/api-keys/:identifier');
+      throw new Error('expected the guard to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnresolvedPathParameterError);
+      expect((error as UnresolvedPathParameterError).path).toBe(
+        '/api-keys/:identifier',
+      );
+      expect((error as UnresolvedPathParameterError).name).toBe(
+        'UnresolvedPathParameterError',
+      );
     }
   });
 });

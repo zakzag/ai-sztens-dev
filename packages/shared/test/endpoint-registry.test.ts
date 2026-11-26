@@ -5,8 +5,20 @@ import {
   API_KEYS_PATH,
   API_PATH_PREFIX,
   ENVELOPE_EXEMPTIONS,
+  VALID_ACTIVITY,
+  VALID_ACTIVITY_LIST,
   VALID_API_KEY,
   VALID_API_KEY_LIST,
+  VALID_AUDIT_LOG_LIST,
+  VALID_CONTACT,
+  VALID_CONTACT_LIST,
+  VALID_CUSTOMER,
+  VALID_CUSTOMER_DETAIL,
+  VALID_CUSTOMER_LIST,
+  VALID_CUSTOMER_TAG,
+  VALID_CUSTOMER_USER,
+  VALID_UPDATE_API_KEY_REQUEST,
+  VALID_UPDATE_CUSTOMER_REQUEST,
   apiKeySchema,
   findEndpoint,
   successEnvelopeSchema,
@@ -51,6 +63,39 @@ const SAMPLE_PAYLOADS: Readonly<Record<string, unknown>> = {
   'apiKeys.list': VALID_API_KEY_LIST,
   'apiKeys.findByIdentifier': VALID_KEY,
   'apiKeys.create': VALID_KEY,
+  'apiKeys.update': VALID_KEY,
+  // A `DELETE` returns nothing, so its payload is `null` — a value, not an
+  // absent field (see `no-payload.schema.ts`).
+  'apiKeys.remove': null,
+  // AIS-178 — the customers aggregate. `updateStatus` answers with the whole
+  // customer, so the same fixture proves both schemas.
+  'customers.list': VALID_CUSTOMER_LIST,
+  'customers.findById': VALID_CUSTOMER_DETAIL,
+  'customers.create': VALID_CUSTOMER,
+  'customers.update': VALID_CUSTOMER,
+  'customers.updateStatus': VALID_CUSTOMER,
+  'customers.remove': null,
+  // The contact aggregate (AIS-178, slice d): the page uses the list schema, the
+  // three single-contact routes the row schema, and the delete `null`.
+  'customers.listContacts': VALID_CONTACT_LIST,
+  'customers.createContact': VALID_CONTACT,
+  'customers.updateContact': VALID_CONTACT,
+  'customers.removeContact': null,
+  // The tag and customer-user resources (AIS-178, slice e): a tag answers with
+  // the catalogue row, a login user with its row, and both deletes `null`.
+  'customers.createTag': VALID_CUSTOMER_TAG,
+  'customers.attachTag': VALID_CUSTOMER_TAG,
+  'customers.detachTag': null,
+  'customers.inviteCustomerUser': VALID_CUSTOMER_USER,
+  'customers.updateCustomerUser': VALID_CUSTOMER_USER,
+  'customers.removeCustomerUser': null,
+  // The activity log and the audit read (AIS-178, slice f): the two mutation
+  // routes answer with the row, the list with a page, and the delete `null`.
+  'customers.listActivities': VALID_ACTIVITY_LIST,
+  'customers.createActivity': VALID_ACTIVITY,
+  'customers.updateActivity': VALID_ACTIVITY,
+  'customers.removeActivity': null,
+  'customers.listAuditLogs': VALID_AUDIT_LOG_LIST,
 };
 
 /** Minimal envelope `meta`; the registry only cares about the payload. */
@@ -82,12 +127,62 @@ function camelCaseOf(tag: string): string {
 }
 
 describe('endpoint registry', () => {
-  it('registers the three api-keys endpoints', () => {
+  it('registers the five api-keys endpoints', () => {
     expect(API_KEYS_ENDPOINTS.map((entry) => entry.operationId)).toEqual([
       'apiKeys.list',
       'apiKeys.findByIdentifier',
       'apiKeys.create',
+      'apiKeys.update',
+      'apiKeys.remove',
     ]);
+  });
+
+  it('documents the update endpoint as a PATCH on the single-resource path', () => {
+    const update = findEndpoint('apiKeys.update');
+
+    expect(update?.method).toBe('PATCH');
+    expect(update?.path).toBe(`${API_KEYS_PATH}/:identifier`);
+    expect(update?.successStatus).toBe(200);
+    expect(update?.requestSchema).toBeDefined();
+    expect(update?.envelope).toBe(true);
+  });
+
+  it('documents the delete endpoint as a DELETE on the single-resource path', () => {
+    const remove = findEndpoint('apiKeys.remove');
+
+    expect(remove?.method).toBe('DELETE');
+    expect(remove?.path).toBe(`${API_KEYS_PATH}/:identifier`);
+    expect(remove?.successStatus).toBe(200);
+    expect(remove?.requestSchema).toBeUndefined();
+    expect(remove?.envelope).toBe(true);
+  });
+
+  it('lists the mutation failure codes of the update endpoint', () => {
+    const errors = findEndpoint('apiKeys.update')?.errors ?? [];
+
+    expect(errors).toContain(API_ERROR_CODE.STALE_WRITE);
+    expect(errors).toContain(API_ERROR_CODE.SEMANTIC_VALIDATION_FAILED);
+    expect(errors).toContain(API_ERROR_CODE.VALIDATION_FAILED);
+    expect(errors).toContain(API_ERROR_CODE.NOT_FOUND);
+  });
+
+  it('parses the update fixture with the update request schema', () => {
+    const schema = findEndpoint('apiKeys.update')?.requestSchema;
+
+    expect(schema?.safeParse(VALID_UPDATE_API_KEY_REQUEST).success).toBe(true);
+  });
+
+  it('rejects an update body without the concurrency token', () => {
+    const schema = findEndpoint('apiKeys.update')?.requestSchema;
+
+    expect(schema?.safeParse({ name: 'Vapi production' }).success).toBe(false);
+  });
+
+  it('describes the delete payload as null', () => {
+    const schema = findEndpoint('apiKeys.remove')?.dataSchema;
+
+    expect(schema?.safeParse(null).success).toBe(true);
+    expect(schema?.safeParse({}).success).toBe(false);
   });
 
   it('keeps operationIds unique across the whole registry', () => {

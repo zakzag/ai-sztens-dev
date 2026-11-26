@@ -133,15 +133,59 @@ describe('component registration', () => {
 
   it('registers the envelope, meta and error components once', () => {
     expect(Object.keys(components.components?.schemas ?? {}).sort()).toEqual([
+      'Activity',
+      'ActivityList',
       'ApiEnvelope',
       'ApiErrorDetail',
       'ApiErrorEnvelope',
       'ApiKey',
       'ApiKeyList',
+      'AttachCustomerTag',
+      'AuditLog',
+      'AuditLogList',
+      'Contact',
+      'ContactList',
+      'CreateActivity',
       'CreateApiKey',
+      'CreateContact',
+      'CreateCustomer',
+      'CreateCustomerTag',
+      'Customer',
+      'CustomerDetail',
+      'CustomerList',
+      'CustomerTag',
+      'CustomerUser',
+      'InviteCustomerUser',
+      'NoPayload',
       'PaginationMeta',
       'ResponseMeta',
+      'UpdateActivity',
+      'UpdateApiKey',
+      'UpdateContact',
+      'UpdateCustomer',
+      'UpdateCustomerStatus',
+      'UpdateCustomerUser',
     ]);
+  });
+
+  it('names the request schema of the update endpoint', () => {
+    const updateApiKey = JSON.stringify(
+      components.components?.schemas?.UpdateApiKey,
+    );
+
+    // The schema is `.strict()`, so the component carries both the required
+    // concurrency token and `additionalProperties: false`.
+    expect(updateApiKey).toContain('"updatedAt"');
+    expect(updateApiKey).toContain('"additionalProperties":false');
+    expect(updateApiKey).not.toContain('"identifier"');
+  });
+
+  it('describes the delete payload as a nullable NoPayload component', () => {
+    // `z.null()` renders as `{ "type": "null" }`; without it `envelopeOf()`
+    // could not describe a `DELETE` response at all.
+    expect(components.components?.schemas?.NoPayload).toEqual({
+      type: 'null',
+    });
   });
 
   it('keeps data and meta required in the envelope component', () => {

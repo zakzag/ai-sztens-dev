@@ -43,6 +43,59 @@ export class InvalidEndpointPathError extends Error {
   }
 }
 
+/** Thrown when a transport path still contains a `:parameter` placeholder. */
+export class UnresolvedPathParameterError extends Error {
+  /** The path that still carries a placeholder. */
+  readonly path: string;
+
+  /**
+   * @param path - the path the transport was asked to call.
+   */
+  constructor(path: string) {
+    super(
+      `Path "${path}" still contains a ":parameter" placeholder; substitute it before calling the transport.`,
+    );
+    this.name = 'UnresolvedPathParameterError';
+    this.path = path;
+  }
+}
+
+/**
+ * Matches a `:parameter` placeholder in a **path segment**.
+ *
+ * Anchored to the start of the string or a slash on purpose: a colon inside a
+ * value (`?since=12:30`) is data, not a placeholder, and must not be rejected.
+ */
+const PATH_PARAMETER = /(?:^|\/):[A-Za-z0-9_]+/;
+
+/**
+ * @param path - a transport path, optionally carrying a query string.
+ * @returns `true` when the pathname still contains a `:parameter` placeholder.
+ */
+export function hasUnresolvedPathParameter(path: string): boolean {
+  const queryIndex = path.indexOf('?');
+  const pathname = queryIndex === -1 ? path : path.slice(0, queryIndex);
+
+  return PATH_PARAMETER.test(pathname);
+}
+
+/**
+ * Rejects a path whose `:parameter` was never substituted.
+ *
+ * `clientPathOf('apiKeys.remove')` returns `/api-keys/:identifier`, and only the
+ * service knows the identifier. Without this guard a forgotten substitution
+ * would send a literal `:identifier` and surface as a confusing `400`/`404`;
+ * instead it fails here, naming the path.
+ *
+ * @param path - the path the transport is about to call.
+ * @throws {UnresolvedPathParameterError} when a placeholder is still present.
+ */
+export function assertNoUnresolvedPathParameter(path: string): void {
+  if (hasUnresolvedPathParameter(path)) {
+    throw new UnresolvedPathParameterError(path);
+  }
+}
+
 /**
  * Strips the global API prefix from a registry path.
  *

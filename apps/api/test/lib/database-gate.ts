@@ -17,10 +17,18 @@
  * self-skips — the same "loud skip, never a silent pass" rule as
  * `app-module-gate.ts`. With a running database (`pnpm db:up` + `DATABASE_URL`)
  * the suite executes fully.
+ *
+ * As with the app-module gate, the skip is a **local convenience**: in CI
+ * {@link reportDatabaseSkip} throws, so a missing database fails the run instead
+ * of turning it green with zero executed tests.
  */
 
 import { sql } from 'drizzle-orm';
 import type { Database } from '../../src/db/database.interface.js';
+import { reportSkip } from './skip-policy.js';
+
+/** Context tag the DB-backed specs print when the probe fails. */
+const DATABASE_GATE_CONTEXT = 'database-gate';
 
 /** How long the probe waits before declaring the database unreachable. */
 export const DATABASE_PROBE_TIMEOUT_MS = 3000;
@@ -29,6 +37,21 @@ export const DATABASE_PROBE_TIMEOUT_MS = 3000;
 export const DATABASE_SKIP_REASON =
   'skipped: no Postgres reachable — run `pnpm db:up` (and set DATABASE_URL) ' +
   'to execute the persistence suite';
+
+/**
+ * Reports that a persistence suite cannot run: warns locally, throws in CI.
+ *
+ * Every DB-backed spec calls this instead of `console.warn`, so the policy has
+ * exactly one implementation.
+ *
+ * @param context - the subsystem tag without brackets, e.g. `'database-gate'`.
+ * @throws {Error} in CI, where a skip must fail the run.
+ */
+export function reportDatabaseSkip(
+  context: string = DATABASE_GATE_CONTEXT,
+): void {
+  reportSkip(`[${context}]`, DATABASE_SKIP_REASON);
+}
 
 /**
  * Races a probe query against a timeout.

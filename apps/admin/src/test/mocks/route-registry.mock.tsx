@@ -23,12 +23,13 @@ export const MOCK_HOME_LABEL = 'Kezdőlap';
 /** Label of the stub second route. */
 export const MOCK_DETAIL_LABEL = 'Részletek';
 
-/** A route with a label — it appears in the navigation. */
+/** A route with a label — it appears in the navigation and roots the trail. */
 export const MOCK_VISIBLE_ROUTE: RouteEntry = {
   path: MOCK_HOME_PATH,
   navLabel: MOCK_HOME_LABEL,
   element: <p>mock home</p>,
   protected: true,
+  breadcrumbLabel: MOCK_HOME_LABEL,
 };
 
 /** A second visible route — it also appears in the navigation. */
@@ -37,6 +38,8 @@ export const MOCK_SECOND_VISIBLE_ROUTE: RouteEntry = {
   navLabel: MOCK_DETAIL_LABEL,
   element: <p>mock detail</p>,
   protected: true,
+  breadcrumbLabel: MOCK_DETAIL_LABEL,
+  breadcrumbParentPath: MOCK_HOME_PATH,
 };
 
 /** A route without a label — it must not appear in the navigation. */
@@ -45,6 +48,7 @@ export const MOCK_UNLABELLED_ROUTE: RouteEntry = {
   navLabel: null,
   element: <p>mock unlabelled</p>,
   protected: true,
+  breadcrumbLabel: null,
 };
 
 /** A route that has a label but is explicitly hidden from the navigation. */
@@ -54,6 +58,8 @@ export const MOCK_HIDDEN_ROUTE: RouteEntry = {
   element: <p>mock hidden</p>,
   protected: true,
   hidden: true,
+  breadcrumbLabel: 'Rejtett',
+  breadcrumbParentPath: MOCK_HOME_PATH,
 };
 
 /** The stub registry used by the layout, nav and router tests. */

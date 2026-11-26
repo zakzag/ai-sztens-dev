@@ -1,0 +1,55 @@
+# AIsztens — LOCAL, DEVELOPER-ONLY database client (Adminer).
+#
+# THIS FILE MUST NEVER REACH THE DROPLET. Nothing in the deploy path reads it:
+# `deploy/deploy.sh`, `.github/workflows/deploy.yml` and `scripts/test/*` all
+# name `infra/docker-compose.yml` explicitly (no `infra/*.yml` glob anywhere),
+# so this file cannot leak into the running stack. Keep it that way: never move
+# a service from here into `infra/docker-compose.yml`.
+#
+# What it is: an add-on web UI for the local Postgres. It has no database and
+# no volume of its own — it is a client, exactly like `psql`, but with a
+# browser. Merge it on top of the DB-only stack so Adminer joins that compose
+# project (and its default network, where the service name `postgres` resolves):
+#
+#   pnpm db:up         # Postgres on 127.0.0.1:5432 (infra/docker-compose.db.yml)
+#   pnpm db:gui        # Adminer on http://localhost:8081
+#   pnpm db:gui:down   # stop Adminer (Postgres keeps running)
+#
+# Login at http://localhost:8081:
+#   System:   PostgreSQL
+#   Server:   postgres
+#   Username: aisztens        (the app role — NOT the `postgres` superuser)
+#   Password: AISZTENS_DB_PASSWORD from infra/.env.local
+#   Database: aisztens_db
+#
+# The three safety rules below are deliberate and must survive edits:
+#
+#   1. `profiles: ['tools']` — a plain `up` never starts this service, even if
+#      the file is merged by accident. The profile has to be requested with
+#      `--profile tools`, which only the `db:gui` script does.
+#   2. the port is published on 127.0.0.1, never on 0.0.0.0 — a database UI
+#      exposed on the LAN is a vulnerability, not a convenience (the same rule
+#      as `docs/Specs/Docker-Debug-Playbook.md` §2.8).
+#   3. no credentials appear in this file. Adminer takes them from the login
+#      form, so the passwords stay in the gitignored `infra/.env.local`.
+#
+# Deliberately no `depends_on: postgres`: the service only makes sense together
+# with the DB stack, but a hard dependency would make the file unusable on its
+# own and would mask "Postgres is down" as a compose error instead of a login
+# error in the browser.
+
+services:
+  adminer:
+    image: adminer:4
+    restart: unless-stopped
+    profiles: ['tools']
+    # Apache + PHP serving one page; ~35 MB resident in practice. The cap keeps
+    # it consistent with every other service in this repo and stops a runaway
+    # PHP process from touching the developer's machine.
+    mem_limit: 128m
+    environment:
+      # Only a prefill of the "Server" field; the user may still change it.
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      # Loopback only — see rule 2 in the header.
+      - '127.0.0.1:8081:8080'
